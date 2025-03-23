@@ -1,0 +1,26 @@
+name: "💡 Feature Idea"
+description: Create a ticket for a feature idea.
+title: "[FEAT] - <title>"
+labels: ["feature"]
+body:
+  - type: checkboxes
+    attributes:
+      label: I've searched for existing issues
+      description: Have you checked existing issues and confirmed this isn't already suggested? More activity / votes on an existing issue means it's more likely to be added to the roadmap.
+      options:
+        - label: Yes, I have.
+          required: true
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: What's the feature idea you're suggesting?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Inspiration / Screenshots
+      description: Attach any relevant inspiration from other tools / screenshots
+    validations:
+      required: false

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "MQTT Viewer",
+  "outputfilename": "MQTT Viewer",
+  "frontend:install": "pnpm i",
+  "frontend:build": "pnpm build",
+  "frontend:dev:watcher": "pnpm dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Sam Webster",
+    "email": "sam@mqttviewer.app"
+  },
+  "info": {
+    "companyName": "MQTT Viewer",
+    "description": "A fast and feature-rich MQTT visualization and debugging tool",
+    "license": "",
+    "repository": "mqtt-viewer/mqtt-viewer",
+    "copyright": "Copyright © 2024 MQTT Viewer"
+  }
+}

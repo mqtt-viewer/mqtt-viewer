@@ -1,0 +1,12 @@
+syntax = "proto3";
+package test;
+
+message TestMessageWithVeryLongNameJustToSeeWhatHappens {
+    string test = 1;
+    string test2 = 2;
+}
+
+message HelloMessage {
+    string bam  = 1;
+    string whambam = 2;
+}

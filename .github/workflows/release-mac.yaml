@@ -1,0 +1,120 @@
+name: Release MQTT Viewer - Mac
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        build:
+          - platform: darwin/amd64
+            os: macos-latest
+            tag: darwin_amd64
+          - platform: darwin/arm64
+            os: macos-latest
+            tag: darwin_arm64
+    runs-on: ${{ matrix.build.os }}
+    name: Release MQTT Viewer (${{ matrix.build.tag }})
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Set up common, sanitised environment variables
+
+      - name: Normalise version tag
+        id: normalise_version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            version=$(echo ${{ github.event.release.tag_name }})
+          else
+            version="v0.0.0"
+          fi
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Define output filename
+        id: define_filename
+        shell: bash
+        run: |
+          echo "filename=MQTT_Viewer_${{ steps.normalise_version.outputs.version }}_${{ matrix.build.tag }}" >> $GITHUB_OUTPUT
+
+      # Set up development dependencies
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.3"
+
+      - name: Install wails
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.15.0"
+
+      # Dependencies
+
+      - name: Setup Gon
+        run: brew install Bearer/tap/gon
+
+      - name: Import code signing certificate from Github Secrets
+        uses: Apple-Actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
+          p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+
+      # Build -- frontend
+
+      - name: Build frontend assets
+        shell: bash
+        run: |
+          npm install -g pnpm
+          cd frontend && pnpm install
+
+      - name: Use mac app icon
+        shell: bash
+        run: |
+          cd build
+          rm -f appicon.png
+          mv appicon-mac.png appicon.png
+
+      # Build
+
+      - name: Build, sign, notarize macOS app
+        shell: bash
+        run: |
+          echo "building app on ${{ matrix.build.platform }}"
+          LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
+          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}"
+          echo "Signing Package"
+          gon -log-level=info ./build/darwin/gon.sign.json
+          echo "Zipping Package"
+          ditto -c -k --keepParent "./build/bin/MQTT Viewer.app" ./build/bin/MQTTViewer.zip
+          echo "Cleaning up"
+          rm -rf "./build/bin/MQTT Viewer.app"
+          echo "Notarizing Zip Files"
+          gon -log-level=info ./build/darwin/gon.notarize.json
+        env:
+          AC_USERNAME: ${{ secrets.AC_USERNAME }}
+          AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
+          AC_PROVIDER: ${{ secrets.AC_PROVIDER }}
+
+      # Publish
+
+      - name: Rename release zip
+        shell: bash
+        run: mv build/bin/MQTTViewer.zip build/bin/${{ steps.define_filename.outputs.filename }}.zip
+
+      - name: Upload release zip
+        uses: alexellis/upload-assets@0.4.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'

@@ -1,0 +1,36 @@
+name: "🐛 Bug Report"
+description: Create a new ticket for a bug.
+title: "[BUG] - <title>"
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      placeholder: "Example: Windows 11, Mac M2 running macOS 12.1"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: What's the problem you're having?
+      placeholder: X doesn't work correctly...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Reproduction steps
+      description: Help me reproduce the issue
+      placeholder: 1. Click on '....' 2. Click on '....' 3. Etc.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Screenshots
+      description: Add any relevant screenshots here
+      placeholder: Paste a screenshot or drag a file here
+    validations:
+      required: false

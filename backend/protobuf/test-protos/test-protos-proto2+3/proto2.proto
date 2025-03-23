@@ -1,0 +1,10 @@
+syntax = "proto2";
+
+message SearchRequest {
+  optional string query = 1;
+  optional int32 page_number = 2;
+  optional int32 result_per_page = 3;
+
+  repeated int32 samples = 4 [packed = true];
+  repeated int32 results = 5 [packed = true];
+}

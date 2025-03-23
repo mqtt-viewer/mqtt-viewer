@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-user-select: none; /* Safari */
+    user-select: none;
+  }
+  @font-face {
+    font-family: "Mona Sans";
+    font-weight: 200 900;
+    font-stretch: 75% 125%;
+    src: url("assets/fonts/MonaSans[slnt\,wdth\,wght].woff2")
+        format("woff2 supports variations"),
+      url("assets/fonts/MonaSans[slnt\,wdth\,wght].woff2")
+        format("woff2-variations");
+  }
+
+  @keyframes flash-background {
+    0% {
+      background-color: rgba(50, 50, 50, 1);
+    }
+    100% {
+      background-color: rgba(50, 50, 50, 0);
+    }
+  }
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    font-family: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+      "Helvetica Neue", sans-serif;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100%;
+    @apply text-base;
+    @apply text-white-text;
+  }
+  #app {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Chrome, Edge, and Safari */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    @apply bg-elevation-1 rounded;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply bg-elevation-1-selected;
+    border-radius: 14px;
+  }
+}
+
+@layer components {
+  .without-ring {
+    @apply focus:ring-0 focus:ring-offset-0;
+  }
+
+  .without-ring:focus:not(:focus-visible) {
+    @apply focus:ring-0 focus:ring-offset-0 focus:outline-none;
+  }
+
+  .without-ring:focus-visible {
+    @apply ring-1 ring-offset-1;
+  }
+}

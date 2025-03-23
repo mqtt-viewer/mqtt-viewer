@@ -1,0 +1,109 @@
+name: Release MQTT Viewer - Windows
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        build:
+          - arch: amd64
+            platform: windows/amd64
+            os: windows-latest
+            tag: windows_amd64
+    runs-on: ${{ matrix.build.os }}
+    name: Release MQTT Viewer (${{ matrix.build.tag }})
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Set up common, sanitised environment variables
+
+      - name: Normalise version tag
+        id: normalise_version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            version=$(echo ${{ github.event.release.tag_name }})
+          else
+            version="v0.0.0"
+          fi
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Define output filename
+        id: define_filename
+        shell: bash
+        run: |
+          echo "filename=MQTT_Viewer_${{ steps.normalise_version.outputs.version }}_${{ matrix.build.tag }}" >> $GITHUB_OUTPUT
+
+      # Set up development dependencies
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.3"
+
+      - name: Install wails
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.15.0"
+
+      # Dependencies
+
+      - name: Install Windows dependencies
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install nsis
+
+      # Build
+
+      - name: Build frontend assets
+        shell: bash
+        run: |
+          npm install -g pnpm
+          cd frontend && pnpm install
+
+      - name: Build Windows exe (Portable)
+        shell: bash
+        run: |
+          LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
+          LD_FLAGS="${LD_FLAGS} -X main.portablebuild=true"
+          wails build -ldflags "${LD_FLAGS}" -webview2 embed
+
+      - name: Azure Trusted Signing
+        uses: azure/trusted-signing-action@v0.3.16
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+
+          # Sign all exes inside the folder
+          files-folder: "./build/bin"
+          files-folder-filter: exe
+          file-digest: SHA256
+
+      # Publish
+
+      - name: Compress binary (Win Portable)
+        if: runner.os == 'Windows' && matrix.build.tag == 'windows_amd64'
+        run: Compress-Archive "MQTT Viewer.exe" ${{ steps.define_filename.outputs.filename }}.zip
+        working-directory: ./build/bin
+
+      - name: Upload release zip
+        uses: alexellis/upload-assets@0.4.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'

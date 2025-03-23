@@ -1,0 +1,9 @@
+Package: mqtt-viewer
+Version: 0.0.0
+Section: base
+Priority: optional
+Architecture: ARCH
+Depends: libgtk-3-dev, libwebkit2gtk-4.0-dev
+Maintainer: Sam Webster <mqtt.viewer@gmail.com>
+Homepage: https://github.com/samfweb/mqtt-viewer
+Description: "TODO"

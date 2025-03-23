@@ -1,0 +1,12 @@
+syntax = "proto3";
+option go_package = "mqtt-viewer/mqtt/test";
+
+message Order {
+  float         total = 1;
+  repeated Item items = 2;
+
+  message Item {
+    string name  = 1;
+    float  price = 2;
+  }
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.utf9k.october</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL</project_license>
+  <developer_name>Sam Webster</developer_name>
+  <update_contact>mqtt.viewer@gmail.com</update_contact>
+  <url type="homepage">https://github.com/mqtt-viewer/mqtt-viewer</url>
+  <url type="bugtracker">https://github.com/mqtt-viewer/mqtt-viewer</url>
+  <name>MQTT Viewer</name>
+  <summary>Visualise MQTT data</summary>
+  <description>
+    <p>Visualise MQTT data - TODO</p>
+    <p>Community edition is open source</p>
+  </description>
+  <categories>
+    <category>Office</category>
+  </categories>
+  <launchable type="desktop-id">mqtt-viewer.desktop</launchable>
+  <project_group>mqtt-viewer</project_group>
+  <content_rating type="oars-1.0" />
+  <releases>
+    <release version="1.0.0" date="2023-07-06" />
+  </releases>
+  <requires>
+    <internet>always</internet>
+  </requires>
+</component>

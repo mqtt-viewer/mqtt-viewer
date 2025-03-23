@@ -1,0 +1,9 @@
+h1:9abMW1PKAELx6fIDxfdCCWil5EtT+pQIB/HEgmxzUu8=
+20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
+20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
+20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
+20241003123229_remove_clear_data_on_connect_field.sql h1:MW8CjdzJu2s1HVVihFh20VotBXmk5yIElx35FdKRzeg=
+20241124062407_skip-cert-verification-option.sql h1:3EDWJ7nJXFmaSNmvBaKC7xpAzsgv7T2tukwMy5Yp1KQ=
+20250104043611_add-filter-history.sql h1:MFOqkDbRWD3UPmnlDE9E15OAuF5V3GJ97pxYKrufJl0=
+20250105103712_add-publish-history.sql h1:013cIINrwoNfvOvbiz9ugP7kgQjkeehxY3ZiiQVkva4=
+20250320051532_add-global-and-encrypt-passwords.sql h1:AUHViwZmcVYjxaFMFI4kLpDfzSLSolsx0e2oJQKE99A=

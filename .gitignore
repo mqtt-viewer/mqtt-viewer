@@ -1,0 +1,9 @@
+build/bin
+node_modules
+frontend/dist
+*.db
+_dev_resources
+mqtt-viewer
+secrets.json
+.env
+.DS_STORE

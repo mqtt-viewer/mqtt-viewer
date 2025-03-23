@@ -1,0 +1,18 @@
+syntax = "proto3";
+package demo;
+
+message TemperatureReading {
+    string test = 1;
+    string test2 = 2;
+}
+
+message HumidityReading {
+    string bam  = 1;
+    string whambam = 2;
+}
+
+message SensorPayload {
+    TemperatureReading temperature = 1;
+    HumidityReading humidity = 2;
+    int64 uptime = 3;
+}

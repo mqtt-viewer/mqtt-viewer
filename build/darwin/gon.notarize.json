@@ -1,0 +1,8 @@
+{
+  "notarize": [
+    {
+      "path": "./build/bin/MQTTViewer.zip",
+      "bundle_id": "com.mqttviewer.MQTTViewer"
+    }
+  ]
+}
