@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Live discussions
-    url: "https://join.slack.com/t/mqttviewercommunity/shared_invite/zt-2rkuhktty-xmHqWeNzKGWPQTJve491uA"
-    about: Ask questions and share feedback on the Slack community.
   - name: ⭐ Help out ⭐
     url: "https://testimonial.to/mqtt-viewer/"
     about: If MQTT Viewer has been useful, writing a testimonial would really help!
