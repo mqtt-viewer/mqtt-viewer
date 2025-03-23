@@ -12,18 +12,17 @@
   };
 
   const onSubmitFeatureClick = async () => {
-    BrowserOpenURL("https://mqtt-viewer.canny.io/feature-requests");
+    BrowserOpenURL(
+      "https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=feature_idea.yml"
+    );
     onClose();
   };
 
   const onSubmitBugClick = async () => {
-    BrowserOpenURL("https://mqtt-viewer.canny.io/feature-requests");
-  };
-
-  const onJoinSlackChannelClick = () => {
     BrowserOpenURL(
-      "https://join.slack.com/t/mqttviewercommunity/shared_invite/zt-2rkuhktty-xmHqWeNzKGWPQTJve491uA"
+      "https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=bug_report.yml"
     );
+    onClose();
   };
 </script>
 
@@ -48,21 +47,6 @@
           onClick={onSubmitBugClick}
         />
       </div>
-    </div>
-
-    <div
-      class="w-full text-secondary-text flex flex-col gap-2 items-center mt-3"
-    >
-      <p class="">
-        You can also join the <span class="inline-block"
-          ><Button
-            variant="text"
-            class="underline underline-offset-2"
-            on:click={onJoinSlackChannelClick}
-            >MQTT Viewer Slack community</Button
-          ></span
-        >
-      </p>
     </div>
   </div>
 </Dialog>
