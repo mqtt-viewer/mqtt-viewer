@@ -2,7 +2,7 @@
 
 [MQTT Viewer](https://mqttviewer.app) is a feature-rich and performant MQTT visualisation and debugging tool for Windows, Mac and Linux.
 
-[Download MQTT Viewer](https://mqttviewer.app/download)
+[Download MQTT Viewer](https://github.com/mqtt-viewer/mqtt-viewer/releases)
 
 ![Screenshot of MQTT Viewer](docs/images/screenshot.png)
 
