@@ -110,7 +110,6 @@ func (a *App) UpdateConnection(conn *models.Connection) (*Connection, error) {
 
 	passwordIsDifferent := conn.Password.Valid && conn.Password.String != "" && (!appConnection.Connection.Password.Valid || conn.Password.String != appConnection.Connection.Password.String)
 	if passwordIsDifferent {
-		slog.Info(fmt.Sprintf("Password is different, encrypting it (%s)", conn.Password.String))
 		// Encrypt the incoming password from the frontend
 		encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(conn.Password.String))
 		if err != nil {
@@ -121,11 +120,9 @@ func (a *App) UpdateConnection(conn *models.Connection) (*Connection, error) {
 	err := a.Db.Model(&appConnection.Connection).Updates(conn)
 
 	if appConnection.Connection.Password.Valid {
-		slog.Info(fmt.Sprintf("decrypting password %s", appConnection.Connection.Password.String))
 		// Gorm's hooks don't seem to fire properly when using Model().Updates(), so we need to manually unencrypt the password
 		// (Gorm has been frustrating me no-end, I'd like to rip it out and replace it with something else)
 		decryptedPassword, err := cryptography.DecryptBytesForMachine(env.MachineId, []byte(appConnection.Connection.Password.String))
-		slog.Info(fmt.Sprintf("decrypted password = %s", decryptedPassword))
 		if err != nil {
 			return nil, err
 		}
