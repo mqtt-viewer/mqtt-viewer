@@ -66,10 +66,6 @@ export function GetFilterHistoriesForConnection(arg1) {
   return window['go']['app']['App']['GetFilterHistoriesForConnection'](arg1);
 }
 
-export function GetMatchingProtoDescriptorForTopic(arg1, arg2) {
-  return window['go']['app']['App']['GetMatchingProtoDescriptorForTopic'](arg1, arg2);
-}
-
 export function GetMatchingSubscriptionForTopic(arg1, arg2) {
   return window['go']['app']['App']['GetMatchingSubscriptionForTopic'](arg1, arg2);
 }
@@ -96,10 +92,6 @@ export function GetSortStates() {
 
 export function LoadOpenTabs() {
   return window['go']['app']['App']['LoadOpenTabs']();
-}
-
-export function LoadProtoRegistry(arg1) {
-  return window['go']['app']['App']['LoadProtoRegistry'](arg1);
 }
 
 export function NewConnection() {

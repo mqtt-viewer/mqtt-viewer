@@ -231,6 +231,7 @@ const updateConnectionDetails = async (
       return store;
     });
   } catch (e) {
+    console.error(e);
     throw e;
   }
 };
@@ -275,29 +276,29 @@ const deleteConnection = async (id: number) => {
 };
 
 const loadConnectionProtoRegistry = async (connId: number) => {
-  try {
-    const result = await LoadProtoRegistry(connId);
-    update((store) => {
-      const existingConnection = store.connections[connId];
-      store.connections[connId] = {
-        ...existingConnection,
-        loadedProtoDetails: result,
-        protoLoadError: undefined,
-      };
-      return store;
-    });
-    return result;
-  } catch (e) {
-    console.error("error loading proto registry");
-    update((store) => {
-      const existingConnection = store.connections[connId];
-      store.connections[connId] = {
-        ...existingConnection,
-        protoLoadError: e as unknown as string,
-      };
-      return store;
-    });
-  }
+  // try {
+  //   const result = await LoadProtoRegistry(connId);
+  //   update((store) => {
+  //     const existingConnection = store.connections[connId];
+  //     store.connections[connId] = {
+  //       ...existingConnection,
+  //       loadedProtoDetails: result,
+  //       protoLoadError: undefined,
+  //     };
+  //     return store;
+  //   });
+  //   return result;
+  // } catch (e) {
+  //   console.error("error loading proto registry");
+  //   update((store) => {
+  //     const existingConnection = store.connections[connId];
+  //     store.connections[connId] = {
+  //       ...existingConnection,
+  //       protoLoadError: e as unknown as string,
+  //     };
+  //     return store;
+  //   });
+  // }
 };
 
 const clearConnectionProtoRegistry = async (connId: number) => {

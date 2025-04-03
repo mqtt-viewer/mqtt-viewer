@@ -13,6 +13,7 @@ import (
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/backend/paths"
+	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
 
@@ -90,6 +91,20 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 		panic(err)
 	}
 
+	go func() {
+		err := protobuf.WriteSparkplugBProtoFile(a.Paths.ResourcePath)
+		if err != nil {
+			slog.ErrorContext(a.ctx, fmt.Sprintf("error writing sparkplugB proto file: %v", err))
+			return
+		}
+		registry, err := protobuf.LoadProtoRegistry(a.Paths.ResourcePath)
+		if err != nil {
+			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
+			return
+		}
+		a.ProtoRegistry = registry
+	}()
+
 	if a.Mode != AppModes.Test {
 		updater := update.NewUpdater(a.Paths.ResourcePath, env.MachineId)
 		a.Updater = updater
@@ -140,11 +155,10 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	mqttManager := mqtt.NewMqttManager(withMqttModule, onLatencyUpdate)
 
 	appConnection := AppConnection{
-		ctx:                 &withName,
-		Connection:          conn,
-		MqttManager:         mqttManager,
-		LoadedProtoRegistry: nil,
-		EventSet:            &connEvents,
+		ctx:          &withName,
+		ConnectionId: conn.ID,
+		MqttManager:  mqttManager,
+		EventSet:     &connEvents,
 	}
 
 	mqttManager.SetConnectionCallbacks(
@@ -163,13 +177,13 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 						a.EventRuntime.EventsEmit(appConnection.EventSet.MqttMessages, messages)
 					}
 				})
-				appConnection.Connection.LastConnectedAt = null.NewTime(time.Now(), true)
-				_, err := a.UpdateConnection(appConnection.Connection)
-				if err != nil {
-					slog.Error(err.Error())
-				}
 				if a.Mode != AppModes.Test {
 					a.EventRuntime.EventsEmit(appConnection.EventSet.MqttConnected, nil)
+				}
+				// update connection last connected time in db
+				err := a.Db.Model(&models.Connection{}).Where("id = ?", appConnection.ConnectionId).Update("last_connected_at", null.TimeFrom(time.Now())).Error
+				if err != nil {
+					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("error updating last connected time: %v", err))
 				}
 			},
 			OnConnectionDown: func(reason *error) {

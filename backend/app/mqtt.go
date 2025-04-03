@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"mqtt-viewer/backend/matchers"
-	"mqtt-viewer/backend/middlewares"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
-	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/backend/security"
 	"time"
 )
@@ -20,39 +18,43 @@ func (a *App) ConnectMqtt(connId uint) error {
 	if !ok {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
-	// Always reload the sub matcher / proto matcher, subscriptions may have changed
-	appConnection.SubscriptionMatcher = matchers.NewSubscriptionMatcher(appConnection.Connection.Subscriptions)
 
-	if appConnection.Connection.IsProtoEnabled != nil && *appConnection.Connection.IsProtoEnabled && appConnection.Connection.ProtoRegDir.Valid {
-		if appConnection.LoadedProtoRegistry == nil {
-			protoReg, err := protobuf.LoadProtoRegistry(appConnection.Connection.ProtoRegDir.String)
-			if err != nil {
-				return err
-			}
-			appConnection.LoadedProtoRegistry = protoReg
-		}
-		appConnection.ProtoMatcher = matchers.NewProtoMatcher(*appConnection.ctx, appConnection.SubscriptionMatcher, *appConnection.LoadedProtoRegistry.LoadedDescriptorsNameMap)
+	connection := models.Connection{}
+	err = a.Db.First(&connection, connId).Error
+	if err != nil {
+		return err
+	}
+
+	subscriptions := []models.Subscription{}
+	err = a.Db.First(&subscriptions, "connection_id = ?", connId).Error
+	if err != nil {
+		return err
+	}
+
+	// Always reload the sub matcher / proto matcher, subscriptions may have changed
+	appConnection.SubscriptionMatcher = matchers.NewSubscriptionMatcher(subscriptions)
+	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled {
+		// TODO: load sparkplug proto registry
 		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{
 			BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
-				middlewares.NewProtoEncodeMiddleware(appConnection.ProtoMatcher).Middleware,
+				// middlewares.NewProtoEncodeMiddleware(appConnection.ProtoMatcher).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				middlewares.NewProtoDecodeMiddleware(appConnection.ProtoMatcher).Middleware,
+				// middlewares.NewProtoDecodeMiddleware(appConnection.ProtoMatcher).Middleware,
 			},
 		})
 	} else {
-		appConnection.ProtoMatcher = nil
 		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{})
 	}
 
-	connectionDetails, err := getConnectionDetailsFromConnectionModel(appConnection.Connection)
+	connectionDetails, err := getConnectionDetailsFromConnectionModel(&connection)
 	if err != nil {
 		slog.Error(err.Error())
 		return err
 	}
 
-	subs := make([]mqtt.SubscribeParams, len(appConnection.Connection.Subscriptions))
-	for i, sub := range appConnection.Connection.Subscriptions {
+	subs := make([]mqtt.SubscribeParams, len(subscriptions))
+	for i, sub := range subscriptions {
 		subs[i] = mqtt.SubscribeParams{
 			Topic: sub.Topic,
 			QoS:   int(*sub.QoS),

@@ -1,23 +1,8 @@
 export namespace app {
 	
-	export class LoadedProtoRegistryResult {
-	    dir: string;
-	    loadedFileNamesWithDescriptors: {[key: string]: string[]};
-	
-	    static createFrom(source: any = {}) {
-	        return new LoadedProtoRegistryResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.dir = source["dir"];
-	        this.loadedFileNamesWithDescriptors = source["loadedFileNamesWithDescriptors"];
-	    }
-	}
 	export class Connection {
 	    connectionDetails: models.Connection;
 	    isConnected: boolean;
-	    loadedProtoDetails?: LoadedProtoRegistryResult;
 	    eventSet: events.ConnectionEventsSet;
 	
 	    static createFrom(source: any = {}) {
@@ -28,7 +13,6 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.connectionDetails = this.convertValues(source["connectionDetails"], models.Connection);
 	        this.isConnected = source["isConnected"];
-	        this.loadedProtoDetails = this.convertValues(source["loadedProtoDetails"], LoadedProtoRegistryResult);
 	        this.eventSet = this.convertValues(source["eventSet"], events.ConnectionEventsSet);
 	    }
 	
@@ -96,7 +80,6 @@ export namespace app {
 	        this.version = source["version"];
 	    }
 	}
-	
 	export class MqttStats {
 	    totalMessagesReceived: number;
 	    totalMessagesSent: number;

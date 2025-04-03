@@ -16,10 +16,9 @@ import (
 
 // Used to represent a connection in the frontend
 type Connection struct {
-	ConnectionDetails  models.Connection          `json:"connectionDetails"`
-	IsConnected        bool                       `json:"isConnected"`
-	LoadedProtoDetails *LoadedProtoRegistryResult `json:"loadedProtoDetails"`
-	EventSet           events.ConnectionEventsSet `json:"eventSet"`
+	ConnectionDetails models.Connection          `json:"connectionDetails"`
+	IsConnected       bool                       `json:"isConnected"`
+	EventSet          events.ConnectionEventsSet `json:"eventSet"`
 }
 
 type Connections struct {
@@ -29,11 +28,15 @@ type Connections struct {
 func (a *App) GetAllConnections() Connections {
 	result := make(map[uint]Connection)
 	for id, appConn := range a.AppConnections {
+		connectionDetails := models.Connection{}
+		if res := a.Db.First(&connectionDetails, id); res.Error != nil {
+			slog.Error("Failed to get connection details", "error", res.Error)
+			continue
+		}
 		result[id] = Connection{
-			ConnectionDetails:  *appConn.Connection,
-			IsConnected:        appConn.MqttManager.ConnectionState == mqtt.ConnectionStates.Connected,
-			LoadedProtoDetails: appConn.getLoadedProtoDetails(),
-			EventSet:           *appConn.EventSet,
+			ConnectionDetails: connectionDetails,
+			IsConnected:       appConn.MqttManager.ConnectionState == mqtt.ConnectionStates.Connected,
+			EventSet:          *appConn.EventSet,
 		}
 	}
 	return Connections{
@@ -95,55 +98,46 @@ func (a *App) NewConnection() (*Connection, error) {
 	}
 	a.AppConnections[conn.ID] = appConnection
 	return &Connection{
-		ConnectionDetails:  conn,
-		IsConnected:        false,
-		EventSet:           eventSet,
-		LoadedProtoDetails: appConnection.getLoadedProtoDetails(),
+		ConnectionDetails: conn,
+		IsConnected:       false,
+		EventSet:          eventSet,
 	}, nil
 }
 
-func (a *App) UpdateConnection(conn *models.Connection) (*Connection, error) {
+func (a *App) UpdateConnection(conn *models.Connection) error {
 	appConnection, ok := a.AppConnections[conn.ID]
 	if !ok {
-		return nil, fmt.Errorf("connection not found")
+		return fmt.Errorf("connection not found")
 	}
 
-	passwordIsDifferent := conn.Password.Valid && conn.Password.String != "" && (!appConnection.Connection.Password.Valid || conn.Password.String != appConnection.Connection.Password.String)
-	if passwordIsDifferent {
+	existingConnection := models.Connection{}
+	if res := a.Db.First(&existingConnection, conn.ID); res.Error != nil {
+		return res.Error
+	}
+
+	passwordHasChanged := conn.Password.Valid && conn.Password.String != "" && (!existingConnection.Password.Valid || conn.Password.String != existingConnection.Password.String)
+	if passwordHasChanged {
 		// Encrypt the incoming password from the frontend
 		encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(conn.Password.String))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		conn.Password.String = string(encryptedPassword)
 	}
-	err := a.Db.Model(&appConnection.Connection).Updates(conn)
 
-	if appConnection.Connection.Password.Valid {
-		// Gorm's hooks don't seem to fire properly when using Model().Updates(), so we need to manually unencrypt the password
-		// (Gorm has been frustrating me no-end, I'd like to rip it out and replace it with something else)
-		decryptedPassword, err := cryptography.DecryptBytesForMachine(env.MachineId, []byte(appConnection.Connection.Password.String))
-		if err != nil {
-			return nil, err
-		}
-		conn.Password.String = string(decryptedPassword)
-		appConnection.Connection.Password.String = string(decryptedPassword)
+	updated := models.Connection{
+		ID: conn.ID,
 	}
-
+	err := a.Db.Model(updated).Updates(conn)
 	if err.Error != nil {
-		return nil, err.Error
+		return err.Error
 	}
 
 	// Update name stored in ctx for logging
 	newCtx := logging.ReplaceCtx(*appConnection.ctx, slog.String("name", getMqttManagerName(conn)))
 	appConnection.ctx = &newCtx
 
-	return &Connection{
-		ConnectionDetails:  *conn,
-		IsConnected:        appConnection.MqttManager.ConnectionState == mqtt.ConnectionStates.Connected,
-		EventSet:           *appConnection.EventSet,
-		LoadedProtoDetails: appConnection.getLoadedProtoDetails(),
-	}, nil
+	return nil
 }
 
 func (a *App) DeleteConnection(id uint) error {
@@ -159,14 +153,4 @@ func (a *App) DeleteConnection(id uint) error {
 	delete(a.AppConnections, id)
 	a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
 	return nil
-}
-
-func (ac *AppConnection) getLoadedProtoDetails() *LoadedProtoRegistryResult {
-	if ac.LoadedProtoRegistry == nil {
-		return nil
-	}
-	return &LoadedProtoRegistryResult{
-		Dir:                            ac.LoadedProtoRegistry.Dir,
-		LoadedFileNamesWithDescriptors: *ac.LoadedProtoRegistry.LoadedFilesWithDescriptorsMap,
-	}
 }
