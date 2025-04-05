@@ -384,8 +384,6 @@ export namespace models {
 	    connectionId: number;
 	    qos?: number;
 	    topic: string;
-	    // Go type: null
-	    protoDescriptor: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new Subscription(source);
@@ -399,7 +397,6 @@ export namespace models {
 	        this.connectionId = source["connectionId"];
 	        this.qos = source["qos"];
 	        this.topic = source["topic"];
-	        this.protoDescriptor = this.convertValues(source["protoDescriptor"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -440,8 +437,6 @@ export namespace models {
 	    // Go type: null
 	    password: any;
 	    isProtoEnabled?: boolean;
-	    // Go type: null
-	    protoRegDir: any;
 	    isCertsEnabled?: boolean;
 	    skipCertVerification?: boolean;
 	    // Go type: null
@@ -478,7 +473,6 @@ export namespace models {
 	        this.username = this.convertValues(source["username"], null);
 	        this.password = this.convertValues(source["password"], null);
 	        this.isProtoEnabled = source["isProtoEnabled"];
-	        this.protoRegDir = this.convertValues(source["protoRegDir"], null);
 	        this.isCertsEnabled = source["isCertsEnabled"];
 	        this.skipCertVerification = source["skipCertVerification"];
 	        this.certCa = this.convertValues(source["certCa"], null);

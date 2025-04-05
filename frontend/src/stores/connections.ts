@@ -5,7 +5,6 @@ import {
   UpdateConnection,
   GetAllConnections,
   NewConnection,
-  LoadProtoRegistry,
 } from "wailsjs/go/app/App";
 import { get, writable } from "svelte/store";
 import { events, type app } from "wailsjs/go/models";
@@ -64,14 +63,6 @@ const init = async () => {
     });
     for (const connection of connectionsArray) {
       registerConnectionEvents(connection);
-    }
-    for (const connection of connectionsArray) {
-      if (
-        connection.connectionDetails.isProtoEnabled &&
-        connection.connectionDetails.protoRegDir
-      ) {
-        await loadConnectionProtoRegistry(connection.connectionDetails.id);
-      }
     }
     EventsOn(events.GlobalEvent.ConnectionDeleted, async (id: number) => {
       await tabs.closeTab(id);
@@ -209,17 +200,6 @@ const updateConnectionDetails = async (
     await UpdateConnection(
       connectionDetails as unknown as app.Connection["connectionDetails"]
     );
-    const existingConnection = get({ subscribe }).connections[
-      connectionDetails.id
-    ];
-    if (
-      !existingConnection.connectionDetails.isProtoEnabled &&
-      connectionDetails.isProtoEnabled &&
-      connectionDetails.protoRegDir
-    ) {
-      // Proto registry was just enabled
-      await loadConnectionProtoRegistry(connectionDetails.id);
-    }
     const connectionString = getConnectionString(connectionDetails);
     update((store) => {
       const existingConnection = store.connections[connectionDetails.id];
@@ -275,51 +255,6 @@ const deleteConnection = async (id: number) => {
   }
 };
 
-const loadConnectionProtoRegistry = async (connId: number) => {
-  // try {
-  //   const result = await LoadProtoRegistry(connId);
-  //   update((store) => {
-  //     const existingConnection = store.connections[connId];
-  //     store.connections[connId] = {
-  //       ...existingConnection,
-  //       loadedProtoDetails: result,
-  //       protoLoadError: undefined,
-  //     };
-  //     return store;
-  //   });
-  //   return result;
-  // } catch (e) {
-  //   console.error("error loading proto registry");
-  //   update((store) => {
-  //     const existingConnection = store.connections[connId];
-  //     store.connections[connId] = {
-  //       ...existingConnection,
-  //       protoLoadError: e as unknown as string,
-  //     };
-  //     return store;
-  //   });
-  // }
-};
-
-const clearConnectionProtoRegistry = async (connId: number) => {
-  try {
-    update((store) => {
-      const existingConnection = store.connections[connId];
-      store.connections[connId] = {
-        ...existingConnection,
-        loadedProtoDetails: {
-          dir: "",
-          loadedFileNamesWithDescriptors: {},
-        },
-        protoLoadError: undefined,
-      };
-      return store;
-    });
-  } catch (e) {
-    throw e;
-  }
-};
-
 const connect = async (connectionId: number) => {
   console.log("connecting", connectionId);
   try {
@@ -357,8 +292,6 @@ export default {
   addConnection,
   updateConnectionDetails,
   deleteConnection,
-  loadConnectionProtoRegistry,
-  clearConnectionProtoRegistry,
   toggleShowDataPageWhileDisconnected,
   connect,
   disconnect,
