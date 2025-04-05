@@ -250,9 +250,6 @@ func getNewConnectionWithCustomProperties(app *App, customDetails *models.Connec
 		if customDetails.HasCustomClientId != nil && *customDetails.IsProtoEnabled != false {
 			newConnection.ConnectionDetails.IsProtoEnabled = customDetails.IsProtoEnabled
 		}
-		if customDetails.ProtoRegDir.Valid {
-			newConnection.ConnectionDetails.ProtoRegDir = customDetails.ProtoRegDir
-		}
 		if customDetails.IsProtoEnabled != nil {
 			newConnection.ConnectionDetails.IsProtoEnabled = customDetails.IsProtoEnabled
 		}

@@ -92,7 +92,7 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	}
 
 	go func() {
-		err := protobuf.WriteSparkplugBProtoFile(a.Paths.ResourcePath)
+		err := protobuf.WriteSparkplugProtoFiles(a.Paths.ResourcePath)
 		if err != nil {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error writing sparkplugB proto file: %v", err))
 			return

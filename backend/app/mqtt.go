@@ -3,10 +3,11 @@ package app
 import (
 	"fmt"
 	"log/slog"
-	"mqtt-viewer/backend/matchers"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/security"
+	topicmatching "mqtt-viewer/backend/topic-matching"
 	"time"
 )
 
@@ -32,15 +33,17 @@ func (a *App) ConnectMqtt(connId uint) error {
 	}
 
 	// Always reload the sub matcher / proto matcher, subscriptions may have changed
-	appConnection.SubscriptionMatcher = matchers.NewSubscriptionMatcher(subscriptions)
-	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled {
+	appConnection.SubscriptionMatcher = topicmatching.NewSubscriptionMatcher(subscriptions)
+
+	// Add protobuf middlewares if enabled
+	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && a.ProtoRegistry != nil {
 		// TODO: load sparkplug proto registry
 		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{
 			BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
-				// middlewares.NewProtoEncodeMiddleware(appConnection.ProtoMatcher).Middleware,
+				mqttmiddleware.NewProtoEncodeMiddleware(a.ProtoRegistry).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				// middlewares.NewProtoDecodeMiddleware(appConnection.ProtoMatcher).Middleware,
+				mqttmiddleware.NewProtoDecodeMiddleware(a.ProtoRegistry).Middleware,
 			},
 		})
 	} else {

@@ -4,10 +4,10 @@ import (
 	"context"
 	db "mqtt-viewer/backend/db"
 	eventRuntime "mqtt-viewer/backend/event-runtime"
-	"mqtt-viewer/backend/matchers"
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/backend/paths"
 	"mqtt-viewer/backend/protobuf"
+	topicmatching "mqtt-viewer/backend/topic-matching"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
 )
@@ -29,7 +29,7 @@ type AppConnection struct {
 	ctx                 *context.Context
 	ConnectionId        uint
 	MqttManager         *mqtt.MqttManager
-	SubscriptionMatcher *matchers.SubscriptionMatcher
+	SubscriptionMatcher *topicmatching.SubscriptionMatcher
 	MqttMessageBuffer   *mqtt.MessageBuffer
 	EventSet            *events.ConnectionEventsSet
 }
