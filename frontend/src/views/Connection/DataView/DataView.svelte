@@ -20,14 +20,14 @@
     connection.eventSet
   );
 
-  const matchedProtoTopicStore = createMatchedTopicsStore(
+  const matchedTopicsStore = createMatchedTopicsStore(
     connection.connectionDetails.id
   );
 
   $: connection.connectionState,
     (() => {
       if (connection.connectionState === "disconnected") {
-        matchedProtoTopicStore.clearCache();
+        matchedTopicsStore.clearCache();
         selectedTopicStore.deselectTopic();
       }
     })();
@@ -93,7 +93,7 @@
       <PublishPanel
         {connection}
         {isPublishDisabled}
-        getTopicMatchesSubscription={matchedProtoTopicStore.getTopicProtoDescriptorMatch}
+        getTopicMatchesSubscription={matchedTopicsStore.getTopicMatch}
         isOpen={isPublishPanelOpen}
         open={() => (isPublishPanelOpen = true)}
         close={() => (isPublishPanelOpen = false)}

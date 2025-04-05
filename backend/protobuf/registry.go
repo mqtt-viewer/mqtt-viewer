@@ -70,8 +70,15 @@ func (r *ProtoRegistry) GetLoadedDescriptorNames() []string {
 	return keys
 }
 
-func (r *ProtoRegistry) getMessageDescriptorFromName(name string) protoreflect.MessageDescriptor {
-	return *(*r.LoadedDescriptorsNameMap)[name]
+func (r *ProtoRegistry) GetMessageDescriptorFromName(name string) (protoreflect.MessageDescriptor, bool) {
+	if r.LoadedDescriptorsNameMap == nil {
+		return nil, false
+	}
+	descriptor, ok := (*r.LoadedDescriptorsNameMap)[name]
+	if !ok || descriptor == nil {
+		return nil, false
+	}
+	return *descriptor, true
 }
 
 func getMessageDescriptors(compiledFiles *linker.Files, filePath string) []protoreflect.MessageDescriptor {

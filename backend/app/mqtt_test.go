@@ -16,7 +16,7 @@ func TestMqttV3Connects(t *testing.T) {
 		MqttVersion: "3",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -28,7 +28,7 @@ func TestMqttV5Connects(t *testing.T) {
 		MqttVersion: "5",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -41,7 +41,7 @@ func TestMqttV3ConnectFailsWhenWrongHost(t *testing.T) {
 		MqttVersion: "3",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -54,7 +54,7 @@ func TestMqttV5ConnectFailsWhenWrongHost(t *testing.T) {
 		MqttVersion: "5",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -68,7 +68,7 @@ func TestMqttV3ConnectFailsWhenWrongPort(t *testing.T) {
 		MqttVersion: "3",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -82,7 +82,7 @@ func TestMqttV5ConnectFailsWhenWrongPort(t *testing.T) {
 		MqttVersion: "5",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -95,7 +95,7 @@ func TestMqttV3ConnectFailsWhenWrongProtocol(t *testing.T) {
 		MqttVersion: "3",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -108,7 +108,7 @@ func TestMqttV5SubscribesCorrectly(t *testing.T) {
 		MqttVersion: "5",
 	})
 
-	err := app.ConnectMqtt(localConnection.Connection.ID)
+	err := app.ConnectMqtt(localConnection.ConnectionId)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -151,7 +151,7 @@ func MqttPubAndSubIntegrationTest(t *testing.T, mqttVersion string, publishPrope
 	localConnection := getNewConnectionWithCustomProperties(app, &models.Connection{
 		MqttVersion: mqttVersion,
 	})
-	connId := localConnection.Connection.ID
+	connId := localConnection.ConnectionId
 
 	appConnection := app.AppConnections[connId]
 
@@ -211,7 +211,7 @@ func TestProtoEnabledWithoutProtoRegDir(t *testing.T) {
 	localConnection := getNewConnectionWithCustomProperties(app, &models.Connection{
 		IsProtoEnabled: &trueVal,
 	})
-	connId := localConnection.Connection.ID
+	connId := localConnection.ConnectionId
 
 	err := app.ConnectMqtt(connId)
 	if err != nil {
@@ -249,9 +249,6 @@ func getNewConnectionWithCustomProperties(app *App, customDetails *models.Connec
 		}
 		if customDetails.HasCustomClientId != nil && *customDetails.IsProtoEnabled != false {
 			newConnection.ConnectionDetails.IsProtoEnabled = customDetails.IsProtoEnabled
-		}
-		if customDetails.ProtoRegDir.Valid {
-			newConnection.ConnectionDetails.ProtoRegDir = customDetails.ProtoRegDir
 		}
 		if customDetails.IsProtoEnabled != nil {
 			newConnection.ConnectionDetails.IsProtoEnabled = customDetails.IsProtoEnabled

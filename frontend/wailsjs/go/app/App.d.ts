@@ -38,8 +38,6 @@ export function GetEnvInfo():Promise<app.EnvInfo>;
 
 export function GetFilterHistoriesForConnection(arg1:number):Promise<Array<models.FilterHistory>>;
 
-export function GetMatchingProtoDescriptorForTopic(arg1:number,arg2:string):Promise<string>;
-
 export function GetMatchingSubscriptionForTopic(arg1:number,arg2:string):Promise<models.Subscription>;
 
 export function GetMessageHistory(arg1:number,arg2:string):Promise<Array<mqtt.MqttMessage>>;
@@ -54,8 +52,6 @@ export function GetSortStates():Promise<Array<models.SortState>>;
 
 export function LoadOpenTabs():Promise<Array<models.Tab>>;
 
-export function LoadProtoRegistry(arg1:number):Promise<app.LoadedProtoRegistryResult>;
-
 export function NewConnection():Promise<app.Connection>;
 
 export function PublishMqtt(arg1:number,arg2:app.PublishParams):Promise<void>;
@@ -68,7 +64,7 @@ export function StartUpdate():Promise<void>;
 
 export function Startup(arg1:context.Context,arg2:app.StartupOptions):Promise<void>;
 
-export function UpdateConnection(arg1:models.Connection):Promise<app.Connection>;
+export function UpdateConnection(arg1:models.Connection):Promise<void>;
 
 export function UpdateOpenConnectionTabs(arg1:Array<number>):Promise<void>;
 

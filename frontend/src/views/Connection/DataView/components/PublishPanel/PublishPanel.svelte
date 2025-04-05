@@ -69,16 +69,32 @@
         matchingSub = null;
         return;
       }
-      if (!connection.connectionDetails.isProtoEnabled) {
-        result.protoDescriptor = null;
-      }
       noMatchingSub = false;
       matchingSub = result;
     },
     500
   );
 
-  $: matchingProtoDescriptor = matchingSub?.protoDescriptor ?? null;
+  $: matchingProtoDescriptor = getMatchingProtoDescriptor(
+    matchingSub,
+    $publishStore.topic
+  );
+
+  let getMatchingProtoDescriptor = (
+    sub: models.Subscription | null,
+    topic: string
+  ) => {
+    if (!sub) {
+      return null;
+    }
+    if (topic.startsWith("spAv1.0")) {
+      return "Sparkplug A v1.0";
+    }
+    if (topic.startsWith("spBv1.0")) {
+      return "Sparkplug B v1.0";
+    }
+    return null;
+  };
 
   $: connection.connectionState,
     (() => {

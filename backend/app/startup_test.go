@@ -116,8 +116,8 @@ func TestGetSavedConnectionsReturnsAllConnections(t *testing.T) {
 func TestAppConnectionIdMapIsBuiltCorrectly(t *testing.T) {
 	app := getSeededTestApp(t)
 	for id, conn := range app.AppConnections {
-		if conn.Connection.ID != uint(id) {
-			t.Errorf("Expected connection id %v, got %v", id+1, conn.Connection.ID)
+		if conn.ConnectionId != uint(id) {
+			t.Errorf("Expected connection id %v, got %v", id+1, conn.ConnectionId)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func TestCreateAppConnectionFromConnectionModel(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if appConn.Connection.ID != connModel.ID {
-		t.Errorf("Expected connection id %v, got %v", connModel.ID, appConn.Connection.ID)
+	if appConn.ConnectionId != connModel.ID {
+		t.Errorf("Expected connection id %v, got %v", connModel.ID, appConn.ConnectionId)
 	}
 }

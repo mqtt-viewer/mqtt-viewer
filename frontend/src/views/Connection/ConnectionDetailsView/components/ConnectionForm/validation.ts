@@ -47,6 +47,7 @@ export const ConnectionFormValidationSchema = z
       .optional(),
     isCertsEnabled: z.boolean().transform((val) => !!val),
     skipCertVerification: z.boolean().transform((val) => !!val),
+    isProtoEnabled: z.boolean().transform((val) => !!val),
     certCa: z
       .string()
       .optional()

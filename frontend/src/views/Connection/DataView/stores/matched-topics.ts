@@ -45,6 +45,6 @@ export const createMatchedTopicsStore = (connId: number) => {
   return {
     subscribe,
     clearCache,
-    getTopicProtoDescriptorMatch: getTopicMatch,
+    getTopicMatch,
   };
 };

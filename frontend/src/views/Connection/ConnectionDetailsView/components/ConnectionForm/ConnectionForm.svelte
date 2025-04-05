@@ -23,6 +23,7 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
 
   export let connection: Connection;
   $: connectionId = connection.connectionDetails.id;
@@ -45,6 +46,7 @@
     certClientKey,
     customIconSeed,
     skipCertVerification,
+    isProtoEnabled,
   } = connection.connectionDetails;
 
   const { form, errors, data, isValid, setFields, validate } =
@@ -328,6 +330,15 @@
       </div>
     {/if}
   {/if}
+  <div class="-mt-6">
+    <Switch
+      disabled={isAllFieldsDisabled}
+      onChange={(checked) => setFields(`isProtoEnabled`, checked, true)}
+      name="isProtoEnabled"
+      label="Automatically encode/decode Sparkplug messages"
+      defaultChecked={isProtoEnabled}
+    />
+  </div>
 </form>
 <ConfirmDeleteConnectionDialog
   {connection}

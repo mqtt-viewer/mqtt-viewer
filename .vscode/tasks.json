@@ -5,7 +5,10 @@
       "label": "build",
       "type": "shell",
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "CGO_LDFLAGS": "-framework UniformTypeIdentifiers"
+        }
       },
       "command": "go",
       "args": [

@@ -1,23 +1,8 @@
 export namespace app {
 	
-	export class LoadedProtoRegistryResult {
-	    dir: string;
-	    loadedFileNamesWithDescriptors: {[key: string]: string[]};
-	
-	    static createFrom(source: any = {}) {
-	        return new LoadedProtoRegistryResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.dir = source["dir"];
-	        this.loadedFileNamesWithDescriptors = source["loadedFileNamesWithDescriptors"];
-	    }
-	}
 	export class Connection {
 	    connectionDetails: models.Connection;
 	    isConnected: boolean;
-	    loadedProtoDetails?: LoadedProtoRegistryResult;
 	    eventSet: events.ConnectionEventsSet;
 	
 	    static createFrom(source: any = {}) {
@@ -28,7 +13,6 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.connectionDetails = this.convertValues(source["connectionDetails"], models.Connection);
 	        this.isConnected = source["isConnected"];
-	        this.loadedProtoDetails = this.convertValues(source["loadedProtoDetails"], LoadedProtoRegistryResult);
 	        this.eventSet = this.convertValues(source["eventSet"], events.ConnectionEventsSet);
 	    }
 	
@@ -96,7 +80,6 @@ export namespace app {
 	        this.version = source["version"];
 	    }
 	}
-	
 	export class MqttStats {
 	    totalMessagesReceived: number;
 	    totalMessagesSent: number;
@@ -401,8 +384,6 @@ export namespace models {
 	    connectionId: number;
 	    qos?: number;
 	    topic: string;
-	    // Go type: null
-	    protoDescriptor: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new Subscription(source);
@@ -416,7 +397,6 @@ export namespace models {
 	        this.connectionId = source["connectionId"];
 	        this.qos = source["qos"];
 	        this.topic = source["topic"];
-	        this.protoDescriptor = this.convertValues(source["protoDescriptor"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -457,8 +437,6 @@ export namespace models {
 	    // Go type: null
 	    password: any;
 	    isProtoEnabled?: boolean;
-	    // Go type: null
-	    protoRegDir: any;
 	    isCertsEnabled?: boolean;
 	    skipCertVerification?: boolean;
 	    // Go type: null
@@ -495,7 +473,6 @@ export namespace models {
 	        this.username = this.convertValues(source["username"], null);
 	        this.password = this.convertValues(source["password"], null);
 	        this.isProtoEnabled = source["isProtoEnabled"];
-	        this.protoRegDir = this.convertValues(source["protoRegDir"], null);
 	        this.isCertsEnabled = source["isCertsEnabled"];
 	        this.skipCertVerification = source["skipCertVerification"];
 	        this.certCa = this.convertValues(source["certCa"], null);

@@ -1,4 +1,4 @@
-package matchers
+package topicmatching
 
 import (
 	"mqtt-viewer/backend/models"

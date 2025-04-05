@@ -26,7 +26,6 @@ type Connection struct {
 	Username             null.String      `json:"username"`
 	Password             null.String      `json:"password"`
 	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
-	ProtoRegDir          null.String      `json:"protoRegDir"`
 	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
 	SkipCertVerification *bool            `json:"skipCertVerification"`
 	CertCa               null.String      `json:"certCa"`
@@ -75,13 +74,12 @@ type Tab struct {
 }
 
 type Subscription struct {
-	ID              uint        `json:"id" gorm:"primaryKey"`
-	CreatedAt       time.Time   `json:"createdAt"`
-	UpdatedAt       time.Time   `json:"updatedAt"`
-	ConnectionID    uint        `json:"connectionId"`
-	QoS             *uint       `json:"qos"`
-	Topic           string      `json:"topic"`
-	ProtoDescriptor null.String `json:"protoDescriptor"`
+	ID           uint      `json:"id" gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	ConnectionID uint      `json:"connectionId"`
+	QoS          *uint     `json:"qos"`
+	Topic        string    `json:"topic"`
 }
 
 type PanelSize struct {
