@@ -270,7 +270,10 @@
       errorMessage={$errors.clientId?.[0]}
     />
   {/if}
-  <div class="flex row gap-4">
+  <div
+    class="flex row gap-4"
+    style:display={isSslTls || $data.isCertsEnabled ? undefined : "none"}
+  >
     <div style:display={isSslTls ? undefined : "none"}>
       <Switch
         disabled={isAllFieldsDisabled}
@@ -330,15 +333,13 @@
       </div>
     {/if}
   {/if}
-  <div class="-mt-6">
-    <Switch
-      disabled={isAllFieldsDisabled}
-      onChange={(checked) => setFields(`isProtoEnabled`, checked, true)}
-      name="isProtoEnabled"
-      label="Automatically encode/decode Sparkplug messages"
-      defaultChecked={isProtoEnabled}
-    />
-  </div>
+  <Switch
+    disabled={isAllFieldsDisabled}
+    onChange={(checked) => setFields(`isProtoEnabled`, checked, true)}
+    name="isProtoEnabled"
+    label="Automatically encode/decode Sparkplug messages"
+    defaultChecked={isProtoEnabled}
+  />
 </form>
 <ConfirmDeleteConnectionDialog
   {connection}
