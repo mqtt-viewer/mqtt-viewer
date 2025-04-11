@@ -39,7 +39,6 @@ func (c *Connection) encryptPassword(tx *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	slog.Info(fmt.Sprintf("replacing password %s with encrypted password %s", c.Password.String, string(encryptedPassword)))
 
 	tx.Statement.SetColumn("password", string(encryptedPassword))
 	return nil
@@ -55,7 +54,6 @@ func (c *Connection) decryptPassword(tx *gorm.DB) error {
 		slog.Warn(fmt.Sprintf("error decrypting password: %v", err))
 		return nil
 	}
-	slog.Info(fmt.Sprintf("replacing encrypted password %s with decrypted password %s", c.Password.String, string(decryptedPassword)))
 	c.Password.String = string(decryptedPassword)
 	return nil
 }
