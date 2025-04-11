@@ -27,7 +27,7 @@ func (a *App) ConnectMqtt(connId uint) error {
 	}
 
 	subscriptions := []models.Subscription{}
-	err = a.Db.First(&subscriptions, "connection_id = ?", connId).Error
+	err = a.Db.Where("connection_id = ?", connId).Find(&subscriptions).Error
 	if err != nil {
 		return err
 	}
