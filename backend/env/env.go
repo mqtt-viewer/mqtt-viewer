@@ -30,7 +30,6 @@ func init() {
 	if MachineIdProtectString == "" {
 		panic("MachineIdProtectString must be set")
 	}
-	slog.Info(fmt.Sprintf("running machine id protect string %s", MachineIdProtectString))
 	mid, err := machine.GetMachineId(MachineIdProtectString)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error getting machine id: %v", err))
