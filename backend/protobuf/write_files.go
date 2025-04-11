@@ -20,9 +20,9 @@ func WriteSparkplugProtoFiles(resourcePath string) error {
 	protoDirPath := path.Join(resourcePath, ProtoResourceDirName)
 
 	// Check if the directory exists
-	if _, err := os.Stat(path.Dir(protoDirPath)); os.IsNotExist(err) {
+	if _, err := os.Stat(protoDirPath); os.IsNotExist(err) {
 		// Create the directory if it doesn't exist
-		if err := os.MkdirAll(path.Dir(protoDirPath), 0644); err != nil {
+		if err := os.MkdirAll(protoDirPath, 0644); err != nil {
 			return err
 		}
 	}
