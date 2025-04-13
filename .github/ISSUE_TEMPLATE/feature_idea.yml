@@ -1,7 +1,7 @@
 name: "💡 Feature Idea"
 description: Create a ticket for a feature idea.
 title: "[FEAT] - <title>"
-labels: ["feature"]
+type: "Enhancement"
 body:
   - type: checkboxes
     attributes:
