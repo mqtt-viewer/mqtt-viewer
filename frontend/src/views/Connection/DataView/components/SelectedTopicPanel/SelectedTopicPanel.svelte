@@ -51,6 +51,7 @@
         $selectedTopicStore.options.format = "json-prettier";
       } catch (e) {
         // It isn't valid JSON
+        $selectedTopicStore.options.format = "none";
       }
     })();
 
