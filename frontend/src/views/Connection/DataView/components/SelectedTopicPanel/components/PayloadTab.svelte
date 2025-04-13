@@ -4,7 +4,7 @@
   import DiffCodeEditor from "@/components/CodeEditor/DiffCodeEditor.svelte";
   import {
     decodePayload,
-    type SupportCodeEditorCodec,
+    type SupportedCodeEditorCodec,
   } from "@/components/CodeEditor/codec";
   import {
     formatPayload,
@@ -14,7 +14,7 @@
   export let isComparing: boolean;
   export let payload: string;
   export let payloadLeftForCompare: string | null = null;
-  export let codec: SupportCodeEditorCodec;
+  export let codec: SupportedCodeEditorCodec;
   export let format: SupportedCodeEditorFormat;
 
   $: processPayload = (payload: string) => {

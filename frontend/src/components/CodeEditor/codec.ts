@@ -1,8 +1,8 @@
-export type SupportCodeEditorCodec = "none" | "base64" | "hex";
+export type SupportedCodeEditorCodec = "none" | "base64" | "hex";
 
 export const encodePayload = (
   payload: string,
-  codec: SupportCodeEditorCodec
+  codec: SupportedCodeEditorCodec
 ) => {
   if (codec === "none") {
     return payload;
@@ -24,7 +24,7 @@ export const encodePayload = (
 
 export const decodePayload = (
   payload: string,
-  codec: SupportCodeEditorCodec
+  codec: SupportedCodeEditorCodec
 ) => {
   if (codec === "none") {
     return payload;

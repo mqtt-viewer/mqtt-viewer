@@ -10,7 +10,7 @@ import { app, models, mqtt } from "wailsjs/go/models";
 import type { DeepOmit } from "@/util/types";
 import {
   encodePayload,
-  type SupportCodeEditorCodec,
+  type SupportedCodeEditorCodec,
 } from "@/components/CodeEditor/codec";
 import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
 import { emptyConvertValues } from "@/util/convertValues";
@@ -24,7 +24,7 @@ export interface PublishDetails {
   retain: boolean;
   properties: Omit<app.PublishProperties, "userProperties">;
   userPropertiesArray: { key: string; value: string }[];
-  codec: SupportCodeEditorCodec;
+  codec: SupportedCodeEditorCodec;
   format: SupportedCodeEditorFormat;
   // Used to signal a call to set the contents of the editor
   // from payload instead of the usual reverse
