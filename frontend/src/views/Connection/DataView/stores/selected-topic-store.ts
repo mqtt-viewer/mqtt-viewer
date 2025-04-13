@@ -3,7 +3,7 @@ import type { mqtt } from "wailsjs/go/models";
 import { GetMessageHistory } from "wailsjs/go/app/App";
 import { EventsOn } from "wailsjs/runtime/runtime";
 import type { events } from "wailsjs/go/models";
-import type { SupportCodeEditorCodec } from "@/components/CodeEditor/codec";
+import type { SupportedCodeEditorCodec } from "@/components/CodeEditor/codec";
 import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
 
 export type MqttHistoryMessage = Omit<
@@ -21,7 +21,7 @@ interface SelectedTopicData {
   options: {
     autoSelect: boolean;
     compare: boolean;
-    decoding: SupportCodeEditorCodec;
+    decoding: SupportedCodeEditorCodec;
     format: SupportedCodeEditorFormat;
   };
   onNewMessages: null | ((messages: MqttHistoryMessage[]) => void);

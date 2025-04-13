@@ -8,7 +8,7 @@ import { app, models } from "wailsjs/go/models";
 
 import type { DeepOmit } from "@/util/types";
 import type { PublishDetails, PublishDetailsStore } from "./publish-details";
-import type { SupportCodeEditorCodec } from "@/components/CodeEditor/codec";
+import type { SupportedCodeEditorCodec } from "@/components/CodeEditor/codec";
 import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
 
 export type PublishHistory = DeepOmit<models.PublishHistory, "convertValues">[];
@@ -76,7 +76,7 @@ export const createPublishHistoryStore = (
       qos: entry.qos,
       retain: entry.retain,
       properties: properties,
-      codec: entry.encoding as SupportCodeEditorCodec,
+      codec: entry.encoding as SupportedCodeEditorCodec,
       format: entry.format as SupportedCodeEditorFormat,
       hasAttemptedPublish: true,
       topicError: null,
