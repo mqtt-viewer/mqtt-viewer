@@ -39,6 +39,21 @@
   $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
 
+  $: selectedMessagePayload,
+    (() => {
+      // Auto-format to JSON if the payload is a valid JSON string
+      try {
+        if (selectedMessagePayload === null) {
+          return null;
+        }
+        JSON.parse(selectedMessagePayload);
+        // It's valid JSON
+        $selectedTopicStore.options.format = "json-prettier";
+      } catch (e) {
+        // It isn't valid JSON
+      }
+    })();
+
   $: isComparing = $selectedTopicStore.options.compare;
   $: isAutoSelectingMostRecent = $selectedTopicStore.options.autoSelect;
 
@@ -60,7 +75,7 @@
     ><div class="relative min-h-[50px] h-full">
       <div class="flex gap-1 items-center min-h-[50px] max-w-full h-full py-2">
         <Topic topic={selectedTopicString ?? ""} />
-        <div class="grow" />
+        <div class="grow"></div>
         <DropdownMenu>
           <div slot="trigger" class="">
             <IconButton>
