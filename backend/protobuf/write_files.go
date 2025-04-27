@@ -22,7 +22,7 @@ func WriteSparkplugProtoFiles(resourcePath string) error {
 	// Check if the directory exists
 	if _, err := os.Stat(protoDirPath); os.IsNotExist(err) {
 		// Create the directory if it doesn't exist
-		if err := os.MkdirAll(protoDirPath, 0644); err != nil {
+		if err := os.MkdirAll(protoDirPath, os.ModePerm); err != nil {
 			return err
 		}
 	}
@@ -50,7 +50,7 @@ func writeFile(path string, bytes []byte) error {
 	}
 
 	// Write the embedded file to the specified path
-	if err := os.WriteFile(path, bytes, 0644); err != nil {
+	if err := os.WriteFile(path, bytes, os.ModePerm); err != nil {
 		return err
 	}
 	return nil
