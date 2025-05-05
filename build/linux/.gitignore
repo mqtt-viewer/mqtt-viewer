@@ -1,0 +1,3 @@
+appimage/build/*.AppDir
+appimage/build/*.AppImage
+*.AppImage
