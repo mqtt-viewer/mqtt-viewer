@@ -7,8 +7,5 @@
     "a11y-click-events-have-key-events": "ignore",
     "a11y-no-static-element-interactions": "ignore",
     "a11y-no-noninteractive-element-interactions": "ignore"
-  },
-  "yaml.schemas": {
-    "https://json.schemastore.org/github-issue-config.json": "file:///Users/sam/git/mqtt-viewer/.github/ISSUE_TEMPLATE/config.yml"
   }
 }
