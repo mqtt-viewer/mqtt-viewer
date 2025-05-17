@@ -1,8 +1,9 @@
 name: Release MQTT Viewer - Linux
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "*"
 
 jobs:
   release:
@@ -13,10 +14,10 @@ jobs:
             platform: linux/amd64
             os: blacksmith
             tag: linux_amd64
-          - arch: arm64
-            platform: linux/arm64
-            os: blacksmith-arm
-            tag: linux_arm64
+          # - arch: arm64
+          #   platform: linux/arm64
+          #   os: blacksmith-arm
+          #   tag: linux_arm64
     runs-on: ${{ matrix.build.os }}
     name: Release MQTT Viewer (${{ matrix.build.tag }})
     steps:
@@ -29,12 +30,7 @@ jobs:
         id: normalise_version
         shell: bash
         run: |
-          if [ -n "${{ github.event.release.tag_name }}" ]; then
-            version=$(echo ${{ github.event.release.tag_name }})
-          else
-            version="v0.0.0"
-          fi
-          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version=0.0.1-appimagetest" >> $GITHUB_OUTPUT
 
       - name: Define output filename
         id: define_filename
@@ -72,27 +68,45 @@ jobs:
           npm install -g pnpm
           cd frontend && pnpm install
 
-      - name: Build wails app
+      - name: Build wails app for AppImage
         shell: bash
         run: |
           LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.IsAppImage=true"
           wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
 
-      # Packaging
+      # Rename
 
-      - name: Compress linux binary
+      - name: Rename linux binary to be appimage compatible
         shell: bash
         run: |
-          cd build/bin && zip -r ${{ steps.define_filename.outputs.filename }}.zip "MQTT Viewer"
+          cd build/bin && mv "MQTT Viewer" MQTTViewer
 
-      # Publish
+      # Package AppImage
+      - name: Package app image
+        shell: bash
+        run: |
+          cd build/linux && go run build_appimage.go
 
-      - name: Upload release binaries
+      # Rename
+      - name: Rename app image
+        shell: bash
+        run: |
+          cd build/linux && mv MQTTViewer*.AppImage ${{ steps.define_filename.outputs.filename }}.AppImage
+
+      # ls to check it worked
+      - name: List files
+        shell: bash
+        run: |
+          ls -la build/linux
+
+      #Publish
+      - name: Upload release appimage
         uses: alexellis/upload-assets@0.4.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'
+          asset_paths: '["build/linux/${{ steps.define_filename.outputs.filename }}.AppImage"]'

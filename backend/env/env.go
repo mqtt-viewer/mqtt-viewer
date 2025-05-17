@@ -15,6 +15,7 @@ var (
 	MachineId              = ""
 	CloudUsername          = "dev-username"
 	CloudPassword          = "dev-password"
+	IsAppImage             = "false"
 )
 
 func init() {

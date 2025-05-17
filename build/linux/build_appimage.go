@@ -190,16 +190,16 @@ func main() {
 
 	fmt.Println("AppImage created successfully:", targetFile)
 
-	// zipping app image
-	zipFile := filepath.Join(outputDir, fmt.Sprintf("%s-%s.AppImage.zip", name, arch))
-	zipCmd := fmt.Sprintf("zip -r %s %s", zipFile, targetFile)
-	zipOutput, err := EXEC(zipCmd)
-	if err != nil {
-		println(zipOutput)
-		fmt.Println("Error zipping AppImage:", err)
-		os.Exit(1)
-	}
-	fmt.Println("AppImage zipped successfully:", zipFile)
+	// // zipping app image
+	// zipFile := filepath.Join(outputDir, fmt.Sprintf("%s-%s.AppImage.zip", name, arch))
+	// zipCmd := fmt.Sprintf("zip -r %s %s", zipFile, targetFile)
+	// zipOutput, err := EXEC(zipCmd)
+	// if err != nil {
+	// 	println(zipOutput)
+	// 	fmt.Println("Error zipping AppImage:", err)
+	// 	os.Exit(1)
+	// }
+	// fmt.Println("AppImage zipped successfully:", zipFile)
 }
 
 func findGTKFiles(files []string) ([]string, error) {

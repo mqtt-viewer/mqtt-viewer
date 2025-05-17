@@ -47,6 +47,13 @@ func (u *Updater) CheckForUpdate() (*UpdateResponse, error) {
 
 	u.updateResponse = updateResponse
 
+	isAppimage := env.IsAppImage == "true"
+	if isAppimage {
+		u.updateResponse.UpdateUrl = ""
+		u.updateResponse.NotificationUrl = "https://github.com/mqtt-viewer/mqtt-viewer/releases"
+		u.updateResponse.NotificationText = "A new update is available via AppImage. Click here to download."
+	}
+
 	if updateResponse.LatestVersion == env.Version || strings.TrimPrefix(updateResponse.LatestVersion, "v") == env.Version {
 		slog.InfoContext(u.logCtx, "current version is the latest")
 		return nil, nil
