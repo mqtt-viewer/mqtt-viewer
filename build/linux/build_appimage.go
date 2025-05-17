@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/shlex"
 )
@@ -52,6 +53,8 @@ var (
 )
 
 func main() {
+	LOG(LOG_INFO, "Starting AppImage build process")
+	LOG(LOG_INFO, "Current directory: %s", currentDir)
 
 	// Architecture-specific variables using a map
 	archDetails := map[string]string{
@@ -60,35 +63,48 @@ func main() {
 		"x86_64": "x86_64",
 	}
 
+	LOG(LOG_INFO, "Detecting architecture: %s", runtime.GOARCH)
 	arch, exists := archDetails[runtime.GOARCH]
 	if !exists {
-		fmt.Printf("Unsupported architecture: %s\n", runtime.GOARCH)
+		LOG(LOG_ERROR, "Unsupported architecture: %s", runtime.GOARCH)
 		os.Exit(1)
 	}
+	LOG(LOG_INFO, "Using architecture: %s", arch)
 
 	appDir := filepath.Join(buildDir, fmt.Sprintf("%s-%s.AppDir", name, arch))
+	LOG(LOG_INFO, "AppDir path: %s", appDir)
 
 	// Remove existing app directory if it exists
 	if _, err := os.Stat(appDir); err == nil {
+		LOG(LOG_INFO, "Removing existing AppDir: %s", appDir)
 		err = os.RemoveAll(appDir)
 		if err != nil {
+			LOG(LOG_ERROR, "Failed to remove existing app directory: %s", err)
 			panic(fmt.Sprintf("failed to remove existing app directory: %s", err))
 		}
 	}
 
+	LOG(LOG_INFO, "Creating directory structure")
 	usrBin := filepath.Join(appDir, "usr", "bin")
 	MKDIR(buildDir)
 	MKDIR(usrBin)
+
+	LOG(LOG_INFO, "Copying binary: %s -> %s", binaryPath, usrBin)
 	COPY(binaryPath, usrBin)
 	CHMOD(filepath.Join(usrBin, filepath.Base(binaryPath)), 0755)
+
+	LOG(LOG_INFO, "Setting up icon: %s", iconPath)
 	dotDirIcon := filepath.Join(appDir, ".DirIcon")
 	COPY(iconPath, dotDirIcon)
 	iconLink := filepath.Join(appDir, filepath.Base(iconPath))
 	DELETE(iconLink)
 	SYMLINK(".DirIcon", iconLink)
+
+	LOG(LOG_INFO, "Copying desktop file: %s -> %s", desktopFilePath, appDir)
 	COPY(desktopFilePath, appDir)
 
 	// Download linuxdeploy and make it executable
+	LOG(LOG_INFO, "Changing directory to: %s", buildDir)
 	CD(buildDir)
 
 	// Download URLs using a map based on architecture
@@ -97,6 +113,7 @@ func main() {
 		"AppRun":      fmt.Sprintf("https://github.com/AppImage/AppImageKit/releases/download/continuous/AppRun-%s", arch),
 	}
 
+	LOG(LOG_INFO, "Downloading required tools concurrently")
 	// Download necessary files concurrently
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -104,8 +121,12 @@ func main() {
 	go func() {
 		linuxdeployPath := filepath.Join(buildDir, filepath.Base(urls["linuxdeploy"]))
 		if !EXISTS(linuxdeployPath) {
+			LOG(LOG_INFO, "Downloading linuxdeploy from: %s", urls["linuxdeploy"])
 			DOWNLOAD(urls["linuxdeploy"], linuxdeployPath)
+		} else {
+			LOG(LOG_INFO, "linuxdeploy already exists at: %s", linuxdeployPath)
 		}
+		LOG(LOG_DEBUG, "Making linuxdeploy executable")
 		CHMOD(linuxdeployPath, 0755)
 		wg.Done()
 	}()
@@ -113,22 +134,37 @@ func main() {
 	go func() {
 		target := filepath.Join(appDir, "AppRun")
 		if !EXISTS(target) {
+			LOG(LOG_INFO, "Downloading AppRun from: %s", urls["AppRun"])
 			DOWNLOAD(urls["AppRun"], target)
+		} else {
+			LOG(LOG_INFO, "AppRun already exists at: %s", target)
 		}
+		LOG(LOG_DEBUG, "Making AppRun executable")
 		CHMOD(target, 0755)
 		wg.Done()
 	}()
 
+	LOG(LOG_INFO, "Waiting for downloads to complete")
 	wg.Wait()
+	LOG(LOG_SUCCESS, "All downloads completed successfully")
 
 	// Processing GTK files
+	LOG(LOG_INFO, "Searching for required GTK files")
 	filesNeeded := []string{"WebKitWebProcess", "WebKitNetworkProcess", "libwebkit2gtkinjectedbundle.so"}
+	LOG(LOG_DEBUG, "Required files: %v", filesNeeded)
+
 	files, err := findGTKFiles(filesNeeded)
 	if err != nil {
+		LOG(LOG_ERROR, "Error finding GTK files: %s", err)
 		fmt.Println("Error finding GTK files:", err)
 		os.Exit(1)
 	}
+	LOG(LOG_SUCCESS, "Found %d GTK files", len(files))
+
+	LOG(LOG_INFO, "Changing directory to: %s", appDir)
 	CD(appDir)
+
+	LOG(LOG_INFO, "Copying GTK files to AppDir")
 	for _, file := range files {
 		targetDir := filepath.Dir(file)
 		if targetDir[0] == '/' {
@@ -136,24 +172,35 @@ func main() {
 		}
 		targetDir, err = filepath.Abs(targetDir)
 		if err != nil {
+			LOG(LOG_ERROR, "Error getting absolute path: %s", err)
 			fmt.Println("Error getting absolute path:", err)
 			os.Exit(1)
 		}
+		LOG(LOG_DEBUG, "Creating directory: %s", targetDir)
 		MKDIR(targetDir)
+		LOG(LOG_DEBUG, "Copying file: %s -> %s", file, targetDir)
 		COPY(file, targetDir)
 	}
+	LOG(LOG_SUCCESS, "All GTK files copied successfully")
 
 	// Copy GTK Plugin
-	err = os.WriteFile(filepath.Join(buildDir, "linuxdeploy-plugin-gtk.sh"), gtkPlugin, 0755)
+	LOG(LOG_INFO, "Writing GTK plugin script")
+	gtkPluginPath := filepath.Join(buildDir, "linuxdeploy-plugin-gtk.sh")
+	err = os.WriteFile(gtkPluginPath, gtkPlugin, 0755)
 	if err != nil {
+		LOG(LOG_ERROR, "Error writing GTK plugin: %s", err)
 		fmt.Println("Error writing GTK plugin:", err)
 		os.Exit(1)
 	}
+	LOG(LOG_SUCCESS, "GTK plugin written to: %s", gtkPluginPath)
 
 	// Determine GTK Version
+	LOG(LOG_INFO, "Determining GTK version")
 	targetBinary := filepath.Join(appDir, "usr", "bin", "MQTTViewer")
+	LOG(LOG_DEBUG, "Running ldd on: %s", targetBinary)
 	lddOutput, err := EXEC(fmt.Sprintf("ldd %s", targetBinary))
 	if err != nil {
+		LOG(LOG_ERROR, "Error running ldd: %s\nOutput: %s", err, string(lddOutput))
 		println(string(lddOutput))
 		os.Exit(1)
 	}
@@ -162,33 +209,47 @@ func main() {
 	switch {
 	case CONTAINS(lddString, "libgtk-x11-2.0.so"):
 		DeployGtkVersion = "2"
+		LOG(LOG_INFO, "Detected GTK version: 2")
 	case CONTAINS(lddString, "libgtk-3.so"):
 		DeployGtkVersion = "3"
+		LOG(LOG_INFO, "Detected GTK version: 3")
 	case CONTAINS(lddString, "libgtk-4.so"):
 		DeployGtkVersion = "4"
+		LOG(LOG_INFO, "Detected GTK version: 4")
 	default:
+		LOG(LOG_ERROR, "Unable to determine GTK version")
 		fmt.Println("Unable to determine GTK version")
 		os.Exit(1)
 	}
 
 	// Run linuxdeploy to bundle the application
+	LOG(LOG_INFO, "Running linuxdeploy to bundle the application")
+	LOG(LOG_INFO, "Changing directory to: %s", buildDir)
 	CD(buildDir)
 	linuxdeployAppImage := filepath.Join(buildDir, fmt.Sprintf("linuxdeploy-%s.AppImage", arch))
 
 	cmd := fmt.Sprintf("%s --appimage-extract-and-run --appdir %s --output appimage --plugin gtk", linuxdeployAppImage, appDir)
+	LOG(LOG_INFO, "Setting DEPLOY_GTK_VERSION=%s", DeployGtkVersion)
 	SETENV("DEPLOY_GTK_VERSION", DeployGtkVersion)
+
+	LOG(LOG_INFO, "Executing: %s", cmd)
 	output, err := EXEC(cmd)
 	if err != nil {
+		LOG(LOG_ERROR, "Error running linuxdeploy: %s\nOutput: %s", err, string(output))
 		println(output)
 		fmt.Println("Error running linuxdeploy:", err)
 		os.Exit(1)
 	}
+	LOG(LOG_SUCCESS, "linuxdeploy completed successfully")
 
 	// Move file to output directory
 	targetFile := filepath.Join(buildDir, fmt.Sprintf("%s-%s.AppImage", name, arch))
+	outputFile := filepath.Join(outputDir, filepath.Base(targetFile))
+	LOG(LOG_INFO, "Moving AppImage to output directory: %s -> %s", targetFile, outputDir)
 	MOVE(targetFile, outputDir)
 
-	fmt.Println("AppImage created successfully:", targetFile)
+	LOG(LOG_SUCCESS, "AppImage created successfully: %s", outputFile)
+	fmt.Println("AppImage created successfully:", outputFile)
 
 	// // zipping app image
 	// zipFile := filepath.Join(outputDir, fmt.Sprintf("%s-%s.AppImage.zip", name, arch))
@@ -200,6 +261,62 @@ func main() {
 	// 	os.Exit(1)
 	// }
 	// fmt.Println("AppImage zipped successfully:", zipFile)
+}
+
+// Log levels
+const (
+	LOG_DEBUG   = 0
+	LOG_INFO    = 1
+	LOG_SUCCESS = 2
+	LOG_WARNING = 3
+	LOG_ERROR   = 4
+)
+
+// ANSI color codes for terminal output
+const (
+	COLOR_RESET   = "\033[0m"
+	COLOR_RED     = "\033[31m"
+	COLOR_GREEN   = "\033[32m"
+	COLOR_YELLOW  = "\033[33m"
+	COLOR_BLUE    = "\033[34m"
+	COLOR_MAGENTA = "\033[35m"
+	COLOR_CYAN    = "\033[36m"
+	COLOR_WHITE   = "\033[37m"
+	COLOR_BOLD    = "\033[1m"
+)
+
+// Current log level - can be changed at runtime
+var logLevel = LOG_DEBUG
+
+// LOG logs a message with the specified level and optional formatting arguments
+func LOG(level int, format string, args ...interface{}) {
+	if level < logLevel {
+		return
+	}
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	var prefix string
+
+	switch level {
+	case LOG_DEBUG:
+		prefix = COLOR_CYAN + "[DEBUG]" + COLOR_RESET
+	case LOG_INFO:
+		prefix = COLOR_BLUE + "[INFO]" + COLOR_RESET
+	case LOG_SUCCESS:
+		prefix = COLOR_GREEN + "[SUCCESS]" + COLOR_RESET
+	case LOG_WARNING:
+		prefix = COLOR_YELLOW + "[WARNING]" + COLOR_RESET
+	case LOG_ERROR:
+		prefix = COLOR_RED + "[ERROR]" + COLOR_RESET
+	}
+
+	message := fmt.Sprintf(format, args...)
+	fmt.Printf("%s %s %s\n", prefix, COLOR_BOLD+timestamp+COLOR_RESET, message)
+}
+
+// SetLogLevel sets the minimum log level to display
+func SetLogLevel(level int) {
+	logLevel = level
 }
 
 func findGTKFiles(files []string) ([]string, error) {
@@ -249,6 +366,7 @@ func findGTKFiles(files []string) ([]string, error) {
 
 func checkError(err error) {
 	if err != nil {
+		LOG(LOG_ERROR, "Error: %s", err)
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
@@ -453,11 +571,22 @@ func EXEC(command string) ([]byte, error) {
 	// Split input using shlex
 	args, err := shlex.Split(command)
 	checkError(err)
+
+	LOG(LOG_DEBUG, "Executing command: %s", command)
 	// Execute command
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = CWD()
 	cmd.Env = os.Environ()
-	return cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		LOG(LOG_ERROR, "Command failed: %s", command)
+		LOG(LOG_DEBUG, "Command output: %s", string(output))
+	} else {
+		LOG(LOG_DEBUG, "Command completed successfully: %s", command)
+	}
+
+	return output, err
 }
 
 func CHMOD(path string, mode os.FileMode) {
@@ -578,18 +707,37 @@ func REPLACEALL(filename string, substitutions Sub) {
 }
 
 func DOWNLOAD(url string, target string) {
+	LOG(LOG_INFO, "Downloading: %s -> %s", url, target)
+
 	// create HTTP client
 	resp, err := http.Get(url)
-	checkError(err)
+	if err != nil {
+		LOG(LOG_ERROR, "Download failed: %s", err)
+		checkError(err)
+	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("download failed with status code: %d", resp.StatusCode)
+		LOG(LOG_ERROR, "Download failed: %s", err)
+		checkError(err)
+	}
+
 	out, err := os.Create(target)
-	checkError(err)
+	if err != nil {
+		LOG(LOG_ERROR, "Failed to create file: %s", err)
+		checkError(err)
+	}
 	defer out.Close()
 
 	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-	checkError(err)
+	bytesWritten, err := io.Copy(out, resp.Body)
+	if err != nil {
+		LOG(LOG_ERROR, "Failed to write file: %s", err)
+		checkError(err)
+	}
+
+	LOG(LOG_SUCCESS, "Download completed: %s (%d bytes)", target, bytesWritten)
 }
 
 func FINDFILES(root string, filenames ...string) []string {
