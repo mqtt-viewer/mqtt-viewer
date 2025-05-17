@@ -151,7 +151,7 @@ func main() {
 	}
 
 	// Determine GTK Version
-	targetBinary := filepath.Join(appDir, "usr", "bin", binaryPath)
+	targetBinary := filepath.Join(appDir, "usr", "bin", "MQTTViewer")
 	lddOutput, err := EXEC(fmt.Sprintf("ldd %s", targetBinary))
 	if err != nil {
 		println(string(lddOutput))

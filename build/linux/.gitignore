@@ -1,3 +1,2 @@
-appimage/build/*.AppDir
-appimage/build/*.AppImage
+appimage/build/**
 **.AppImage
