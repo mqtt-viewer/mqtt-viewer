@@ -36,7 +36,10 @@
     {/if}
     {#if hasNotifications}
       {#each $notifications.notifications as n}
-        <Button on:click={n.onClick} class="h-fit w-full text-left py-1">
+        <Button
+          on:click={() => n.onClick?.()}
+          class="h-fit w-full text-left py-1"
+        >
           <div class="flex items-center justify-center py-1">
             <div class="flex gap-3 w-full h-full">
               <div class="h-full flex items-center">

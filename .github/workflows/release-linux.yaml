@@ -61,7 +61,6 @@ jobs:
       # Dependencies
 
       - name: Install Ubuntu prerequisites
-        if: runner.os == 'Linux'
         shell: bash
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
@@ -85,7 +84,6 @@ jobs:
       # Packaging
 
       - name: Compress linux binary
-        if: runner.os == 'Linux'
         shell: bash
         run: |
           cd build/bin && zip -r ${{ steps.define_filename.outputs.filename }}.zip "MQTT Viewer"
@@ -98,3 +96,37 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'
+
+      # AppImage
+
+      - name: Build wails app for AppImage
+        shell: bash
+        run: |
+          LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.IsAppImage=true"
+          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
+
+      - name: Rename linux binary to be appimage compatible
+        shell: bash
+        run: |
+          cd build/bin && mv "MQTT Viewer" MQTTViewer
+
+      - name: Package appimage
+        shell: bash
+        run: |
+          cd build/linux && go run build_appimage.go
+
+      - name: Rename appimage
+        shell: bash
+        run: |
+          cd build/linux && mv MQTTViewer*.AppImage ${{ steps.define_filename.outputs.filename }}.AppImage
+
+      - name: Upload release appimage
+        uses: alexellis/upload-assets@0.4.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          asset_paths: '["build/linux/${{ steps.define_filename.outputs.filename }}.AppImage"]'
