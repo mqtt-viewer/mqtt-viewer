@@ -1,0 +1,121 @@
+name: Release MQTT Viewer - Linux
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        build:
+          - arch: amd64
+            platform: linux/amd64
+            os: blacksmith
+            tag: linux_amd64
+          - arch: arm64
+            platform: linux/arm64
+            os: blacksmith-arm
+            tag: linux_arm64
+    runs-on: ${{ matrix.build.os }}
+    name: Release MQTT Viewer (${{ matrix.build.tag }})
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Set up common, sanitised environment variables
+
+      - name: Normalise version tag
+        id: normalise_version
+        shell: bash
+        run: |
+          echo "version=v0.6.5" >> $GITHUB_OUTPUT
+
+      - name: Define output filename
+        id: define_filename
+        shell: bash
+        run: |
+          echo "filename=MQTT_Viewer_${{ steps.normalise_version.outputs.version }}_${{ matrix.build.tag }}" >> $GITHUB_OUTPUT
+
+      # Set up development dependencies
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.3"
+
+      - name: Install wails
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.15.0"
+
+      # Dependencies
+
+      - name: Install Ubuntu prerequisites
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # Build
+
+      - name: Build frontend assets
+        shell: bash
+        run: |
+          npm install -g pnpm
+          cd frontend && pnpm install
+
+      - name: Build wails app for AppImage
+        shell: bash
+        run: |
+          LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
+          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.IsAppImage=true"
+          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
+
+      # Rename
+
+      - name: Rename linux binary to be appimage compatible
+        shell: bash
+        run: |
+          cd build/bin && mv "MQTT Viewer" MQTTViewer
+
+      # Package AppImage
+      - name: Package app image
+        shell: bash
+        run: |
+          cd build/linux && go run build_appimage.go
+
+      # Rename
+      - name: Rename app image
+        shell: bash
+        run: |
+          cd build/linux && mv MQTTViewer*.AppImage ${{ steps.define_filename.outputs.filename }}.AppImage
+
+      # ls to check it worked
+      - name: List files
+        shell: bash
+        run: |
+          ls -la build/linux
+
+      #Publish
+      # - name: Upload release appimage
+      #   uses: alexellis/upload-assets@0.4.1
+      #   env:
+      #     GITHUB_TOKEN: ${{ github.token }}
+      #   with:
+      #     asset_paths: '[]'
+
+      # Publish to existing release
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/linux/${{ steps.define_filename.outputs.filename }}.AppImage
+          tag: v0.6.5
+          overwrite: false

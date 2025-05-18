@@ -113,6 +113,7 @@ search_tool() {
 
     PATH_ARRAY=(
         "$(get_triplet_path)/$directory/$tool"
+        "/usr/lib/$(uname -m)-linux-gnu/$directory/$tool"
         "/usr/lib64/$directory/$tool"
         "/usr/lib/$directory/$tool"
         "/usr/bin/$tool"
@@ -162,6 +163,9 @@ fi
 
 APPDIR="$(realpath "$APPDIR")"
 mkdir -p "$APPDIR"
+
+# make lib64 writable again. -- added from tauri script
+chmod +w "$APPDIR"/usr/lib64 || true
 
 . /etc/os-release
 if [ "$ID" = "debian" ] || [ "$ID" = "ubuntu" ]; then
@@ -374,3 +378,20 @@ for directory in "${PATCH_ARRAY[@]}"; do
         ln $verbose -sf "${file/$LD_GTK_LIBRARY_PATH\//}" "$APPDIR/usr/lib"
     done < <(find "$directory" -name '*.so' -print0)
 done
+
+
+# set write permission on lib64 again to make it deletable.
+chmod +w "$APPDIR"/usr/lib64 || true
+
+# We have to copy the files first to not get permission errors when we assign gio_extras_dir
+find /usr/lib* -name libgiognutls.so -exec mkdir -p "$APPDIR"/"$(dirname '{}')" \; -exec cp --parents '{}' "$APPDIR/" \; || true
+# related files that we seemingly don't need:
+# libgiolibproxy.so - libgiognomeproxy.so - glib-pacrunner
+
+gio_extras_dir=$(find "$APPDIR"/usr/lib* -name libgiognutls.so -exec dirname '{}' \; 2>/dev/null)
+cat >> "$HOOKFILE" <<EOF
+export GIO_EXTRA_MODULES="\$APPDIR/${gio_extras_dir#"$APPDIR"/}"
+EOF
+
+#binary patch absolute paths in libwebkit files
+find "$APPDIR"/usr/lib* -name 'libwebkit*' -exec sed -i -e "s|/usr|././|g" '{}' \;
