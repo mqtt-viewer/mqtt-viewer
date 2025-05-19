@@ -124,12 +124,12 @@ jobs:
       - name: zip appdir
         shell: bash
         run: |
-          cd build/linux && zip -r ./${{ steps.define_filename.outputs.filename }}_appdir.zip *.AppDir
+          cd build/linux/appimage/build && zip -r ./${{ steps.define_filename.outputs.filename }}_appdir.zip *.AppDir
 
       - name: Upload zipped appdir to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/linux/${{ steps.define_filename.outputs.filename }}_appdir.zip
+          file: build/linux/appimage/build/${{ steps.define_filename.outputs.filename }}_appdir.zip
           tag: v0.6.5
           overwrite: false
