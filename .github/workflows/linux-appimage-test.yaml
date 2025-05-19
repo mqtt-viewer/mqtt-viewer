@@ -58,7 +58,7 @@ jobs:
 
       - name: Install Ubuntu prerequisites
         shell: bash
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
 
       # Build
 
@@ -112,10 +112,24 @@ jobs:
       #     asset_paths: '[]'
 
       # Publish to existing release
-      - name: Upload binaries to release
+      # - name: Upload binaries to release
+      #   uses: svenstaro/upload-release-action@v2
+      #   with:
+      #     repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #     file: build/linux/${{ steps.define_filename.outputs.filename }}.AppImage
+      #     tag: v0.6.5
+      #     overwrite: false
+
+      # Also publish the appdir for debugging
+      - name: zip appdir
+        shell: bash
+        run: |
+          cd build/linux && zip -r ./${{ steps.define_filename.outputs.filename }}_appdir.zip *.AppDir
+
+      - name: Upload zipped appdir to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/linux/${{ steps.define_filename.outputs.filename }}.AppImage
+          file: build/linux/${{ steps.define_filename.outputs.filename }}_appdir.zip
           tag: v0.6.5
           overwrite: false
