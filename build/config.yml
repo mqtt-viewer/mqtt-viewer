@@ -1,0 +1,40 @@
+version: '3'
+
+info:
+  companyName: "MQTT Viewer"
+  productName: "MQTT Viewer"
+  productIdentifier: "app.mqttviewer"
+  description: "A fast and feature-rich MQTT visualization and debugging tool"
+  copyright: "Copyright © 2024 MQTT Viewer"
+  comments: "MQTT visualization and debugging tool"
+  version: "0.0.1"
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend/node_modules
+      - frontend/dist
+      - bin
+    file:
+      - .DS_Store
+      - "*_test.go"
+    watched_extension:
+      - "*.go"
+      - "*.js"
+      - "*.ts"
+      - "*.svelte"
+    git_ignore: true
+  executes:
+    - cmd: wails3 build DEV=true
+      type: blocking
+    - cmd: wails3 task common:dev:frontend
+      type: background
+    - cmd: ./bin/MQTTViewer
+      type: primary
+
+fileAssociations: []

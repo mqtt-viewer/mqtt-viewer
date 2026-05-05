@@ -1,0 +1,30 @@
+version: '3'
+
+includes:
+  common: ./build/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+vars:
+  APP_NAME: MQTTViewer
+  BIN_DIR: bin
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
+tasks:
+  build:
+    summary: Builds the application for the current platform
+    cmds:
+      - task: '{{OS}}:build'
+        vars:
+          VERSION: '{{.VERSION | default "v0.0.1-defaultv"}}'
+
+  package:
+    summary: Packages a production build for the current platform
+    cmds:
+      - task: '{{OS}}:package'
+        vars:
+          VERSION: '{{.VERSION | default "v0.0.1-defaultv"}}'
+
+  dev:
+    summary: Runs Wails v3 development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}

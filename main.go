@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"log/slog"
 	"mqtt-viewer/backend/app"
@@ -10,10 +9,7 @@ import (
 	"os"
 
 	"github.com/mitchellh/panicwrap"
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist
@@ -35,33 +31,34 @@ func main() {
 		}
 	}
 
-	app := app.NewApp(app.AppModes.Wails, env.Version)
+	viewerApp := app.NewApp(app.AppModes.Wails, env.Version)
 	connectionEvents := events.NewConnectionEvents()
-	err := wails.Run(&options.App{
-		Title:     "MQTT Viewer",
-		Width:     900,
-		Height:    700,
-		MinWidth:  825,
-		MinHeight: 660,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	wailsApp := application.New(application.Options{
+		Name:        "MQTT Viewer",
+		Description: "A fast and feature-rich MQTT visualization and debugging tool",
+		Assets: application.AssetOptions{
+			Handler: application.BundledAssetFileServer(assets),
 		},
-		BackgroundColour: &options.RGBA{R: 35, G: 33, B: 32, A: 1},
-		OnStartup: func(ctx context.Context) {
-			app.Startup(ctx, nil)
+		Services: []application.Service{
+			application.NewService(viewerApp),
+			application.NewService(connectionEvents),
 		},
-		Bind: []interface{}{
-			app,
-			connectionEvents,
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		EnumBind: []interface{}{
-			events.GlobalEvents,
+	})
+	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title:            "MQTT Viewer",
+		Width:            900,
+		Height:           700,
+		MinWidth:         825,
+		MinHeight:        660,
+		BackgroundColour: application.NewRGBA(35, 33, 32, 1),
+		Mac: application.MacWindow{
+			TitleBar: application.MacTitleBarHiddenInset,
 		},
-		Mac: &mac.Options{
-			TitleBar: mac.TitleBarHiddenInset(),
-		},
-	},
-	)
+	})
+	err := wailsApp.Run()
 
 	if err != nil {
 		slog.Error(err.Error())

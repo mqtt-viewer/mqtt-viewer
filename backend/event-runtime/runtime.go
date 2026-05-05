@@ -3,7 +3,7 @@ package eventRuntime
 import (
 	"context"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type EventRuntime struct {
@@ -22,7 +22,7 @@ func (e *EventRuntime) EventsEmit(
 	eventName string,
 	optionalData ...interface{},
 ) {
-	runtime.EventsEmit(e.ctx, eventName, optionalData...)
+	application.Get().Event.Emit(eventName, optionalData...)
 }
 
 func (e *EventRuntime) EventsOn(
@@ -30,7 +30,9 @@ func (e *EventRuntime) EventsOn(
 	callback func(optionalData ...interface{}),
 	key string,
 ) {
-	cancelFunc := runtime.EventsOn(e.ctx, eventName, callback)
+	cancelFunc := application.Get().Event.On(eventName, func(event *application.CustomEvent) {
+		callback(event.Data)
+	})
 	e.listenerCancelFuncs[key] = cancelFunc
 }
 
@@ -38,7 +40,10 @@ func (e *EventRuntime) EventsOff(
 	eventName string,
 	additionalEventNames ...string,
 ) {
-	runtime.EventsOff(e.ctx, eventName, additionalEventNames...)
+	application.Get().Event.Off(eventName)
+	for _, additionalEventName := range additionalEventNames {
+		application.Get().Event.Off(additionalEventName)
+	}
 }
 
 func (e *EventRuntime) EventsOffKey(

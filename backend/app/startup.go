@@ -17,13 +17,18 @@ import (
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"gopkg.in/guregu/null.v4"
 )
 
 type StartupOptions struct {
 	PathsOverride  *paths.Paths
 	DbNameOverride *string
+}
+
+func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
+	a.Startup(ctx, nil)
+	return nil
 }
 
 func (a *App) Startup(ctx context.Context, options *StartupOptions) {
@@ -33,8 +38,8 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	var err error
 	if a.Mode == AppModes.Wails {
 		a.EventRuntime = eventRuntime.InitEventRuntime(ctx)
-		envInfo := runtime.Environment(a.ctx)
-		if envInfo.BuildType == "production" {
+		envInfo := application.Get().Env.Info()
+		if !envInfo.Debug {
 			slog.Info("starting in production mode")
 			a.Mode = AppModes.Wails
 			a.Paths = paths.GetPaths()

@@ -47,7 +47,7 @@ var (
 	buildDir        = path.Join(currentDir, "./appimage/build")
 	outputDir       = path.Join(currentDir, ".")
 	name            = "MQTTViewer"
-	binaryPath      = path.Join(currentDir, "../bin/MQTTViewer")
+	binaryPath      = path.Join(currentDir, "../../bin/MQTTViewer")
 	iconPath        = path.Join(currentDir, "../appicon.png")
 	desktopFilePath = path.Join(currentDir, "./MQTTViewer.desktop")
 )

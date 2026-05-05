@@ -1,0 +1,52 @@
+version: '3'
+
+tasks:
+  go:mod:tidy:
+    summary: Runs go mod tidy
+    internal: true
+    cmds:
+      - go mod tidy
+
+  install:frontend:deps:
+    summary: Installs frontend dependencies with pnpm
+    dir: frontend
+    sources:
+      - package.json
+      - pnpm-lock.yaml
+    generates:
+      - node_modules/**/*
+    preconditions:
+      - sh: pnpm --version
+        msg: "pnpm is required. Install it with: npm install -g pnpm"
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  generate:bindings:
+    summary: Generates Wails v3 TypeScript bindings
+    deps:
+      - task: go:mod:tidy
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - frontend/bindings/**/*
+    cmds:
+      - wails3 generate bindings -clean=true -ts
+
+  build:frontend:
+    summary: Builds the frontend project
+    dir: frontend
+    deps:
+      - task: install:frontend:deps
+      - task: generate:bindings
+    cmds:
+      - pnpm build
+
+  dev:frontend:
+    summary: Runs the frontend dev server
+    dir: frontend
+    deps:
+      - task: install:frontend:deps
+    cmds:
+      - pnpm dev -- --port {{.VITE_PORT}} --strictPort

@@ -1,20 +1,15 @@
 package app
 
 import (
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 func (a *App) ChooseCertFile(title string) (string, error) {
-	selection, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: title,
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "Certificate Files (*.crt;*.cer;*.key;*.pem;*.jks;*.der;*.pfx)",
-				Pattern:     "*.crt;*.cer;*.key;*.pem;*.jks;*.der;*.pfx",
-			},
-		},
-		ShowHiddenFiles: true,
-	})
+	selection, err := application.Get().Dialog.OpenFile().
+		SetTitle(title).
+		AddFilter("Certificate Files", "*.crt;*.cer;*.key;*.pem;*.jks;*.der;*.pfx").
+		ShowHiddenFiles(true).
+		PromptForSingleSelection()
 	if err != nil {
 		return "", err
 	}
@@ -22,10 +17,12 @@ func (a *App) ChooseCertFile(title string) (string, error) {
 }
 
 func (a *App) ChooseDirectory(title string) (string, error) {
-	selection, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:           title,
-		ShowHiddenFiles: true,
-	})
+	selection, err := application.Get().Dialog.OpenFile().
+		SetTitle(title).
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		ShowHiddenFiles(true).
+		PromptForSingleSelection()
 	if err != nil {
 		return "", err
 	}

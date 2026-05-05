@@ -1,5 +1,7 @@
 package events
 
+import "github.com/wailsapp/wails/v3/pkg/application"
+
 type GlobalEvent string
 
 const (
@@ -13,4 +15,9 @@ var GlobalEvents = []struct {
 }{
 	{ConnectionDeleted, "ConnectionDeleted"},
 	{UpdateAvailable, "UpdateAvailable"},
+}
+
+func init() {
+	application.RegisterEvent[uint](string(ConnectionDeleted))
+	application.RegisterEvent[struct{}](string(UpdateAvailable))
 }

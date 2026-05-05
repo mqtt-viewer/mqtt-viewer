@@ -7,3 +7,8 @@ mqtt-viewer
 secrets.json
 .env
 .DS_STORE
+# Wails v3 generated TypeScript bindings use the Go module name as a path.
+!frontend/bindings/mqtt-viewer/
+!frontend/bindings/mqtt-viewer/**
+.task/
+bin/

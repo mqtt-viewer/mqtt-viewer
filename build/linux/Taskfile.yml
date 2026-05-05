@@ -1,0 +1,26 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application for Linux
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/{{.BIN_DIR}}
+      - 'go build -tags production -trimpath -buildvcs=false -ldflags "-w -s -X mqtt-viewer/backend/env.Version={{.VERSION | default "v0.0.1-defaultv"}}" -o {{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}'
+    env:
+      GOOS: linux
+      CGO_ENABLED: 1
+      GOARCH: '{{.ARCH | default ARCH}}'
+
+  package:
+    summary: Creates a Linux AppImage package
+    deps:
+      - task: build
+        vars:
+          VERSION: '{{.VERSION | default "v0.0.1-defaultv"}}'
+    cmds:
+      - go run ./build/linux/build_appimage.go
