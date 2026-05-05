@@ -31,6 +31,10 @@ func (e *EventRuntime) EventsOn(
 	key string,
 ) {
 	cancelFunc := application.Get().Event.On(eventName, func(event *application.CustomEvent) {
+		if data, ok := event.Data.([]interface{}); ok {
+			callback(data...)
+			return
+		}
 		callback(event.Data)
 	})
 	e.listenerCancelFuncs[key] = cancelFunc

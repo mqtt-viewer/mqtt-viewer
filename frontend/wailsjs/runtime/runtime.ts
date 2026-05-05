@@ -6,6 +6,10 @@ export function BrowserOpenURL(url: string): Promise<void> {
 
 export function EventsOn(eventName: string, callback: (...data: any[]) => void): () => void {
   return Events.On(eventName, (event) => {
+    if (Array.isArray(event.data)) {
+      callback(...event.data);
+      return;
+    }
     callback(event.data);
   });
 }
