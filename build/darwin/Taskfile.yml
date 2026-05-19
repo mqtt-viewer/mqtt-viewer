@@ -1,0 +1,167 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+vars:
+  # Signing configuration for release builds.
+  # Passwords/notarization credentials are provided by keychain or CI env.
+  # SIGN_IDENTITY: "Developer ID Application: Your Company (TEAMID)"
+  # KEYCHAIN_PROFILE: "my-notarize-profile"
+  ENTITLEMENTS: "build/darwin/entitlements.plist"
+
+tasks:
+  build:
+    summary: Builds the application for macOS
+    cmds:
+      - task: build:native
+        vars:
+          ARCH: '{{.ARCH}}'
+          DEV: '{{.DEV}}'
+          OUTPUT: '{{.OUTPUT}}'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
+    vars:
+      DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
+      OUTPUT: '{{.OUTPUT | default .DEFAULT_OUTPUT}}'
+
+  build:native:
+    summary: Builds the application natively on macOS
+    internal: true
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+        vars:
+          DEV: '{{.DEV}}'
+      - task: common:generate:icons
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/{{.BIN_DIR}}
+      - 'go build {{.BUILD_FLAGS}} -o "{{.OUTPUT}}"'
+    vars:
+      PROD_LD_FLAGS: '-w -s -X mqtt-viewer/backend/env.Version={{.VERSION | default "v0.0.1-defaultv"}}{{if .LD_FLAGS}} {{.LD_FLAGS}}{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if .EXTRA_TAGS}}-tags {{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="{{.PROD_LD_FLAGS}}"{{end}}'
+      DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
+      OUTPUT: '{{.OUTPUT | default .DEFAULT_OUTPUT}}'
+    env:
+      GOOS: darwin
+      CGO_ENABLED: 1
+      GOARCH: '{{.ARCH | default ARCH}}'
+      CGO_CFLAGS: '-mmacosx-version-min=12.0'
+      CGO_LDFLAGS: '-mmacosx-version-min=12.0 -framework UniformTypeIdentifiers'
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+
+  build:universal:
+    summary: Builds a universal macOS binary (arm64 + amd64)
+    deps:
+      - task: build
+        vars:
+          ARCH: amd64
+          OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}-amd64'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+      - task: build
+        vars:
+          ARCH: arm64
+          OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}-arm64'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - lipo -create -output "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}-amd64" "{{.BIN_DIR}}/{{.APP_NAME}}-arm64"
+      - rm "{{.BIN_DIR}}/{{.APP_NAME}}-amd64" "{{.BIN_DIR}}/{{.APP_NAME}}-arm64"
+
+  package:
+    summary: Packages the application into a macOS `.app` bundle
+    deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - task: create:app:bundle
+        vars:
+          VERSION: '{{.VERSION}}'
+          BUNDLE_VERSION: '{{.BUNDLE_VERSION}}'
+
+  package:universal:
+    summary: Packages a universal macOS `.app` bundle
+    deps:
+      - task: build:universal
+        vars:
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - task: create:app:bundle
+        vars:
+          VERSION: '{{.VERSION}}'
+          BUNDLE_VERSION: '{{.BUNDLE_VERSION}}'
+
+  create:app:bundle:
+    summary: Creates a macOS `.app` bundle
+    cmds:
+      - rm -rf "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+      - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+      - |
+        if [ -f build/darwin/Assets.car ]; then
+          cp build/darwin/Assets.car "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+        fi
+      - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
+      - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      - /usr/libexec/PlistBuddy -c "Set :CFBundleVersion {{if .BUNDLE_VERSION}}{{.BUNDLE_VERSION}}{{else}}{{.VERSION | default "0.0.1"}}{{end}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
+      - /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString {{if .BUNDLE_VERSION}}{{.BUNDLE_VERSION}}{{else}}{{.VERSION | default "0.0.1"}}{{end}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
+      - task: codesign:adhoc
+
+  codesign:adhoc:
+    summary: Ad-hoc signs the app bundle for local use
+    internal: true
+    cmds:
+      - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+
+  run:
+    cmds:
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS"
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources"
+      - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources"
+      - |
+        if [ -f build/darwin/Assets.car ]; then
+          cp build/darwin/Assets.car "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources"
+        fi
+      - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS"
+      - cp build/darwin/Info.dev.plist "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Info.plist"
+      - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
+      - '"{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/{{.APP_NAME}}"'
+
+  sign:
+    summary: Signs the macOS app bundle with Developer ID
+    deps:
+      - task: package
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          BUNDLE_VERSION: '{{.BUNDLE_VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.app" --identity "{{.SIGN_IDENTITY}}" {{if .ENTITLEMENTS}}--entitlements {{.ENTITLEMENTS}}{{end}}
+    preconditions:
+      - sh: '[ -n "{{.SIGN_IDENTITY}}" ]'
+        msg: "SIGN_IDENTITY is required. Set it in build/darwin/Taskfile.yml or pass it as a task variable."
+
+  sign:notarize:
+    summary: Signs, notarizes, and staples the macOS app bundle
+    deps:
+      - task: package
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          BUNDLE_VERSION: '{{.BUNDLE_VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.app" --identity "{{.SIGN_IDENTITY}}" {{if .ENTITLEMENTS}}--entitlements {{.ENTITLEMENTS}}{{end}} --notarize --keychain-profile "{{.KEYCHAIN_PROFILE}}"
+    preconditions:
+      - sh: '[ -n "{{.SIGN_IDENTITY}}" ]'
+        msg: "SIGN_IDENTITY is required. Set it in build/darwin/Taskfile.yml or pass it as a task variable."
+      - sh: '[ -n "{{.KEYCHAIN_PROFILE}}" ]'
+        msg: "KEYCHAIN_PROFILE is required for notarization."

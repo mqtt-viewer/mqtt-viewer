@@ -3,7 +3,7 @@ version: '3'
 info:
   companyName: "MQTT Viewer"
   productName: "MQTT Viewer"
-  productIdentifier: "app.mqttviewer"
+  productIdentifier: "com.mqttviewer.MQTTViewer"
   description: "A fast and feature-rich MQTT visualization and debugging tool"
   copyright: "Copyright © 2024 MQTT Viewer"
   comments: "MQTT visualization and debugging tool"

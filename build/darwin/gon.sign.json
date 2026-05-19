@@ -1,5 +1,5 @@
 {
-  "source": ["./build/bin/MQTT Viewer.app"],
+  "source": ["./bin/MQTTViewer.app"],
   "bundle_id": "com.mqttviewer.MQTTViewer",
   "sign": {
     "application_identity": "Samuel Webster"

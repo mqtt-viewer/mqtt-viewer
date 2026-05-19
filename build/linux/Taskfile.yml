@@ -10,7 +10,10 @@ tasks:
       - task: common:build:frontend
     cmds:
       - mkdir -p {{.ROOT_DIR}}/{{.BIN_DIR}}
-      - 'go build -tags production -trimpath -buildvcs=false -ldflags "-w -s -X mqtt-viewer/backend/env.Version={{.VERSION | default "v0.0.1-defaultv"}}" -o {{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}'
+      - 'go build {{.BUILD_FLAGS}} -o {{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}'
+    vars:
+      PROD_LD_FLAGS: '-w -s -X mqtt-viewer/backend/env.Version={{.VERSION | default "v0.0.1-defaultv"}}{{if .LD_FLAGS}} {{.LD_FLAGS}}{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if .EXTRA_TAGS}}-tags {{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="{{.PROD_LD_FLAGS}}"{{end}}'
     env:
       GOOS: linux
       CGO_ENABLED: 1
@@ -22,5 +25,8 @@ tasks:
       - task: build
         vars:
           VERSION: '{{.VERSION | default "v0.0.1-defaultv"}}'
+          ARCH: '{{.ARCH}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
     cmds:
       - go run ./build/linux/build_appimage.go

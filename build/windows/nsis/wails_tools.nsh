@@ -1,23 +1,23 @@
-# DO NOT EDIT - Generated automatically by `wails build`
+# DO NOT EDIT - Generated automatically by Wails build assets
 
 !include "x64.nsh"
 !include "WinVer.nsh"
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "{{.Name}}"
+    !define INFO_PROJECTNAME "MQTTViewer"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "{{.Info.CompanyName}}"
+    !define INFO_COMPANYNAME "MQTT Viewer"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "{{.Info.ProductName}}"
+    !define INFO_PRODUCTNAME "MQTT Viewer"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "{{.Info.ProductVersion}}"
+    !define INFO_PRODUCTVERSION "0.0.1"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "{{.Info.Copyright}}"
+    !define INFO_COPYRIGHT "Copyright (c) 2024 MQTT Viewer"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"
@@ -70,13 +70,11 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
                 Goto ok
             ${EndIf}
         !endif
-
         !ifdef SUPPORTS_ARM64
             ${if} ${IsNativeARM64}
                 Goto ok
             ${EndIf}
         !endif
-
         IfSilent silentArch notSilentArch
         silentArch:
             SetErrorLevel 65
@@ -103,7 +101,6 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
             File "/oname=${PRODUCT_EXECUTABLE}" "${ARG_WAILS_AMD64_BINARY}"
         ${EndIf}
     !endif
-
     !ifdef SUPPORTS_ARM64
         ${if} ${IsNativeARM64}
             File "/oname=${PRODUCT_EXECUTABLE}" "${ARG_WAILS_ARM64_BINARY}"
@@ -142,38 +139,34 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
     ${EndIf}
 !macroend
 
-# Install webview2 by launching the bootstrapper
-# See https://docs.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution#online-only-deployment
 !macro wails.webview2runtime
     !ifndef WAILS_INSTALL_WEBVIEW_DETAILPRINT
         !define WAILS_INSTALL_WEBVIEW_DETAILPRINT "Installing: WebView2 Runtime"
     !endif
 
     SetRegView 64
-	# If the admin key exists and is not empty then webview2 is already installed
-	ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
+    ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
     ${If} $0 != ""
         Goto ok
     ${EndIf}
 
     ${If} ${REQUEST_EXECUTION_LEVEL} == "user"
-        # If the installer is run in user level, check the user specific key exists and is not empty then webview2 is already installed
-	    ReadRegStr $0 HKCU "Software\Microsoft\EdgeUpdate\Clients{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
+        ReadRegStr $0 HKCU "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
         ${If} $0 != ""
             Goto ok
         ${EndIf}
      ${EndIf}
-    
-	SetDetailsPrint both
+
+    SetDetailsPrint both
     DetailPrint "${WAILS_INSTALL_WEBVIEW_DETAILPRINT}"
     SetDetailsPrint listonly
-    
+
     InitPluginsDir
     CreateDirectory "$pluginsdir\webview2bootstrapper"
     SetOutPath "$pluginsdir\webview2bootstrapper"
-    File "tmp\MicrosoftEdgeWebview2Setup.exe"
+    File "MicrosoftEdgeWebview2Setup.exe"
     ExecWait '"$pluginsdir\webview2bootstrapper\MicrosoftEdgeWebview2Setup.exe" /silent /install'
-    
+
     SetDetailsPrint both
     ok:
 !macroend

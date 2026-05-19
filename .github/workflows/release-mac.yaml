@@ -10,9 +10,11 @@ jobs:
       matrix:
         build:
           - platform: darwin/amd64
+            arch: amd64
             os: macos-latest
             tag: darwin_amd64
           - platform: darwin/arm64
+            arch: arm64
             os: macos-latest
             tag: darwin_arm64
     runs-on: ${{ matrix.build.os }}
@@ -32,7 +34,9 @@ jobs:
           else
             version="v0.0.0"
           fi
+          bundle_version="${version#v}"
           echo "version=$version" >> $GITHUB_OUTPUT
+          echo "bundle_version=$bundle_version" >> $GITHUB_OUTPUT
 
       - name: Define output filename
         id: define_filename
@@ -45,35 +49,26 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.3"
+          go-version: "1.25.0"
 
-      - name: Install wails
+      - name: Install Wails v3
         shell: bash
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.84
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20.15.0"
 
-      # Dependencies
-
-      - name: Setup Gon
-        run: brew install Bearer/tap/gon
+      - name: Install pnpm
+        shell: bash
+        run: npm install -g pnpm
 
       - name: Import code signing certificate from Github Secrets
         uses: Apple-Actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
           p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
-
-      # Build -- frontend
-
-      - name: Build frontend assets
-        shell: bash
-        run: |
-          npm install -g pnpm
-          cd frontend && pnpm install
 
       - name: Use mac app icon
         shell: bash
@@ -84,7 +79,16 @@ jobs:
 
       # Build
 
-      - name: Build, sign, notarize macOS app
+      - name: Store notarization credentials
+        shell: bash
+        run: |
+          wails3 signing credentials \
+            --apple-id "${{ secrets.AC_USERNAME }}" \
+            --team-id "${{ secrets.AC_PROVIDER }}" \
+            --password "${{ secrets.AC_PASSWORD }}" \
+            --profile "mqtt-viewer-notarize"
+
+      - name: Build, sign, and notarize macOS app
         shell: bash
         run: |
           echo "building app on ${{ matrix.build.platform }}"
@@ -92,29 +96,25 @@ jobs:
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}"
-          echo "Signing Package"
-          gon -log-level=info ./build/darwin/gon.sign.json
+          wails3 task darwin:sign:notarize \
+            ARCH=${{ matrix.build.arch }} \
+            VERSION=${{ steps.normalise_version.outputs.version }} \
+            BUNDLE_VERSION=${{ steps.normalise_version.outputs.bundle_version }} \
+            LD_FLAGS="${LD_FLAGS}" \
+            SIGN_IDENTITY="Samuel Webster" \
+            KEYCHAIN_PROFILE="mqtt-viewer-notarize"
           echo "Zipping Package"
-          ditto -c -k --keepParent "./build/bin/MQTT Viewer.app" ./build/bin/MQTTViewer.zip
-          echo "Cleaning up"
-          rm -rf "./build/bin/MQTT Viewer.app"
-          echo "Notarizing Zip Files"
-          gon -log-level=info ./build/darwin/gon.notarize.json
-        env:
-          AC_USERNAME: ${{ secrets.AC_USERNAME }}
-          AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
-          AC_PROVIDER: ${{ secrets.AC_PROVIDER }}
+          ditto -c -k --keepParent "./bin/MQTTViewer.app" ./bin/MQTTViewer.zip
 
       # Publish
 
       - name: Rename release zip
         shell: bash
-        run: mv build/bin/MQTTViewer.zip build/bin/${{ steps.define_filename.outputs.filename }}.zip
+        run: mv bin/MQTTViewer.zip bin/${{ steps.define_filename.outputs.filename }}.zip
 
       - name: Upload release zip
         uses: alexellis/upload-assets@0.4.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'
+          asset_paths: '["bin/${{ steps.define_filename.outputs.filename }}.zip"]'

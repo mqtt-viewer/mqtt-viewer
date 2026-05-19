@@ -2,6 +2,8 @@ version: '3'
 
 includes:
   common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
   linux: ./build/linux/Taskfile.yml
 
 vars:
@@ -23,6 +25,11 @@ tasks:
       - task: '{{OS}}:package'
         vars:
           VERSION: '{{.VERSION | default "v0.0.1-defaultv"}}'
+
+  run:
+    summary: Runs the application for the current platform
+    cmds:
+      - task: '{{OS}}:run'
 
   dev:
     summary: Runs Wails v3 development mode

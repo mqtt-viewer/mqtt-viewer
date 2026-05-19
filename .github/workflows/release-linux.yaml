@@ -47,16 +47,20 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.3"
+          go-version: "1.25.0"
 
-      - name: Install wails
+      - name: Install Wails v3
         shell: bash
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.84
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20.15.0"
+
+      - name: Install pnpm
+        shell: bash
+        run: npm install -g pnpm
 
       # Dependencies
 
@@ -66,12 +70,6 @@ jobs:
 
       # Build
 
-      - name: Build frontend assets
-        shell: bash
-        run: |
-          npm install -g pnpm
-          cd frontend && pnpm install
-
       - name: Build wails app
         shell: bash
         run: |
@@ -79,14 +77,19 @@ jobs:
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
+          wails3 build \
+            GOOS=linux \
+            GOARCH=${{ matrix.build.arch }} \
+            VERSION=${{ steps.normalise_version.outputs.version }} \
+            EXTRA_TAGS=webkit2_41 \
+            LD_FLAGS="${LD_FLAGS}"
 
       # Packaging
 
       - name: Compress linux binary
         shell: bash
         run: |
-          cd build/bin && zip -r ${{ steps.define_filename.outputs.filename }}.zip "MQTT Viewer"
+          cd bin && zip -r ${{ steps.define_filename.outputs.filename }}.zip MQTTViewer
 
       # Publish
 
@@ -95,7 +98,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'
+          asset_paths: '["bin/${{ steps.define_filename.outputs.filename }}.zip"]'
 
       # AppImage
 
@@ -107,17 +110,12 @@ jobs:
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.IsAppImage=true"
-          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
-
-      - name: Rename linux binary to be appimage compatible
-        shell: bash
-        run: |
-          cd build/bin && mv "MQTT Viewer" MQTTViewer
-
-      - name: Package appimage
-        shell: bash
-        run: |
-          cd build/linux && go run build_appimage.go
+          wails3 package \
+            GOOS=linux \
+            GOARCH=${{ matrix.build.arch }} \
+            VERSION=${{ steps.normalise_version.outputs.version }} \
+            EXTRA_TAGS=webkit2_41 \
+            LD_FLAGS="${LD_FLAGS}"
 
       - name: Rename appimage
         shell: bash

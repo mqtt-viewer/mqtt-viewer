@@ -1,0 +1,113 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+vars:
+  # Signing configuration for release builds.
+  # SIGN_CERTIFICATE: "path/to/certificate.pfx"
+  # SIGN_THUMBPRINT: "certificate-thumbprint"
+  # TIMESTAMP_SERVER: "http://timestamp.digicert.com"
+
+tasks:
+  build:
+    summary: Builds the application for Windows
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+      - task: common:generate:icons
+    cmds:
+      - task: generate:syso
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+      - cmd: mkdir -p {{.ROOT_DIR}}/{{.BIN_DIR}}
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '{{.ROOT_DIR}}/{{.BIN_DIR}}' | Out-Null"
+        platforms: [windows]
+      - 'go build {{.BUILD_FLAGS}} -o "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe"'
+      - cmd: rm -f wails_windows_{{.ARCH | default ARCH}}.syso
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue wails_windows_{{.ARCH | default ARCH}}.syso"
+        platforms: [windows]
+    vars:
+      PROD_LD_FLAGS: '-w -s -H windowsgui -X mqtt-viewer/backend/env.Version={{.VERSION | default "v0.0.1-defaultv"}}{{if .LD_FLAGS}} {{.LD_FLAGS}}{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if .EXTRA_TAGS}}-tags {{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="{{.PROD_LD_FLAGS}}"{{end}}'
+    env:
+      GOOS: windows
+      CGO_ENABLED: 0
+      GOARCH: '{{.ARCH | default ARCH}}'
+
+  generate:syso:
+    summary: Generates the Windows `.syso` resource file
+    dir: build
+    cmds:
+      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.json -out ../wails_windows_{{.ARCH}}.syso
+    vars:
+      ARCH: '{{.ARCH | default ARCH}}'
+
+  package:
+    summary: Packages the Windows application as an NSIS installer
+    cmds:
+      - task: create:nsis:installer
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          PRODUCT_VERSION: '{{.PRODUCT_VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+
+  create:nsis:installer:
+    summary: Creates an NSIS installer
+    dir: build/windows/nsis
+    deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - wails3 generate webview2bootstrapper -dir "{{.ROOT_DIR}}/build/windows/nsis"
+      - >-
+        makensis
+        -DINFO_PROJECTNAME="{{.APP_NAME}}"
+        -DINFO_COMPANYNAME="MQTT Viewer"
+        -DINFO_PRODUCTNAME="MQTT Viewer"
+        -DINFO_PRODUCTVERSION="{{if .PRODUCT_VERSION}}{{.PRODUCT_VERSION}}{{else}}{{.VERSION | default "0.0.1"}}{{end}}"
+        -DINFO_COPYRIGHT="Copyright (c) 2024 MQTT Viewer"
+        -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe"
+        project.nsi
+    vars:
+      ARCH: '{{.ARCH | default ARCH}}'
+      ARG_FLAG: '{{if eq .ARCH "arm64"}}ARM64{{else}}AMD64{{end}}'
+
+  run:
+    cmds:
+      - '{{.BIN_DIR}}/{{.APP_NAME}}.exe'
+
+  sign:
+    summary: Signs the Windows executable
+    deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.exe" {{if .SIGN_CERTIFICATE}}--certificate {{.SIGN_CERTIFICATE}}{{end}} {{if .SIGN_THUMBPRINT}}--thumbprint {{.SIGN_THUMBPRINT}}{{end}} {{if .TIMESTAMP_SERVER}}--timestamp {{.TIMESTAMP_SERVER}}{{end}}
+    preconditions:
+      - sh: '[ -n "{{.SIGN_CERTIFICATE}}" ] || [ -n "{{.SIGN_THUMBPRINT}}" ]'
+        msg: "Either SIGN_CERTIFICATE or SIGN_THUMBPRINT is required."
+
+  sign:installer:
+    summary: Signs the NSIS installer
+    deps:
+      - task: create:nsis:installer
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          LD_FLAGS: '{{.LD_FLAGS}}'
+    cmds:
+      - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}-{{.ARCH | default ARCH}}-installer.exe" {{if .SIGN_CERTIFICATE}}--certificate {{.SIGN_CERTIFICATE}}{{end}} {{if .SIGN_THUMBPRINT}}--thumbprint {{.SIGN_THUMBPRINT}}{{end}} {{if .TIMESTAMP_SERVER}}--timestamp {{.TIMESTAMP_SERVER}}{{end}}
+    preconditions:
+      - sh: '[ -n "{{.SIGN_CERTIFICATE}}" ] || [ -n "{{.SIGN_THUMBPRINT}}" ]'
+        msg: "Either SIGN_CERTIFICATE or SIGN_THUMBPRINT is required."

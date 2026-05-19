@@ -34,6 +34,17 @@ tasks:
     cmds:
       - wails3 generate bindings -clean=true -ts
 
+  generate:icons:
+    summary: Generates Windows `.ico` and macOS `.icns` files from the app icon
+    dir: build
+    sources:
+      - appicon.png
+    generates:
+      - darwin/icons.icns
+      - windows/icon.ico
+    cmds:
+      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
+
   build:frontend:
     summary: Builds the frontend project
     dir: frontend
@@ -41,7 +52,7 @@ tasks:
       - task: install:frontend:deps
       - task: generate:bindings
     cmds:
-      - pnpm build
+      - '{{if eq .DEV "true"}}echo "Skipping production frontend build in dev mode"{{else}}pnpm build{{end}}'
 
   dev:frontend:
     summary: Runs the frontend dev server
@@ -49,4 +60,10 @@ tasks:
     deps:
       - task: install:frontend:deps
     cmds:
-      - pnpm dev -- --port {{.VITE_PORT}} --strictPort
+      - pnpm dev --port {{.VITE_PORT}} --strictPort
+
+  update:build-assets:
+    summary: Updates Wails v3 build assets from build/config.yml
+    dir: build
+    cmds:
+      - wails3 update build-assets -name "{{.APP_NAME}}" -binaryname "{{.APP_NAME}}" -config config.yml -dir .
