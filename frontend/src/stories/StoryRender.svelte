@@ -43,7 +43,8 @@
 <div class="min-h-[180px] size-full bg-elevation-0 p-5 text-white-text">
   {#if componentName === "Dialog"}
     <svelte:component this={component} {...renderArgs}>
-      <span slot="trigger" class="rounded bg-button px-3 py-2">Open dialog</span>
+      <span slot="trigger" class="rounded bg-button px-3 py-2">Open dialog</span
+      >
       <div class="min-w-[320px]">Dialog content prepared for Storybook.</div>
     </svelte:component>
   {:else if componentName === "DropdownMenu"}
@@ -59,7 +60,11 @@
       </div>
     </svelte:component>
   {:else if componentName === "Tabs"}
-    <svelte:component this={component} {...renderArgs} class="h-[260px] w-[520px]">
+    <svelte:component
+      this={component}
+      {...renderArgs}
+      class="h-[260px] w-[520px]"
+    >
       <div slot="tab-1" class="p-4">Payload tab content</div>
       <div slot="tab-2" class="p-4">Header tab content</div>
       <div slot="tab-3" class="p-4">User properties content</div>

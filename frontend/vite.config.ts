@@ -3,7 +3,9 @@ import { defineConfig } from "vitest/config";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 
-const storybookConfigDir = fileURLToPath(new URL("./.storybook", import.meta.url));
+const storybookConfigDir = fileURLToPath(
+  new URL("./.storybook", import.meta.url)
+);
 
 // https://vitejs.dev/config/
 export default defineConfig({

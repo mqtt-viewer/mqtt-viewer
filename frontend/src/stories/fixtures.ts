@@ -67,7 +67,12 @@ export const mockConnectionDetails = {
   lastConnectedAt: new Date(now - 300000),
   customIconSeed: "storybook-local-broker",
   filterHistories: [
-    { id: 1, connectionId: 1, text: "factory/line", lastUsed: new Date(now - 30000).toISOString() },
+    {
+      id: 1,
+      connectionId: 1,
+      text: "factory/line",
+      lastUsed: new Date(now - 30000).toISOString(),
+    },
   ],
   publishHistories: [],
 };
@@ -225,7 +230,10 @@ export const createMockSelectedTopicStore = () => {
     selectedTopic: "factory/line/temperature",
     history: mockMqttMessages.map((message) => ({
       ...message,
-      payload: message.id === "message-1" ? '{"temp":21.4,"unit":"C"}' : '{"humidity":42.8}',
+      payload:
+        message.id === "message-1"
+          ? '{"temp":21.4,"unit":"C"}'
+          : '{"humidity":42.8}',
     })) as any,
     options: {
       autoSelect: true,
@@ -264,7 +272,8 @@ export const createMockPublishStore = () => {
   return {
     subscribe,
     set,
-    setPartial: (partial: Record<string, unknown>) => update((store) => ({ ...store, ...partial })),
+    setPartial: (partial: Record<string, unknown>) =>
+      update((store) => ({ ...store, ...partial })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -276,7 +285,9 @@ export const createMockPublishStore = () => {
 };
 
 export const createMockPublishHistoryStore = () => {
-  const { subscribe, update } = writable({ publishHistory: mockPublishHistory });
+  const { subscribe, update } = writable({
+    publishHistory: mockPublishHistory,
+  });
   return {
     subscribe,
     savePublishEntry: asyncNoop,
@@ -333,7 +344,11 @@ const propDefaults: Record<string, () => unknown> = {
   forceOpen: () => true,
   format: () => "json",
   formatPayload: () => noop,
-  getAllTopics: () => () => ["factory", "factory/line", "factory/line/temperature"],
+  getAllTopics: () => () => [
+    "factory",
+    "factory/line",
+    "factory/line/temperature",
+  ],
   getMatchingSubscription: () => async () => mockSubscriptions[0],
   getOptionDisplay: () => (option?: unknown) => String(option ?? "None"),
   getOptionLabel: () => (option?: unknown) => String(option ?? "None"),
@@ -429,7 +444,11 @@ const propDefaults: Record<string, () => unknown> = {
   state: () => "connected",
   subtopicCount: () => 2,
   syntaxHighlight: () => true,
-  tabs: () => [{ title: "Payload" }, { title: "Headers" }, { title: "User Properties" }],
+  tabs: () => [
+    { title: "Payload" },
+    { title: "Headers" },
+    { title: "User Properties" },
+  ],
   text: () => "Storybook content",
   textToCopy: () => '{"temp":21.4}',
   textToCopyOnLeft: () => '{"temp":20.9}',

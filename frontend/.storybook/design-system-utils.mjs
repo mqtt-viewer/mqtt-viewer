@@ -14,8 +14,14 @@ export const componentIndexSchemaPath = path.join(
   designSystemDir,
   "component-index.schema.json"
 );
-export const designTokensPath = path.join(designSystemDir, "design-tokens.json");
-export const checklistPath = path.join(designSystemDir, "COMPONENT_CHECKLIST.md");
+export const designTokensPath = path.join(
+  designSystemDir,
+  "design-tokens.json"
+);
+export const checklistPath = path.join(
+  designSystemDir,
+  "COMPONENT_CHECKLIST.md"
+);
 
 const roots = [path.resolve("src/components"), path.resolve("src/views")];
 
@@ -59,9 +65,11 @@ export const namespaceForTier = (tier) => {
 
 export const toPosix = (filePath) => filePath.split(path.sep).join("/");
 
-export const relativePath = (filePath) => toPosix(path.relative(process.cwd(), filePath));
+export const relativePath = (filePath) =>
+  toPosix(path.relative(process.cwd(), filePath));
 
-export const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, "utf8"));
+export const readJson = (filePath) =>
+  JSON.parse(fs.readFileSync(filePath, "utf8"));
 
 export const writeJson = (filePath, data) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -96,7 +104,10 @@ export const getComponentFiles = () =>
 export const componentNameFromPath = (sourcePath) =>
   path.basename(sourcePath, ".svelte");
 
-export const inferTier = (sourcePath, componentName = componentNameFromPath(sourcePath)) => {
+export const inferTier = (
+  sourcePath,
+  componentName = componentNameFromPath(sourcePath)
+) => {
   const rel = relativePath(sourcePath);
   if (rel.startsWith("src/views/")) return "view";
   if (primitiveNames.has(componentName)) return "primitive";
@@ -105,12 +116,17 @@ export const inferTier = (sourcePath, componentName = componentNameFromPath(sour
 
 export const titlePartsForSource = (sourcePath) => {
   const rel = relativePath(sourcePath);
-  const sourceRoot = rel.startsWith("src/views/") ? "src/views/" : "src/components/";
+  const sourceRoot = rel.startsWith("src/views/")
+    ? "src/views/"
+    : "src/components/";
   const withoutRoot = rel.slice(sourceRoot.length).replace(/\.svelte$/, "");
   const parts = withoutRoot
     .split("/")
     .filter((part) => part !== "components")
-    .filter((part, index, all) => !(index === all.length - 1 && part === all[index - 1]));
+    .filter(
+      (part, index, all) =>
+        !(index === all.length - 1 && part === all[index - 1])
+    );
   return parts;
 };
 
@@ -133,7 +149,8 @@ export const schemaRelativePathFor = (specPath) =>
 export const parsePropsFromSource = (source) => {
   const props = [];
   const seen = new Set();
-  const exportLetRegex = /export\s+let\s+([A-Za-z0-9_]+)(?:\s*:\s*([^=;\n]+))?(?:\s*=\s*([^;\n]+))?/g;
+  const exportLetRegex =
+    /export\s+let\s+([A-Za-z0-9_]+)(?:\s*:\s*([^=;\n]+))?(?:\s*=\s*([^;\n]+))?/g;
   for (const match of source.matchAll(exportLetRegex)) {
     const name = match[1];
     if (seen.has(name)) continue;
@@ -147,7 +164,8 @@ export const parsePropsFromSource = (source) => {
     };
     const options = inferPropOptions(name, typeExpression, defaultExpression);
     if (options.length > 0) prop.options = options;
-    if (defaultExpression !== "") prop.default = cleanDefaultValue(defaultExpression);
+    if (defaultExpression !== "")
+      prop.default = cleanDefaultValue(defaultExpression);
     props.push(prop);
   }
   return props;
@@ -160,17 +178,49 @@ const cleanDefaultValue = (value) => {
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
   const stringMatch = trimmed.match(/^["']([^"']*)["']/);
   if (stringMatch) return stringMatch[1];
-  if (trimmed === "undefined" || trimmed.startsWith("undefined as")) return null;
+  if (trimmed === "undefined" || trimmed.startsWith("undefined as"))
+    return null;
   return trimmed;
 };
 
 const inferPropType = (name, typeExpression, defaultExpression) => {
   const expression = `${typeExpression} ${defaultExpression}`;
-  if (inferPropOptions(name, typeExpression, defaultExpression).length > 0) return "enum";
-  if (/boolean|true|false/.test(expression) || name.startsWith("is") || name.startsWith("has")) return "boolean";
-  if (/number/.test(expression) || /^(width|height|size|minSize|maxSize|port|qos|connectionId|firstConnectedAtMs|messageCount|subtopicCount)$/.test(name)) return "number";
-  if (/=>|\bFunction\b/.test(expression) || /^on[A-Z]/.test(name) || ["open", "close", "toggleExpansion", "formatPayload", "getAllTopics", "deleteRetainedMessage", "getTopicMatchesSubscription", "setEditorText"].includes(name)) return "function";
-  if (/Writable|Store|writable\(/.test(expression) || name.endsWith("Store") || ["checked", "isOpen"].includes(name)) return "store";
+  if (inferPropOptions(name, typeExpression, defaultExpression).length > 0)
+    return "enum";
+  if (
+    /boolean|true|false/.test(expression) ||
+    name.startsWith("is") ||
+    name.startsWith("has")
+  )
+    return "boolean";
+  if (
+    /number/.test(expression) ||
+    /^(width|height|size|minSize|maxSize|port|qos|connectionId|firstConnectedAtMs|messageCount|subtopicCount)$/.test(
+      name
+    )
+  )
+    return "number";
+  if (
+    /=>|\bFunction\b/.test(expression) ||
+    /^on[A-Z]/.test(name) ||
+    [
+      "open",
+      "close",
+      "toggleExpansion",
+      "formatPayload",
+      "getAllTopics",
+      "deleteRetainedMessage",
+      "getTopicMatchesSubscription",
+      "setEditorText",
+    ].includes(name)
+  )
+    return "function";
+  if (
+    /Writable|Store|writable\(/.test(expression) ||
+    name.endsWith("Store") ||
+    ["checked", "isOpen"].includes(name)
+  )
+    return "store";
   if (/\[\]|Array|\{/.test(expression)) return "object";
   return "string";
 };
@@ -196,14 +246,20 @@ const optionByPropName = {
 const inferPropOptions = (name, typeExpression, defaultExpression) => {
   if (optionByPropName[name]) return optionByPropName[name];
   const expression = `${typeExpression} ${defaultExpression}`;
-  const options = [...expression.matchAll(/["']([^"']+)["']/g)].map((match) => match[1]);
-  return [...new Set(options)].filter((option) => option.length > 0 && option.length < 40);
+  const options = [...expression.matchAll(/["']([^"']+)["']/g)].map(
+    (match) => match[1]
+  );
+  return [...new Set(options)].filter(
+    (option) => option.length > 0 && option.length < 40
+  );
 };
 
 export const extractTokensFromSource = (source, tokenNames) =>
   tokenNames.filter((token) => {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(?:bg|text|border|ring|from|to|via|fill|stroke)-${escaped}(?:\\b|/)`).test(source);
+    return new RegExp(
+      `(?:bg|text|border|ring|from|to|via|fill|stroke)-${escaped}(?:\\b|/)`
+    ).test(source);
   });
 
 export const buildIndex = () => {
@@ -235,7 +291,9 @@ export const buildIndex = () => {
       sourcePath: relativePath(sourcePath),
       specPath: relativePath(specPath),
       storyPath: fs.existsSync(storyPath) ? relativePath(storyPath) : null,
-      storyId: fs.existsSync(storyPath) ? storyTitleFor(sourcePath, tier) : null,
+      storyId: fs.existsSync(storyPath)
+        ? storyTitleFor(sourcePath, tier)
+        : null,
       props: spec.props ?? [],
       tokens: spec.tokens ?? [],
       dependencies: spec.dependencies ?? [],
@@ -267,15 +325,20 @@ export const writeChecklist = (index) => {
       .sort((a, b) => (a.storyId ?? a.name).localeCompare(b.storyId ?? b.name))
       .map((component) => {
         const story = component.storyPath ? "[x]" : "[ ]";
-        const figma = component.figma?.url && component.figma?.nodeId ? "[x]" : "[ ]";
+        const figma =
+          component.figma?.url && component.figma?.nodeId ? "[x]" : "[ ]";
         const props = component.props?.length ? "[x]" : "[ ]";
         const tokens = component.tokens?.length ? "[x]" : "[ ]";
         return `| ${component.storyId ?? component.name} | ${story} | ${figma} | ${props} | ${tokens} |`;
       })
       .join("\n");
 
-  const storyCount = index.components.filter((component) => component.storyPath).length;
-  const figmaCount = index.components.filter((component) => component.status === "figma-linked").length;
+  const storyCount = index.components.filter(
+    (component) => component.storyPath
+  ).length;
+  const figmaCount = index.components.filter(
+    (component) => component.status === "figma-linked"
+  ).length;
   const content = `# Component Checklist\n\n> This file is generated by \`pnpm ds:validate\` from \`component-index.json\`.\n> Hand-edits will be overwritten.\n\n## Foundations\n\n| Token group | Story | Figma | Notes |\n|---|:---:|:---:|---|\n| Tokens (colors + type ramp) | [x] | [ ] | from \`design-tokens.json\` |\n\n## Primitives (\`Primitives/*\`)\n\n| Component | Story | Figma | Props | Tokens |\n|---|:---:|:---:|:---:|:---:|\n${renderRows(rowsByTier.primitive)}\n\n## Components (\`Components/*\`)\n\n| Component | Story | Figma | Props | Tokens |\n|---|:---:|:---:|:---:|:---:|\n${renderRows(rowsByTier.component)}\n\n## Views (\`Views/*\`)\n\n| View | Story | Figma | Props | Tokens |\n|---|:---:|:---:|:---:|:---:|\n${renderRows(rowsByTier.view)}\n\n## Summary\n\n- Components scanned: ${index.components.length}\n- Story present: ${storyCount}\n- Figma-linked: ${figmaCount}\n- Missing specs: ${index.components.filter((component) => component.specMissing).length}\n`;
   fs.writeFileSync(checklistPath, content);
 };

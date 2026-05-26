@@ -27,7 +27,10 @@ export function EventsEmit(eventName: string, ...data: any): void {
   for (const listener of listeners.get(eventName) ?? []) listener(...data);
 }
 
-export function EventsOn(eventName: string, callback: (...data: any[]) => void): () => void {
+export function EventsOn(
+  eventName: string,
+  callback: (...data: any[]) => void
+): () => void {
   const eventListeners = listeners.get(eventName) ?? new Set();
   eventListeners.add(callback);
   listeners.set(eventName, eventListeners);
@@ -47,7 +50,10 @@ export function EventsOnMultiple(
   });
 }
 
-export function EventsOnce(eventName: string, callback: (...data: any[]) => void): () => void {
+export function EventsOnce(
+  eventName: string,
+  callback: (...data: any[]) => void
+): () => void {
   const off = EventsOn(eventName, (...data) => {
     off();
     callback(...data);
@@ -55,7 +61,10 @@ export function EventsOnce(eventName: string, callback: (...data: any[]) => void
   return off;
 }
 
-export function EventsOff(eventName: string, ...additionalEventNames: string[]): void {
+export function EventsOff(
+  eventName: string,
+  ...additionalEventNames: string[]
+): void {
   listeners.delete(eventName);
   for (const name of additionalEventNames) listeners.delete(name);
 }
@@ -99,7 +108,10 @@ export function WindowUnfullscreen(): void {}
 export async function WindowIsFullscreen(): Promise<boolean> {
   return false;
 }
-export async function WindowSetSize(width: number, height: number): Promise<Size> {
+export async function WindowSetSize(
+  width: number,
+  height: number
+): Promise<Size> {
   return { w: width, h: height };
 }
 export async function WindowGetSize(): Promise<Size> {
@@ -127,7 +139,12 @@ export async function WindowIsMinimised(): Promise<boolean> {
 export async function WindowIsNormal(): Promise<boolean> {
   return true;
 }
-export function WindowSetBackgroundColour(_r: number, _g: number, _b: number, _a: number): void {}
+export function WindowSetBackgroundColour(
+  _r: number,
+  _g: number,
+  _b: number,
+  _a: number
+): void {}
 export async function ScreenGetAll(): Promise<Screen[]> {
   return [{ isCurrent: true, isPrimary: true, width: 1440, height: 900 }];
 }
@@ -149,7 +166,10 @@ export async function ClipboardGetText(): Promise<string> {
 export async function ClipboardSetText(_text: string): Promise<boolean> {
   return true;
 }
-export function OnFileDrop(_callback: (x: number, y: number, paths: string[]) => void, _useDropTarget: boolean): void {}
+export function OnFileDrop(
+  _callback: (x: number, y: number, paths: string[]) => void,
+  _useDropTarget: boolean
+): void {}
 export function OnFileDropOff(): void {}
 export function CanResolveFilePaths(): boolean {
   return true;

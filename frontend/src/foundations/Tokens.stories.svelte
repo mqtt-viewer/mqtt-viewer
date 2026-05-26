@@ -13,7 +13,9 @@
   <div class="min-h-screen bg-elevation-0 p-8 text-white-text">
     <div class="mb-8">
       <h1 class="text-xl font-semibold">Colors</h1>
-      <div class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+      <div
+        class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3"
+      >
         {#each Object.entries(tokens.color) as [name, value]}
           <div class="rounded border border-outline bg-elevation-1-card p-3">
             <div
@@ -29,7 +31,9 @@
 
     <div>
       <h1 class="text-xl font-semibold">Type Ramp</h1>
-      <div class="mt-4 flex flex-col gap-3 rounded border border-outline bg-elevation-1-card p-4">
+      <div
+        class="mt-4 flex flex-col gap-3 rounded border border-outline bg-elevation-1-card p-4"
+      >
         {#each Object.entries(tokens.fontSize) as [name, value]}
           <div class="flex items-baseline gap-4">
             <div class="w-16 text-secondary-text">{name}</div>

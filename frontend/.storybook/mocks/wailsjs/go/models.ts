@@ -1,4 +1,5 @@
-const assign = <T extends object>(target: T, source: any = {}) => Object.assign(target, source);
+const assign = <T extends object>(target: T, source: any = {}) =>
+  Object.assign(target, source);
 
 export namespace events {
   export enum GlobalEvent {

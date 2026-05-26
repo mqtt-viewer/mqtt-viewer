@@ -20,7 +20,9 @@ const flattenColors = (colors, prefix = "") => {
         result,
         flattenColors(
           Object.fromEntries(
-            Object.entries(value).filter(([nestedKey]) => nestedKey !== "DEFAULT")
+            Object.entries(value).filter(
+              ([nestedKey]) => nestedKey !== "DEFAULT"
+            )
           ),
           tokenName
         )

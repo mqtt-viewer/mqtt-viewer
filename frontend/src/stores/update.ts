@@ -19,9 +19,12 @@ const { subscribe, set, update } = writable<UpdatesStore>(
       getAvailableUpdate();
     }, 2 * 1000);
     // Check every 10 minutes
-    setInterval(async () => {
-      getAvailableUpdate();
-    }, 10 * 60 * 1000);
+    setInterval(
+      async () => {
+        getAvailableUpdate();
+      },
+      10 * 60 * 1000
+    );
   }
 );
 

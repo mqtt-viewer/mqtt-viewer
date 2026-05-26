@@ -13,7 +13,9 @@ import {
 
 const target = process.argv[2];
 if (!target) {
-  console.error("Usage: pnpm ds:make-spec <ComponentName|path/to/Component.svelte>");
+  console.error(
+    "Usage: pnpm ds:make-spec <ComponentName|path/to/Component.svelte>"
+  );
   process.exit(1);
 }
 
@@ -40,7 +42,9 @@ if (fs.existsSync(specPath)) {
 }
 
 const tokens = fs.existsSync(designTokensPath)
-  ? Object.keys(JSON.parse(fs.readFileSync(designTokensPath, "utf8")).color ?? {})
+  ? Object.keys(
+      JSON.parse(fs.readFileSync(designTokensPath, "utf8")).color ?? {}
+    )
   : [];
 const source = fs.readFileSync(sourcePath, "utf8");
 const componentName = componentNameFromPath(sourcePath);
