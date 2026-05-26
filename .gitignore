@@ -1,6 +1,7 @@
 build/bin
 node_modules
 frontend/dist
+frontend/storybook-static
 *.db
 _dev_resources
 mqtt-viewer

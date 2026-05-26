@@ -1,0 +1,38 @@
+name: Design System
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "docs/design-system/**"
+      - ".github/workflows/design-system.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "docs/design-system/**"
+      - ".github/workflows/design-system.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate registry
+        run: pnpm ds:validate
+      - name: Test Storybook stories
+        run: pnpm test-storybook
+      - name: Build Storybook
+        run: pnpm build-storybook
+      - name: Check generated files
+        run: git diff --exit-code -- src/design-system/component-index.json src/design-system/COMPONENT_CHECKLIST.md src/design-system/design-tokens.json
