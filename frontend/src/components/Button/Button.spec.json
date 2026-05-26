@@ -1,0 +1,95 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Button",
+  "tier": "primitive",
+  "description": "Storybook coverage for Button.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "as",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "button",
+        "a",
+        "div"
+      ],
+      "default": "button"
+    },
+    {
+      "name": "variant",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "primary",
+        "secondary",
+        "text"
+      ],
+      "default": "secondary"
+    },
+    {
+      "name": "iconType",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "iconType"
+      ],
+      "default": null
+    },
+    {
+      "name": "iconSize",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "iconSize"
+      ],
+      "default": 22
+    },
+    {
+      "name": "iconPlacement",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "left",
+        "right"
+      ],
+      "default": "left"
+    },
+    {
+      "name": "iconClass",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "iconClass"
+      ],
+      "default": ""
+    },
+    {
+      "name": "forceHover",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "preventFocus",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text",
+    "button",
+    "hovered"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

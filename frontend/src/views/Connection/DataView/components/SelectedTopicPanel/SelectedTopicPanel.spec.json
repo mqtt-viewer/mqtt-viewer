@@ -1,0 +1,53 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "SelectedTopicPanel",
+  "tier": "view",
+  "description": "Storybook coverage for SelectedTopicPanel.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "selectedTopicStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "firstConnectedAtMs",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "mqttVersion",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "3",
+        "5"
+      ]
+    },
+    {
+      "name": "deleteRetainedMessage",
+      "type": "function",
+      "required": false,
+      "default": "> Promise<void>"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text",
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

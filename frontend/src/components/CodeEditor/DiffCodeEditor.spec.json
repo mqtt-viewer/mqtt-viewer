@@ -1,0 +1,41 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "DiffCodeEditor",
+  "tier": "component",
+  "description": "Storybook coverage for DiffCodeEditor.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "format",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "none",
+        "json",
+        "json-prettier",
+        "xml"
+      ],
+      "default": "json"
+    },
+    {
+      "name": "left",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "right",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

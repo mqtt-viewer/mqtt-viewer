@@ -1,0 +1,51 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "MessageTimeline",
+  "tier": "view",
+  "description": "Storybook coverage for MessageTimeline.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "selectedTopicStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "firstConnectedAtMs",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "onMessageSelect",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "isAutoSelectingMostRecent",
+      "type": "boolean",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "primary",
+    "primary-light",
+    "secondary",
+    "secondary-text",
+    "outline"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

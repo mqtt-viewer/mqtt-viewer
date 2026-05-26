@@ -1,0 +1,58 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "LoadedProtoDetailsDialog",
+  "tier": "view",
+  "description": "Storybook coverage for LoadedProtoDetailsDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "open",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    },
+    {
+      "name": "loadedRootDir",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "loadedProtoFilesWithDescriptorsMap",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "selectedDescriptor",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "selectedDescriptorIsMissing",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "onDescriptorSelect",
+      "type": "function",
+      "required": false,
+      "default": null
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text",
+    "divider",
+    "error"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

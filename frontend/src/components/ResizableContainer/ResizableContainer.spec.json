@@ -1,0 +1,56 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "ResizableContainer",
+  "tier": "primitive",
+  "description": "Storybook coverage for ResizableContainer.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "id",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "collapsed",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "minSize",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "maxSize",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "resizeEdge",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "left",
+        "right"
+      ],
+      "default": "right"
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": false,
+      "default": 0
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

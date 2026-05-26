@@ -1,0 +1,25 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "ConnectionTabs",
+  "tier": "component",
+  "description": "Storybook coverage for ConnectionTabs.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "maxContainerWidth",
+      "type": "string",
+      "required": false,
+      "default": 0
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

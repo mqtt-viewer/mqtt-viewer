@@ -1,8 +1,8 @@
 import { writable } from "svelte/store";
-import { update as wailsupdate } from "../../wailsjs/go/models";
-import { CheckForUpdates } from "../../wailsjs/go/app/App";
+import { update as wailsupdate } from "wailsjs/go/models";
+import { CheckForUpdates } from "wailsjs/go/app/App";
 import notificationStore, { type Notification } from "./notifications";
-import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
+import { BrowserOpenURL } from "wailsjs/runtime/runtime";
 
 interface UpdatesStore {
   isUpdateDialogOpen: boolean;

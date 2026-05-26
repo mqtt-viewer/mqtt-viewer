@@ -1,0 +1,45 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "ConfirmDeleteConnectionDialog",
+  "tier": "view",
+  "description": "Storybook coverage for ConfirmDeleteConnectionDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isOpen",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    },
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onConfirm",
+      "type": "function",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "onCancel",
+      "type": "boolean",
+      "required": false,
+      "default": "() => isOpen.set(false)"
+    }
+  ],
+  "tokens": [
+    "error",
+    "error-light"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

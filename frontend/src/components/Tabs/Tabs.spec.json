@@ -1,0 +1,45 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Tabs",
+  "tier": "primitive",
+  "description": "Storybook coverage for Tabs.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "defaultTab",
+      "type": "string",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "tabs",
+      "type": "object",
+      "required": false,
+      "default": "[]"
+    },
+    {
+      "name": "ariaLabel",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "Tabs"
+      ],
+      "default": "Tabs"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "secondary-text",
+    "outline"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

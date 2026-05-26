@@ -1,0 +1,32 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "SearchAndHistory",
+  "tier": "view",
+  "description": "Storybook coverage for SearchAndHistory.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "searchText",
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "secondary-text",
+    "outline",
+    "elevation-2",
+    "elevation-2-hover"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

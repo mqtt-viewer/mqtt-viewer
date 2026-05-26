@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "Topic",
+  "tier": "view",
+  "description": "Storybook coverage for Topic.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "topic",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "hovered"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

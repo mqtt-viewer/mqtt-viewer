@@ -1,0 +1,66 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Dialog",
+  "tier": "primitive",
+  "description": "Storybook coverage for Dialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "title",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "isOpen",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    },
+    {
+      "name": "onClose",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
+      "name": "noTitleMargin",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "startEmpty",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "showCloseButton",
+      "type": "string",
+      "required": false,
+      "default": "!startEmpty"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "secondary-text",
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

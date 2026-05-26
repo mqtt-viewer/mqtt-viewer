@@ -1,0 +1,18 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "UpdateDialog",
+  "tier": "component",
+  "description": "Storybook coverage for UpdateDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

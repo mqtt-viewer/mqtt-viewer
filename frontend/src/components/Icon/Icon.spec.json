@@ -1,0 +1,75 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Icon",
+  "tier": "primitive",
+  "description": "Storybook coverage for Icon.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "add",
+        "close",
+        "settings",
+        "delete",
+        "connect",
+        "disconnect"
+      ]
+    },
+    {
+      "name": "size",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "small",
+        "medium"
+      ],
+      "default": 16
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": false,
+      "default": "size"
+    },
+    {
+      "name": "height",
+      "type": "number",
+      "required": false,
+      "default": "size"
+    },
+    {
+      "name": "color",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "currentColor"
+      ],
+      "default": "currentColor"
+    },
+    {
+      "name": "weight",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "selected",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

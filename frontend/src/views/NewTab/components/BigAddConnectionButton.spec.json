@@ -1,0 +1,25 @@
+{
+  "$schema": "../../../design-system/component-spec.schema.json",
+  "name": "BigAddConnectionButton",
+  "tier": "view",
+  "description": "Storybook coverage for BigAddConnectionButton.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

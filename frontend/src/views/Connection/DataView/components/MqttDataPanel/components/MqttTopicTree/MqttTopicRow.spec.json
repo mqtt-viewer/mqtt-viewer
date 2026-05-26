@@ -1,0 +1,86 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "MqttTopicRow",
+  "tier": "view",
+  "description": "Storybook coverage for MqttTopicRow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "topic",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "topicLevel",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "expandKey",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "message",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "messageCount",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "subtopicCount",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "isExpanded",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "isSelected",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "isDecodedProto",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "toggleExpansion",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onTopicSelect",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "highlightedTopicStore",
+      "type": "store",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "SelectedMessageArrivalDetails",
+  "tier": "view",
+  "description": "Storybook coverage for SelectedMessageArrivalDetails.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isComparing",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "selectedArrivedAtMs",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "selectedRetain",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "previousArrivedAtMs",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "previousRetain",
+      "type": "boolean",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "GiveFeedbackCard",
+  "tier": "component",
+  "description": "Storybook coverage for GiveFeedbackCard.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "icon",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "iconClass",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "text",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

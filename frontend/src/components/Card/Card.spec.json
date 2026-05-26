@@ -1,0 +1,30 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Card",
+  "tier": "primitive",
+  "description": "Storybook coverage for Card.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void) | null = null"
+    }
+  ],
+  "tokens": [
+    "button",
+    "hovered",
+    "elevation-1",
+    "elevation-1-card"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

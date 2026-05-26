@@ -1,0 +1,110 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Select",
+  "tier": "primitive",
+  "description": "Storybook coverage for Select.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "sameWidth",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "options",
+      "type": "object",
+      "required": false,
+      "default": "[]"
+    },
+    {
+      "name": "defaultValue",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "getOptionLabel",
+      "type": "string",
+      "required": false,
+      "default": "> string"
+    },
+    {
+      "name": "selected",
+      "type": "string",
+      "required": false,
+      "default": "writable<SelectOption<OptionType | undefined>>("
+    },
+    {
+      "name": "placeholder",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "icon",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "bgColor",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "elevation-0",
+        "DEFAULT"
+      ],
+      "default": "untypedColors[\"elevation-0\"][\"DEFAULT\"] as"
+    },
+    {
+      "name": "buttonClass",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "onChange",
+      "type": "function",
+      "required": false,
+      "default": "(value: OptionType | undefined) => {}"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "white-text",
+    "secondary-text",
+    "outline",
+    "hovered",
+    "elevation-2",
+    "elevation-2-hover"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

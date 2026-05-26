@@ -1,0 +1,24 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "UserPropertiesTab",
+  "tier": "view",
+  "description": "Storybook coverage for UserPropertiesTab.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "userProperties",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

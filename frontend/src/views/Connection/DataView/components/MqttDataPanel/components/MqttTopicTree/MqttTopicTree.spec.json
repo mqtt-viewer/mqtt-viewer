@@ -1,0 +1,73 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "MqttTopicTree",
+  "tier": "view",
+  "description": "Storybook coverage for MqttTopicTree.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "width",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "selectedTopic",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "expandedTopicsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "highlightedTopicStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "mqttData",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "searchText",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "sortKey",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "topic",
+        "time"
+      ]
+    },
+    {
+      "name": "sortDir",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "asc",
+        "desc"
+      ]
+    },
+    {
+      "name": "onTopicSelect",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

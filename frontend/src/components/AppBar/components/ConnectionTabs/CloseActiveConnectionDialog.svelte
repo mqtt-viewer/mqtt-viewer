@@ -9,6 +9,10 @@
   export let connection: Connection | null = null;
   export let onConfirm = undefined as (() => void) | undefined;
   export let onCancel = () => open.set(false);
+
+  const onConfirmClick = () => {
+    onConfirm?.();
+  };
 </script>
 
 <Dialog
@@ -35,7 +39,7 @@
         iconType="disconnect"
         iconPlacement="right"
         iconSize={16}
-        on:click={onConfirm}>Disconnect</Button
+        on:click={onConfirmClick}>Disconnect</Button
       >
     </div>
   </div>

@@ -1,0 +1,51 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "ConnectionTab",
+  "tier": "component",
+  "description": "Storybook coverage for ConnectionTab.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isSelected",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onDeleteClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "outline",
+    "hovered",
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

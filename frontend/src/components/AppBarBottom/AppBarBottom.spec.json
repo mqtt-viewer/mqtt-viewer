@@ -1,0 +1,22 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "AppBarBottom",
+  "tier": "component",
+  "description": "Storybook coverage for AppBarBottom.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [],
+  "tokens": [
+    "secondary",
+    "secondary-text",
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

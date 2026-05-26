@@ -1,0 +1,39 @@
+{
+  "$schema": "../../../design-system/component-spec.schema.json",
+  "name": "NewTabButton",
+  "tier": "component",
+  "description": "Storybook coverage for NewTabButton.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isSelected",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "newTabButtonWidth",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "white-text",
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "CloseActiveConnectionDialog",
+  "tier": "component",
+  "description": "Storybook coverage for CloseActiveConnectionDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "open",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    },
+    {
+      "name": "connection",
+      "type": "string",
+      "required": false,
+      "default": "null"
+    },
+    {
+      "name": "onConfirm",
+      "type": "function",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "onCancel",
+      "type": "boolean",
+      "required": false,
+      "default": "() => open.set(false)"
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

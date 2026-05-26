@@ -1,0 +1,63 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "IconButton",
+  "tier": "primitive",
+  "description": "Storybook coverage for IconButton.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "tooltipText",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "tooltipPlacement",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "(e: MouseEvent) => {}"
+    },
+    {
+      "name": "tooltipOpenDelay",
+      "type": "string",
+      "required": false,
+      "default": 500
+    },
+    {
+      "name": "feedbackText",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "preventFocus",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  ],
+  "tokens": [
+    "hovered"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "LoadedProtoTreeItem",
+  "tier": "view",
+  "description": "Storybook coverage for LoadedProtoTreeItem.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "allowPress",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "isExpanded",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "isSelected",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "iconType",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

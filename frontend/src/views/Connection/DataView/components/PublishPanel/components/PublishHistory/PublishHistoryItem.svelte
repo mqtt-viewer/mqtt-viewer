@@ -1,6 +1,6 @@
 <script lang="ts">
   import IconButton from "@/components/Button/IconButton.svelte";
-  import type { SupportCodeEditorCodec } from "@/components/CodeEditor/codec";
+  import type { SupportedCodeEditorCodec } from "@/components/CodeEditor/codec";
   import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
   import { highlightJson } from "@/components/CodeEditor/highlighter";
   import Icon from "@/components/Icon/Icon.svelte";
@@ -12,7 +12,7 @@
   export let retain: boolean;
   export let timestamp: Date;
   export let searchString: string;
-  export let encoding: SupportCodeEditorCodec;
+  export let encoding: SupportedCodeEditorCodec;
   export let format: SupportedCodeEditorFormat;
   export let onClick: () => void;
   export let onCrossClick: () => void;

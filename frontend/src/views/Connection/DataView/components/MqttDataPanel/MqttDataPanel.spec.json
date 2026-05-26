@@ -1,0 +1,36 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "MqttDataPanel",
+  "tier": "view",
+  "description": "Storybook coverage for MqttDataPanel.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "selectedTopicStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "elevation-0"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

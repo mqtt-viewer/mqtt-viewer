@@ -1,0 +1,35 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "UserPropertiesTab",
+  "tier": "view",
+  "description": "Storybook coverage for UserPropertiesTab.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isComparing",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "userProperties",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "userPropertiesToCompare",
+      "type": "object",
+      "required": false,
+      "default": null
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

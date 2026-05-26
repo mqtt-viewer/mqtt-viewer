@@ -8,6 +8,8 @@
   import CloseActiveConnectionDialog from "./CloseActiveConnectionDialog.svelte";
   import { writable } from "svelte/store";
 
+  gsap.registerPlugin(Draggable);
+
   const MAX_TAB_WIDTH = 180;
   const MIN_TAB_WIDTH = 46;
 
@@ -110,7 +112,7 @@
   });
 
   onDestroy(() => {
-    gsapCtx.revert();
+    gsapCtx?.revert();
   });
 
   const changeIndex = (item: ReturnType<typeof Sortable>, to: number) => {

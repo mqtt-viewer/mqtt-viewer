@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "PayloadTab",
+  "tier": "view",
+  "description": "Storybook coverage for PayloadTab.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "publishStore",
+      "type": "store",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "outline"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

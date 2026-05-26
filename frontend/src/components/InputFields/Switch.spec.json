@@ -1,0 +1,67 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Switch",
+  "tier": "primitive",
+  "description": "Storybook coverage for Switch.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "defaultChecked",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "checked",
+      "type": "store",
+      "required": false,
+      "default": "writable(defaultChecked)"
+    },
+    {
+      "name": "checkedBool",
+      "type": "string",
+      "required": false,
+      "default": "defaultChecked"
+    },
+    {
+      "name": "onChange",
+      "type": "boolean",
+      "required": false,
+      "default": "(newChecked: boolean) => {"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "primary-light",
+    "secondary",
+    "secondary-text",
+    "switch",
+    "hovered"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

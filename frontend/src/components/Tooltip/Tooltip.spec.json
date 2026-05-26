@@ -1,0 +1,57 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Tooltip",
+  "tier": "primitive",
+  "description": "Storybook coverage for Tooltip.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "placement",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "default": null
+    },
+    {
+      "name": "text",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "openDelay",
+      "type": "string",
+      "required": false,
+      "default": 600
+    },
+    {
+      "name": "forceOpen",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "closeOnPointerDown",
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  ],
+  "tokens": [
+    "elevation-2"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

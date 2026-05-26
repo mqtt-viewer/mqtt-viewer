@@ -1,0 +1,56 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "PublishPanel",
+  "tier": "view",
+  "description": "Storybook coverage for PublishPanel.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "isOpen",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "isPublishDisabled",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "open",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "close",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "getTopicMatchesSubscription",
+      "type": "function",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text",
+    "warning",
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

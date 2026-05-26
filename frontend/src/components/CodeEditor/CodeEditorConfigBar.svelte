@@ -1,13 +1,13 @@
 <script lang="ts">
   import IconButton from "../Button/IconButton.svelte";
   import CopyToClipboard from "../CopyToClipboard/CopyToClipboard.svelte";
-  import type { SupportCodeEditorCodec } from "./codec";
+  import type { SupportedCodeEditorCodec } from "./codec";
   import CodeEditorConfigBarOption from "./CodeEditorConfigBarOption.svelte";
   import type { SupportedCodeEditorFormat } from "./formatting";
 
   export let isReadyOnly: boolean = false;
   export let isComparing: boolean = false;
-  export let codec: SupportCodeEditorCodec = "none";
+  export let codec: SupportedCodeEditorCodec = "none";
   export let format: SupportedCodeEditorFormat = "none";
   export let textToCopy: string;
   export let textToCopyOnLeft: string | null = null;

@@ -35,14 +35,14 @@ test("data keys are sorted according to descending time", () => {
   expect(sortedKeys).toEqual(SORTED_TIME_ASC.toReversed());
 });
 
-const SORTED_ALPH_ASC = ["0000", "1211", "5678", "aaaaaa", "AAAbbbb", "zzzz"];
+const SORTED_TOPIC_DESC = ["0000", "1211", "5678", "aaaaaa", "AAAbbbb", "zzzz"];
 
-test("data keys are sorted alphabetically ascending", () => {
-  const sortedKeys = getSortedDataKeys(UNSORTED_DATA, "alphabetical", "asc");
-  expect(sortedKeys).toEqual(SORTED_ALPH_ASC);
+test("data keys are sorted by topic descending", () => {
+  const sortedKeys = getSortedDataKeys(UNSORTED_DATA, "topic", "desc");
+  expect(sortedKeys).toEqual(SORTED_TOPIC_DESC);
 });
 
-test("data keys are sorted alphabetically descending", () => {
-  const sortedKeys = getSortedDataKeys(UNSORTED_DATA, "alphabetical", "desc");
-  expect(sortedKeys).toEqual(SORTED_ALPH_ASC.toReversed());
+test("data keys are sorted by topic ascending", () => {
+  const sortedKeys = getSortedDataKeys(UNSORTED_DATA, "topic", "asc");
+  expect(sortedKeys).toEqual(SORTED_TOPIC_DESC.toReversed());
 });

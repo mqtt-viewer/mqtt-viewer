@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mqtt-viewer/design-system/component-spec.schema.json",
+  "title": "Colocated Component Spec",
+  "description": "Hand-authored source of truth, colocated beside each component as <Component>.spec.json. This is the ONLY file a developer/agent edits for design<->code metadata. The aggregate registry index (component-index.json) is GENERATED from these and must never be hand-edited.",
+  "type": "object",
+  "required": ["name", "tier", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Relative path to this schema for editor validation, e.g. '../../design-system/component-spec.schema.json' (depth varies for nested views)."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9]+$",
+      "description": "PascalCase. MUST match the .svelte component AND the Figma component name. This string is the sync key across Figma, code, and the generated index."
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["primitive", "component", "view"],
+      "description": "Drives the Storybook title namespace (Primitives/Components/Views)."
+    },
+    "description": {
+      "type": "string",
+      "description": "One line. Used in autodocs and by the AI to disambiguate Figma matches."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["todo", "story-only", "figma-linked", "deprecated"],
+      "description": "Lifecycle of the code<->design link. (No 'code-connected' tier — Code Connect intentionally not used; it requires a paid Figma Org plan.)"
+    },
+    "figma": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fileKey": { "type": "string" },
+        "nodeId": { "type": "string", "description": "Figma node id of the component/component-set, e.g. '1234:567'." },
+        "url": { "type": "string", "description": "Frame URL consumed by Storybook addon-designs. Empty + status<figma-linked until known." },
+        "lastSyncedHash": {
+          "type": ["string", "null"],
+          "description": "Structural hash of the Figma node at last sync, COMPUTED BY OUR TOOLING (Figma exposes no per-node hash). The MCP/sync tool recomputes the live hash and compares to this to detect drift."
+        },
+        "lastSyncedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "props": {
+      "type": "array",
+      "description": "Public prop/variant contract. Compared against Figma component properties to detect drift.",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "type": {
+            "type": "string",
+            "examples": ["string", "boolean", "number", "enum", "snippet"]
+          },
+          "options": {
+            "type": "array",
+            "description": "Allowed values when type is enum. Should map 1:1 to a Figma variant property's values.",
+            "items": { "type": "string" }
+          },
+          "default": {},
+          "required": { "type": "boolean", "default": false },
+          "figmaProperty": {
+            "type": ["string", "null"],
+            "description": "Matching Figma component property name when it differs from `name`."
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "tokens": {
+      "type": "array",
+      "description": "Design token names this component consumes (keys from design-tokens.json). Validated to exist.",
+      "items": { "type": "string" }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Names of other components this one renders.",
+      "items": { "type": "string" }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Wails coupling, mocking needs, known/accepted divergence from Figma, etc."
+    }
+  }
+}

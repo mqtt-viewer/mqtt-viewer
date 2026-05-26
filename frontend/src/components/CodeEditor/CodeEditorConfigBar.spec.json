@@ -1,0 +1,71 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "CodeEditorConfigBar",
+  "tier": "component",
+  "description": "Storybook coverage for CodeEditorConfigBar.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isReadyOnly",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "isComparing",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "codec",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "none",
+        "base64",
+        "hex"
+      ],
+      "default": "none"
+    },
+    {
+      "name": "format",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "none",
+        "json",
+        "json-prettier",
+        "xml"
+      ],
+      "default": "none"
+    },
+    {
+      "name": "textToCopy",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "textToCopyOnLeft",
+      "type": "string",
+      "required": false,
+      "default": "null"
+    },
+    {
+      "name": "formatPayload",
+      "type": "function",
+      "required": false,
+      "default": "> void = () => {}"
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

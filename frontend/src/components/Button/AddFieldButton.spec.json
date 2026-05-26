@@ -1,0 +1,49 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "AddFieldButton",
+  "tier": "primitive",
+  "description": "Storybook coverage for AddFieldButton.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "text",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
+      "name": "size",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "small",
+        "medium"
+      ],
+      "default": "medium"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

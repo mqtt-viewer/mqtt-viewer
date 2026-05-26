@@ -1,0 +1,25 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "ProtobufLogo",
+  "tier": "primitive",
+  "description": "Storybook coverage for ProtobufLogo.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isActive",
+      "type": "boolean",
+      "required": false,
+      "default": null
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "RecentConnectionsList",
+  "tier": "view",
+  "description": "Storybook coverage for RecentConnectionsList.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connections",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "elevation-1"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

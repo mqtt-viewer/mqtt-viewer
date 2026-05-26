@@ -1,0 +1,50 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "HeaderRow",
+  "tier": "view",
+  "description": "Storybook coverage for HeaderRow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "rowName",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "rowValue",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "rowValueDiff",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "rowValueToCompare",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "rowValueToCompareDiff",
+      "type": "string",
+      "required": false,
+      "default": null
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

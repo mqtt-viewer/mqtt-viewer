@@ -1,0 +1,31 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Checkbox",
+  "tier": "primitive",
+  "description": "Storybook coverage for Checkbox.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "label",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "checked",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

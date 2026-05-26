@@ -19,7 +19,8 @@
     "isolatedModules": true,
     "paths": {
       "@/*": ["src/*"],
-      "wailsjs": ["./wailsjs"]
+      "wailsjs": ["./wailsjs"],
+      "wailsjs/*": ["./wailsjs/*"]
     }
   },
   "include": [

@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mqtt-viewer/design-system/component-index.schema.json",
+  "title": "Generated Component Index",
+  "description": "GENERATED, never hand-edited. Built by `ds:registry` from the colocated <Component>.spec.json files (see component-spec.schema.json) plus filesystem facts. This is the queryable/diffable aggregate the AI and CI consume; the source of truth is the colocated specs.",
+  "type": "object",
+  "required": ["version", "generatedAt", "tokensRef", "components"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "description": "Semver of the index shape." },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "tokensRef": {
+      "type": "string",
+      "description": "Path to design-tokens.json the component tokens validate against."
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "tier", "sourcePath", "specPath", "status"],
+        "additionalProperties": false,
+        "description": "A colocated spec, merged with filesystem-resolved paths. Spec fields (name, tier, status, figma, props, tokens, dependencies, notes) are copied verbatim from <Component>.spec.json — see component-spec.schema.json.",
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$" },
+          "tier": { "type": "string", "enum": ["primitive", "component", "view"] },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["todo", "story-only", "figma-linked", "deprecated"] },
+          "sourcePath": { "type": "string", "description": "Resolved from disk." },
+          "specPath": { "type": "string", "description": "Resolved from disk: the colocated .spec.json." },
+          "storyPath": { "type": ["string", "null"], "description": "Resolved from disk." },
+          "storyId": { "type": ["string", "null"], "description": "e.g. 'Primitives/Button'." },
+          "figma": { "type": "object" },
+          "props": { "type": "array" },
+          "tokens": { "type": "array", "items": { "type": "string" } },
+          "dependencies": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" },
+          "specMissing": {
+            "type": "boolean",
+            "description": "True when a component .svelte exists on disk with no colocated .spec.json yet. Drives the 'todo' rows in the checklist."
+          }
+        }
+      }
+    }
+  }
+}

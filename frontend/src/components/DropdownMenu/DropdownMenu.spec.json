@@ -1,0 +1,68 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "DropdownMenu",
+  "tier": "primitive",
+  "description": "Storybook coverage for DropdownMenu.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "triggerText",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "triggerClass",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "triggerIconSize",
+      "type": "string",
+      "required": false,
+      "default": 16
+    },
+    {
+      "name": "triggerVariant",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "primary",
+        "secondary",
+        "text"
+      ],
+      "default": "secondary"
+    },
+    {
+      "name": "placement",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "default": null
+    }
+  ],
+  "tokens": [
+    "elevation-2"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,3914 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-05-26T08:34:31.191Z",
+  "tokensRef": "src/design-system/design-tokens.json",
+  "components": [
+    {
+      "name": "AppBar",
+      "tier": "component",
+      "description": "Storybook coverage for AppBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "outline",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/AppBar.svelte",
+      "specPath": "src/components/AppBar/AppBar.spec.json",
+      "storyPath": "src/components/AppBar/AppBar.stories.svelte",
+      "storyId": "Components/AppBar",
+      "specMissing": false
+    },
+    {
+      "name": "CloseActiveConnectionDialog",
+      "tier": "component",
+      "description": "Storybook coverage for CloseActiveConnectionDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
+          "name": "connection",
+          "type": "string",
+          "required": false,
+          "default": "null"
+        },
+        {
+          "name": "onConfirm",
+          "type": "function",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onCancel",
+          "type": "boolean",
+          "required": false,
+          "default": "() => open.set(false)"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/ConnectionTabs/CloseActiveConnectionDialog.svelte",
+      "specPath": "src/components/AppBar/components/ConnectionTabs/CloseActiveConnectionDialog.spec.json",
+      "storyPath": "src/components/AppBar/components/ConnectionTabs/CloseActiveConnectionDialog.stories.svelte",
+      "storyId": "Components/AppBar/ConnectionTabs/CloseActiveConnectionDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionTab",
+      "tier": "component",
+      "description": "Storybook coverage for ConnectionTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isSelected",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onDeleteClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "outline",
+        "hovered",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/ConnectionTabs/ConnectionTab.svelte",
+      "specPath": "src/components/AppBar/components/ConnectionTabs/ConnectionTab.spec.json",
+      "storyPath": "src/components/AppBar/components/ConnectionTabs/ConnectionTab.stories.svelte",
+      "storyId": "Components/AppBar/ConnectionTabs/ConnectionTab",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionTabs",
+      "tier": "component",
+      "description": "Storybook coverage for ConnectionTabs.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "maxContainerWidth",
+          "type": "string",
+          "required": false,
+          "default": 0
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/ConnectionTabs/ConnectionTabs.svelte",
+      "specPath": "src/components/AppBar/components/ConnectionTabs/ConnectionTabs.spec.json",
+      "storyPath": "src/components/AppBar/components/ConnectionTabs/ConnectionTabs.stories.svelte",
+      "storyId": "Components/AppBar/ConnectionTabs",
+      "specMissing": false
+    },
+    {
+      "name": "FeedbackDialog",
+      "tier": "component",
+      "description": "Storybook coverage for FeedbackDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        }
+      ],
+      "tokens": [
+        "success",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/FeedbackDialog/FeedbackDialog.svelte",
+      "specPath": "src/components/AppBar/components/FeedbackDialog/FeedbackDialog.spec.json",
+      "storyPath": "src/components/AppBar/components/FeedbackDialog/FeedbackDialog.stories.svelte",
+      "storyId": "Components/AppBar/FeedbackDialog",
+      "specMissing": false
+    },
+    {
+      "name": "GiveFeedbackCard",
+      "tier": "component",
+      "description": "Storybook coverage for GiveFeedbackCard.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "icon",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "iconClass",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/FeedbackDialog/GiveFeedbackCard.svelte",
+      "specPath": "src/components/AppBar/components/FeedbackDialog/GiveFeedbackCard.spec.json",
+      "storyPath": "src/components/AppBar/components/FeedbackDialog/GiveFeedbackCard.stories.svelte",
+      "storyId": "Components/AppBar/FeedbackDialog/GiveFeedbackCard",
+      "specMissing": false
+    },
+    {
+      "name": "NewTabButton",
+      "tier": "component",
+      "description": "Storybook coverage for NewTabButton.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isSelected",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "newTabButtonWidth",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "white-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/NewTabButton.svelte",
+      "specPath": "src/components/AppBar/components/NewTabButton.spec.json",
+      "storyPath": "src/components/AppBar/components/NewTabButton.stories.svelte",
+      "storyId": "Components/AppBar/NewTabButton",
+      "specMissing": false
+    },
+    {
+      "name": "NotificationsButton",
+      "tier": "component",
+      "description": "Storybook coverage for NotificationsButton.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBar/components/NotificationsButton.svelte",
+      "specPath": "src/components/AppBar/components/NotificationsButton.spec.json",
+      "storyPath": "src/components/AppBar/components/NotificationsButton.stories.svelte",
+      "storyId": "Components/AppBar/NotificationsButton",
+      "specMissing": false
+    },
+    {
+      "name": "AppBarBottom",
+      "tier": "component",
+      "description": "Storybook coverage for AppBarBottom.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/AppBarBottom.svelte",
+      "specPath": "src/components/AppBarBottom/AppBarBottom.spec.json",
+      "storyPath": "src/components/AppBarBottom/AppBarBottom.stories.svelte",
+      "storyId": "Components/AppBarBottom",
+      "specMissing": false
+    },
+    {
+      "name": "LicenseStatus",
+      "tier": "component",
+      "description": "Storybook coverage for LicenseStatus.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/components/LicenseStatus.svelte",
+      "specPath": "src/components/AppBarBottom/components/LicenseStatus.spec.json",
+      "storyPath": "src/components/AppBarBottom/components/LicenseStatus.stories.svelte",
+      "storyId": "Components/AppBarBottom/LicenseStatus",
+      "specMissing": false
+    },
+    {
+      "name": "MessageStats",
+      "tier": "component",
+      "description": "Storybook coverage for MessageStats.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/components/MessageStats.svelte",
+      "specPath": "src/components/AppBarBottom/components/MessageStats.spec.json",
+      "storyPath": "src/components/AppBarBottom/components/MessageStats.stories.svelte",
+      "storyId": "Components/AppBarBottom/MessageStats",
+      "specMissing": false
+    },
+    {
+      "name": "AddFieldButton",
+      "tier": "primitive",
+      "description": "Storybook coverage for AddFieldButton.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "size",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "small",
+            "medium"
+          ],
+          "default": "medium"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Button/AddFieldButton.svelte",
+      "specPath": "src/components/Button/AddFieldButton.spec.json",
+      "storyPath": "src/components/Button/AddFieldButton.stories.svelte",
+      "storyId": "Primitives/Button/AddFieldButton",
+      "specMissing": false
+    },
+    {
+      "name": "Button",
+      "tier": "primitive",
+      "description": "Storybook coverage for Button.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "as",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "button",
+            "a",
+            "div"
+          ],
+          "default": "button"
+        },
+        {
+          "name": "variant",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "primary",
+            "secondary",
+            "text"
+          ],
+          "default": "secondary"
+        },
+        {
+          "name": "iconType",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "iconType"
+          ],
+          "default": null
+        },
+        {
+          "name": "iconSize",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "iconSize"
+          ],
+          "default": 22
+        },
+        {
+          "name": "iconPlacement",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "left",
+            "right"
+          ],
+          "default": "left"
+        },
+        {
+          "name": "iconClass",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "iconClass"
+          ],
+          "default": ""
+        },
+        {
+          "name": "forceHover",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "preventFocus",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "button",
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Button/Button.svelte",
+      "specPath": "src/components/Button/Button.spec.json",
+      "storyPath": "src/components/Button/Button.stories.svelte",
+      "storyId": "Primitives/Button",
+      "specMissing": false
+    },
+    {
+      "name": "IconButton",
+      "tier": "primitive",
+      "description": "Storybook coverage for IconButton.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "tooltipText",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "tooltipPlacement",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "(e: MouseEvent) => {}"
+        },
+        {
+          "name": "tooltipOpenDelay",
+          "type": "string",
+          "required": false,
+          "default": 500
+        },
+        {
+          "name": "feedbackText",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "preventFocus",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        }
+      ],
+      "tokens": [
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Button/IconButton.svelte",
+      "specPath": "src/components/Button/IconButton.spec.json",
+      "storyPath": "src/components/Button/IconButton.stories.svelte",
+      "storyId": "Primitives/Button/IconButton",
+      "specMissing": false
+    },
+    {
+      "name": "Card",
+      "tier": "primitive",
+      "description": "Storybook coverage for Card.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void) | null = null"
+        }
+      ],
+      "tokens": [
+        "button",
+        "hovered",
+        "elevation-1",
+        "elevation-1-card"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Card/Card.svelte",
+      "specPath": "src/components/Card/Card.spec.json",
+      "storyPath": "src/components/Card/Card.stories.svelte",
+      "storyId": "Primitives/Card",
+      "specMissing": false
+    },
+    {
+      "name": "CodeEditor",
+      "tier": "component",
+      "description": "Storybook coverage for CodeEditor.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "format",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "none",
+            "json",
+            "json-prettier",
+            "xml"
+          ],
+          "default": "none"
+        },
+        {
+          "name": "readOnly",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "setEditorText",
+          "type": "function",
+          "required": false,
+          "default": "(newText: string) => {}"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/CodeEditor/CodeEditor.svelte",
+      "specPath": "src/components/CodeEditor/CodeEditor.spec.json",
+      "storyPath": "src/components/CodeEditor/CodeEditor.stories.svelte",
+      "storyId": "Components/CodeEditor",
+      "specMissing": false
+    },
+    {
+      "name": "CodeEditorConfigBar",
+      "tier": "component",
+      "description": "Storybook coverage for CodeEditorConfigBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isReadyOnly",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isComparing",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "codec",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "none",
+            "base64",
+            "hex"
+          ],
+          "default": "none"
+        },
+        {
+          "name": "format",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "none",
+            "json",
+            "json-prettier",
+            "xml"
+          ],
+          "default": "none"
+        },
+        {
+          "name": "textToCopy",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "textToCopyOnLeft",
+          "type": "string",
+          "required": false,
+          "default": "null"
+        },
+        {
+          "name": "formatPayload",
+          "type": "function",
+          "required": false,
+          "default": "> void = () => {}"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/CodeEditor/CodeEditorConfigBar.svelte",
+      "specPath": "src/components/CodeEditor/CodeEditorConfigBar.spec.json",
+      "storyPath": "src/components/CodeEditor/CodeEditorConfigBar.stories.svelte",
+      "storyId": "Components/CodeEditor/CodeEditorConfigBar",
+      "specMissing": false
+    },
+    {
+      "name": "CodeEditorConfigBarOption",
+      "tier": "component",
+      "description": "Storybook coverage for CodeEditorConfigBarOption.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "required": false,
+          "default": "[]"
+        },
+        {
+          "name": "defaultValue",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "getOptionLabel",
+          "type": "string",
+          "required": false,
+          "default": "> string"
+        },
+        {
+          "name": "getOptionDisplay",
+          "type": "string",
+          "required": false,
+          "default": "> string = getOptionLabel"
+        },
+        {
+          "name": "selected",
+          "type": "string",
+          "required": false,
+          "default": "writable<SelectOption<OptionType | undefined>>("
+        },
+        {
+          "name": "onChange",
+          "type": "function",
+          "required": false,
+          "default": "(value: OptionType | undefined) => {}"
+        },
+        {
+          "name": "setValue",
+          "type": "function",
+          "required": false,
+          "default": "(value: OptionType | undefined) => {"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "white-text",
+        "elevation-2",
+        "elevation-2-hover"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/CodeEditor/CodeEditorConfigBarOption.svelte",
+      "specPath": "src/components/CodeEditor/CodeEditorConfigBarOption.spec.json",
+      "storyPath": "src/components/CodeEditor/CodeEditorConfigBarOption.stories.svelte",
+      "storyId": "Components/CodeEditor/CodeEditorConfigBarOption",
+      "specMissing": false
+    },
+    {
+      "name": "DiffCodeEditor",
+      "tier": "component",
+      "description": "Storybook coverage for DiffCodeEditor.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "format",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "none",
+            "json",
+            "json-prettier",
+            "xml"
+          ],
+          "default": "json"
+        },
+        {
+          "name": "left",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "right",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/CodeEditor/DiffCodeEditor.svelte",
+      "specPath": "src/components/CodeEditor/DiffCodeEditor.spec.json",
+      "storyPath": "src/components/CodeEditor/DiffCodeEditor.stories.svelte",
+      "storyId": "Components/CodeEditor/DiffCodeEditor",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionIdenticon",
+      "tier": "primitive",
+      "description": "Storybook coverage for ConnectionIdenticon.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/ConnectionIdenticon/ConnectionIdenticon.svelte",
+      "specPath": "src/components/ConnectionIdenticon/ConnectionIdenticon.spec.json",
+      "storyPath": "src/components/ConnectionIdenticon/ConnectionIdenticon.stories.svelte",
+      "storyId": "Primitives/ConnectionIdenticon",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionStatusCircle",
+      "tier": "primitive",
+      "description": "Storybook coverage for ConnectionStatusCircle.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "state",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "reconnecting"
+          ]
+        }
+      ],
+      "tokens": [
+        "success",
+        "error",
+        "warning"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte",
+      "specPath": "src/components/ConnectionStatusCircle/ConnectionStatusCircle.spec.json",
+      "storyPath": "src/components/ConnectionStatusCircle/ConnectionStatusCircle.stories.svelte",
+      "storyId": "Primitives/ConnectionStatusCircle",
+      "specMissing": false
+    },
+    {
+      "name": "ContextMenu",
+      "tier": "primitive",
+      "description": "Storybook coverage for ContextMenu.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/ContextMenu/ContextMenu.svelte",
+      "specPath": "src/components/ContextMenu/ContextMenu.spec.json",
+      "storyPath": "src/components/ContextMenu/ContextMenu.stories.svelte",
+      "storyId": "Primitives/ContextMenu",
+      "specMissing": false
+    },
+    {
+      "name": "CopyToClipboard",
+      "tier": "primitive",
+      "description": "Storybook coverage for CopyToClipboard.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "size",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "small",
+            "medium"
+          ],
+          "default": 16
+        },
+        {
+          "name": "tooltipText",
+          "type": "string",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/CopyToClipboard/CopyToClipboard.svelte",
+      "specPath": "src/components/CopyToClipboard/CopyToClipboard.spec.json",
+      "storyPath": "src/components/CopyToClipboard/CopyToClipboard.stories.svelte",
+      "storyId": "Primitives/CopyToClipboard",
+      "specMissing": false
+    },
+    {
+      "name": "Dialog",
+      "tier": "primitive",
+      "description": "Storybook coverage for Dialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
+          "name": "onClose",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "noTitleMargin",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "startEmpty",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "showCloseButton",
+          "type": "string",
+          "required": false,
+          "default": "!startEmpty"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Dialog/Dialog.svelte",
+      "specPath": "src/components/Dialog/Dialog.spec.json",
+      "storyPath": "src/components/Dialog/Dialog.stories.svelte",
+      "storyId": "Primitives/Dialog",
+      "specMissing": false
+    },
+    {
+      "name": "DialogActionBar",
+      "tier": "primitive",
+      "description": "Storybook coverage for DialogActionBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Dialog/DialogActionBar.svelte",
+      "specPath": "src/components/Dialog/DialogActionBar.spec.json",
+      "storyPath": "src/components/Dialog/DialogActionBar.stories.svelte",
+      "storyId": "Primitives/Dialog/DialogActionBar",
+      "specMissing": false
+    },
+    {
+      "name": "DropdownCloseOnClick",
+      "tier": "primitive",
+      "description": "Storybook coverage for DropdownCloseOnClick.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/DropdownMenu/DropdownCloseOnClick.svelte",
+      "specPath": "src/components/DropdownMenu/DropdownCloseOnClick.spec.json",
+      "storyPath": "src/components/DropdownMenu/DropdownCloseOnClick.stories.svelte",
+      "storyId": "Primitives/DropdownMenu/DropdownCloseOnClick",
+      "specMissing": false
+    },
+    {
+      "name": "DropdownMenu",
+      "tier": "primitive",
+      "description": "Storybook coverage for DropdownMenu.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "triggerText",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "triggerClass",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "triggerIconSize",
+          "type": "string",
+          "required": false,
+          "default": 16
+        },
+        {
+          "name": "triggerVariant",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "primary",
+            "secondary",
+            "text"
+          ],
+          "default": "secondary"
+        },
+        {
+          "name": "placement",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "default": null
+        }
+      ],
+      "tokens": [
+        "elevation-2"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/DropdownMenu/DropdownMenu.svelte",
+      "specPath": "src/components/DropdownMenu/DropdownMenu.spec.json",
+      "storyPath": "src/components/DropdownMenu/DropdownMenu.stories.svelte",
+      "storyId": "Primitives/DropdownMenu",
+      "specMissing": false
+    },
+    {
+      "name": "DropdownMenuItem",
+      "tier": "primitive",
+      "description": "Storybook coverage for DropdownMenuItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isSelected",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "white-text",
+        "elevation-2",
+        "elevation-2-hover"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/DropdownMenu/DropdownMenuItem.svelte",
+      "specPath": "src/components/DropdownMenu/DropdownMenuItem.spec.json",
+      "storyPath": "src/components/DropdownMenu/DropdownMenuItem.stories.svelte",
+      "storyId": "Primitives/DropdownMenu/DropdownMenuItem",
+      "specMissing": false
+    },
+    {
+      "name": "Icon",
+      "tier": "primitive",
+      "description": "Storybook coverage for Icon.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "type",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "add",
+            "close",
+            "settings",
+            "delete",
+            "connect",
+            "disconnect"
+          ]
+        },
+        {
+          "name": "size",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "small",
+            "medium"
+          ],
+          "default": 16
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": false,
+          "default": "size"
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": false,
+          "default": "size"
+        },
+        {
+          "name": "color",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "currentColor"
+          ],
+          "default": "currentColor"
+        },
+        {
+          "name": "weight",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "selected",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Icon/Icon.svelte",
+      "specPath": "src/components/Icon/Icon.spec.json",
+      "storyPath": "src/components/Icon/Icon.stories.svelte",
+      "storyId": "Primitives/Icon",
+      "specMissing": false
+    },
+    {
+      "name": "IconContext",
+      "tier": "primitive",
+      "description": "Storybook coverage for IconContext.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Icon/IconContext.svelte",
+      "specPath": "src/components/Icon/IconContext.spec.json",
+      "storyPath": "src/components/Icon/IconContext.stories.svelte",
+      "storyId": "Primitives/Icon/IconContext",
+      "specMissing": false
+    },
+    {
+      "name": "BaseInput",
+      "tier": "primitive",
+      "description": "Storybook coverage for BaseInput.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "errorMessage",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "hasError",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "bgColor",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "elevation-0",
+            "DEFAULT"
+          ],
+          "default": "untypedColors[\"elevation-0\"][\"DEFAULT\"] as"
+        },
+        {
+          "name": "bgHoverColor",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "icon",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onChange",
+          "type": "function",
+          "required": false,
+          "default": "(value: string | undefined) => {}"
+        },
+        {
+          "name": "onBlur",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "onFocus",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "inputEl",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "inputClass",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "actionButtons",
+          "type": "object",
+          "required": false,
+          "default": "[]"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "secondary-text",
+        "outline",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/InputFields/BaseInput.svelte",
+      "specPath": "src/components/InputFields/BaseInput.spec.json",
+      "storyPath": "src/components/InputFields/BaseInput.stories.svelte",
+      "storyId": "Primitives/InputFields/BaseInput",
+      "specMissing": false
+    },
+    {
+      "name": "BaseNumberInput",
+      "tier": "primitive",
+      "description": "Storybook coverage for BaseNumberInput.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "errorMessage",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "hasError",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "bgColor",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "elevation-0",
+            "DEFAULT"
+          ],
+          "default": "untypedColors[\"elevation-0\"][\"DEFAULT\"] as"
+        },
+        {
+          "name": "bgHoverColor",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "icon",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onChange",
+          "type": "function",
+          "required": false,
+          "default": "(value: string | undefined) => {}"
+        },
+        {
+          "name": "onBlur",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "onFocus",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "inputEl",
+          "type": "string",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "secondary-text",
+        "outline",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/InputFields/BaseNumberInput.svelte",
+      "specPath": "src/components/InputFields/BaseNumberInput.spec.json",
+      "storyPath": "src/components/InputFields/BaseNumberInput.stories.svelte",
+      "storyId": "Primitives/InputFields/BaseNumberInput",
+      "specMissing": false
+    },
+    {
+      "name": "Checkbox",
+      "tier": "primitive",
+      "description": "Storybook coverage for Checkbox.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "checked",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/InputFields/Checkbox.svelte",
+      "specPath": "src/components/InputFields/Checkbox.spec.json",
+      "storyPath": "src/components/InputFields/Checkbox.stories.svelte",
+      "storyId": "Primitives/InputFields/Checkbox",
+      "specMissing": false
+    },
+    {
+      "name": "FilePathPicker",
+      "tier": "primitive",
+      "description": "Storybook coverage for FilePathPicker.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "defaultValue",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "variant",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "primary",
+            "secondary",
+            "text"
+          ]
+        },
+        {
+          "name": "actionLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "valueLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": false,
+          "default": "defaultValue ?? \"\""
+        },
+        {
+          "name": "onFileChosen",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onFileRemoved",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "white-text",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/InputFields/FilePathPicker.svelte",
+      "specPath": "src/components/InputFields/FilePathPicker.spec.json",
+      "storyPath": "src/components/InputFields/FilePathPicker.stories.svelte",
+      "storyId": "Primitives/InputFields/FilePathPicker",
+      "specMissing": false
+    },
+    {
+      "name": "Select",
+      "tier": "primitive",
+      "description": "Storybook coverage for Select.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "sameWidth",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "required": false,
+          "default": "[]"
+        },
+        {
+          "name": "defaultValue",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "getOptionLabel",
+          "type": "string",
+          "required": false,
+          "default": "> string"
+        },
+        {
+          "name": "selected",
+          "type": "string",
+          "required": false,
+          "default": "writable<SelectOption<OptionType | undefined>>("
+        },
+        {
+          "name": "placeholder",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "icon",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "bgColor",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "elevation-0",
+            "DEFAULT"
+          ],
+          "default": "untypedColors[\"elevation-0\"][\"DEFAULT\"] as"
+        },
+        {
+          "name": "buttonClass",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onChange",
+          "type": "function",
+          "required": false,
+          "default": "(value: OptionType | undefined) => {}"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "outline",
+        "hovered",
+        "elevation-2",
+        "elevation-2-hover"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/InputFields/Select.svelte",
+      "specPath": "src/components/InputFields/Select.spec.json",
+      "storyPath": "src/components/InputFields/Select.stories.svelte",
+      "storyId": "Primitives/InputFields/Select",
+      "specMissing": false
+    },
+    {
+      "name": "Switch",
+      "tier": "primitive",
+      "description": "Storybook coverage for Switch.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "defaultChecked",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "checked",
+          "type": "store",
+          "required": false,
+          "default": "writable(defaultChecked)"
+        },
+        {
+          "name": "checkedBool",
+          "type": "string",
+          "required": false,
+          "default": "defaultChecked"
+        },
+        {
+          "name": "onChange",
+          "type": "boolean",
+          "required": false,
+          "default": "(newChecked: boolean) => {"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "primary-light",
+        "secondary",
+        "secondary-text",
+        "switch",
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/InputFields/Switch.svelte",
+      "specPath": "src/components/InputFields/Switch.spec.json",
+      "storyPath": "src/components/InputFields/Switch.stories.svelte",
+      "storyId": "Primitives/InputFields/Switch",
+      "specMissing": false
+    },
+    {
+      "name": "MaxOpenTabsDialog",
+      "tier": "component",
+      "description": "Storybook coverage for MaxOpenTabsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/MaxOpenTabsDialog/MaxOpenTabsDialog.svelte",
+      "specPath": "src/components/MaxOpenTabsDialog/MaxOpenTabsDialog.spec.json",
+      "storyPath": "src/components/MaxOpenTabsDialog/MaxOpenTabsDialog.stories.svelte",
+      "storyId": "Components/MaxOpenTabsDialog",
+      "specMissing": false
+    },
+    {
+      "name": "PageHeaderBar",
+      "tier": "primitive",
+      "description": "Storybook coverage for PageHeaderBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/PageHeaderBar/PageHeaderBar.svelte",
+      "specPath": "src/components/PageHeaderBar/PageHeaderBar.spec.json",
+      "storyPath": "src/components/PageHeaderBar/PageHeaderBar.stories.svelte",
+      "storyId": "Primitives/PageHeaderBar",
+      "specMissing": false
+    },
+    {
+      "name": "PanelHeader",
+      "tier": "primitive",
+      "description": "Storybook coverage for PanelHeader.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/PanelHeader/PanelHeader.svelte",
+      "specPath": "src/components/PanelHeader/PanelHeader.spec.json",
+      "storyPath": "src/components/PanelHeader/PanelHeader.stories.svelte",
+      "storyId": "Primitives/PanelHeader",
+      "specMissing": false
+    },
+    {
+      "name": "ProtobufLogo",
+      "tier": "primitive",
+      "description": "Storybook coverage for ProtobufLogo.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/ProtobufLogo/ProtobufLogo.svelte",
+      "specPath": "src/components/ProtobufLogo/ProtobufLogo.spec.json",
+      "storyPath": "src/components/ProtobufLogo/ProtobufLogo.stories.svelte",
+      "storyId": "Primitives/ProtobufLogo",
+      "specMissing": false
+    },
+    {
+      "name": "ResizableContainer",
+      "tier": "primitive",
+      "description": "Storybook coverage for ResizableContainer.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "collapsed",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "minSize",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxSize",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "resizeEdge",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "left",
+            "right"
+          ],
+          "default": "right"
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": false,
+          "default": 0
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/ResizableContainer/ResizableContainer.svelte",
+      "specPath": "src/components/ResizableContainer/ResizableContainer.spec.json",
+      "storyPath": "src/components/ResizableContainer/ResizableContainer.stories.svelte",
+      "storyId": "Primitives/ResizableContainer",
+      "specMissing": false
+    },
+    {
+      "name": "SparkplugLogo",
+      "tier": "primitive",
+      "description": "Storybook coverage for SparkplugLogo.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/SparkplugLogo/SparkplugLogo.svelte",
+      "specPath": "src/components/SparkplugLogo/SparkplugLogo.spec.json",
+      "storyPath": "src/components/SparkplugLogo/SparkplugLogo.stories.svelte",
+      "storyId": "Primitives/SparkplugLogo",
+      "specMissing": false
+    },
+    {
+      "name": "Tabs",
+      "tier": "primitive",
+      "description": "Storybook coverage for Tabs.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "defaultTab",
+          "type": "string",
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "tabs",
+          "type": "object",
+          "required": false,
+          "default": "[]"
+        },
+        {
+          "name": "ariaLabel",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "Tabs"
+          ],
+          "default": "Tabs"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "secondary-text",
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Tabs/Tabs.svelte",
+      "specPath": "src/components/Tabs/Tabs.spec.json",
+      "storyPath": "src/components/Tabs/Tabs.stories.svelte",
+      "storyId": "Primitives/Tabs",
+      "specMissing": false
+    },
+    {
+      "name": "Toast",
+      "tier": "primitive",
+      "description": "Storybook coverage for Toast.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "success",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Toast/Toast.svelte",
+      "specPath": "src/components/Toast/Toast.spec.json",
+      "storyPath": "src/components/Toast/Toast.stories.svelte",
+      "storyId": "Primitives/Toast",
+      "specMissing": false
+    },
+    {
+      "name": "Tooltip",
+      "tier": "primitive",
+      "description": "Storybook coverage for Tooltip.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "placement",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "default": null
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "openDelay",
+          "type": "string",
+          "required": false,
+          "default": 600
+        },
+        {
+          "name": "forceOpen",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "closeOnPointerDown",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        }
+      ],
+      "tokens": [
+        "elevation-2"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/Tooltip/Tooltip.svelte",
+      "specPath": "src/components/Tooltip/Tooltip.spec.json",
+      "storyPath": "src/components/Tooltip/Tooltip.stories.svelte",
+      "storyId": "Primitives/Tooltip",
+      "specMissing": false
+    },
+    {
+      "name": "UpdateDialog",
+      "tier": "component",
+      "description": "Storybook coverage for UpdateDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",
+      "specPath": "src/components/UpdateDialog/UpdateDialog.spec.json",
+      "storyPath": "src/components/UpdateDialog/UpdateDialog.stories.svelte",
+      "storyId": "Components/UpdateDialog",
+      "specMissing": false
+    },
+    {
+      "name": "Connection",
+      "tier": "view",
+      "description": "Storybook coverage for Connection.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/Connection.svelte",
+      "specPath": "src/views/Connection/Connection.spec.json",
+      "storyPath": "src/views/Connection/Connection.stories.svelte",
+      "storyId": "Views/Connection",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionDetailsView",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionDetailsView.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView",
+      "specMissing": false
+    },
+    {
+      "name": "ConfirmDeleteConnectionDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConfirmDeleteConnectionDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onConfirm",
+          "type": "function",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onCancel",
+          "type": "boolean",
+          "required": false,
+          "default": "() => isOpen.set(false)"
+        }
+      ],
+      "tokens": [
+        "error",
+        "error-light"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionForm",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionForm.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "error",
+        "error-light"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/ConnectionForm/ConnectionForm.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/ConnectionForm/ConnectionForm.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/ConnectionForm/ConnectionForm.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/ConnectionForm",
+      "specMissing": false
+    },
+    {
+      "name": "LoadedProtoDetailsDialog",
+      "tier": "view",
+      "description": "Storybook coverage for LoadedProtoDetailsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
+          "name": "loadedRootDir",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "loadedProtoFilesWithDescriptorsMap",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "selectedDescriptor",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "selectedDescriptorIsMissing",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onDescriptorSelect",
+          "type": "function",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "divider",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoDetailsDialog.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoDetailsDialog.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoDetailsDialog.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog",
+      "specMissing": false
+    },
+    {
+      "name": "LoadedProtoTree",
+      "tier": "view",
+      "description": "Storybook coverage for LoadedProtoTree.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "treeItems",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "level",
+          "type": "string",
+          "required": false,
+          "default": 1
+        },
+        {
+          "name": "selectedDescriptor",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onDescriptorSelect",
+          "type": "function",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTree.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTree.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTree.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree",
+      "specMissing": false
+    },
+    {
+      "name": "LoadedProtoTreeItem",
+      "tier": "view",
+      "description": "Storybook coverage for LoadedProtoTreeItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "allowPress",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isExpanded",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isSelected",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "iconType",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem",
+      "specMissing": false
+    },
+    {
+      "name": "SubscriptionsForm",
+      "tier": "view",
+      "description": "Storybook coverage for SubscriptionsForm.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/SubscriptionsForm",
+      "specMissing": false
+    },
+    {
+      "name": "DataView",
+      "tier": "view",
+      "description": "Storybook coverage for DataView.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/DataView.svelte",
+      "specPath": "src/views/Connection/DataView/DataView.spec.json",
+      "storyPath": "src/views/Connection/DataView/DataView.stories.svelte",
+      "storyId": "Views/Connection/DataView",
+      "specMissing": false
+    },
+    {
+      "name": "MqttDataPanel",
+      "tier": "view",
+      "description": "Storybook coverage for MqttDataPanel.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "selectedTopicStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel",
+      "specMissing": false
+    },
+    {
+      "name": "MqttTopicRow",
+      "tier": "view",
+      "description": "Storybook coverage for MqttTopicRow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "topicLevel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "expandKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "messageCount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "subtopicCount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "isExpanded",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isSelected",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isDecodedProto",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "toggleExpansion",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onTopicSelect",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "highlightedTopicStore",
+          "type": "store",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow",
+      "specMissing": false
+    },
+    {
+      "name": "MqttTopicTree",
+      "tier": "view",
+      "description": "Storybook coverage for MqttTopicTree.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "width",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "selectedTopic",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "expandedTopicsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "highlightedTopicStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "mqttData",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "searchText",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "sortKey",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "topic",
+            "time"
+          ]
+        },
+        {
+          "name": "sortDir",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "asc",
+            "desc"
+          ]
+        },
+        {
+          "name": "onTopicSelect",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicTree.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicTree.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicTree.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel/MqttTopicTree",
+      "specMissing": false
+    },
+    {
+      "name": "SearchActionBar",
+      "tier": "view",
+      "description": "Storybook coverage for SearchActionBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "getAllTopics",
+          "type": "function",
+          "required": false,
+          "default": "> string[]"
+        },
+        {
+          "name": "searchStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "expandedTopicsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "sortStore",
+          "type": "store",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "error",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchActionBar.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchActionBar.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchActionBar.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel/SearchActionBar",
+      "specMissing": false
+    },
+    {
+      "name": "SearchAndHistory",
+      "tier": "view",
+      "description": "Storybook coverage for SearchAndHistory.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "searchText",
+          "type": "string",
+          "required": false,
+          "default": ""
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "outline",
+        "elevation-2",
+        "elevation-2-hover"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory",
+      "specMissing": false
+    },
+    {
+      "name": "PublishPanel",
+      "tier": "view",
+      "description": "Storybook coverage for PublishPanel.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isPublishDisabled",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "open",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "close",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "getTopicMatchesSubscription",
+          "type": "function",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "warning",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/PublishPanel.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/PublishPanel.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/PublishPanel.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel",
+      "specMissing": false
+    },
+    {
+      "name": "HeadersTab",
+      "tier": "view",
+      "description": "Storybook coverage for HeadersTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "data",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/HeadersTab/HeadersTab.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/HeadersTab/HeadersTab.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/HeadersTab/HeadersTab.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/HeadersTab",
+      "specMissing": false
+    },
+    {
+      "name": "HeaderRow",
+      "tier": "view",
+      "description": "Storybook coverage for HeaderRow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/HeadersTab/components/HeaderRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/HeadersTab/components/HeaderRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/HeadersTab/components/HeaderRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow",
+      "specMissing": false
+    },
+    {
+      "name": "PayloadTab",
+      "tier": "view",
+      "description": "Storybook coverage for PayloadTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "publishStore",
+          "type": "store",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PayloadTab.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PayloadTab.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PayloadTab.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/PayloadTab",
+      "specMissing": false
+    },
+    {
+      "name": "PublishHistory",
+      "tier": "view",
+      "description": "Storybook coverage for PublishHistory.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "publishHistoryStore",
+          "type": "store",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistory.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistory.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistory.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/PublishHistory",
+      "specMissing": false
+    },
+    {
+      "name": "PublishHistoryItem",
+      "tier": "view",
+      "description": "Storybook coverage for PublishHistoryItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "retain",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "searchString",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "encoding",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "format",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "none",
+            "json",
+            "json-prettier",
+            "xml"
+          ]
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onCrossClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistoryItem.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistoryItem.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistoryItem.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/PublishHistory/PublishHistoryItem",
+      "specMissing": false
+    },
+    {
+      "name": "SearchableText",
+      "tier": "view",
+      "description": "Storybook coverage for SearchableText.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "syntaxHighlight",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isTopic",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "searchTerm",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "config",
+          "type": "object",
+          "required": false,
+          "default": "{"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/SearchableText.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/SearchableText.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/SearchableText.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/PublishHistory/SearchableText",
+      "specMissing": false
+    },
+    {
+      "name": "UserPropertiesTab",
+      "tier": "view",
+      "description": "Storybook coverage for UserPropertiesTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "userProperties",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/UserPropertiesTab.svelte",
+      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/UserPropertiesTab.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/UserPropertiesTab.stories.svelte",
+      "storyId": "Views/Connection/DataView/PublishPanel/UserPropertiesTab",
+      "specMissing": false
+    },
+    {
+      "name": "SelectedTopicPanel",
+      "tier": "view",
+      "description": "Storybook coverage for SelectedTopicPanel.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "selectedTopicStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "firstConnectedAtMs",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "mqttVersion",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "3",
+            "5"
+          ]
+        },
+        {
+          "name": "deleteRetainedMessage",
+          "type": "function",
+          "required": false,
+          "default": "> Promise<void>"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel",
+      "specMissing": false
+    },
+    {
+      "name": "HeadersTab",
+      "tier": "view",
+      "description": "Storybook coverage for HeadersTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isComparing",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "headers",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "headersToCompare",
+          "type": "string",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/HeadersTab.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/HeadersTab.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/HeadersTab.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/HeadersTab",
+      "specMissing": false
+    },
+    {
+      "name": "MessageTimeline",
+      "tier": "view",
+      "description": "Storybook coverage for MessageTimeline.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "selectedTopicStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "firstConnectedAtMs",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "onMessageSelect",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "isAutoSelectingMostRecent",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "primary",
+        "primary-light",
+        "secondary",
+        "secondary-text",
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/MessageTimeline.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/MessageTimeline.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/MessageTimeline.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/MessageTimeline",
+      "specMissing": false
+    },
+    {
+      "name": "PayloadTab",
+      "tier": "view",
+      "description": "Storybook coverage for PayloadTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isComparing",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "payloadLeftForCompare",
+          "type": "string",
+          "required": false,
+          "default": "null"
+        },
+        {
+          "name": "codec",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "none",
+            "base64",
+            "hex"
+          ]
+        },
+        {
+          "name": "format",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "none",
+            "json",
+            "json-prettier",
+            "xml"
+          ]
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/PayloadTab.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/PayloadTab.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/PayloadTab.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/PayloadTab",
+      "specMissing": false
+    },
+    {
+      "name": "SelectedMessageArrivalDetails",
+      "tier": "view",
+      "description": "Storybook coverage for SelectedMessageArrivalDetails.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isComparing",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "selectedArrivedAtMs",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "selectedRetain",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "previousArrivedAtMs",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "previousRetain",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/SelectedMessageArrivalDetails.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/SelectedMessageArrivalDetails.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/SelectedMessageArrivalDetails.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/SelectedMessageArrivalDetails",
+      "specMissing": false
+    },
+    {
+      "name": "Topic",
+      "tier": "view",
+      "description": "Storybook coverage for Topic.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Topic.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Topic.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Topic.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/Topic",
+      "specMissing": false
+    },
+    {
+      "name": "UserPropertiesTab",
+      "tier": "view",
+      "description": "Storybook coverage for UserPropertiesTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isComparing",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "userProperties",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "userPropertiesToCompare",
+          "type": "object",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/UserPropertiesTab.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/UserPropertiesTab.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/UserPropertiesTab.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/UserPropertiesTab",
+      "specMissing": false
+    },
+    {
+      "name": "HeaderRow",
+      "tier": "view",
+      "description": "Storybook coverage for HeaderRow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "rowName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rowValue",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rowValueDiff",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "rowValueToCompare",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "rowValueToCompareDiff",
+          "type": "string",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/shared/HeaderRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/shared/HeaderRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/shared/HeaderRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/shared/HeaderRow",
+      "specMissing": false
+    },
+    {
+      "name": "HeaderRowItem",
+      "tier": "view",
+      "description": "Storybook coverage for HeaderRowItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "valueDiff",
+          "type": "string",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/shared/HeaderRowItem.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/shared/HeaderRowItem.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/shared/HeaderRowItem.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/shared/HeaderRowItem",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionHeaderBar",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionHeaderBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "connectionIsValid",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/components/ConnectionHeaderBar.svelte",
+      "specPath": "src/views/Connection/components/ConnectionHeaderBar.spec.json",
+      "storyPath": "src/views/Connection/components/ConnectionHeaderBar.stories.svelte",
+      "storyId": "Views/Connection/ConnectionHeaderBar",
+      "specMissing": false
+    },
+    {
+      "name": "Home",
+      "tier": "view",
+      "description": "Storybook coverage for Home.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Home/Home.svelte",
+      "specPath": "src/views/Home/Home.spec.json",
+      "storyPath": "src/views/Home/Home.stories.svelte",
+      "storyId": "Views/Home",
+      "specMissing": false
+    },
+    {
+      "name": "HomeConnectionList",
+      "tier": "view",
+      "description": "Storybook coverage for HomeConnectionList.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connections",
+          "type": "object",
+          "required": false,
+          "default": "[]"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Home/components/HomeConnectionList/HomeConnectionList.svelte",
+      "specPath": "src/views/Home/components/HomeConnectionList/HomeConnectionList.spec.json",
+      "storyPath": "src/views/Home/components/HomeConnectionList/HomeConnectionList.stories.svelte",
+      "storyId": "Views/Home/HomeConnectionList",
+      "specMissing": false
+    },
+    {
+      "name": "HomeConnectionListItem",
+      "tier": "view",
+      "description": "Storybook coverage for HomeConnectionListItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.svelte",
+      "specPath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.spec.json",
+      "storyPath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.stories.svelte",
+      "storyId": "Views/Home/HomeConnectionList/HomeConnectionListItem",
+      "specMissing": false
+    },
+    {
+      "name": "HomeHeaderBar",
+      "tier": "view",
+      "description": "Storybook coverage for HomeHeaderBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Home/components/HomeHeaderBar.svelte",
+      "specPath": "src/views/Home/components/HomeHeaderBar.spec.json",
+      "storyPath": "src/views/Home/components/HomeHeaderBar.stories.svelte",
+      "storyId": "Views/Home/HomeHeaderBar",
+      "specMissing": false
+    },
+    {
+      "name": "NewTab",
+      "tier": "view",
+      "description": "Storybook coverage for NewTab.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/NewTab/NewTab.svelte",
+      "specPath": "src/views/NewTab/NewTab.spec.json",
+      "storyPath": "src/views/NewTab/NewTab.stories.svelte",
+      "storyId": "Views/NewTab",
+      "specMissing": false
+    },
+    {
+      "name": "BigAddConnectionButton",
+      "tier": "view",
+      "description": "Storybook coverage for BigAddConnectionButton.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/NewTab/components/BigAddConnectionButton.svelte",
+      "specPath": "src/views/NewTab/components/BigAddConnectionButton.spec.json",
+      "storyPath": "src/views/NewTab/components/BigAddConnectionButton.stories.svelte",
+      "storyId": "Views/NewTab/BigAddConnectionButton",
+      "specMissing": false
+    },
+    {
+      "name": "RecentConnectionsList",
+      "tier": "view",
+      "description": "Storybook coverage for RecentConnectionsList.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connections",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/NewTab/components/RecentConnectionsList/RecentConnectionsList.svelte",
+      "specPath": "src/views/NewTab/components/RecentConnectionsList/RecentConnectionsList.spec.json",
+      "storyPath": "src/views/NewTab/components/RecentConnectionsList/RecentConnectionsList.stories.svelte",
+      "storyId": "Views/NewTab/RecentConnectionsList",
+      "specMissing": false
+    },
+    {
+      "name": "RecentConnectionsListItem",
+      "tier": "view",
+      "description": "Storybook coverage for RecentConnectionsListItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/NewTab/components/RecentConnectionsList/RecentConnectionsListItem.svelte",
+      "specPath": "src/views/NewTab/components/RecentConnectionsList/RecentConnectionsListItem.spec.json",
+      "storyPath": "src/views/NewTab/components/RecentConnectionsList/RecentConnectionsListItem.stories.svelte",
+      "storyId": "Views/NewTab/RecentConnectionsList/RecentConnectionsListItem",
+      "specMissing": false
+    },
+    {
+      "name": "PleaseUpdate",
+      "tier": "view",
+      "description": "Storybook coverage for PleaseUpdate.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/PleaseUpdate/PleaseUpdate.svelte",
+      "specPath": "src/views/PleaseUpdate/PleaseUpdate.spec.json",
+      "storyPath": "src/views/PleaseUpdate/PleaseUpdate.stories.svelte",
+      "storyId": "Views/PleaseUpdate",
+      "specMissing": false
+    }
+  ]
+}

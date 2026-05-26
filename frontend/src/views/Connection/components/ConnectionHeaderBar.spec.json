@@ -1,0 +1,32 @@
+{
+  "$schema": "../../../design-system/component-spec.schema.json",
+  "name": "ConnectionHeaderBar",
+  "tier": "view",
+  "description": "Storybook coverage for ConnectionHeaderBar.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "connectionIsValid",
+      "type": "boolean",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

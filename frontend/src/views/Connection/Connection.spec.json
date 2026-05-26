@@ -1,0 +1,24 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "Connection",
+  "tier": "view",
+  "description": "Storybook coverage for Connection.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": true
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

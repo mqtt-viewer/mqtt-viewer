@@ -1,0 +1,41 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "CopyToClipboard",
+  "tier": "primitive",
+  "description": "Storybook coverage for CopyToClipboard.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "text",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "size",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "small",
+        "medium"
+      ],
+      "default": 16
+    },
+    {
+      "name": "tooltipText",
+      "type": "string",
+      "required": false,
+      "default": null
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

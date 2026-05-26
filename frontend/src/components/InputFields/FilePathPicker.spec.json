@@ -1,0 +1,74 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "FilePathPicker",
+  "tier": "primitive",
+  "description": "Storybook coverage for FilePathPicker.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "defaultValue",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "variant",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "primary",
+        "secondary",
+        "text"
+      ]
+    },
+    {
+      "name": "actionLabel",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "valueLabel",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "value",
+      "type": "string",
+      "required": false,
+      "default": "defaultValue ?? \"\""
+    },
+    {
+      "name": "onFileChosen",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onFileRemoved",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "white-text",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "CodeEditorConfigBarOption",
+  "tier": "component",
+  "description": "Storybook coverage for CodeEditorConfigBarOption.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "options",
+      "type": "object",
+      "required": false,
+      "default": "[]"
+    },
+    {
+      "name": "defaultValue",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "getOptionLabel",
+      "type": "string",
+      "required": false,
+      "default": "> string"
+    },
+    {
+      "name": "getOptionDisplay",
+      "type": "string",
+      "required": false,
+      "default": "> string = getOptionLabel"
+    },
+    {
+      "name": "selected",
+      "type": "string",
+      "required": false,
+      "default": "writable<SelectOption<OptionType | undefined>>("
+    },
+    {
+      "name": "onChange",
+      "type": "function",
+      "required": false,
+      "default": "(value: OptionType | undefined) => {}"
+    },
+    {
+      "name": "setValue",
+      "type": "function",
+      "required": false,
+      "default": "(value: OptionType | undefined) => {"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "white-text",
+    "elevation-2",
+    "elevation-2-hover"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "FeedbackDialog",
+  "tier": "component",
+  "description": "Storybook coverage for FeedbackDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "open",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    }
+  ],
+  "tokens": [
+    "success",
+    "error"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

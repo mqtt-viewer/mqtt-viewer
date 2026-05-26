@@ -1,0 +1,36 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "DropdownMenuItem",
+  "tier": "primitive",
+  "description": "Storybook coverage for DropdownMenuItem.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isSelected",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "white-text",
+    "elevation-2",
+    "elevation-2-hover"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

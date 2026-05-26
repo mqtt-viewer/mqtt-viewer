@@ -1,0 +1,60 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "PayloadTab",
+  "tier": "view",
+  "description": "Storybook coverage for PayloadTab.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isComparing",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "payload",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "payloadLeftForCompare",
+      "type": "string",
+      "required": false,
+      "default": "null"
+    },
+    {
+      "name": "codec",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "none",
+        "base64",
+        "hex"
+      ]
+    },
+    {
+      "name": "format",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "none",
+        "json",
+        "json-prettier",
+        "xml"
+      ]
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text",
+    "outline"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}
