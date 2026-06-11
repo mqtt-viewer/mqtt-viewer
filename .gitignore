@@ -11,6 +11,7 @@ secrets.json
 .DS_STORE
 
 # wails3 build outputs
+.task/
 *.syso
 build/darwin/icons.icns
 build/windows/icon.ico

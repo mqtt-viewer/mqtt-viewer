@@ -17,7 +17,7 @@
     !define INFO_PRODUCTVERSION "0.0.0"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "Copyright © 2026 MQTT Viewer"
+    !define INFO_COPYRIGHT "Copyright (c) 2026 MQTT Viewer"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"

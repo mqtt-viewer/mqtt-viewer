@@ -52,9 +52,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      # -tags gtk3: the CLI links the same webview stack as the app; without
+      # the tag it requires gtk4 dev headers, which we don't install.
       - name: Install wails3 CLI
         shell: bash
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+        run: go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
