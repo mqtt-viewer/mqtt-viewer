@@ -7,6 +7,9 @@
     -webkit-user-select: none; /* Safari */
     user-select: none;
   }
+  ::selection {
+    background-color: rgba(124, 140, 255, 0.4);
+  }
   @font-face {
     font-family: "Mona Sans";
     font-weight: 200 900;
