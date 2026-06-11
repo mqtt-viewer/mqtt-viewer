@@ -3,9 +3,11 @@ import {
   SavePublishHistoryEntry,
   DeletePublishHistoryEntry,
   PublishMqtt,
-} from "wailsjs/go/app/App";
+} from "bindings/mqtt-viewer/backend/app/app";
 import { get, writable } from "svelte/store";
-import { app, models, mqtt } from "wailsjs/go/models";
+import * as app from "bindings/mqtt-viewer/backend/app/models";
+import * as models from "bindings/mqtt-viewer/backend/models/models";
+import * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 
 import type { DeepOmit } from "@/util/types";
 import {

@@ -7,10 +7,8 @@ const (
 	UpdateAvailable   GlobalEvent = "UpdateAvailable"
 )
 
-var GlobalEvents = []struct {
-	Value  GlobalEvent
-	TSName string
-}{
-	{ConnectionDeleted, "ConnectionDeleted"},
-	{UpdateAvailable, "UpdateAvailable"},
+// GlobalEventNames returns all global event names. It exists so the
+// GlobalEvent enum is included in the generated frontend bindings.
+func (e *ConnectionEvents) GlobalEventNames() []GlobalEvent {
+	return []GlobalEvent{ConnectionDeleted, UpdateAvailable}
 }

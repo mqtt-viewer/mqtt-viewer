@@ -4,15 +4,20 @@ on:
   release:
     types: [published]
 
+env:
+  GO_VERSION: "1.25.x"
+  WAILS_VERSION: "v3.0.0-alpha.98"
+  NODE_VERSION: "20.15.0"
+
 jobs:
   release:
     strategy:
       matrix:
         build:
-          - platform: darwin/amd64
+          - arch: amd64
             os: macos-latest
             tag: darwin_amd64
-          - platform: darwin/arm64
+          - arch: arm64
             os: macos-latest
             tag: darwin_arm64
     runs-on: ${{ matrix.build.os }}
@@ -45,16 +50,20 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.3"
+          go-version: ${{ env.GO_VERSION }}
 
-      - name: Install wails
+      - name: Install wails3 CLI
         shell: bash
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.15.0"
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        shell: bash
+        run: npm install -g pnpm
 
       # Dependencies
 
@@ -67,14 +76,6 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
           p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
 
-      # Build -- frontend
-
-      - name: Build frontend assets
-        shell: bash
-        run: |
-          npm install -g pnpm
-          cd frontend && pnpm install
-
       - name: Use mac app icon
         shell: bash
         run: |
@@ -84,21 +85,27 @@ jobs:
 
       # Build
 
-      - name: Build, sign, notarize macOS app
+      - name: Build and package macOS app
         shell: bash
         run: |
-          echo "building app on ${{ matrix.build.platform }}"
+          echo "building app for darwin/${{ matrix.build.arch }}"
           LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}"
+          wails3 task darwin:package ARCH=${{ matrix.build.arch }} VERSION=${{ steps.normalise_version.outputs.version }} LD_FLAGS="${LD_FLAGS}"
+
+      - name: Sign, zip, notarize macOS app
+        shell: bash
+        run: |
+          echo "Removing ad-hoc signature"
+          codesign --remove-signature "./bin/MQTT Viewer.app"
           echo "Signing Package"
           gon -log-level=info ./build/darwin/gon.sign.json
           echo "Zipping Package"
-          ditto -c -k --keepParent "./build/bin/MQTT Viewer.app" ./build/bin/MQTTViewer.zip
+          ditto -c -k --keepParent "./bin/MQTT Viewer.app" ./bin/MQTTViewer.zip
           echo "Cleaning up"
-          rm -rf "./build/bin/MQTT Viewer.app"
+          rm -rf "./bin/MQTT Viewer.app"
           echo "Notarizing Zip Files"
           gon -log-level=info ./build/darwin/gon.notarize.json
         env:
@@ -108,13 +115,15 @@ jobs:
 
       # Publish
 
-      - name: Rename release zip
+      - name: Rename release zip and create checksum
         shell: bash
-        run: mv build/bin/MQTTViewer.zip build/bin/${{ steps.define_filename.outputs.filename }}.zip
+        run: |
+          mv bin/MQTTViewer.zip bin/${{ steps.define_filename.outputs.filename }}.zip
+          cd bin && shasum -a 256 ${{ steps.define_filename.outputs.filename }}.zip > ${{ steps.define_filename.outputs.filename }}.zip.sha256
 
-      - name: Upload release zip
+      - name: Upload release assets
         uses: alexellis/upload-assets@0.4.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'
+          asset_paths: '["bin/${{ steps.define_filename.outputs.filename }}.zip", "bin/${{ steps.define_filename.outputs.filename }}.zip.sha256"]'

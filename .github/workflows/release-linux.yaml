@@ -4,17 +4,20 @@ on:
   release:
     types: [published]
 
+env:
+  GO_VERSION: "1.25.x"
+  WAILS_VERSION: "v3.0.0-alpha.98"
+  NODE_VERSION: "20.15.0"
+
 jobs:
   release:
     strategy:
       matrix:
         build:
           - arch: amd64
-            platform: linux/amd64
             os: blacksmith
             tag: linux_amd64
           - arch: arm64
-            platform: linux/arm64
             os: blacksmith-arm
             tag: linux_arm64
     runs-on: ${{ matrix.build.os }}
@@ -47,86 +50,63 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.3"
+          go-version: ${{ env.GO_VERSION }}
 
-      - name: Install wails
+      - name: Install wails3 CLI
         shell: bash
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.15.0"
+          node-version: ${{ env.NODE_VERSION }}
 
-      # Dependencies
+      - name: Install pnpm
+        shell: bash
+        run: npm install -g pnpm
+
+      # Dependencies (gtk3 / WebKit2GTK 4.1 stack, matching the -tags gtk3 build)
 
       - name: Install Ubuntu prerequisites
         shell: bash
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libfuse2 zip rpm
 
-      # Build
+      # Build + package (binary, AppImage, deb, rpm)
 
-      - name: Build frontend assets
-        shell: bash
-        run: |
-          npm install -g pnpm
-          cd frontend && pnpm install
-
-      - name: Build wails app
+      - name: Build and package wails app
         shell: bash
         run: |
           LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
+          wails3 task linux:package ARCH=${{ matrix.build.arch }} VERSION=${{ steps.normalise_version.outputs.version }} LD_FLAGS="${LD_FLAGS}"
 
-      # Packaging
+      # Collect + rename artifacts
 
-      - name: Compress linux binary
+      - name: Collect release artifacts
         shell: bash
         run: |
-          cd build/bin && zip -r ${{ steps.define_filename.outputs.filename }}.zip "MQTT Viewer"
+          set -x
+          filename=${{ steps.define_filename.outputs.filename }}
+          mkdir -p dist
+          # plain binary zip (consumed by the in-app updater)
+          (cd bin && zip -r ../dist/${filename}.zip mqtt-viewer)
+          # AppImage
+          mv bin/*.AppImage dist/${filename}.AppImage
+          # deb / rpm
+          mv bin/*.deb dist/${filename}.deb
+          mv bin/*.rpm dist/${filename}.rpm
+          # checksums
+          cd dist && for f in ${filename}.zip ${filename}.AppImage ${filename}.deb ${filename}.rpm; do
+            sha256sum "$f" > "$f.sha256"
+          done
 
       # Publish
 
-      - name: Upload release binaries
+      - name: Upload release assets
         uses: alexellis/upload-assets@0.4.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: '["build/bin/${{ steps.define_filename.outputs.filename }}.zip"]'
-
-      # AppImage
-
-      - name: Build wails app for AppImage
-        shell: bash
-        run: |
-          LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
-          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
-          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
-          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.IsAppImage=true"
-          wails build -platform ${{ matrix.build.platform }} -ldflags "${LD_FLAGS}" -tags webkit2_41
-
-      - name: Rename linux binary to be appimage compatible
-        shell: bash
-        run: |
-          cd build/bin && mv "MQTT Viewer" MQTTViewer
-
-      - name: Package appimage
-        shell: bash
-        run: |
-          cd build/linux && go run build_appimage.go
-
-      - name: Rename appimage
-        shell: bash
-        run: |
-          cd build/linux && mv MQTTViewer*.AppImage ${{ steps.define_filename.outputs.filename }}.AppImage
-
-      - name: Upload release appimage
-        uses: alexellis/upload-assets@0.4.1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          asset_paths: '["build/linux/${{ steps.define_filename.outputs.filename }}.AppImage"]'
+          asset_paths: '["dist/*"]'

@@ -5,7 +5,7 @@ new-migration NAME:
   atlas migrate diff --env gorm {{NAME}}
 
 build VERSION="v0.0.1-defaultv":
-  wails build -ldflags "-X mqtt-viewer/backend/env.Version={{VERSION}}"
+  wails3 task package VERSION={{VERSION}} LD_FLAGS="-X mqtt-viewer/backend/env.Version={{VERSION}}"
 
-build-pi VERSION="v0.0.1-defaultv":
-  ~/go/bin/wails build -ldflags "-X mqtt-viewer/backend/env.Version={{VERSION}}"
+dev:
+  wails3 dev

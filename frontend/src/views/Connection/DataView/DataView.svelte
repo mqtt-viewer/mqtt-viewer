@@ -8,7 +8,7 @@
   import { createMatchedTopicsStore } from "./stores/matched-topics";
   import panelSizes from "@/stores/panel-sizes";
   import { addToast } from "@/components/Toast/Toast.svelte";
-  import { DeleteRetainedMessage } from "wailsjs/go/app/App";
+  import { DeleteRetainedMessage } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
 

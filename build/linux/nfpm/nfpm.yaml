@@ -1,0 +1,38 @@
+# nfpm packaging configuration for deb/rpm builds.
+# Make sure to check the documentation at https://nfpm.goreleaser.com
+name: "mqtt-viewer"
+arch: ${GOARCH}
+platform: "linux"
+version: ${NFPM_VERSION}
+section: "default"
+priority: "extra"
+maintainer: Sam Webster <sam@mqttviewer.app>
+description: "A fast and feature-rich MQTT visualization and debugging tool"
+vendor: "MQTT Viewer"
+homepage: "https://mqttviewer.app"
+license: "MIT"
+release: "1"
+
+contents:
+  - src: "./bin/mqtt-viewer"
+    dst: "/usr/local/bin/mqtt-viewer"
+  - src: "./build/appicon.png"
+    dst: "/usr/share/icons/hicolor/128x128/apps/mqtt-viewer.png"
+  - src: "./build/linux/mqtt-viewer.desktop"
+    dst: "/usr/share/applications/mqtt-viewer.desktop"
+
+# Dependencies for the GTK3 + WebKit2GTK 4.1 stack (matches the -tags gtk3 build)
+depends:
+  - libgtk-3-0
+  - libwebkit2gtk-4.1-0
+
+# Distribution-specific overrides for different package formats
+overrides:
+  # RPM packages for Fedora / RHEL / AlmaLinux / Rocky Linux
+  rpm:
+    depends:
+      - gtk3
+      - webkit2gtk4.1
+
+scripts:
+  postinstall: "./build/linux/nfpm/scripts/postinstall.sh"

@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { PublishMqtt } from "wailsjs/go/app/App";
-  import type { app, models, mqtt } from "wailsjs/go/models";
+  import { PublishMqtt } from "bindings/mqtt-viewer/backend/app/app";
+  import type * as app from "bindings/mqtt-viewer/backend/app/models";
+  import type * as models from "bindings/mqtt-viewer/backend/models/models";
+  import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
   import Button from "@/components/Button/Button.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
   import Tabs from "@/components/Tabs/Tabs.svelte";

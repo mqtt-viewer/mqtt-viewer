@@ -56,11 +56,12 @@ Hard rules (validator enforces):
 ## Authoring rules (so stories + sync work)
 
 1. **Props over fetching.** A component must render from props alone in a story.
-   No store reads / no `wailsjs` calls in the render path. Where a component
+   No store reads / no `bindings` calls in the render path. Where a component
    currently reads a store or Wails, pass mock data in the story; if impossible
    without refactor, record it in `spec.json.notes` — don't fake it.
-2. **Wails is mocked in Storybook** (`.storybook/mocks/wailsjs/`). Don't import
-   real Go bindings into shared/presentational components.
+2. **Wails is mocked in Storybook** (`.storybook/mocks/bindings/` and
+   `.storybook/mocks/wailsio-runtime.ts`). Don't import real Go bindings into
+   shared/presentational components.
 3. **Co-locate** the story; title = `<Tier>/<Name>` (`Primitives/Button`).
 4. **`tags: ['autodocs']`** on every story meta (prop tables + smoke tests).
 5. **`argTypes`** for every enum prop; `options` must match `spec.json` `props[].options`

@@ -1,7 +1,7 @@
 import { get, writable } from "svelte/store";
-import { Environment, WindowIsFullscreen } from "wailsjs/runtime/runtime";
+import { System, Window } from "@wailsio/runtime";
 import _ from "lodash";
-import { GetEnvInfo } from "wailsjs/go/app/App";
+import { GetEnvInfo } from "bindings/mqtt-viewer/backend/app/app";
 
 const IS_BETA = true;
 
@@ -34,7 +34,7 @@ const { subscribe, set, update } = writable<EnvStore>({
 });
 
 const debouncedCheckFullscreen = _.debounce(async () => {
-  const isFullscreen = await WindowIsFullscreen();
+  const isFullscreen = await Window.IsFullscreen();
   update((store) => {
     return {
       ...store,
@@ -46,8 +46,13 @@ const debouncedCheckFullscreen = _.debounce(async () => {
 const init = async () => {
   try {
     window.addEventListener("resize", debouncedCheckFullscreen, true);
-    const env = await Environment();
-    const isFullscreen = await WindowIsFullscreen();
+    const info = await System.Environment();
+    const env = {
+      buildType: info.Debug ? "dev" : "production",
+      platform: info.OS,
+      arch: info.Arch,
+    };
+    const isFullscreen = await Window.IsFullscreen();
     const configuredEnv = await GetEnvInfo();
     set({
       env,

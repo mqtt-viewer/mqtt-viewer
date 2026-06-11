@@ -10,7 +10,7 @@
   import { untypedColors } from "@/util/resolvedTailwindConfig";
   // @ts-ignore
   import VirtualList from "@sveltejs/svelte-virtual-list/VirtualList.svelte";
-  import type { models } from "wailsjs/go/models";
+  import type * as models from "bindings/mqtt-viewer/backend/models/models";
   import { addToast } from "@/components/Toast/Toast.svelte";
 
   export let publishHistoryStore: ReturnType<typeof createPublishHistoryStore>;

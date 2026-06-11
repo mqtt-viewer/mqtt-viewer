@@ -259,7 +259,7 @@
     }}
     name="hasCustomClientId"
     label="Use custom Client ID"
-    defaultChecked={hasCustomClientId}
+    defaultChecked={hasCustomClientId ?? undefined}
   />
   {#if $data.hasCustomClientId}
     <BaseInput
@@ -280,7 +280,7 @@
         onChange={(checked) => setFields(`isCertsEnabled`, checked, true)}
         name="isCertsEnabled"
         label="Use custom certificates"
-        defaultChecked={isCertsEnabled}
+        defaultChecked={isCertsEnabled ?? undefined}
       />
     </div>
     <div style:display={$data.isCertsEnabled && isSslTls ? undefined : "none"}>
@@ -288,7 +288,7 @@
         onChange={(checked) => setFields(`skipCertVerification`, checked, true)}
         name="skipCertVerification"
         label="Skip certificate validation (insecure)"
-        defaultChecked={skipCertVerification}
+        defaultChecked={skipCertVerification ?? undefined}
       />
     </div>
   </div>
@@ -338,7 +338,7 @@
     onChange={(checked) => setFields(`isProtoEnabled`, checked, true)}
     name="isProtoEnabled"
     label="Automatically encode/decode Sparkplug messages"
-    defaultChecked={isProtoEnabled}
+    defaultChecked={isProtoEnabled ?? undefined}
   />
 </form>
 <ConfirmDeleteConnectionDialog

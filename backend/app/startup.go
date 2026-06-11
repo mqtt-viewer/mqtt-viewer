@@ -17,7 +17,7 @@ import (
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"gopkg.in/guregu/null.v4"
 )
 
@@ -26,15 +26,20 @@ type StartupOptions struct {
 	DbNameOverride *string
 }
 
+// ServiceStartup is called by Wails when the application starts up
+func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
+	a.Startup(ctx, nil)
+	return nil
+}
+
 func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	a.ctx = ctx
 	a.Events = events.NewConnectionEvents()
 	var dbConn *db.DB
 	var err error
 	if a.Mode == AppModes.Wails {
-		a.EventRuntime = eventRuntime.InitEventRuntime(ctx)
-		envInfo := runtime.Environment(a.ctx)
-		if envInfo.BuildType == "production" {
+		a.EventRuntime = eventRuntime.InitEventRuntime(application.Get())
+		if !env.IsDev {
 			slog.Info("starting in production mode")
 			a.Mode = AppModes.Wails
 			a.Paths = paths.GetPaths()
@@ -106,8 +111,12 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	}()
 
 	if a.Mode != AppModes.Test {
-		updater := update.NewUpdater(a.Paths.ResourcePath, env.MachineId)
-		a.Updater = updater
+		updater, err := update.InitUpdater(application.Get())
+		if err != nil {
+			slog.Error(fmt.Sprintf("error initialising updater: %v", err))
+		} else {
+			a.Updater = updater
+		}
 	}
 }
 

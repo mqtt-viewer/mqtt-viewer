@@ -1,8 +1,8 @@
 import { writable } from "svelte/store";
-import { update as wailsupdate } from "wailsjs/go/models";
-import { CheckForUpdates } from "wailsjs/go/app/App";
+import * as wailsupdate from "bindings/mqtt-viewer/backend/update/models";
+import { CheckForUpdates } from "bindings/mqtt-viewer/backend/app/app";
 import notificationStore, { type Notification } from "./notifications";
-import { BrowserOpenURL } from "wailsjs/runtime/runtime";
+import { Browser } from "@wailsio/runtime";
 
 interface UpdatesStore {
   isUpdateDialogOpen: boolean;
@@ -46,13 +46,16 @@ const getAvailableUpdate = async () => {
             type: "info",
             icon: "download",
           };
-          if (availableUpdate.notification_url) {
-            notification.onClick = () => {
-              BrowserOpenURL(availableUpdate.notification_url);
-            };
-          }
-          if (availableUpdate.update_url) {
+          if (availableUpdate.can_update) {
+            // Self-updatable install: confirm, then hand over to the
+            // built-in Wails updater window.
             notification.onClick = openUpdateDialog;
+          } else if (availableUpdate.notification_url) {
+            // Managed installs (AppImage/deb/rpm) or unlicensed updates:
+            // send the user to the right place instead.
+            notification.onClick = () => {
+              Browser.OpenURL(availableUpdate.notification_url);
+            };
           }
           notificationStore.addNotification(notification);
         }

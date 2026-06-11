@@ -1,10 +1,21 @@
 build/bin
+/bin/
 node_modules
 frontend/dist
 frontend/storybook-static
 *.db
 _dev_resources
-mqtt-viewer
+/mqtt-viewer
 secrets.json
 .env
 .DS_STORE
+
+# wails3 build outputs
+*.syso
+build/darwin/icons.icns
+build/windows/icon.ico
+build/linux/*.desktop
+build/linux/appimage/build/
+build/linux/appimage/mqtt-viewer
+build/linux/appimage/mqtt-viewer.png
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe

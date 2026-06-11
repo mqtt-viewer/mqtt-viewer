@@ -1,8 +1,8 @@
 import { get, writable } from "svelte/store";
-import type { mqtt } from "wailsjs/go/models";
-import { GetMessageHistory } from "wailsjs/go/app/App";
-import { EventsOn } from "wailsjs/runtime/runtime";
-import type { events } from "wailsjs/go/models";
+import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
+import { GetMessageHistory } from "bindings/mqtt-viewer/backend/app/app";
+import { Events } from "@wailsio/runtime";
+import type * as events from "bindings/mqtt-viewer/events/models";
 import type { SupportedCodeEditorCodec } from "@/components/CodeEditor/codec";
 import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
 
@@ -53,34 +53,32 @@ export const createSelectedTopicStore = (
   );
 
   const registerMessageListener = () => {
-    EventsOn(
-      connectionEventSet.mqttMessages,
-      (messages: mqtt.MqttMessage[]) => {
-        const { selectedTopic, onNewMessages } = get({ subscribe });
-        if (selectedTopic === null) return;
-        const newMessagesForSelectedTopic = messages.filter(
-          (m) => m.topic === selectedTopic
-        );
-        if (newMessagesForSelectedTopic.length > 0) {
-          const decodedNewMessages = newMessagesForSelectedTopic.map((m) => {
-            return {
-              ...m,
-              payload: atob(m.payload as unknown as string),
-            };
-          });
-          if (onNewMessages !== null) {
-            onNewMessages(decodedNewMessages);
-          }
-          update((store) => {
-            return {
-              ...store,
-              history: [...store.history, ...decodedNewMessages],
-            };
-          });
+    Events.On(connectionEventSet.mqttMessages, (e) => {
+      const messages: mqtt.MqttMessage[] = e.data;
+      const { selectedTopic, onNewMessages } = get({ subscribe });
+      if (selectedTopic === null) return;
+      const newMessagesForSelectedTopic = messages.filter(
+        (m) => m.topic === selectedTopic
+      );
+      if (newMessagesForSelectedTopic.length > 0) {
+        const decodedNewMessages = newMessagesForSelectedTopic.map((m) => {
+          return {
+            ...m,
+            payload: atob(m.payload as unknown as string),
+          };
+        });
+        if (onNewMessages !== null) {
+          onNewMessages(decodedNewMessages);
         }
+        update((store) => {
+          return {
+            ...store,
+            history: [...store.history, ...decodedNewMessages],
+          };
+        });
       }
-    );
-    EventsOn(connectionEventSet.mqttClearHistory, () => {
+    });
+    Events.On(connectionEventSet.mqttClearHistory, () => {
       update((store) => {
         return { ...store, history: [], selectedTopic: null };
       });

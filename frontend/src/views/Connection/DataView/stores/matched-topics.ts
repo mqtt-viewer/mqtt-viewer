@@ -1,6 +1,6 @@
 import { writable, get } from "svelte/store";
-import { GetMatchingSubscriptionForTopic } from "wailsjs/go/app/App";
-import type { models } from "wailsjs/go/models";
+import { GetMatchingSubscriptionForTopic } from "bindings/mqtt-viewer/backend/app/app";
+import type * as models from "bindings/mqtt-viewer/backend/models/models";
 type Topic = string;
 
 interface MatchedTopicsStore {

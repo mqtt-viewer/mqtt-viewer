@@ -2,9 +2,10 @@ import {
   GetPublishHistoriesForConnection,
   SavePublishHistoryEntry,
   DeletePublishHistoryEntry,
-} from "wailsjs/go/app/App";
+} from "bindings/mqtt-viewer/backend/app/app";
 import { writable } from "svelte/store";
-import { app, models } from "wailsjs/go/models";
+import * as app from "bindings/mqtt-viewer/backend/app/models";
+import * as models from "bindings/mqtt-viewer/backend/models/models";
 
 import type { DeepOmit } from "@/util/types";
 import type { PublishDetails, PublishDetailsStore } from "./publish-details";
@@ -57,12 +58,12 @@ export const createPublishHistoryStore = (
 
     const properties: app.PublishProperties = {
       payloadFormatIndicator: !!entry.headerPayloadFormatIndicator,
-      messageExpiryInterval: entry.headerMessageExpiryInterval,
-      contentType: entry.headerContentType,
-      responseTopic: entry.headerResponseTopic,
-      correlationData: entry.headerCorrelationData,
-      subscriptionIdentifier: entry.headerSubscriptionIdentifier,
-      topicAlias: entry.headerTopicAlias,
+      messageExpiryInterval: entry.headerMessageExpiryInterval ?? undefined,
+      contentType: entry.headerContentType ?? undefined,
+      responseTopic: entry.headerResponseTopic ?? undefined,
+      correlationData: entry.headerCorrelationData ?? undefined,
+      subscriptionIdentifier: entry.headerSubscriptionIdentifier ?? undefined,
+      topicAlias: entry.headerTopicAlias ?? undefined,
     };
     const userPropertiesArray = Object.entries(firstUserProperties).map(
       ([key, value]) => {
@@ -115,14 +116,17 @@ export const createPublishHistoryStore = (
         retain: params.retain,
         encoding: params.encoding,
         format: params.format,
-        userProperties: userPropertiesString,
-        headerContentType: params.properties?.contentType,
-        headerPayloadFormatIndicator: params.properties?.payloadFormatIndicator,
-        headerMessageExpiryInterval: params.properties?.messageExpiryInterval,
-        headerResponseTopic: params.properties?.responseTopic,
-        headerCorrelationData: params.properties?.correlationData,
-        headerSubscriptionIdentifier: params.properties?.subscriptionIdentifier,
-        headerTopicAlias: params.properties?.topicAlias,
+        userProperties: userPropertiesString ?? null,
+        headerContentType: params.properties?.contentType ?? null,
+        headerPayloadFormatIndicator:
+          params.properties?.payloadFormatIndicator ?? null,
+        headerMessageExpiryInterval:
+          params.properties?.messageExpiryInterval ?? null,
+        headerResponseTopic: params.properties?.responseTopic ?? null,
+        headerCorrelationData: params.properties?.correlationData ?? null,
+        headerSubscriptionIdentifier:
+          params.properties?.subscriptionIdentifier ?? null,
+        headerTopicAlias: params.properties?.topicAlias ?? null,
       });
       console.log("saved publish history entry", entry);
       update((store) => {

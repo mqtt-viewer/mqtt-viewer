@@ -1,5 +1,5 @@
 import { get, writable } from "svelte/store";
-import { LoadOpenTabs, UpdateOpenConnectionTabs } from "wailsjs/go/app/App";
+import { LoadOpenTabs, UpdateOpenConnectionTabs } from "bindings/mqtt-viewer/backend/app/app";
 
 export const MAX_OPEN_TABS = 10;
 

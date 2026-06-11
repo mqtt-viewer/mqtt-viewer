@@ -170,7 +170,7 @@
             <HeadersTab
               {isComparing}
               headers={selectedMessage.properties}
-              headersToCompare={previousMessage?.properties}
+              headersToCompare={previousMessage?.properties ?? undefined}
             />
           {/if}
         </div>

@@ -3,9 +3,9 @@ import {
   DeleteSubscription,
   GetAllSubscriptionsByConnectionId,
   UpdateSubscription,
-} from "wailsjs/go/app/App";
+} from "bindings/mqtt-viewer/backend/app/app";
 import { get, writable } from "svelte/store";
-import type { models } from "wailsjs/go/models";
+import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import type { DeepOmit } from "@/util/types";
 import { debounce } from "lodash";
 
