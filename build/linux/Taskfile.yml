@@ -99,6 +99,11 @@ tasks:
     summary: Creates an AppImage
     dir: build/linux/appimage
     deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          LD_FLAGS:
+            ref: .LD_FLAGS
       - task: generate:dotdesktop
     cmds:
       - cp "{{.APP_BINARY}}" "{{.APP_NAME}}"
@@ -113,6 +118,12 @@ tasks:
 
   create:deb:
     summary: Creates a deb package
+    deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          LD_FLAGS:
+            ref: .LD_FLAGS
     cmds:
       - task: generate:dotdesktop
       - wails3 tool package -name "{{.APP_NAME}}" -format deb -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
@@ -122,6 +133,12 @@ tasks:
 
   create:rpm:
     summary: Creates a rpm package
+    deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          LD_FLAGS:
+            ref: .LD_FLAGS
     cmds:
       - task: generate:dotdesktop
       - wails3 tool package -name "{{.APP_NAME}}" -format rpm -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
