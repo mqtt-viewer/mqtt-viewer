@@ -30,6 +30,10 @@ export function DeleteSubscription(arg1:number,arg2:number):Promise<void>;
 
 export function DisconnectMqtt(arg1:number):Promise<void>;
 
+export function ExportAllMessages(arg1:number):Promise<string>;
+
+export function ExportTopicMessages(arg1:number,arg2:string):Promise<string>;
+
 export function GetAllConnections():Promise<app.Connections>;
 
 export function GetAllSubscriptionsByConnectionId():Promise<{[key: number]: Array<models.Subscription>}>;

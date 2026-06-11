@@ -50,6 +50,14 @@ export function DisconnectMqtt(arg1) {
   return window['go']['app']['App']['DisconnectMqtt'](arg1);
 }
 
+export function ExportAllMessages(arg1) {
+  return window['go']['app']['App']['ExportAllMessages'](arg1);
+}
+
+export function ExportTopicMessages(arg1, arg2) {
+  return window['go']['app']['App']['ExportTopicMessages'](arg1, arg2);
+}
+
 export function GetAllConnections() {
   return window['go']['app']['App']['GetAllConnections']();
 }

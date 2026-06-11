@@ -23,6 +23,7 @@
   export let firstConnectedAtMs: number;
   export let mqttVersion: "3" | "5";
   export let deleteRetainedMessage: (topic: string) => Promise<void>;
+  export let exportTopicMessages: (topic: string) => Promise<void>;
 
   $: selectedTopicString = $selectedTopicStore.selectedTopic;
 
@@ -96,6 +97,19 @@
               defaultChecked={isComparing}
               onChange={(checked) => selectedTopicStore.setComparing(checked)}
             />
+            <DropdownCloseOnClick>
+              <Button
+                variant="text"
+                on:click={() =>
+                  !!$selectedTopicStore.selectedTopic
+                    ? exportTopicMessages($selectedTopicStore.selectedTopic)
+                    : undefined}
+                ><div class="flex mr-[17px] ml-2">
+                  <Icon type="download" size={20} />
+                </div>
+                <span>Export message history</span></Button
+              >
+            </DropdownCloseOnClick>
             <DropdownCloseOnClick>
               <Button
                 variant="text"

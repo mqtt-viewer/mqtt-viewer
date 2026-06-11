@@ -8,7 +8,10 @@
   import { createMatchedTopicsStore } from "./stores/matched-topics";
   import panelSizes from "@/stores/panel-sizes";
   import { addToast } from "@/components/Toast/Toast.svelte";
-  import { DeleteRetainedMessage } from "wailsjs/go/app/App";
+  import {
+    DeleteRetainedMessage,
+    ExportTopicMessages,
+  } from "wailsjs/go/app/App";
 
   export let connection: Connection;
 
@@ -76,6 +79,32 @@
       });
     }
   };
+
+  const exportTopicMessages = async (topic: string) => {
+    try {
+      const path = await ExportTopicMessages(
+        connection.connectionDetails.id,
+        topic
+      );
+      if (path !== "") {
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: path,
+            type: "success",
+          },
+        });
+      }
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to export messages",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
 </script>
 
 <div class="flex flex-col w-full h-full max-h-full max-w-full">
@@ -118,6 +147,7 @@
           connectionId={connection.connectionDetails.id}
           {selectedTopicStore}
           {deleteRetainedMessage}
+          {exportTopicMessages}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
           mqttVersion={connection.connectionDetails.mqttVersion === "3"
             ? "3"
