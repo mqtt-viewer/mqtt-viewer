@@ -20,5 +20,6 @@ export const LANG_EXTENSIONS: {
 } = {
   json: [json(), linter(jsonParseLinter()), lintGutter()],
   "json-prettier": [json(), linter(jsonParseLinter()), lintGutter()],
+  hex: [],
   none: [],
 };

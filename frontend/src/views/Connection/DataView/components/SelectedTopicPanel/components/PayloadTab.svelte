@@ -27,9 +27,7 @@
         console.error("error decoding payload", e);
       }
     }
-    if (format === "json-prettier") {
-      p = formatPayload(p, "json-prettier");
-    }
+    p = formatPayload(p, format);
     return p;
   };
 
