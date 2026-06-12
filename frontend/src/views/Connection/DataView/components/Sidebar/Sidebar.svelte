@@ -65,8 +65,6 @@
   };
 
   const backToLibrary = () => {
-    // Global collections are shared across connections — refresh on return.
-    collectionsStore.load();
     page = "library";
   };
 

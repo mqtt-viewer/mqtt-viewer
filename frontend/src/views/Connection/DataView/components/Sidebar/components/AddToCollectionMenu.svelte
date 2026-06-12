@@ -40,16 +40,11 @@
     await onCreate(name, scope);
     query = "";
   };
-
-  // global collections can change from other connections; refresh on open
-  const refreshOnOpen = (_node: HTMLElement) => {
-    collectionsStore.load();
-  };
 </script>
 
 <DropdownMenu placement="bottom-end">
   <slot name="trigger" slot="trigger" />
-  <div class="flex flex-col min-w-[220px]" slot="menu-content" use:refreshOnOpen>
+  <div class="flex flex-col min-w-[220px]" slot="menu-content">
     <!-- svelte-ignore a11y_autofocus -->
     <input
       class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"

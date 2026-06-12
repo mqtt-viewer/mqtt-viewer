@@ -1,10 +1,8 @@
 <script lang="ts">
   import type { models } from "wailsjs/go/models";
   import Icon from "@/components/Icon/Icon.svelte";
-  import Dialog from "@/components/Dialog/Dialog.svelte";
-  import DialogActionBar from "@/components/Dialog/DialogActionBar.svelte";
-  import Button from "@/components/Button/Button.svelte";
-  import BaseInput from "@/components/InputFields/BaseInput.svelte";
+  import InlineNameInput from "./InlineNameInput.svelte";
+  import ConfirmDeleteDialog from "./ConfirmDeleteDialog.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
@@ -20,19 +18,11 @@
   let isHovered = false;
   let isDeleteOpen = writable(false);
   let isRenaming = false;
-  let renameValue = "";
 
   $: messages = collection.messages ?? [];
 
-  const startRename = () => {
-    renameValue = collection.name;
-    isRenaming = true;
-  };
-
-  const commitRename = async () => {
-    if (!isRenaming) return;
+  const commitRename = async (name: string) => {
     isRenaming = false;
-    const name = renameValue.trim();
     if (!name || name === collection.name) return;
     try {
       await collectionsStore.renameCollection(collection.id, name);
@@ -78,20 +68,12 @@
     on:mouseleave={() => (isHovered = false)}
   >
     {#if isRenaming}
-      <form
-        role="presentation"
-        class="w-full"
-        on:submit|preventDefault={commitRename}
-        on:keydown={(e) => e.key === "Escape" && (isRenaming = false)}
-      >
-        <!-- svelte-ignore a11y_autofocus -->
-        <BaseInput
-          bind:value={renameValue}
-          name={`rename-collection-${collection.id}`}
-          autofocus
-          onBlur={commitRename}
-        />
-      </form>
+      <InlineNameInput
+        name={`rename-collection-${collection.id}`}
+        initialValue={collection.name}
+        onCommit={commitRename}
+        onCancel={() => (isRenaming = false)}
+      />
     {:else}
       <button
         class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
@@ -116,7 +98,9 @@
             <Icon type="menuDots" size={16} />
           </div>
           <div class="flex flex-col" slot="menu-content">
-            <DropdownMenuItem onClick={startRename}>Rename</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => (isRenaming = true)}
+              >Rename</DropdownMenuItem
+            >
             <DropdownMenuItem
               class="hover:text-error"
               onClick={() => ($isDeleteOpen = true)}>Delete</DropdownMenuItem
@@ -140,11 +124,9 @@
   {/if}
 </div>
 
-<Dialog title="Delete collection" description={deleteDescription} isOpen={isDeleteOpen}>
-  <DialogActionBar>
-    <Button variant="secondary" on:click={() => ($isDeleteOpen = false)}
-      >Cancel</Button
-    >
-    <Button class="bg-error" on:click={deleteCollection}>Delete</Button>
-  </DialogActionBar>
-</Dialog>
+<ConfirmDeleteDialog
+  isOpen={isDeleteOpen}
+  title="Delete collection"
+  description={deleteDescription}
+  onConfirm={deleteCollection}
+/>

@@ -101,12 +101,15 @@
 | Views/Connection/DataView/Sidebar/AddToCollectionMenu | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/CollectionFolder | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/InlineNameInput | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/Sidebar/NewMessageRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/PublishView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/SavedMessageRow | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/SearchableText | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/SearchMessagesModal | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/SidebarCollapsedRail | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/SidebarTopBar | [x] | [ ] | [x] | [x] |
@@ -122,7 +125,7 @@
 
 ## Summary
 
-- Components scanned: 96
-- Story present: 96
+- Components scanned: 99
+- Story present: 99
 - Figma-linked: 0
 - Missing specs: 0

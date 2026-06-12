@@ -7,6 +7,7 @@
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import ConnectionIdenticon from "@/components/ConnectionIdenticon/ConnectionIdenticon.svelte";
+  import ConfirmDeleteConnectionDialog from "@/views/Connection/ConnectionDetailsView/components/ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte";
   import connections, { type Connection } from "@/stores/connections";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { writable } from "svelte/store";
@@ -64,7 +65,6 @@
         },
       });
     }
-    $isDeleteOpen = false;
   };
 </script>
 
@@ -112,15 +112,8 @@
   </form>
 </Dialog>
 
-<Dialog
-  title="Delete connection"
-  description={`Delete "${connection.connectionDetails.name}"? Its publish history and connection-scoped collections will also be deleted.`}
+<ConfirmDeleteConnectionDialog
   isOpen={isDeleteOpen}
->
-  <DialogActionBar>
-    <Button variant="secondary" on:click={() => ($isDeleteOpen = false)}
-      >Cancel</Button
-    >
-    <Button class="bg-error" on:click={deleteConnection}>Delete</Button>
-  </DialogActionBar>
-</Dialog>
+  {connection}
+  onConfirm={deleteConnection}
+/>

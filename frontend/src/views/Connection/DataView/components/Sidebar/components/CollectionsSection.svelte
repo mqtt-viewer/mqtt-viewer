@@ -3,7 +3,7 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
-  import BaseInput from "@/components/InputFields/BaseInput.svelte";
+  import InlineNameInput from "./InlineNameInput.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import {
     filterByScope,
@@ -20,23 +20,9 @@
   $: title = scope === "global" ? "Global Collections" : "Connection Collections";
 
   let isCreating = false;
-  let newName = "";
 
-  const startCreate = () => {
-    newName = "";
-    isCreating = true;
-  };
-
-  const cancelCreate = () => {
-    newName = "";
+  const commitCreate = async (name: string) => {
     isCreating = false;
-  };
-
-  const commitCreate = async () => {
-    if (!isCreating) return;
-    // clear before awaiting so the form's blur can't re-enter and create twice
-    isCreating = false;
-    const name = newName.trim();
     if (!name) return;
     try {
       await collectionsStore.createCollection(name, scope);
@@ -56,27 +42,19 @@
   <div class="flex items-center justify-between h-5">
     <span class="text-sm font-semibold text-secondary-text">{title}</span>
     <Tooltip text={`New ${scope} collection`}>
-      <IconButton onClick={startCreate}>
+      <IconButton onClick={() => (isCreating = true)}>
         <Icon type="plus" size={16} />
       </IconButton>
     </Tooltip>
   </div>
 
   {#if isCreating}
-    <form
-      role="presentation"
-      on:submit|preventDefault={commitCreate}
-      on:keydown={(e) => e.key === "Escape" && cancelCreate()}
-    >
-      <!-- svelte-ignore a11y_autofocus -->
-      <BaseInput
-        bind:value={newName}
-        name={`new-${scope}-collection`}
-        placeholder="Type to add a new collection"
-        autofocus
-        onBlur={commitCreate}
-      />
-    </form>
+    <InlineNameInput
+      name={`new-${scope}-collection`}
+      placeholder="Type to add a new collection"
+      onCommit={commitCreate}
+      onCancel={() => (isCreating = false)}
+    />
   {/if}
 
   {#if collections.length === 0 && !isCreating}

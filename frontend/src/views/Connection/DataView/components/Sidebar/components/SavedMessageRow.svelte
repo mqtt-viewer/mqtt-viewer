@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { models } from "wailsjs/go/models";
   import Icon from "@/components/Icon/Icon.svelte";
-  import BaseInput from "@/components/InputFields/BaseInput.svelte";
+  import InlineNameInput from "./InlineNameInput.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
@@ -13,21 +13,13 @@
 
   let isHovered = false;
   let isRenaming = false;
-  let renameValue = "";
 
   $: otherCollections = $collectionsStore.collections.filter(
     (c) => c.id !== message.collectionId
   );
 
-  const startRename = () => {
-    renameValue = message.name;
-    isRenaming = true;
-  };
-
-  const commitRename = async () => {
-    if (!isRenaming) return;
+  const commitRename = async (name: string) => {
     isRenaming = false;
-    const name = renameValue.trim();
     if (!name || name === message.name) return;
     try {
       await collectionsStore.renameMessage(message.id, name);
@@ -60,20 +52,12 @@
   on:mouseleave={() => (isHovered = false)}
 >
   {#if isRenaming}
-    <form
-      role="presentation"
-      class="w-full"
-      on:submit|preventDefault={commitRename}
-      on:keydown={(e) => e.key === "Escape" && (isRenaming = false)}
-    >
-      <!-- svelte-ignore a11y_autofocus -->
-      <BaseInput
-        bind:value={renameValue}
-        name={`rename-message-${message.id}`}
-        autofocus
-        onBlur={commitRename}
-      />
-    </form>
+    <InlineNameInput
+      name={`rename-message-${message.id}`}
+      initialValue={message.name}
+      onCommit={commitRename}
+      onCancel={() => (isRenaming = false)}
+    />
   {:else}
     <button
       class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
@@ -104,7 +88,9 @@
                 "Failed to duplicate message"
               )}>Duplicate</DropdownMenuItem
           >
-          <DropdownMenuItem onClick={startRename}>Rename</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => (isRenaming = true)}
+            >Rename</DropdownMenuItem
+          >
           {#if otherCollections.length > 0}
             <div class="px-2 pt-2 pb-1 text-sm text-secondary-text">
               Move to...

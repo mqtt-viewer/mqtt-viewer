@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-12T06:40:33.891Z",
+  "generatedAt": "2026-06-12T10:05:01.022Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3614,6 +3614,54 @@
       "specMissing": false
     },
     {
+      "name": "ConfirmDeleteDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConfirmDeleteDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onConfirm",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "error",
+        "error-light"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConfirmDeleteDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConfirmDeleteDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConfirmDeleteDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConfirmDeleteDialog",
+      "specMissing": false
+    },
+    {
       "name": "ConnectionRow",
       "tier": "view",
       "description": "Storybook coverage for ConnectionRow.",
@@ -3739,6 +3787,58 @@
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/HistorySection.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/HistorySection.stories.svelte",
       "storyId": "Views/Connection/DataView/Sidebar/HistorySection",
+      "specMissing": false
+    },
+    {
+      "name": "InlineNameInput",
+      "tier": "view",
+      "description": "Storybook coverage for InlineNameInput.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "initialValue",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "placeholder",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onCommit",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onCancel",
+          "type": "function",
+          "required": false,
+          "default": "> void = () => {}"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/InlineNameInput.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/InlineNameInput.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/InlineNameInput.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/InlineNameInput",
       "specMissing": false
     },
     {
@@ -3936,6 +4036,56 @@
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/SearchMessagesModal.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SearchMessagesModal.stories.svelte",
       "storyId": "Views/Connection/DataView/Sidebar/SearchMessagesModal",
+      "specMissing": false
+    },
+    {
+      "name": "SearchableText",
+      "tier": "view",
+      "description": "Storybook coverage for SearchableText.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "isTopic",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "searchTerm",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "config",
+          "type": "object",
+          "required": false,
+          "default": "{ contextChars: 40, maxDisplayChars: 80 }"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SearchableText.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/SearchableText.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SearchableText.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/SearchableText",
       "specMissing": false
     },
     {

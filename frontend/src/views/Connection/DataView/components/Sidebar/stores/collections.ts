@@ -22,6 +22,18 @@ interface CollectionsState {
 
 export type CollectionsStore = ReturnType<typeof createCollectionsStore>;
 
+// Global collections are shared across connections, so every sidebar's store
+// listens for mutations made by the others and refetches.
+const storeRegistry = new Set<() => void>();
+const notifyOtherStores = (self: () => void) => {
+  for (const reload of storeRegistry) {
+    if (reload !== self) reload();
+  }
+};
+
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+
 export const createCollectionsStore = (connId: number) => {
   const { subscribe, set, update } = writable<CollectionsState>(
     {
@@ -30,6 +42,8 @@ export const createCollectionsStore = (connId: number) => {
     },
     () => {
       load();
+      storeRegistry.add(load);
+      return () => storeRegistry.delete(load);
     }
   );
 
@@ -49,6 +63,45 @@ export const createCollectionsStore = (connId: number) => {
     }
   };
 
+  // Applies a targeted change locally (matching the backend's name ordering)
+  // and tells other connections' stores to refetch shared state.
+  const apply = (fn: (collections: models.Collection[]) => void) => {
+    update((store) => {
+      fn(store.collections);
+      store.collections.sort(byName);
+      for (const collection of store.collections) {
+        collection.messages?.sort(byName);
+      }
+      return store;
+    });
+    notifyOtherStores(load);
+  };
+
+  const removeMessageById = (
+    collections: models.Collection[],
+    id: number
+  ): models.CollectionMessage | undefined => {
+    for (const collection of collections) {
+      const index = (collection.messages ?? []).findIndex((m) => m.id === id);
+      if (index >= 0) {
+        return collection.messages.splice(index, 1)[0];
+      }
+    }
+    return undefined;
+  };
+
+  const insertMessage = (
+    collections: models.Collection[],
+    message: models.CollectionMessage
+  ) => {
+    const target = collections.find((c) => c.id === message.collectionId);
+    if (!target) return;
+    target.messages = [
+      ...(target.messages ?? []).filter((m) => m.id !== message.id),
+      message,
+    ];
+  };
+
   const createCollection = async (name: string, scope: CollectionScope) => {
     const created = await CreateCollection(
       app.CreateCollectionParams.createFrom({
@@ -56,18 +109,27 @@ export const createCollectionsStore = (connId: number) => {
         connectionId: scope === "connection" ? connId : undefined,
       })
     );
-    await load();
+    apply((collections) => {
+      created.messages = created.messages ?? [];
+      collections.push(created);
+    });
     return created;
   };
 
   const renameCollection = async (id: number, name: string) => {
-    await RenameCollection(id, name);
-    await load();
+    const renamed = await RenameCollection(id, name);
+    apply((collections) => {
+      const collection = collections.find((c) => c.id === id);
+      if (collection) collection.name = renamed.name;
+    });
   };
 
   const deleteCollection = async (id: number) => {
     await DeleteCollection(id);
-    await load();
+    apply((collections) => {
+      const index = collections.findIndex((c) => c.id === id);
+      if (index >= 0) collections.splice(index, 1);
+    });
   };
 
   const saveMessage = async (
@@ -76,29 +138,44 @@ export const createCollectionsStore = (connId: number) => {
     const saved = await SaveCollectionMessage(
       app.SaveCollectionMessageParams.createFrom(params)
     );
-    await load();
+    apply((collections) => {
+      removeMessageById(collections, saved.id);
+      insertMessage(collections, saved);
+    });
     return saved;
   };
 
   const renameMessage = async (id: number, name: string) => {
-    await RenameCollectionMessage(id, name);
-    await load();
+    const renamed = await RenameCollectionMessage(id, name);
+    apply((collections) => {
+      for (const collection of collections) {
+        const message = (collection.messages ?? []).find((m) => m.id === id);
+        if (message) message.name = renamed.name;
+      }
+    });
   };
 
   const moveMessage = async (id: number, targetCollectionId: number) => {
-    await MoveCollectionMessage(id, targetCollectionId);
-    await load();
+    const moved = await MoveCollectionMessage(id, targetCollectionId);
+    apply((collections) => {
+      removeMessageById(collections, id);
+      insertMessage(collections, moved);
+    });
   };
 
   const duplicateMessage = async (id: number) => {
     const copy = await DuplicateCollectionMessage(id);
-    await load();
+    apply((collections) => {
+      insertMessage(collections, copy);
+    });
     return copy;
   };
 
   const deleteMessage = async (id: number) => {
     await DeleteCollectionMessage(id);
-    await load();
+    apply((collections) => {
+      removeMessageById(collections, id);
+    });
   };
 
   return {

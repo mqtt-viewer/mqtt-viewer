@@ -14,6 +14,7 @@
     PublishHistory,
   } from "../../PublishPanel/stores/publish-history";
   import type { CollectionsStore } from "../stores/collections";
+  import SearchableText from "./SearchableText.svelte";
 
   export let isOpen: Writable<boolean>;
   export let collectionsStore: CollectionsStore;
@@ -101,13 +102,29 @@
                   <span class="text-base font-medium whitespace-nowrap"
                     >{message.name}</span
                   >
-                  <span class="truncate text-secondary-text min-w-0"
-                    >{message.topic}</span
-                  >
+                  {#if debouncedQuery}
+                    <SearchableText
+                      searchTerm={debouncedQuery}
+                      isTopic
+                      text={message.topic}
+                    />
+                  {:else}
+                    <span class="truncate text-secondary-text min-w-0"
+                      >{message.topic}</span
+                    >
+                  {/if}
                 </div>
                 {#if message.payload}
                   <div class="font-mono truncate text-secondary-text">
-                    {@html highlightJson(message.payload)}
+                    {#if debouncedQuery}
+                      <SearchableText
+                        searchTerm={debouncedQuery}
+                        text={message.payload}
+                        config={{ contextChars: 30, maxDisplayChars: 50 }}
+                      />
+                    {:else}
+                      {@html highlightJson(message.payload)}
+                    {/if}
                   </div>
                 {/if}
               </div>
@@ -139,10 +156,26 @@
             >
               <Icon type="history" size={16} />
               <div class="grow min-w-0 space-y-1">
-                <div class="truncate pr-2">{entry.topic}</div>
+                {#if debouncedQuery}
+                  <SearchableText
+                    searchTerm={debouncedQuery}
+                    isTopic
+                    text={entry.topic}
+                  />
+                {:else}
+                  <div class="truncate pr-2">{entry.topic}</div>
+                {/if}
                 {#if entry.payload}
                   <div class="font-mono truncate text-secondary-text">
-                    {@html highlightJson(entry.payload)}
+                    {#if debouncedQuery}
+                      <SearchableText
+                        searchTerm={debouncedQuery}
+                        text={entry.payload}
+                        config={{ contextChars: 30, maxDisplayChars: 50 }}
+                      />
+                    {:else}
+                      {@html highlightJson(entry.payload)}
+                    {/if}
                   </div>
                 {/if}
               </div>
