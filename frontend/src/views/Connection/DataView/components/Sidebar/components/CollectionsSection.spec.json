@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "CollectionsSection",
+  "tier": "view",
+  "description": "Storybook coverage for CollectionsSection.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "scope",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "collectionsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "onOpenMessage",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

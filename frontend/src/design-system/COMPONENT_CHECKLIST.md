@@ -101,6 +101,19 @@
 | Views/Connection/DataView/SelectedTopicPanel/shared/HeaderRowItem | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/SelectedTopicPanel/Topic | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/SelectedTopicPanel/UserPropertiesTab | [x] | [ ] | [x] | [ ] |
+| Views/Connection/DataView/Sidebar | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/AddToCollectionMenu | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/CollectionFolder | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/NewMessageRow | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/PublishView | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/SavedMessageRow | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/SearchMessagesModal | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/SidebarCollapsedRail | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/SidebarTopBar | [x] | [ ] | [x] | [x] |
 | Views/Home | [x] | [ ] | [ ] | [x] |
 | Views/Home/HomeConnectionList | [x] | [ ] | [x] | [ ] |
 | Views/Home/HomeConnectionList/HomeConnectionListItem | [x] | [ ] | [x] | [x] |
@@ -113,7 +126,7 @@
 
 ## Summary
 
-- Components scanned: 87
-- Story present: 87
+- Components scanned: 100
+- Story present: 100
 - Figma-linked: 0
 - Missing specs: 0

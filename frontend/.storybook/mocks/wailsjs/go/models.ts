@@ -73,6 +73,56 @@ export namespace models {
     }
   }
 
+  export class CollectionMessage {
+    id = 0;
+    collectionId = 0;
+    name = "";
+    topic = "";
+    qos = 0;
+    retain = false;
+    payload = "";
+    encoding = "none";
+    format = "none";
+    userProperties?: string;
+    headerContentType?: string;
+    headerResponseTopic?: string;
+    headerCorrelationData?: string;
+    headerPayloadFormatIndicator?: boolean;
+    headerMessageExpiryInterval?: number;
+    headerTopicAlias?: number;
+    headerSubscriptionIdentifier?: number;
+    createdAt: any = null;
+    updatedAt: any = null;
+
+    static createFrom(source: any = {}) {
+      return new CollectionMessage(source);
+    }
+
+    constructor(source: any = {}) {
+      assign(this, source);
+    }
+  }
+
+  export class Collection {
+    id = 0;
+    connectionId?: number;
+    name = "";
+    createdAt: any = null;
+    updatedAt: any = null;
+    messages: CollectionMessage[] = [];
+
+    static createFrom(source: any = {}) {
+      return new Collection(source);
+    }
+
+    constructor(source: any = {}) {
+      assign(this, source);
+      this.messages = (source.messages ?? []).map(
+        (message: any) => new CollectionMessage(message)
+      );
+    }
+  }
+
   export class FilterHistory {
     id = 0;
     connectionId = 0;
@@ -252,6 +302,47 @@ export namespace app {
 
     static createFrom(source: any = {}) {
       return new PublishParams(source);
+    }
+
+    constructor(source: any = {}) {
+      assign(this, source);
+    }
+  }
+
+  export class CreateCollectionParams {
+    name = "";
+    connectionId?: number;
+
+    static createFrom(source: any = {}) {
+      return new CreateCollectionParams(source);
+    }
+
+    constructor(source: any = {}) {
+      assign(this, source);
+    }
+  }
+
+  export class SaveCollectionMessageParams {
+    id?: number;
+    collectionId = 0;
+    name = "";
+    topic = "";
+    payload = "";
+    qos = 0;
+    retain = false;
+    encoding = "none";
+    format = "none";
+    headerContentType?: string;
+    headerResponseTopic?: string;
+    headerCorrelationData?: string;
+    headerPayloadFormatIndicator?: boolean;
+    headerMessageExpiryInterval?: number;
+    headerTopicAlias?: number;
+    headerSubscriptionIdentifier?: number;
+    userProperties?: string;
+
+    static createFrom(source: any = {}) {
+      return new SaveCollectionMessageParams(source);
     }
 
     constructor(source: any = {}) {

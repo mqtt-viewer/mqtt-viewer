@@ -1,0 +1,42 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "SavedMessageRow",
+  "tier": "view",
+  "description": "Storybook coverage for SavedMessageRow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "message",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "collectionsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "onOpenMessage",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "emphasis",
+    "secondary-text",
+    "hovered",
+    "error"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

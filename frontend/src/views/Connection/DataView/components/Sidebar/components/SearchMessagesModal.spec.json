@@ -1,0 +1,51 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "SearchMessagesModal",
+  "tier": "view",
+  "description": "Storybook coverage for SearchMessagesModal.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isOpen",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "collectionsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "publishHistoryStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "onOpenMessage",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onOpenEntry",
+      "type": "number",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "secondary-text",
+    "hovered"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

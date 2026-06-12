@@ -268,6 +268,10 @@ export const createMockPublishStore = () => {
     forceEditorTextSetIncrement: 0,
     hasAttemptedPublish: true,
     topicError: null,
+    sourceMessageId: null,
+    sourceMessageName: null,
+    sourceCollectionId: null,
+    baseline: null,
   });
   return {
     subscribe,
@@ -281,6 +285,84 @@ export const createMockPublishStore = () => {
         ...store,
         payload: JSON.stringify(JSON.parse(store.payload), null, 2),
       })),
+    setSource: noop,
+    markSaved: noop,
+  };
+};
+
+export const mockCollectionMessage = {
+  id: 1,
+  collectionId: 1,
+  name: "Doorbell ping",
+  topic: "home/doorbell/ping",
+  payload: '{"ding":"dong"}',
+  qos: 0,
+  retain: false,
+  encoding: "none",
+  format: "json",
+};
+
+export const mockCollections = [
+  {
+    id: 1,
+    name: "Funzone",
+    messages: [
+      mockCollectionMessage,
+      {
+        id: 2,
+        collectionId: 1,
+        name: "All-lights off",
+        topic: "home/lights/all",
+        payload: '{"state":"off"}',
+        qos: 1,
+        retain: true,
+        encoding: "none",
+        format: "json",
+      },
+    ],
+  },
+  {
+    id: 2,
+    connectionId: 1,
+    name: "Development",
+    messages: [
+      {
+        id: 3,
+        collectionId: 2,
+        name: "Backyard sensor",
+        topic: "backyard/sensors/1",
+        payload: '{"temp":45,"hello":"world"}',
+        qos: 0,
+        retain: false,
+        encoding: "none",
+        format: "json",
+      },
+    ],
+  },
+];
+
+export const createMockCollectionsStore = () => {
+  const { subscribe } = writable({
+    collections: mockCollections,
+    isLoaded: true,
+  });
+  return {
+    subscribe,
+    load: asyncNoop,
+    createCollection: async (name: string, scope: string) => ({
+      id: 99,
+      name,
+      connectionId: scope === "connection" ? 1 : undefined,
+      messages: [],
+    }),
+    renameCollection: asyncNoop,
+    deleteCollection: asyncNoop,
+    saveMessage: async () => mockCollectionMessage,
+    renameMessage: asyncNoop,
+    moveMessage: asyncNoop,
+    duplicateMessage: async () => mockCollectionMessage,
+    deleteMessage: asyncNoop,
+    findMessage: () => mockCollectionMessage,
   };
 };
 
@@ -313,7 +395,21 @@ const propDefaults: Record<string, () => unknown> = {
   closeOnPointerDown: () => true,
   codec: () => "none",
   collapsed: () => false,
+  collapseSidebar: () => noop,
+  collection: () => mockCollections[0],
+  collectionsStore: () => createMockCollectionsStore(),
   config: () => ({ contextChars: 30, maxDisplayChars: 80 }),
+  currentCollectionId: () => 1,
+  entry: () => mockPublishHistory[0],
+  expand: () => noop,
+  onBack: () => noop,
+  onCreate: () => asyncNoop,
+  onNewMessage: () => noop,
+  onOpenEntry: () => noop,
+  onOpenMessage: () => noop,
+  onSearch: () => noop,
+  onSelect: () => noop,
+  scope: () => "global",
   connection: () => mockConnection,
   connectionId: () => 1,
   connectionIsValid: () => true,
@@ -513,6 +609,10 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   IconButton: { tooltipText: "Settings" },
   LoadedProtoDetailsDialog: { open: writable(true) },
   PublishPanel: { isOpen: true, open: noop, close: noop },
+  PublishView: { isPublishDisabled: false },
+  SavedMessageRow: { message: mockCollectionMessage },
+  SearchMessagesModal: { isOpen: writable(true) },
+  Sidebar: { isOpen: true, open: noop, close: noop },
   Select: {
     options: ["mqtt", "mqtts", "ws", "wss"],
     defaultValue: "mqtt",

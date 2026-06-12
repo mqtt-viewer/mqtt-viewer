@@ -15,7 +15,9 @@
   import CollectionsSection from "./components/CollectionsSection.svelte";
   import HistorySection from "./components/HistorySection.svelte";
   import PublishView from "./components/PublishView.svelte";
+  import SearchMessagesModal from "./components/SearchMessagesModal.svelte";
   import { twMerge } from "tailwind-merge";
+  import { writable } from "svelte/store";
 
   export let connection: Connection;
   export let isOpen: boolean;
@@ -35,6 +37,8 @@
   const collectionsStore = createCollectionsStore(connectionId);
 
   let page: "library" | "publish" = "library";
+  let isSearchOpen = writable(false);
+  const openSearch = () => ($isSearchOpen = true);
 
   const openNewMessage = () => {
     publishStore.setSource(null);
@@ -76,6 +80,7 @@
       {connection}
       expand={open}
       onNewMessage={expandIntoNewMessage}
+      onSearch={openSearch}
     />
   {:else if page === "publish"}
     <PublishView
@@ -89,7 +94,7 @@
     />
   {:else}
     <div class="size-full flex flex-col min-h-0">
-      <SidebarTopBar {connection} collapseSidebar={close} />
+      <SidebarTopBar {connection} collapseSidebar={close} onSearch={openSearch} />
       <ConnectionRow {connection} />
       <NewMessageRow onClick={openNewMessage} />
       <div class="grow min-h-0 overflow-y-auto px-3 pb-3 flex flex-col gap-4">
@@ -112,3 +117,11 @@
     </div>
   {/if}
 </div>
+
+<SearchMessagesModal
+  isOpen={isSearchOpen}
+  {collectionsStore}
+  {publishHistoryStore}
+  onOpenMessage={openSavedMessage}
+  onOpenEntry={openHistoryEntry}
+/>

@@ -1,0 +1,50 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "HistoryItem",
+  "tier": "view",
+  "description": "Storybook coverage for HistoryItem.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "entry",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "collectionsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "publishHistoryStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "emphasis",
+    "secondary-text",
+    "hovered",
+    "divider",
+    "error",
+    "elevation-1",
+    "chip-border"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}
