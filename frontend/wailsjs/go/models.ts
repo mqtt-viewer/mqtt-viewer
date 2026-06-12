@@ -64,6 +64,20 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class CreateCollectionParams {
+	    name: string;
+	    connectionId?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateCollectionParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.connectionId = source["connectionId"];
+	    }
+	}
 	export class EnvInfo {
 	    isDev: boolean;
 	    serverAddress: string;
@@ -183,6 +197,50 @@ export namespace app {
 		}
 	}
 	
+	export class SaveCollectionMessageParams {
+	    id?: number;
+	    collectionId: number;
+	    name: string;
+	    topic: string;
+	    payload: string;
+	    qos: number;
+	    retain: boolean;
+	    encoding: string;
+	    format: string;
+	    headerContentType?: string;
+	    headerResponseTopic?: string;
+	    headerCorrelationData?: string;
+	    headerPayloadFormatIndicator?: boolean;
+	    headerMessageExpiryInterval?: number;
+	    headerTopicAlias?: number;
+	    headerSubscriptionIdentifier?: number;
+	    userProperties?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SaveCollectionMessageParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.collectionId = source["collectionId"];
+	        this.name = source["name"];
+	        this.topic = source["topic"];
+	        this.payload = source["payload"];
+	        this.qos = source["qos"];
+	        this.retain = source["retain"];
+	        this.encoding = source["encoding"];
+	        this.format = source["format"];
+	        this.headerContentType = source["headerContentType"];
+	        this.headerResponseTopic = source["headerResponseTopic"];
+	        this.headerCorrelationData = source["headerCorrelationData"];
+	        this.headerPayloadFormatIndicator = source["headerPayloadFormatIndicator"];
+	        this.headerMessageExpiryInterval = source["headerMessageExpiryInterval"];
+	        this.headerTopicAlias = source["headerTopicAlias"];
+	        this.headerSubscriptionIdentifier = source["headerSubscriptionIdentifier"];
+	        this.userProperties = source["userProperties"];
+	    }
+	}
 	export class SavePublishHistoryEntryParams {
 	    connectionId: number;
 	    topic: string;
@@ -274,6 +332,117 @@ export namespace events {
 }
 
 export namespace models {
+	
+	export class CollectionMessage {
+	    id: number;
+	    collectionId: number;
+	    name: string;
+	    topic: string;
+	    qos: number;
+	    retain: boolean;
+	    payload: string;
+	    encoding: string;
+	    format: string;
+	    userProperties?: string;
+	    headerContentType?: string;
+	    headerResponseTopic?: string;
+	    headerCorrelationData?: string;
+	    headerPayloadFormatIndicator?: boolean;
+	    headerMessageExpiryInterval?: number;
+	    headerTopicAlias?: number;
+	    headerSubscriptionIdentifier?: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.collectionId = source["collectionId"];
+	        this.name = source["name"];
+	        this.topic = source["topic"];
+	        this.qos = source["qos"];
+	        this.retain = source["retain"];
+	        this.payload = source["payload"];
+	        this.encoding = source["encoding"];
+	        this.format = source["format"];
+	        this.userProperties = source["userProperties"];
+	        this.headerContentType = source["headerContentType"];
+	        this.headerResponseTopic = source["headerResponseTopic"];
+	        this.headerCorrelationData = source["headerCorrelationData"];
+	        this.headerPayloadFormatIndicator = source["headerPayloadFormatIndicator"];
+	        this.headerMessageExpiryInterval = source["headerMessageExpiryInterval"];
+	        this.headerTopicAlias = source["headerTopicAlias"];
+	        this.headerSubscriptionIdentifier = source["headerSubscriptionIdentifier"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Collection {
+	    id: number;
+	    connectionId?: number;
+	    name: string;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	    messages: CollectionMessage[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Collection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.connectionId = source["connectionId"];
+	        this.name = source["name"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.messages = this.convertValues(source["messages"], CollectionMessage);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class PublishHistory {
 	    id: number;

@@ -18,6 +18,12 @@ export function ClearConnectionHistory(arg1:number):Promise<void>;
 
 export function ConnectMqtt(arg1:number):Promise<void>;
 
+export function CreateCollection(arg1:app.CreateCollectionParams):Promise<models.Collection>;
+
+export function DeleteCollection(arg1:number):Promise<void>;
+
+export function DeleteCollectionMessage(arg1:number):Promise<void>;
+
 export function DeleteConnection(arg1:number):Promise<void>;
 
 export function DeleteFilterHistoryEntry(arg1:number,arg2:string):Promise<void>;
@@ -30,6 +36,8 @@ export function DeleteSubscription(arg1:number,arg2:number):Promise<void>;
 
 export function DisconnectMqtt(arg1:number):Promise<void>;
 
+export function DuplicateCollectionMessage(arg1:number):Promise<models.CollectionMessage>;
+
 export function ExportAllMessages(arg1:number):Promise<string>;
 
 export function ExportTopicMessages(arg1:number,arg2:string):Promise<string>;
@@ -37,6 +45,8 @@ export function ExportTopicMessages(arg1:number,arg2:string):Promise<string>;
 export function GetAllConnections():Promise<app.Connections>;
 
 export function GetAllSubscriptionsByConnectionId():Promise<{[key: number]: Array<models.Subscription>}>;
+
+export function GetCollectionsForConnection(arg1:number):Promise<Array<models.Collection>>;
 
 export function GetEnvInfo():Promise<app.EnvInfo>;
 
@@ -56,9 +66,17 @@ export function GetSortStates():Promise<Array<models.SortState>>;
 
 export function LoadOpenTabs():Promise<Array<models.Tab>>;
 
+export function MoveCollectionMessage(arg1:number,arg2:number):Promise<models.CollectionMessage>;
+
 export function NewConnection():Promise<app.Connection>;
 
 export function PublishMqtt(arg1:number,arg2:app.PublishParams):Promise<void>;
+
+export function RenameCollection(arg1:number,arg2:string):Promise<models.Collection>;
+
+export function RenameCollectionMessage(arg1:number,arg2:string):Promise<models.CollectionMessage>;
+
+export function SaveCollectionMessage(arg1:app.SaveCollectionMessageParams):Promise<models.CollectionMessage>;
 
 export function SaveFilterHistoryEntry(arg1:number,arg2:string):Promise<models.FilterHistory>;
 

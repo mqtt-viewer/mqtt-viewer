@@ -147,6 +147,9 @@ func (a *App) DeleteConnection(id uint) error {
 	if res := a.Db.Where("connection_id = ?", id).Delete(&models.Tab{}); res.Error != nil {
 		return res.Error
 	}
+	if err := deleteCollectionsForConnection(&a.Db.DB, id); err != nil {
+		return err
+	}
 	if res := a.Db.Delete(&models.Connection{}, id); res.Error != nil {
 		return res.Error
 	}

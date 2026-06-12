@@ -66,6 +66,39 @@ type PublishHistory struct {
 	PublishedAt                  time.Time `json:"publishedAt"`
 }
 
+type Collection struct {
+	ID uint `json:"id" gorm:"primaryKey"`
+	// nil = global collection, available on all connections
+	ConnectionID *uint               `json:"connectionId" gorm:"index:collections_connid"`
+	Name         string              `json:"name"`
+	CreatedAt    time.Time           `json:"createdAt"`
+	UpdatedAt    time.Time           `json:"updatedAt"`
+	Messages     []CollectionMessage `json:"messages"`
+}
+
+type CollectionMessage struct {
+	ID           uint   `json:"id" gorm:"primaryKey"`
+	CollectionID uint   `json:"collectionId" gorm:"index:collection_messages_collid"`
+	Name         string `json:"name"`
+	Topic        string `json:"topic"`
+	QoS          uint   `json:"qos"`
+	Retain       bool   `json:"retain"`
+	Payload      string `json:"payload"`
+	Encoding     string `json:"encoding"`
+	Format       string `json:"format"`
+	//JSON key-value properties stored as string
+	UserProperties               *string   `json:"userProperties"`
+	HeaderContentType            *string   `json:"headerContentType"`
+	HeaderResponseTopic          *string   `json:"headerResponseTopic"`
+	HeaderCorrelationData        *string   `json:"headerCorrelationData"`
+	HeaderPayloadFormatIndicator *bool     `json:"headerPayloadFormatIndicator"`
+	HeaderMessageExpiryInterval  *int32    `json:"headerMessageExpiryInterval"`
+	HeaderTopicAlias             *int32    `json:"headerTopicAlias"`
+	HeaderSubscriptionIdentifier *int32    `json:"headerSubscriptionIdentifier"`
+	CreatedAt                    time.Time `json:"createdAt"`
+	UpdatedAt                    time.Time `json:"updatedAt"`
+}
+
 type Tab struct {
 	ID           uint       `json:"id" gorm:"primaryKey"`
 	TabIndex     uint       `json:"tabIndex"`

@@ -26,6 +26,18 @@ export function ConnectMqtt(arg1) {
   return window['go']['app']['App']['ConnectMqtt'](arg1);
 }
 
+export function CreateCollection(arg1) {
+  return window['go']['app']['App']['CreateCollection'](arg1);
+}
+
+export function DeleteCollection(arg1) {
+  return window['go']['app']['App']['DeleteCollection'](arg1);
+}
+
+export function DeleteCollectionMessage(arg1) {
+  return window['go']['app']['App']['DeleteCollectionMessage'](arg1);
+}
+
 export function DeleteConnection(arg1) {
   return window['go']['app']['App']['DeleteConnection'](arg1);
 }
@@ -50,6 +62,10 @@ export function DisconnectMqtt(arg1) {
   return window['go']['app']['App']['DisconnectMqtt'](arg1);
 }
 
+export function DuplicateCollectionMessage(arg1) {
+  return window['go']['app']['App']['DuplicateCollectionMessage'](arg1);
+}
+
 export function ExportAllMessages(arg1) {
   return window['go']['app']['App']['ExportAllMessages'](arg1);
 }
@@ -64,6 +80,10 @@ export function GetAllConnections() {
 
 export function GetAllSubscriptionsByConnectionId() {
   return window['go']['app']['App']['GetAllSubscriptionsByConnectionId']();
+}
+
+export function GetCollectionsForConnection(arg1) {
+  return window['go']['app']['App']['GetCollectionsForConnection'](arg1);
 }
 
 export function GetEnvInfo() {
@@ -102,12 +122,28 @@ export function LoadOpenTabs() {
   return window['go']['app']['App']['LoadOpenTabs']();
 }
 
+export function MoveCollectionMessage(arg1, arg2) {
+  return window['go']['app']['App']['MoveCollectionMessage'](arg1, arg2);
+}
+
 export function NewConnection() {
   return window['go']['app']['App']['NewConnection']();
 }
 
 export function PublishMqtt(arg1, arg2) {
   return window['go']['app']['App']['PublishMqtt'](arg1, arg2);
+}
+
+export function RenameCollection(arg1, arg2) {
+  return window['go']['app']['App']['RenameCollection'](arg1, arg2);
+}
+
+export function RenameCollectionMessage(arg1, arg2) {
+  return window['go']['app']['App']['RenameCollectionMessage'](arg1, arg2);
+}
+
+export function SaveCollectionMessage(arg1) {
+  return window['go']['app']['App']['SaveCollectionMessage'](arg1);
 }
 
 export function SaveFilterHistoryEntry(arg1, arg2) {
