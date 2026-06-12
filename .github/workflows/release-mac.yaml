@@ -103,7 +103,11 @@ jobs:
           echo "Signing Package"
           gon -log-level=info ./build/darwin/gon.sign.json
           echo "Zipping Package"
-          ditto -c -k --keepParent "./bin/MQTT Viewer.app" ./bin/MQTTViewer.zip
+          # --norsrc/--noextattr/--noqtn: keep AppleDouble (._*) entries out of
+          # the zip. The in-app updater extracts this zip verbatim; stray ._
+          # files break the bundle's code signature seal and Gatekeeper then
+          # silently refuses to launch the updated app.
+          ditto -c -k --norsrc --noextattr --noqtn --keepParent "./bin/MQTT Viewer.app" ./bin/MQTTViewer.zip
           echo "Cleaning up"
           rm -rf "./bin/MQTT Viewer.app"
           echo "Notarizing Zip Files"
