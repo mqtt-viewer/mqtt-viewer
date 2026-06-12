@@ -119,3 +119,33 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           asset_paths: '["dist/*"]'
+
+      # Register the updater artifact with the portal. The record is created
+      # with released=false; toggle `released` in the portal admin UI to make
+      # it visible to in-app update checks.
+
+      - name: Register release with portal
+        shell: bash
+        env:
+          PORTAL_URL: https://cloud.mqttviewer.app
+          CI_RELEASES_USERNAME: ${{ secrets.CI_RELEASES_USERNAME }}
+          CI_RELEASES_PASSWORD: ${{ secrets.CI_RELEASES_PASSWORD }}
+          RELEASE_NOTES: ${{ github.event.release.body }}
+          PUBLISHED_AT: ${{ github.event.release.published_at }}
+        run: |
+          asset=dist/${{ steps.define_filename.outputs.filename }}.zip
+          name=$(basename "$asset")
+          size=$(wc -c < "$asset" | tr -d ' ')
+          sha256=$(cut -d' ' -f1 < "$asset.sha256")
+          url="https://github.com/${{ github.repository }}/releases/download/${{ steps.normalise_version.outputs.version }}/$name"
+          jq -n \
+            --arg version "${{ steps.normalise_version.outputs.version }}" \
+            --arg notes "$RELEASE_NOTES" \
+            --arg published_at "$PUBLISHED_AT" \
+            --arg key "windows_${{ matrix.build.arch }}" \
+            --arg name "$name" --arg url "$url" --arg sha256 "$sha256" --argjson size "$size" \
+            '{version: $version, release_notes: $notes, published_at: $published_at,
+              artifacts: {($key): {name: $name, url: $url, size: $size, sha256: $sha256}}}' \
+            | curl --fail-with-body -u "$CI_RELEASES_USERNAME:$CI_RELEASES_PASSWORD" \
+                -H 'Content-Type: application/json' -d @- \
+                "$PORTAL_URL/api/cv1/updates/v3/releases"
