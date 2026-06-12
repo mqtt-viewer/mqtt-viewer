@@ -74,6 +74,14 @@ export function DisconnectMqtt(connId: number): $CancellablePromise<void> {
     return $Call.ByID(2595921592, connId);
 }
 
+export function ExportAllMessages(connId: number): $CancellablePromise<string> {
+    return $Call.ByID(2360991441, connId);
+}
+
+export function ExportTopicMessages(connId: number, topic: string): $CancellablePromise<string> {
+    return $Call.ByID(2895564909, connId, topic);
+}
+
 export function GetAllConnections(): $CancellablePromise<$models.Connections> {
     return $Call.ByID(3922339528).then(($result: any) => {
         return $$createType4($result);
