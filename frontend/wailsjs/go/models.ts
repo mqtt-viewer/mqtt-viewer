@@ -35,7 +35,7 @@ export namespace app {
 		}
 	}
 	export class Connections {
-	    connections: {[key: number]: Connection};
+	    connections: Record<number, Connection>;
 	
 	    static createFrom(source: any = {}) {
 	        return new Connections(source);
@@ -85,7 +85,7 @@ export namespace app {
 	    totalMessagesSent: number;
 	    totalBytesReceived: number;
 	    totalBytesSent: number;
-	    statsByConnection: {[key: number]: mqtt.ConnectionStats};
+	    statsByConnection: Record<number, mqtt.ConnectionStats>;
 	
 	    static createFrom(source: any = {}) {
 	        return new MqttStats(source);
@@ -126,7 +126,7 @@ export namespace app {
 	    responseTopic?: string;
 	    correlationData?: string;
 	    subscriptionIdentifier?: number;
-	    userProperties?: {[key: string]: string};
+	    userProperties?: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new PublishProperties(source);
@@ -224,7 +224,8 @@ export namespace app {
 	    }
 	}
 	export class StartupOptions {
-	
+	    PathsOverride?: paths.Paths;
+	    DbNameOverride?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StartupOptions(source);
@@ -232,8 +233,27 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	
+	        this.PathsOverride = this.convertValues(source["PathsOverride"], paths.Paths);
+	        this.DbNameOverride = source["DbNameOverride"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
@@ -426,30 +446,23 @@ export namespace models {
 	    name: string;
 	    mqttVersion: string;
 	    hasCustomClientId?: boolean;
-	    // Go type: null
-	    clientId: any;
+	    clientId?: string;
 	    protocol: string;
 	    host: string;
 	    port: number;
 	    websocketPath: string;
-	    // Go type: null
-	    username: any;
-	    // Go type: null
-	    password: any;
+	    username?: string;
+	    password?: string;
 	    isProtoEnabled?: boolean;
 	    isCertsEnabled?: boolean;
 	    skipCertVerification?: boolean;
-	    // Go type: null
-	    certCa: any;
-	    // Go type: null
-	    certClient: any;
-	    // Go type: null
-	    certClientKey: any;
+	    certCa?: string;
+	    certClient?: string;
+	    certClientKey?: string;
 	    subscriptions: Subscription[];
-	    // Go type: null
-	    lastConnectedAt: any;
-	    // Go type: null
-	    customIconSeed: any;
+	    // Go type: time
+	    lastConnectedAt?: any;
+	    customIconSeed?: string;
 	    filterHistories: FilterHistory[];
 	    publishHistories: PublishHistory[];
 	
@@ -465,22 +478,22 @@ export namespace models {
 	        this.name = source["name"];
 	        this.mqttVersion = source["mqttVersion"];
 	        this.hasCustomClientId = source["hasCustomClientId"];
-	        this.clientId = this.convertValues(source["clientId"], null);
+	        this.clientId = source["clientId"];
 	        this.protocol = source["protocol"];
 	        this.host = source["host"];
 	        this.port = source["port"];
 	        this.websocketPath = source["websocketPath"];
-	        this.username = this.convertValues(source["username"], null);
-	        this.password = this.convertValues(source["password"], null);
+	        this.username = source["username"];
+	        this.password = source["password"];
 	        this.isProtoEnabled = source["isProtoEnabled"];
 	        this.isCertsEnabled = source["isCertsEnabled"];
 	        this.skipCertVerification = source["skipCertVerification"];
-	        this.certCa = this.convertValues(source["certCa"], null);
-	        this.certClient = this.convertValues(source["certClient"], null);
-	        this.certClientKey = this.convertValues(source["certClientKey"], null);
+	        this.certCa = source["certCa"];
+	        this.certClient = source["certClient"];
+	        this.certClientKey = source["certClientKey"];
 	        this.subscriptions = this.convertValues(source["subscriptions"], Subscription);
 	        this.lastConnectedAt = this.convertValues(source["lastConnectedAt"], null);
-	        this.customIconSeed = this.convertValues(source["customIconSeed"], null);
+	        this.customIconSeed = source["customIconSeed"];
 	        this.filterHistories = this.convertValues(source["filterHistories"], FilterHistory);
 	        this.publishHistories = this.convertValues(source["publishHistories"], PublishHistory);
 	    }
@@ -605,7 +618,7 @@ export namespace mqtt {
 	    messageExpiry?: number;
 	    subscriptionIdentifier?: number;
 	    topicAlias?: number;
-	    userProperties: {[key: string]: string};
+	    userProperties: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new MessageProperties(source);
@@ -631,7 +644,9 @@ export namespace mqtt {
 	    retain: boolean;
 	    properties?: MessageProperties;
 	    timeMs: number;
-	    middlewareProperties?: {[key: string]: any};
+	    middlewareProperties?: Record<string, any>;
+	    // Go type: time
+	    Time: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new MqttMessage(source);
@@ -647,6 +662,7 @@ export namespace mqtt {
 	        this.properties = this.convertValues(source["properties"], MessageProperties);
 	        this.timeMs = source["timeMs"];
 	        this.middlewareProperties = source["middlewareProperties"];
+	        this.Time = this.convertValues(source["Time"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -666,6 +682,23 @@ export namespace mqtt {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace paths {
+	
+	export class Paths {
+	    ResourcePath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Paths(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ResourcePath = source["ResourcePath"];
+	    }
 	}
 
 }
