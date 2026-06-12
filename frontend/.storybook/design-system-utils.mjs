@@ -76,6 +76,20 @@ export const writeJson = (filePath, data) => {
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 };
 
+// Keep the previous generatedAt when nothing else changed, so regenerating
+// the index is a no-op for git (CI diffs these files).
+export const writeComponentIndex = (index) => {
+  if (fs.existsSync(componentIndexPath)) {
+    const existing = readJson(componentIndexPath);
+    const stripTimestamp = (value) =>
+      JSON.stringify({ ...value, generatedAt: null });
+    if (stripTimestamp(existing) === stripTimestamp(index)) {
+      index = { ...index, generatedAt: existing.generatedAt };
+    }
+  }
+  writeJson(componentIndexPath, index);
+};
+
 export const walkFiles = (dir, predicate) => {
   if (!fs.existsSync(dir)) return [];
   const result = [];
