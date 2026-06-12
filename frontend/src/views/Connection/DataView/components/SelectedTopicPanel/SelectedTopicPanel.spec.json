@@ -41,6 +41,12 @@
       "type": "function",
       "required": false,
       "default": "> Promise<void>"
+    },
+    {
+      "name": "exportTopicMessages",
+      "type": "function",
+      "required": false,
+      "default": "> Promise<void>"
     }
   ],
   "tokens": [

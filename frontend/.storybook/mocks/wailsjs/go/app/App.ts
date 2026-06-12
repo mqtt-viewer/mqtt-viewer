@@ -59,6 +59,18 @@ export async function DeleteSubscription(
 ): Promise<void> {}
 export async function DisconnectMqtt(_connectionId: number): Promise<void> {}
 
+export async function ExportAllMessages(
+  _connectionId: number
+): Promise<string> {
+  return "/Users/sam/exports/mqtt-messages-all.json";
+}
+export async function ExportTopicMessages(
+  _connectionId: number,
+  topic: string
+): Promise<string> {
+  return `/Users/sam/exports/mqtt-messages-${topic.replaceAll("/", "-")}.json`;
+}
+
 export async function GetAllConnections(): Promise<app.Connections> {
   return new app.Connections({
     connections: {

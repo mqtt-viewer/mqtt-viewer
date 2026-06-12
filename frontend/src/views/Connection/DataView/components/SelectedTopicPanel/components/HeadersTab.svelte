@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { mqtt } from "wailsjs/go/models";
+  import { base64ToUtf8 } from "@/components/CodeEditor/codec";
   import HeaderRow from "./shared/HeaderRow.svelte";
   import { getSortedObjectDiffs } from "./shared/diff-helpers";
 
@@ -37,7 +38,7 @@
   const getKeyValuePair = (key: string, value?: string) => {
     // Correlation data comes through as an encoded string
     if (key === "correlationData") {
-      const decodedValue = value ? atob(value) : "";
+      const decodedValue = value ? base64ToUtf8(value) : "";
       return [key, decodedValue];
     }
     if (key === "payloadFormat") {

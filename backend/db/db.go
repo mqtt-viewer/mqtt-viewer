@@ -32,6 +32,13 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 	var err error
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		// remove stale sidecar files left behind by a deleted db so they
+		// can't be replayed into the new empty file
+		for _, sfx := range []string{"-journal", "-wal", "-shm"} {
+			if os.Remove(dbPath+sfx) == nil {
+				slog.Warn("removed stale sqlite sidecar file " + dbPath + sfx)
+			}
+		}
 		slog.Info("creating db file at " + dbPath)
 		file, err := os.Create(dbPath)
 		if err != nil {
@@ -70,7 +77,7 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 			loggerConfig,
 		)
 	}
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath+"?_pragma=busy_timeout(5000)"), &gorm.Config{
 		Logger: newLogger,
 	})
 	if err != nil {

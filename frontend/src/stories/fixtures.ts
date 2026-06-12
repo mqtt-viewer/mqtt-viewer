@@ -339,6 +339,7 @@ const propDefaults: Record<string, () => unknown> = {
     store.expandMultipleTopics(["factory", "factory/line"]);
     return store;
   },
+  exportTopicMessages: () => asyncNoop,
   feedbackText: () => "Copied",
   firstConnectedAtMs: () => now - 600000,
   forceOpen: () => true,

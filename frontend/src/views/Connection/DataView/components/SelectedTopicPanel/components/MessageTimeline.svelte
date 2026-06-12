@@ -256,35 +256,41 @@
     timeline.zoomOut(1);
   };
 
-  $: onKeypress = (
+  $: onKeydown = (
     event: KeyboardEvent & {
       currentTarget: EventTarget;
     }
   ) => {
-    if (event.code === "KeyD" || event.code === "ArrowRight") {
-      selectNextOrPreviousMessage("next");
-    } else if (event.code === "KeyA" || event.code === "ArrowLeft") {
-      selectNextOrPreviousMessage("previous");
-    } else if (event.code === "KeyW" || event.code === "ArrowUp") {
-      zoomIn();
-    } else if (event.code === "KeyS" || event.code === "ArrowDown") {
-      zoomOut();
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
     }
-    if (
-      event.code === "KeyA" ||
-      event.code === "ArrowLeft" ||
-      event.code === "KeyD" ||
-      event.code === "ArrowRight"
-    ) {
-      isAutoSelectingMostRecent = false;
+    switch (event.code) {
+      case "KeyD":
+      case "ArrowRight":
+        selectNextOrPreviousMessage("next");
+        isAutoSelectingMostRecent = false;
+        break;
+      case "KeyA":
+      case "ArrowLeft":
+        selectNextOrPreviousMessage("previous");
+        isAutoSelectingMostRecent = false;
+        break;
+      case "KeyW":
+      case "ArrowUp":
+        zoomIn();
+        break;
+      case "KeyS":
+      case "ArrowDown":
+        zoomOut();
+        break;
+      default:
+        return;
     }
     event.preventDefault();
     event.stopPropagation();
-    return true;
   };
 </script>
 
-<!-- <svelte:window on:keypress={onKeypress} /> -->
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 <section
   autofocus
@@ -298,7 +304,7 @@
   on:blur={() => {
     timelineIsFocused = false;
   }}
-  on:keypress={onKeypress}
+  on:keydown={onKeydown}
   id="timeline"
   class={`
     py-[1px]
@@ -314,7 +320,7 @@
   >
     <Tooltip
       closeOnPointerDown={false}
-      text="Use W-A-S-D to select messages and zoom"
+      text="Use W-A-S-D or arrow keys to select messages and zoom"
     >
       <Icon type="info" />
     </Tooltip>

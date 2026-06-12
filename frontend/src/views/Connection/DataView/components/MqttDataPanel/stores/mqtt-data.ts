@@ -1,6 +1,7 @@
 import { get, writable } from "svelte/store";
 import type { events, mqtt } from "wailsjs/go/models";
 import { EventsOn } from "wailsjs/runtime/runtime";
+import { base64ToUtf8 } from "@/components/CodeEditor/codec";
 import type { HighlightedMqttTopicsStore } from "./highlighted-topics";
 
 export type MqttData = {
@@ -53,7 +54,7 @@ export const createMqttDataStore = (
         }
       }
       const timestamp = new Date(message.timeMs);
-      const decodedMessage = atob(message.payload as unknown as string);
+      const decodedMessage = base64ToUtf8(message.payload as unknown as string);
       const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
       update((mqttData) => {
         return insertMqttMessage(

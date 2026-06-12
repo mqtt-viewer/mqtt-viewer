@@ -47,6 +47,7 @@
   --color-timeline-border: rgb(46, 46, 46);
   --color-search-highlight-text: #9890ff;
   --color-search-highlight-bg: #9890ff25;
+  --color-text-selection: rgba(124, 140, 255, 0.4);
   --color-flash-rgb: 50 50 50;
 
   /* CodeMirror editor (dark = One Dark) */
@@ -64,10 +65,10 @@
   --cm-highlight-background: #2c313a;
   --cm-background: #282c34;
   --cm-tooltip-background: #353a42;
-  --cm-selection: #3e4451;
+  --cm-selection: rgba(124, 140, 255, 0.35);
+  --cm-selection-blurred: rgba(124, 140, 255, 0.18);
   --cm-cursor: #528bff;
   --cm-content-overlay: rgba(15, 15, 15, 0.4);
-  --cm-readonly-overlay: rgba(5, 5, 5, 0.7);
   --cm-search-match: #72a1ff59;
   --cm-search-match-outline: #457dff;
   --cm-search-match-selected: #6199ff2f;
@@ -114,6 +115,7 @@
   --color-timeline-border: rgb(212, 212, 218);
   --color-search-highlight-text: #4a55c7;
   --color-search-highlight-bg: rgba(94, 108, 224, 0.15);
+  --color-text-selection: rgba(94, 108, 224, 0.35);
   --color-flash-rgb: 190 190 198;
 
   /* CodeMirror editor (light = One Light) */
@@ -131,10 +133,10 @@
   --cm-highlight-background: #e4e4e6;
   --cm-background: #fafafa;
   --cm-tooltip-background: #ffffff;
-  --cm-selection: #d4d9f2;
+  --cm-selection: rgba(94, 108, 224, 0.3);
+  --cm-selection-blurred: rgba(94, 108, 224, 0.15);
   --cm-cursor: #5e6ce0;
   --cm-content-overlay: rgba(255, 255, 255, 0.4);
-  --cm-readonly-overlay: rgba(250, 250, 250, 0.7);
   --cm-search-match: #5e6ce033;
   --cm-search-match-outline: #5e6ce0;
   --cm-search-match-selected: #5e6ce01f;
@@ -149,6 +151,9 @@
   * {
     -webkit-user-select: none; /* Safari */
     user-select: none;
+  }
+  ::selection {
+    background-color: var(--color-text-selection);
   }
   @font-face {
     font-family: "Mona Sans";

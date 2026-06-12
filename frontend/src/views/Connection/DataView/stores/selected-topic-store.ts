@@ -3,7 +3,10 @@ import type { mqtt } from "wailsjs/go/models";
 import { GetMessageHistory } from "wailsjs/go/app/App";
 import { EventsOn } from "wailsjs/runtime/runtime";
 import type { events } from "wailsjs/go/models";
-import type { SupportedCodeEditorCodec } from "@/components/CodeEditor/codec";
+import {
+  base64ToUtf8,
+  type SupportedCodeEditorCodec,
+} from "@/components/CodeEditor/codec";
 import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
 
 export type MqttHistoryMessage = Omit<
@@ -65,7 +68,7 @@ export const createSelectedTopicStore = (
           const decodedNewMessages = newMessagesForSelectedTopic.map((m) => {
             return {
               ...m,
-              payload: atob(m.payload as unknown as string),
+              payload: base64ToUtf8(m.payload as unknown as string),
             };
           });
           if (onNewMessages !== null) {
@@ -96,7 +99,7 @@ export const createSelectedTopicStore = (
     const decocdedHistory = history.map((m) => {
       return {
         ...m,
-        payload: atob(m.payload as unknown as string),
+        payload: base64ToUtf8(m.payload as unknown as string),
       };
     });
     update((store) => {

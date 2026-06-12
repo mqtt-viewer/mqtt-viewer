@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/eclipse/paho.golang/autopaho"
@@ -43,6 +44,11 @@ func (mm *MqttManager) Connect(connectionDetails MqttConnectionDetails, subscrip
 
 	if mm.ConnectionState == ConnectionStates.Connecting {
 		slog.WarnContext(mm.ctx, "attempted connection while already connecting")
+		return nil
+	}
+
+	if mm.ConnectionState == ConnectionStates.Reconnecting {
+		slog.WarnContext(mm.ctx, "attempted connection while reconnecting")
 		return nil
 	}
 
@@ -106,26 +112,38 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 	mm.pinger = newPingerV5(mm.ctx, mm.onNewLatencyMs)
 	clientId := connectionDetails.ClientId
 	connectErrChan := make(chan error)
+	var initialOnce sync.Once
 	config := autopaho.ClientConfig{
 		// Debug:                         NewMqttLogger(),
 		// PahoDebug:                     NewMqttLogger(),
 		CleanStartOnInitialConnection: true,
 		BrokerUrls:                    []*url.URL{broker},
 		KeepAlive:                     30,
-		ConnectRetryDelay:             10 * time.Second,
+		ConnectRetryDelay:             3 * time.Second,
 		ConnectTimeout:                CONNECTION_TIMEOUT,
 		OnConnectionUp: func(cm *autopaho.ConnectionManager, c *paho.Connack) {
 			err := subscribeV5(ctx, mm.ctx, cm, subscriptions)
 			if err != nil {
 				slog.ErrorContext(mm.ctx, err.Error())
-				connectErrChan <- err
+				initialOnce.Do(func() {
+					connectErrChan <- err
+				})
 				return
 			}
 			mm.SetConnectionState(ConnectionStates.Connected, nil)
-			connectErrChan <- nil
+			initialOnce.Do(func() {
+				connectErrChan <- nil
+			})
 		},
 		OnConnectError: func(err error) {
-			connectErrChan <- err
+			sent := false
+			initialOnce.Do(func() {
+				connectErrChan <- err
+				sent = true
+			})
+			if !sent {
+				slog.ErrorContext(mm.ctx, "connect error while reconnecting: "+err.Error())
+			}
 		},
 		ClientConfig: paho.ClientConfig{
 			PingHandler: mm.pinger,
@@ -141,13 +159,17 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 				}},
 			OnClientError: func(err error) {
 				err = errors.New("client error: " + err.Error())
-				mm.Disconnect(&err)
+				if mm.ConnectionState == ConnectionStates.Connected {
+					mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
+				}
 			},
 			OnServerDisconnect: func(d *paho.Disconnect) {
 
 				errString := "server disconnected: " + d.Properties.ReasonString
 				err := errors.New(errString)
-				mm.Disconnect(&err)
+				if mm.ConnectionState == ConnectionStates.Connected {
+					mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
+				}
 			},
 		},
 	}
@@ -197,21 +219,30 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 		opts.SetTLSConfig(connectionDetails.TlsConfig)
 	}
 	opts.SetAutoReconnect(true)
+	opts.SetMaxReconnectInterval(30 * time.Second)
 	opts.SetConnectRetry(false)
 	opts.SetOrderMatters(false)
 	opts.SetConnectionLostHandler(func(c mqttV3.Client, err error) {
-		mm.Disconnect(&err)
+		if mm.ConnectionState == ConnectionStates.Connected {
+			mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
+		}
 	})
 
 	subErrChan := make(chan error)
+	var initialOnce sync.Once
 	opts.SetOnConnectHandler(func(c mqttV3.Client) {
 		err := subscribeV3(mm.ctx, c, subscriptions)
 		if err != nil {
 			slog.Error(err.Error())
-			subErrChan <- err
+			initialOnce.Do(func() {
+				subErrChan <- err
+			})
+			return
 		}
 		mm.SetConnectionState(ConnectionStates.Connected, nil)
-		subErrChan <- nil
+		initialOnce.Do(func() {
+			subErrChan <- nil
+		})
 	})
 	opts.SetConnectTimeout(CONNECTION_TIMEOUT)
 	opts.SetKeepAlive(20 * time.Second)

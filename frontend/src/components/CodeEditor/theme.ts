@@ -54,22 +54,18 @@ const oneDarkTheme = EditorView.theme(
 
     ".cm-scroller": {
       overflow: "auto",
+      backgroundColor: "var(--cm-content-overlay)",
     },
 
     ".cm-content": {
       caretColor: cursor,
-      backgroundColor: "var(--cm-content-overlay)",
-    },
-
-    ".cm-readonly .cm-content": {
-      backgroundColor: "var(--cm-readonly-overlay)",
     },
 
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: cursor },
 
     // --- Selection handling ---
     ".cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-      backgroundColor: "unset",
+      backgroundColor: "var(--cm-selection-blurred)",
     },
 
     "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground":

@@ -13,9 +13,10 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import _ from "lodash";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
-  import { ClearConnectionHistory } from "wailsjs/go/app/App";
+  import { ClearConnectionHistory, ExportAllMessages } from "wailsjs/go/app/App";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import SearchAndHistory from "./SearchAndHistory.svelte";
+  import { addToast } from "@/components/Toast/Toast.svelte";
 
   export let getAllTopics: () => string[];
   export let searchStore: SearchStore;
@@ -50,6 +51,29 @@
       await ClearConnectionHistory(connectionId);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  $: onExportDataClick = async () => {
+    try {
+      const path = await ExportAllMessages(connectionId);
+      if (path !== "") {
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: path,
+            type: "success",
+          },
+        });
+      }
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to export messages",
+          description: e as string,
+          type: "error",
+        },
+      });
     }
   };
 
@@ -117,6 +141,9 @@
       >
 
       <div class="flex flex-col" slot="menu-content">
+        <DropdownMenuItem onClick={onExportDataClick}
+          >Export all data</DropdownMenuItem
+        >
         <DropdownMenuItem class="text-error" onClick={onClearDataClick}
           >Clear all data</DropdownMenuItem
         >

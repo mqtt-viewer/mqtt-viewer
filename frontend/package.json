@@ -3,6 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "esbuild",
+      "svelte-preprocess"
+    ]
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

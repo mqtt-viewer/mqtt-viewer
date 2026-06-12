@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-12T01:04:02.462Z",
+  "generatedAt": "2026-06-12T04:22:12.166Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -662,7 +662,7 @@
             "none",
             "json",
             "json-prettier",
-            "xml"
+            "hex"
           ],
           "default": "none"
         },
@@ -732,7 +732,7 @@
             "none",
             "json",
             "json-prettier",
-            "xml"
+            "hex"
           ],
           "default": "none"
         },
@@ -859,7 +859,7 @@
             "none",
             "json",
             "json-prettier",
-            "xml"
+            "hex"
           ],
           "default": "json"
         },
@@ -3243,6 +3243,12 @@
         },
         {
           "name": "deleteRetainedMessage",
+          "type": "function",
+          "required": false,
+          "default": "> Promise<void>"
+        },
+        {
+          "name": "exportTopicMessages",
           "type": "function",
           "required": false,
           "default": "> Promise<void>"
