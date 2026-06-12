@@ -17,7 +17,7 @@ import {
   storyPathFor,
   storyTitleFor,
   writeChecklist,
-  writeJson,
+  writeComponentIndex,
 } from "./design-system-utils.mjs";
 
 const run = (command, args) => {
@@ -27,7 +27,7 @@ const run = (command, args) => {
 
 run("node", [".storybook/extract-tokens.mjs"]);
 const index = buildIndex();
-writeJson(componentIndexPath, index);
+writeComponentIndex(index);
 
 const ajv = new Ajv({
   allErrors: true,
