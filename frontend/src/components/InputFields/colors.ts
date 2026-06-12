@@ -8,7 +8,7 @@ export const InputColors = {
   PRIMARY: untypedColors["primary"]["DEFAULT"],
   LABEL: untypedColors["secondary-text"]["DEFAULT"],
   OUTLINE: untypedColors["outline"]["DEFAULT"],
-  HOVERED: untypedColors["hovered"]["DEFAULT"],
+  HOVERED: "var(--color-hovered)",
   HOVERED_SWITCH_BG: untypedColors["outline"]["light"],
   ERROR: untypedColors["error"]["DEFAULT"],
   DEFAULT_BACKGROUND: untypedColors["elevation-0"]["DEFAULT"],

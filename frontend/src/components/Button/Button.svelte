@@ -39,16 +39,16 @@
   class={twMerge(
     "transition-colors cursor-pointer",
     "flex items-center gap-2",
-    "enabled:hover:text-white enabled:group-hover:text-white",
-    isNotButton && "hover:text-white group-hover:text-white",
+    "enabled:hover:text-emphasis enabled:group-hover:text-emphasis",
+    isNotButton && "hover:text-emphasis group-hover:text-emphasis",
     variant !== "text" ? "h-[30px] rounded px-4 py-1" : "text-secondary-text",
     variant === "primary"
-      ? "bg-button enabled:hover:bg-hovered border-[1px] border-gray-600"
+      ? "bg-button enabled:hover:bg-hovered border-[1px] border-button-border"
       : "",
     variant === "primary" && isNotButton && "hover:bg-hovered",
     variant === "secondary" ? "bg-button enabled:hover:bg-hovered" : "",
     variant === "secondary" && isNotButton && "hover:bg-hovered",
-    forceHover && "text-white",
+    forceHover && "text-emphasis",
     forceHover && variant !== "text" && "bg-hovered",
     isDisabled && "cursor-not-allowed opacity-60",
     $$restProps.class

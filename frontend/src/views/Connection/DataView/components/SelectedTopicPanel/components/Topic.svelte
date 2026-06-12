@@ -171,7 +171,7 @@
               on:mouseleave={handleMouseLeave}
               on:click={() => handleClick(index)}
             >
-              <span class="text-gray-400 relative z-10">/</span>
+              <span class="text-secondary-text relative z-10">/</span>
             </div>
           {/if}
           <div

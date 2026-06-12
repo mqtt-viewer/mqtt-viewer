@@ -142,7 +142,7 @@
   };
 
   const fieldColor = untypedColors["outline"]["DEFAULT"];
-  const fieldHoverColor = untypedColors["hovered"]["DEFAULT"];
+  const fieldHoverColor = "var(--color-hovered)";
 </script>
 
 <div
@@ -164,7 +164,7 @@
       <div
         class={`flex gap-1 absolute top-1/2 -left-4 -rotate-90
           transition-colors
-      ${collapsedPanelHovered ? "text-white" : "text-secondary-text"}`}
+      ${collapsedPanelHovered ? "text-emphasis" : "text-secondary-text"}`}
       >
         Publish
         <Button

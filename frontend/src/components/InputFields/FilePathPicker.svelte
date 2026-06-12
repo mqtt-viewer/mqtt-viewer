@@ -49,7 +49,7 @@
   const onMouseLeave = () => (isDivHovered = false);
 
   $: hoveredIconColorClass =
-    isDivHovered && !disabled ? "text-white" : "text-secondary-text";
+    isDivHovered && !disabled ? "text-emphasis" : "text-secondary-text";
   $: iconColorClass =
     !!value && !disabled ? "text-primary" : hoveredIconColorClass;
 </script>

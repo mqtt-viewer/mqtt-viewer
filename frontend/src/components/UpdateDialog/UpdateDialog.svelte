@@ -61,7 +61,7 @@
     >
   {:else}
     <div class="flex flex-col items-center gap-4 my-8">
-      <Square color={"#7c8cff"} size="40" unit="px" duration="4s" />
+      <Square color={"var(--color-primary)"} size="40" unit="px" duration="4s" />
     </div>
     The app will restart itself once the update is complete.
   {/if}

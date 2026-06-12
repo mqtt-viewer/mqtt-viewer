@@ -93,7 +93,7 @@
 
 <PanelHeader class="bg-elevation-0">
   <div
-    class="flex flex-row items-center h-full gap-2 px-2 text-white overflow-hidden"
+    class="flex flex-row items-center h-full gap-2 px-2 text-emphasis overflow-hidden"
   >
     <SearchAndHistory bind:searchText />
     <Tooltip placement="bottom">

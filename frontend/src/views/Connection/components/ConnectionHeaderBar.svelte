@@ -63,7 +63,7 @@
   <div class="relative size-full flex gap-4 justify-center items-center">
     <div class="flex gap-1 items-center">
       <div class="size-6"><ConnectionIdenticon {connection} /></div>
-      <span class="font-semibold text-white"
+      <span class="font-semibold text-emphasis"
         >{connection.connectionDetails.name}</span
       >
     </div>

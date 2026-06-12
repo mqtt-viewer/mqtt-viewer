@@ -21,7 +21,7 @@
 <button
   class={twMerge(
     "relative text-left cursor-pointer rounded py-[6px] px-2 text-white-text focus:z-10",
-    isHovered ? "bg-elevation-2-hover text-white" : "",
+    isHovered ? "bg-elevation-2-hover text-emphasis" : "",
     isSelected ? "border-primary border-[1px]" : "",
     className
   )}

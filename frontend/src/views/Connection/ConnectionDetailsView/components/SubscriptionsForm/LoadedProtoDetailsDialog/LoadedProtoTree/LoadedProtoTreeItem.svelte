@@ -29,7 +29,7 @@
 <div
   class={`h-[30px] flex py-1 px-[8px] items-center gap-2 rounded-sm
   text-secondary-text
-  ${allowPress ? "hover:text-white" : "cursor-auto"}
+  ${allowPress ? "hover:text-emphasis" : "cursor-auto"}
   transition-colors ${
     isSelected ? "border border-primary px-[8px]" : "px-[9px]"
   }`}

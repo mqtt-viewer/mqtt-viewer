@@ -64,7 +64,7 @@
   };
 
   $: hoveredInputLabelColorClass =
-    isHovered && !disabled ? "text-white" : "text-secondary-text";
+    isHovered && !disabled ? "text-emphasis" : "text-secondary-text";
   $: validInputLabelColorClass = isFocused
     ? "text-primary"
     : hoveredInputLabelColorClass;

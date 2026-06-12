@@ -49,14 +49,14 @@
         <div class="w-full flex gap-2">
           {#each tags as tag}
             <div
-              class="font-mono text-sm leading-1 pt-[1px] border border-gray-700 px-1"
+              class="font-mono text-sm leading-1 pt-[1px] border border-chip-border px-1"
             >
               {tag}
             </div>
           {/each}
           {#if retain}
             <div
-              class="text-secondary font-mono text-sm leading-1 pt-[1px] border border-gray-700 px-1"
+              class="text-secondary font-mono text-sm leading-1 pt-[1px] border border-chip-border px-1"
             >
               Retain
             </div>
@@ -87,7 +87,7 @@
         </div>
       </div>
       <div
-        class="w-fit self-stretch flex items-center mr-7 ml-3 text-gray-400 whitespace-nowrap"
+        class="w-fit self-stretch flex items-center mr-7 ml-3 text-secondary-text whitespace-nowrap"
       >
         {moment(timestamp).fromNow()}
       </div>

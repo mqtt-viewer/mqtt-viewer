@@ -39,8 +39,8 @@
       <button
         use:melt={$trigger(tabIds[i])}
         class={`trigger relative p-[10px] text-base
-          ${$value === tabIds[i] ? "text-white" : "text-secondary-text"}
-          hover:text-white transition-colors
+          ${$value === tabIds[i] ? "text-emphasis" : "text-secondary-text"}
+          hover:text-emphasis transition-colors
         `}
       >
         {tab.title}

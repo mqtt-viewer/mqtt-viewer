@@ -56,7 +56,7 @@
       id={id + "-content"}
       use:melt={$content}
       transition:fade={{ duration: 100 }}
-      class="py-1 px-3 text-white rounded bg-elevation-2 shadow z-[10003]"
+      class="py-1 px-3 text-emphasis rounded bg-elevation-2 shadow z-[10003]"
     >
       <div use:melt={$arrow} />
       {#if text}

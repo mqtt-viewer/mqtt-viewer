@@ -10,6 +10,7 @@
   import { writable } from "svelte/store";
   import NotificationsButton from "./components/NotificationsButton.svelte";
   import FeedbackDialog from "./components/FeedbackDialog/FeedbackDialog.svelte";
+  import theme from "@/stores/theme";
 
   let className = "";
   export { className as class };
@@ -28,7 +29,7 @@
 </script>
 
 <div
-  class={twMerge("w-full h-[38px] min-h-[38px] bg-black flex", className)}
+  class={twMerge("w-full h-[38px] min-h-[38px] bg-app-bar flex", className)}
   style="--wails-draggable:drag"
 >
   {#if $os.isMac && !$os.isFullscreen}
@@ -60,6 +61,12 @@
     class={"mr-4 flex items-center gap-1 relative z-10"}
     style="--wails-draggable:false"
   >
+    <IconButton
+      tooltipText={$theme === "dark" ? "Light mode" : "Dark mode"}
+      onClick={() => theme.toggle()}
+    >
+      <Icon type={$theme === "dark" ? "lightMode" : "darkMode"} />
+    </IconButton>
     <NotificationsButton />
     <IconButton
       onClick={() => {

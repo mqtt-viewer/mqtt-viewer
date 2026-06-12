@@ -41,6 +41,8 @@ import {
   PencilSimple,
   ClockCounterClockwise,
   Info,
+  Sun,
+  Moon,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -62,6 +64,8 @@ export const ICON_MAP = {
   message: EnvelopeSimple,
   menu: DotsThreeOutlineVertical,
   info: Info,
+  lightMode: Sun,
+  darkMode: Moon,
 
   // Actions
   close: X,

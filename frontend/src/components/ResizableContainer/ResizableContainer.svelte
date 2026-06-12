@@ -119,7 +119,7 @@
   <slot />
   <div
     class={`absolute top-0 h-full w-[2px] z-10 translate-x-1/2
-        bg-white transition-opacity duration-500
+        bg-emphasis transition-opacity duration-500
         ${resizeEdge === "right" ? "right-0" : "left-0"}
         ${edgeHovered || resizing ? "opacity-100 delay-200" : "opacity-0 delay-0"}
       `}

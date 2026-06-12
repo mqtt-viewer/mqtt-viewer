@@ -73,7 +73,7 @@
   const onMouseLeave = () => (isHovered = false);
 
   $: hoveredLabelColorClass =
-    isHovered && !disabled ? "text-white" : "text-secondary-text";
+    isHovered && !disabled ? "text-emphasis" : "text-secondary-text";
   $: labelColorClass =
     isOpen || isFocused ? "text-primary" : hoveredLabelColorClass;
 
@@ -151,7 +151,7 @@
       {#each options as item}
         <div
           class="relative cursor-pointer rounded py-1 px-2 text-white-text focus:z-10
-              data-[highlighted]:bg-elevation-2-hover data-[highlighted]:text-white
+              data-[highlighted]:bg-elevation-2-hover data-[highlighted]:text-emphasis
               data-[selected]:border-primary data-[selected]:border-[1px]"
           use:melt={$option({ value: item, label: getOptionLabel(item) })}
         >

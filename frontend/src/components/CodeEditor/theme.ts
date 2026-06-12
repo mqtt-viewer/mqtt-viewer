@@ -2,26 +2,27 @@ import { EditorView } from "@codemirror/view";
 import { type Extension } from "@codemirror/state";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
-import { untypedColors } from "@/util/resolvedTailwindConfig";
 
-// Using https://github.com/one-dark/vscode-one-dark-theme/ as reference for the colors
+// All colors resolve through the theme CSS variables defined in
+// src/style.css (One Dark by default, One Light when html.light is set),
+// so editors restyle on theme change without being rebuilt.
 
-const chalky = "#e5c07b",
-  coral = "#e06c75",
-  cyan = "#56b6c2",
-  invalid = "#ffffff",
-  ivory = "#abb2bf",
-  stone = "#7d8799", // Brightened compared to original to increase contrast
-  malibu = "#61afef",
-  sage = "#98c379",
-  whiskey = "#d19a66",
-  violet = "#c678dd",
-  darkBackground = "#21252b",
-  highlightBackground = "#2c313a",
-  background = "#282c34",
-  tooltipBackground = "#353a42",
-  selection = "rgba(124, 140, 255, 0.35)",
-  cursor = "#528bff";
+const chalky = "var(--cm-chalky)",
+  coral = "var(--cm-coral)",
+  cyan = "var(--cm-cyan)",
+  invalid = "var(--cm-invalid)",
+  ivory = "var(--cm-ivory)",
+  stone = "var(--cm-stone)",
+  malibu = "var(--cm-malibu)",
+  sage = "var(--cm-sage)",
+  whiskey = "var(--cm-whiskey)",
+  violet = "var(--cm-violet)",
+  darkBackground = "var(--cm-dark-background)",
+  highlightBackground = "var(--cm-highlight-background)",
+  background = "var(--cm-background)",
+  tooltipBackground = "var(--cm-tooltip-background)",
+  selection = "var(--cm-selection)",
+  cursor = "var(--cm-cursor)";
 
 /// The colors used in the theme, as CSS color strings.
 const color = {
@@ -53,7 +54,7 @@ const oneDarkTheme = EditorView.theme(
 
     ".cm-scroller": {
       overflow: "auto",
-      backgroundColor: "rgba(15, 15, 15, 0.4)",
+      backgroundColor: "var(--cm-content-overlay)",
     },
 
     ".cm-content": {
@@ -64,7 +65,7 @@ const oneDarkTheme = EditorView.theme(
 
     // --- Selection handling ---
     ".cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-      backgroundColor: "rgba(124, 140, 255, 0.18)",
+      backgroundColor: "var(--cm-selection-blurred)",
     },
 
     "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground":
@@ -72,27 +73,30 @@ const oneDarkTheme = EditorView.theme(
     // --------------------------
 
     ".cm-panels": { backgroundColor: darkBackground, color: ivory },
-    ".cm-panels.cm-panels-top": { borderBottom: "2px solid black" },
-    ".cm-panels.cm-panels-bottom": { borderTop: "2px solid black" },
+    ".cm-panels.cm-panels-top": {
+      borderBottom: "2px solid var(--cm-panel-border)",
+    },
+    ".cm-panels.cm-panels-bottom": {
+      borderTop: "2px solid var(--cm-panel-border)",
+    },
 
     ".cm-searchMatch": {
-      backgroundColor: "#72a1ff59",
-      outline: "1px solid #457dff",
+      backgroundColor: "var(--cm-search-match)",
+      outline: "1px solid var(--cm-search-match-outline)",
     },
     ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "#6199ff2f",
+      backgroundColor: "var(--cm-search-match-selected)",
     },
 
-    ".cm-activeLine": { backgroundColor: "#6699ff0b" },
-    ".cm-selectionMatch": { backgroundColor: "#aafe661a" },
+    ".cm-activeLine": { backgroundColor: "var(--cm-active-line)" },
+    ".cm-selectionMatch": { backgroundColor: "var(--cm-selection-match)" },
 
     "&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket": {
-      backgroundColor: "#bad0f847",
+      backgroundColor: "var(--cm-matching-bracket)",
     },
 
     ".cm-gutters": {
-      // backgroundColor: background,
-      backgroundColor: untypedColors["elevation-1"]["DEFAULT"],
+      backgroundColor: "var(--color-elevation-1)",
       color: stone,
       border: "none",
     },
@@ -104,7 +108,7 @@ const oneDarkTheme = EditorView.theme(
     ".cm-foldPlaceholder": {
       backgroundColor: "transparent",
       border: "none",
-      color: "#ddd",
+      color: "var(--cm-fold-placeholder)",
     },
 
     ".cm-tooltip": {

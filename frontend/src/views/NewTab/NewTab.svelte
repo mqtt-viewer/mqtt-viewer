@@ -18,7 +18,7 @@
   };
 
   const fieldColor = untypedColors["outline"]["DEFAULT"];
-  const fieldHoverColor = untypedColors["hovered"]["DEFAULT"];
+  const fieldHoverColor = "var(--color-hovered)";
 </script>
 
 <div class="w-full h-full flex justify-center overflow-y-auto bg-elevation-1">

@@ -41,6 +41,6 @@
       />
     {/each}
   {:else}
-    <div class="text-center text-gray-500">No user properties</div>
+    <div class="text-center text-secondary-text">No user properties</div>
   {/if}
 </div>
