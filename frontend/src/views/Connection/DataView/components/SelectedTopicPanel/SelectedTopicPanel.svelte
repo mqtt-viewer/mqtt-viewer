@@ -46,6 +46,9 @@
         if (selectedMessagePayload === null) {
           return null;
         }
+        if ($selectedTopicStore.options.format === "hex") {
+          return null;
+        }
         JSON.parse(selectedMessagePayload);
         // It's valid JSON
         $selectedTopicStore.options.format = "json-prettier";
