@@ -45,15 +45,16 @@ func (c *Connection) encryptPassword(tx *gorm.DB) error {
 }
 
 func (c *Connection) decryptPassword(tx *gorm.DB) error {
-	if !c.Password.Valid || c.Password.String == "" {
+	if c.Password == nil || *c.Password == "" {
 		return nil
 	}
 
-	decryptedPassword, err := cryptography.DecryptBytesForMachine(env.MachineId, []byte(c.Password.String))
+	decryptedPassword, err := cryptography.DecryptBytesForMachine(env.MachineId, []byte(*c.Password))
 	if err != nil {
 		slog.Warn(fmt.Sprintf("error decrypting password: %v", err))
 		return nil
 	}
-	c.Password.String = string(decryptedPassword)
+	decrypted := string(decryptedPassword)
+	c.Password = &decrypted
 	return nil
 }

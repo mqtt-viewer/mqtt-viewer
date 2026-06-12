@@ -230,26 +230,26 @@ func getConnectionDetailsFromConnectionModel(connection *models.Connection) (*mq
 		Port:        connection.Port,
 	}
 
-	if connection.Username.Valid {
-		details.Username = connection.Username.String
+	if connection.Username != nil {
+		details.Username = *connection.Username
 	}
-	if connection.Password.Valid {
-		details.Password = []byte(connection.Password.String)
+	if connection.Password != nil {
+		details.Password = []byte(*connection.Password)
 	}
-	if connection.ClientId.Valid {
-		details.ClientId = connection.ClientId.String
+	if connection.ClientId != nil {
+		details.ClientId = *connection.ClientId
 	}
 
 	if connection.IsCertsEnabled != nil && *connection.IsCertsEnabled {
 		buildTlsParams := security.BuildTlsParams{}
-		if connection.CertCa.Valid {
-			buildTlsParams.CertCaPath = connection.CertCa.String
+		if connection.CertCa != nil {
+			buildTlsParams.CertCaPath = *connection.CertCa
 		}
-		if connection.CertClient.Valid {
-			buildTlsParams.CertClientPath = connection.CertClient.String
+		if connection.CertClient != nil {
+			buildTlsParams.CertClientPath = *connection.CertClient
 		}
-		if connection.CertClientKey.Valid {
-			buildTlsParams.CertClientKeyPath = connection.CertClientKey.String
+		if connection.CertClientKey != nil {
+			buildTlsParams.CertClientKeyPath = *connection.CertClientKey
 		}
 		if connection.SkipCertVerification != nil {
 			buildTlsParams.SkipCertVerification = *connection.SkipCertVerification

@@ -2,8 +2,6 @@ package models
 
 import (
 	"time"
-
-	"gopkg.in/guregu/null.v4"
 )
 
 type Global struct {
@@ -18,22 +16,22 @@ type Connection struct {
 	Name                 string           `json:"name"`
 	MqttVersion          string           `json:"mqttVersion"`
 	HasCustomClientId    *bool            `json:"hasCustomClientId"`
-	ClientId             null.String      `json:"clientId"`
+	ClientId             *string          `json:"clientId"`
 	Protocol             string           `json:"protocol"`
 	Host                 string           `json:"host"`
 	Port                 int              `json:"port"`
 	WebsocketPath        string           `json:"websocketPath"`
-	Username             null.String      `json:"username"`
-	Password             null.String      `json:"password"`
+	Username             *string          `json:"username"`
+	Password             *string          `json:"password"`
 	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
 	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
 	SkipCertVerification *bool            `json:"skipCertVerification"`
-	CertCa               null.String      `json:"certCa"`
-	CertClient           null.String      `json:"certClient"`
-	CertClientKey        null.String      `json:"certClientKey"`
+	CertCa               *string          `json:"certCa"`
+	CertClient           *string          `json:"certClient"`
+	CertClientKey        *string          `json:"certClientKey"`
 	Subscriptions        []Subscription   `json:"subscriptions"`
-	LastConnectedAt      null.Time        `json:"lastConnectedAt"`
-	CustomIconSeed       null.String      `json:"customIconSeed"`
+	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
+	CustomIconSeed       *string          `json:"customIconSeed"`
 	FilterHistories      []FilterHistory  `json:"filterHistories"`
 	PublishHistories     []PublishHistory `json:"publishHistories"`
 }

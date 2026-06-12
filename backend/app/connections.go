@@ -10,7 +10,6 @@ import (
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/events"
 
-	"gopkg.in/guregu/null.v4"
 	"gorm.io/gorm"
 )
 
@@ -49,6 +48,7 @@ func (a *App) NewConnection() (*Connection, error) {
 	isProtoEnabled := false
 	isCertsEnabled := false
 	hasCustomClientId := false
+	customIconSeed := ""
 	var qos uint = 0
 	conn := models.Connection{
 		Protocol:          "mqtt",
@@ -59,7 +59,7 @@ func (a *App) NewConnection() (*Connection, error) {
 		HasCustomClientId: &hasCustomClientId,
 		IsProtoEnabled:    &isProtoEnabled,
 		IsCertsEnabled:    &isCertsEnabled,
-		CustomIconSeed:    null.StringFrom(""),
+		CustomIconSeed:    &customIconSeed,
 		Subscriptions: []models.Subscription{
 			{
 				Topic: "#",
@@ -115,14 +115,15 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 		return res.Error
 	}
 
-	passwordHasChanged := conn.Password.Valid && conn.Password.String != "" && (!existingConnection.Password.Valid || conn.Password.String != existingConnection.Password.String)
+	passwordHasChanged := conn.Password != nil && *conn.Password != "" && (existingConnection.Password == nil || *conn.Password != *existingConnection.Password)
 	if passwordHasChanged {
 		// Encrypt the incoming password from the frontend
-		encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(conn.Password.String))
+		encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(*conn.Password))
 		if err != nil {
 			return err
 		}
-		conn.Password.String = string(encryptedPassword)
+		encrypted := string(encryptedPassword)
+		conn.Password = &encrypted
 	}
 
 	updated := models.Connection{

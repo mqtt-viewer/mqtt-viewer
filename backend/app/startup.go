@@ -18,7 +18,6 @@ import (
 	"mqtt-viewer/events"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"gopkg.in/guregu/null.v4"
 )
 
 type StartupOptions struct {
@@ -182,7 +181,7 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					a.EventRuntime.EventsEmit(appConnection.EventSet.MqttConnected, nil)
 				}
 				// update connection last connected time in db
-				err := a.Db.Model(&models.Connection{}).Where("id = ?", appConnection.ConnectionId).Update("last_connected_at", null.TimeFrom(time.Now())).Error
+				err := a.Db.Model(&models.Connection{}).Where("id = ?", appConnection.ConnectionId).Update("last_connected_at", time.Now()).Error
 				if err != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("error updating last connected time: %v", err))
 				}
