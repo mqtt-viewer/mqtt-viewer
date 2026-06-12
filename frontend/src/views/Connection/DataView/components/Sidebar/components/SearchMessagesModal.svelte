@@ -7,6 +7,8 @@
   import IconButton from "@/components/Button/IconButton.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
   import { highlightJson } from "@/components/CodeEditor/highlighter";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import _ from "lodash";
   import type {
     createPublishHistoryStore,
     PublishHistory,
@@ -22,6 +24,10 @@
   const MAX_RESULTS = 50;
 
   let query = "";
+  // filtering re-highlights every visible payload; debounce keystrokes
+  let debouncedQuery = "";
+  const syncQuery = _.debounce((q: string) => (debouncedQuery = q), 150);
+  $: syncQuery(query);
 
   const matchesQuery = (q: string, ...fields: (string | undefined)[]) => {
     const needle = q.trim().toLowerCase();
@@ -35,7 +41,7 @@
     )
     .filter(({ message }) =>
       matchesQuery(
-        query,
+        debouncedQuery,
         message.name,
         message.topic,
         message.payload,
@@ -46,7 +52,12 @@
 
   $: historyMatches = $publishHistoryStore.publishHistory
     .filter((entry) =>
-      matchesQuery(query, entry.topic, entry.payload, entry.userProperties)
+      matchesQuery(
+        debouncedQuery,
+        entry.topic,
+        entry.payload,
+        entry.userProperties
+      )
     )
     .slice(0, MAX_RESULTS);
 
@@ -145,7 +156,15 @@
               onClick={(e) => {
                 e?.preventDefault();
                 e?.stopImmediatePropagation();
-                publishHistoryStore.deletePublishEntry(entry.id);
+                publishHistoryStore.deletePublishEntry(entry.id).catch((err) =>
+                  addToast({
+                    data: {
+                      title: "Failed to delete history entry",
+                      description: err as string,
+                      type: "error",
+                    },
+                  })
+                );
               }}
             >
               <Icon type="close" size={14} />

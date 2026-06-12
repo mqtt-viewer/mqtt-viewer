@@ -67,8 +67,18 @@
   };
 
   const createAndSave = async (name: string, scope: CollectionScope) => {
-    const created = await collectionsStore.createCollection(name, scope);
-    await saveToCollection(created.id);
+    try {
+      const created = await collectionsStore.createCollection(name, scope);
+      await saveToCollection(created.id);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to create collection",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
   };
 
   const deleteEntry = async () => {

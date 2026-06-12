@@ -41,12 +41,17 @@
   const openSearch = () => ($isSearchOpen = true);
 
   const openNewMessage = () => {
-    publishStore.setSource(null);
+    // Keep an in-progress draft; only reset when the editor holds a saved
+    // message's scratch copy (or has never been touched).
+    if ($publishStore.sourceMessageId !== null) {
+      publishStore.setSource(null);
+    }
     page = "publish";
   };
 
   const openSavedMessage = (message: models.CollectionMessage) => {
     publishStore.setSource(message);
+    open();
     page = "publish";
   };
 
@@ -55,10 +60,13 @@
     publishHistoryStore.setPublishDetailsFromHistoryEntry(
       entry as models.PublishHistory
     );
+    open();
     page = "publish";
   };
 
   const backToLibrary = () => {
+    // Global collections are shared across connections — refresh on return.
+    collectionsStore.load();
     page = "library";
   };
 

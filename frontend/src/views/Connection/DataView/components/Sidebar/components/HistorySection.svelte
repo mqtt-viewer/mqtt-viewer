@@ -11,8 +11,17 @@
   export let collectionsStore: CollectionsStore;
   export let onOpenEntry: (entry: PublishHistory[number]) => void;
 
+  // Rendering (and syntax-highlighting) the full 500-entry history at once
+  // can stall the UI, so show recent entries and expand on demand.
+  const VISIBLE_STEP = 50;
+  let visibleCount = VISIBLE_STEP;
+
+  $: hiddenCount = Math.max(
+    0,
+    $publishHistoryStore.publishHistory.length - visibleCount
+  );
   $: groups = groupByRecency(
-    $publishHistoryStore.publishHistory,
+    $publishHistoryStore.publishHistory.slice(0, visibleCount),
     (entry) => new Date(entry.publishedAt as unknown as string)
   );
 </script>
@@ -40,4 +49,12 @@
       {/each}
     </div>
   {/each}
+  {#if hiddenCount > 0}
+    <button
+      class="text-base text-secondary-text hover:text-emphasis text-left px-1 pb-2"
+      on:click={() => (visibleCount += VISIBLE_STEP)}
+    >
+      Show {Math.min(hiddenCount, VISIBLE_STEP)} more ({hiddenCount} hidden)
+    </button>
+  {/if}
 {/if}

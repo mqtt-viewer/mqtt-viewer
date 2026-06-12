@@ -39,6 +39,60 @@ export interface PublishDetails {
   baseline: string | null;
 }
 
+// Flat record shape shared by publish history entries and collection messages.
+export interface StoredPublishMessage {
+  topic: string;
+  payload: string;
+  qos: number;
+  retain: boolean;
+  encoding: string;
+  format: string;
+  userProperties?: string | null;
+  headerContentType?: string | null;
+  headerResponseTopic?: string | null;
+  headerCorrelationData?: string | null;
+  headerPayloadFormatIndicator?: boolean | null;
+  headerMessageExpiryInterval?: number | null;
+  headerTopicAlias?: number | null;
+  headerSubscriptionIdentifier?: number | null;
+}
+
+// Single mapper from a stored message (history entry or collection message)
+// to editor fields — keep history and collections loading in lockstep.
+export const publishDetailsFromStoredMessage = (
+  message: StoredPublishMessage
+): Partial<PublishDetails> => {
+  let userPropertiesArray: { key: string; value: string }[] = [];
+  if (message.userProperties) {
+    try {
+      userPropertiesArray = Object.entries(
+        JSON.parse(message.userProperties)
+      ).map(([key, value]) => ({ key, value: value as string }));
+    } catch (e) {
+      // no parseable properties
+    }
+  }
+  return {
+    topic: message.topic,
+    payload: message.payload,
+    qos: message.qos,
+    retain: message.retain,
+    codec: (message.encoding || "none") as SupportedCodeEditorCodec,
+    format: (message.format || "none") as SupportedCodeEditorFormat,
+    properties: {
+      payloadFormatIndicator: !!message.headerPayloadFormatIndicator,
+      messageExpiryInterval: message.headerMessageExpiryInterval ?? undefined,
+      contentType: message.headerContentType ?? undefined,
+      responseTopic: message.headerResponseTopic ?? undefined,
+      correlationData: message.headerCorrelationData ?? undefined,
+      subscriptionIdentifier: message.headerSubscriptionIdentifier ?? undefined,
+      topicAlias: message.headerTopicAlias ?? undefined,
+    },
+    userPropertiesArray,
+    topicError: null,
+  };
+};
+
 // The fields that count towards "Modified (unsaved)" for a saved message.
 export const snapshotPublishDetails = (
   details: Pick<
@@ -166,74 +220,52 @@ export const createPublishStore = (connId: number) => {
     });
   };
 
+  const blankDetails: Partial<PublishDetails> = {
+    topic: "",
+    payload: "{\n\n}",
+    qos: 0,
+    retain: false,
+    properties: {
+      payloadFormatIndicator: false,
+      messageExpiryInterval: undefined,
+      contentType: undefined,
+      responseTopic: undefined,
+      correlationData: undefined,
+      subscriptionIdentifier: undefined,
+      topicAlias: undefined,
+    },
+    userPropertiesArray: [],
+    codec: "none",
+    format: "none",
+    topicError: null,
+  };
+
   // Loads a saved collection message into the editor as a scratch copy
   // (null = blank new message). Edits are not persisted until markSaved.
   const setSource = (message: models.CollectionMessage | null) => {
-    if (!message) {
-      setPartial({
-        topic: "",
-        payload: "{\n\n}",
-        qos: 0,
-        retain: false,
-        properties: {
-          payloadFormatIndicator: false,
-          messageExpiryInterval: undefined,
-          contentType: undefined,
-          responseTopic: undefined,
-          correlationData: undefined,
-          subscriptionIdentifier: undefined,
-          topicAlias: undefined,
-        },
-        userPropertiesArray: [],
-        codec: "none",
-        format: "none",
-        hasAttemptedPublish: false,
-        topicError: null,
-        sourceMessageId: null,
-        sourceMessageName: null,
-        sourceCollectionId: null,
-        baseline: null,
-      });
-      return;
-    }
-
-    let userPropertiesArray: { key: string; value: string }[] = [];
-    if (message.userProperties) {
-      try {
-        userPropertiesArray = Object.entries(
-          JSON.parse(message.userProperties)
-        ).map(([key, value]) => ({ key, value: value as string }));
-      } catch (e) {
-        // no parseable properties
-      }
-    }
-    const loaded: Partial<PublishDetails> = {
-      topic: message.topic,
-      payload: message.payload,
-      qos: message.qos,
-      retain: message.retain,
-      codec: (message.encoding || "none") as SupportedCodeEditorCodec,
-      format: (message.format || "none") as SupportedCodeEditorFormat,
-      properties: {
-        payloadFormatIndicator: !!message.headerPayloadFormatIndicator,
-        messageExpiryInterval: message.headerMessageExpiryInterval,
-        contentType: message.headerContentType,
-        responseTopic: message.headerResponseTopic,
-        correlationData: message.headerCorrelationData,
-        subscriptionIdentifier: message.headerSubscriptionIdentifier,
-        topicAlias: message.headerTopicAlias,
-      },
-      userPropertiesArray,
-      hasAttemptedPublish: false,
-      topicError: null,
-      sourceMessageId: message.id,
-      sourceMessageName: message.name,
-      sourceCollectionId: message.collectionId,
-    };
-    setPartial({
+    const loaded: Partial<PublishDetails> = message
+      ? {
+          ...publishDetailsFromStoredMessage(message),
+          sourceMessageId: message.id,
+          sourceMessageName: message.name,
+          sourceCollectionId: message.collectionId,
+        }
+      : {
+          ...blankDetails,
+          sourceMessageId: null,
+          sourceMessageName: null,
+          sourceCollectionId: null,
+        };
+    loaded.baseline = message
+      ? snapshotPublishDetails(loaded as PublishDetails)
+      : null;
+    update((store) => ({
+      ...store,
       ...loaded,
-      baseline: snapshotPublishDetails(loaded as PublishDetails),
-    });
+      hasAttemptedPublish: false,
+      // always refresh the editor, even when the loaded payload is empty
+      forceEditorTextSetIncrement: store.forceEditorTextSetIncrement + 1,
+    }));
   };
 
   // Re-baselines after the scratch copy has been written back, or after a

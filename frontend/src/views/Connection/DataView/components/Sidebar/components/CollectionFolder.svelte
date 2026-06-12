@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { models } from "wailsjs/go/models";
   import Icon from "@/components/Icon/Icon.svelte";
-  import IconButton from "@/components/Button/IconButton.svelte";
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import DialogActionBar from "@/components/Dialog/DialogActionBar.svelte";
   import Button from "@/components/Button/Button.svelte";

@@ -9,9 +9,9 @@ import {
   DuplicateCollectionMessage,
   DeleteCollectionMessage,
 } from "wailsjs/go/app/App";
-import { derived, get, writable } from "svelte/store";
+import { writable } from "svelte/store";
 import { app, models } from "wailsjs/go/models";
-import { getContext, setContext } from "svelte";
+import { addToast } from "@/components/Toast/Toast.svelte";
 
 export type CollectionScope = "global" | "connection";
 
@@ -21,12 +21,6 @@ interface CollectionsState {
 }
 
 export type CollectionsStore = ReturnType<typeof createCollectionsStore>;
-
-const contextKey = "collections";
-
-export const getCollectionsStoreFromContext = () => {
-  return getContext(contextKey) as CollectionsStore;
-};
 
 export const createCollectionsStore = (connId: number) => {
   const { subscribe, set, update } = writable<CollectionsState>(
@@ -45,6 +39,13 @@ export const createCollectionsStore = (connId: number) => {
       set({ collections: collections ?? [], isLoaded: true });
     } catch (e) {
       console.error("failed to load collections", e);
+      addToast({
+        data: {
+          title: "Failed to load collections",
+          description: e as string,
+          type: "error",
+        },
+      });
     }
   };
 
@@ -100,15 +101,7 @@ export const createCollectionsStore = (connId: number) => {
     await load();
   };
 
-  const findMessage = (id: number): models.CollectionMessage | undefined => {
-    for (const collection of get({ subscribe }).collections) {
-      const match = (collection.messages ?? []).find((m) => m.id === id);
-      if (match) return match;
-    }
-    return undefined;
-  };
-
-  const store = {
+  return {
     subscribe,
     load,
     createCollection,
@@ -119,12 +112,7 @@ export const createCollectionsStore = (connId: number) => {
     moveMessage,
     duplicateMessage,
     deleteMessage,
-    findMessage,
   };
-
-  setContext(contextKey, store);
-
-  return store;
 };
 
 export const filterByScope = (

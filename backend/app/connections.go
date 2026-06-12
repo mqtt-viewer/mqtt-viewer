@@ -141,17 +141,23 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 }
 
 func (a *App) DeleteConnection(id uint) error {
-	if res := a.Db.Where("connection_id = ?", id).Delete(&models.Subscription{}); res.Error != nil {
-		return res.Error
-	}
-	if res := a.Db.Where("connection_id = ?", id).Delete(&models.Tab{}); res.Error != nil {
-		return res.Error
-	}
-	if err := deleteCollectionsForConnection(&a.Db.DB, id); err != nil {
+	err := a.Db.Transaction(func(tx *gorm.DB) error {
+		if res := tx.Where("connection_id = ?", id).Delete(&models.Subscription{}); res.Error != nil {
+			return res.Error
+		}
+		if res := tx.Where("connection_id = ?", id).Delete(&models.Tab{}); res.Error != nil {
+			return res.Error
+		}
+		if err := deleteCollectionsForConnection(tx, id); err != nil {
+			return err
+		}
+		if res := tx.Delete(&models.Connection{}, id); res.Error != nil {
+			return res.Error
+		}
+		return nil
+	})
+	if err != nil {
 		return err
-	}
-	if res := a.Db.Delete(&models.Connection{}, id); res.Error != nil {
-		return res.Error
 	}
 	delete(a.AppConnections, id)
 	a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)

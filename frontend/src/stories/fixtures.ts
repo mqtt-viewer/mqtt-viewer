@@ -362,7 +362,6 @@ export const createMockCollectionsStore = () => {
     moveMessage: asyncNoop,
     duplicateMessage: async () => mockCollectionMessage,
     deleteMessage: asyncNoop,
-    findMessage: () => mockCollectionMessage,
   };
 };
 

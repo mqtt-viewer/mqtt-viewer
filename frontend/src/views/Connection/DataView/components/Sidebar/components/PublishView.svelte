@@ -179,13 +179,28 @@
   };
 
   const createAndSave = async (name: string, scope: CollectionScope) => {
-    const created = await collectionsStore.createCollection(name, scope);
-    await saveNewToCollection(created.id);
+    try {
+      const created = await collectionsStore.createCollection(name, scope);
+      await saveNewToCollection(created.id);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to create collection",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
   };
 
   $: publishMqtt = async () => {
     try {
       await publishStore.publish();
+      // publish() validates and returns without sending on an empty topic —
+      // don't record a history entry for a message that never went out
+      if (!$publishStore.topic || $publishStore.topicError) {
+        return;
+      }
       const userProperties = publishStore.getUserProperties();
       await publishHistoryStore.savePublishEntry({
         connectionId,

@@ -26,7 +26,11 @@
     : collections;
   $: globalMatches = filterByScope(matches, "global");
   $: connectionMatches = filterByScope(matches, "connection");
-  $: exactMatch = collections.some(
+  // per-scope: a global "Sensors" must not block creating a connection-scoped one
+  $: connectionExactMatch = filterByScope(collections, "connection").some(
+    (c) => c.name.toLowerCase() === query.trim().toLowerCase()
+  );
+  $: globalExactMatch = filterByScope(collections, "global").some(
     (c) => c.name.toLowerCase() === query.trim().toLowerCase()
   );
 
@@ -36,11 +40,16 @@
     await onCreate(name, scope);
     query = "";
   };
+
+  // global collections can change from other connections; refresh on open
+  const refreshOnOpen = (_node: HTMLElement) => {
+    collectionsStore.load();
+  };
 </script>
 
 <DropdownMenu placement="bottom-end">
   <slot name="trigger" slot="trigger" />
-  <div class="flex flex-col min-w-[220px]" slot="menu-content">
+  <div class="flex flex-col min-w-[220px]" slot="menu-content" use:refreshOnOpen>
     <!-- svelte-ignore a11y_autofocus -->
     <input
       class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"
@@ -82,13 +91,15 @@
         Collection not found
       </div>
     {/if}
-    {#if query.trim() && !exactMatch}
+    {#if query.trim() && !connectionExactMatch}
       <DropdownMenuItem onClick={() => create("connection")}>
         <div class="flex items-center gap-2">
           <Icon type="plus" size={14} />
           <span class="truncate">Create “{query.trim()}”</span>
         </div>
       </DropdownMenuItem>
+    {/if}
+    {#if query.trim() && !globalExactMatch}
       <DropdownMenuItem onClick={() => create("global")}>
         <div class="flex items-center gap-2">
           <Icon type="plus" size={14} />

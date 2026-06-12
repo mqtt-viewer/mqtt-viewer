@@ -50,7 +50,9 @@
       readOnly,
       lang: format,
       langCompartment,
-      doc: format === "json" || format === "json-prettier" ? "{\n\n}" : "",
+      doc:
+        text ||
+        (format === "json" || format === "json-prettier" ? "{\n\n}" : ""),
     })
   );
 

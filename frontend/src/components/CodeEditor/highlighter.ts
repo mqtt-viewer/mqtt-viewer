@@ -5,8 +5,10 @@ import _ from "lodash";
 
 export const highlightJson = (jsonString?: string) => {
   try {
+    // Consumers render the result with {@html}; non-JSON payloads skip the
+    // escaping emit() path below, so they must be escaped here.
     if (!jsonString || !validateJSON(jsonString)) {
-      return jsonString;
+      return _.escape(jsonString);
     }
     let result = "";
 

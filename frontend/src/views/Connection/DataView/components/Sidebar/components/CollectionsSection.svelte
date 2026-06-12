@@ -34,11 +34,10 @@
 
   const commitCreate = async () => {
     if (!isCreating) return;
+    // clear before awaiting so the form's blur can't re-enter and create twice
+    isCreating = false;
     const name = newName.trim();
-    if (!name) {
-      isCreating = false;
-      return;
-    }
+    if (!name) return;
     try {
       await collectionsStore.createCollection(name, scope);
     } catch (e) {
@@ -50,7 +49,6 @@
         },
       });
     }
-    isCreating = false;
   };
 </script>
 
