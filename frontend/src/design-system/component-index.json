@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-11T14:11:30.709Z",
+  "generatedAt": "2026-06-12T00:22:37.889Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -859,7 +859,7 @@
             "none",
             "json",
             "json-prettier",
-            "xml"
+            "hex"
           ],
           "default": "json"
         },
