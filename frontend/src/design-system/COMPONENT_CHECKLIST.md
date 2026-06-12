@@ -84,13 +84,9 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/PublishPanel | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/PublishPanel/PublishHistory | [x] | [ ] | [x] | [ ] |
-| Views/Connection/DataView/PublishPanel/PublishHistory/PublishHistoryItem | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/PublishPanel/PublishHistory/SearchableText | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/UserPropertiesTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/SelectedTopicPanel | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/SelectedTopicPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
@@ -126,7 +122,7 @@
 
 ## Summary
 
-- Components scanned: 100
-- Story present: 100
+- Components scanned: 96
+- Story present: 96
 - Figma-linked: 0
 - Missing specs: 0

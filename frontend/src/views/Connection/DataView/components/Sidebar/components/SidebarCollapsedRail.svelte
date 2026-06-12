@@ -25,8 +25,8 @@
     </Tooltip>
   {/if}
   <Tooltip text="New message" placement="right">
-    <IconButton onClick={onNewMessage} class="text-primary">
-      <Icon type="plusCircle" size={20} />
+    <IconButton onClick={onNewMessage}>
+      <span class="text-primary"><Icon type="plusCircle" size={20} /></span>
     </IconButton>
   </Tooltip>
   {#if onSearch}
