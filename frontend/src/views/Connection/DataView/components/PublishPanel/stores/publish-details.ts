@@ -31,7 +31,39 @@ export interface PublishDetails {
   forceEditorTextSetIncrement: number;
   hasAttemptedPublish: boolean;
   topicError: string | null;
+  // Set when the editor holds a scratch copy of a saved collection message.
+  // baseline is a snapshot of the saved state used for dirty detection.
+  sourceMessageId: number | null;
+  sourceMessageName: string | null;
+  sourceCollectionId: number | null;
+  baseline: string | null;
 }
+
+// The fields that count towards "Modified (unsaved)" for a saved message.
+export const snapshotPublishDetails = (
+  details: Pick<
+    PublishDetails,
+    | "topic"
+    | "payload"
+    | "qos"
+    | "retain"
+    | "codec"
+    | "format"
+    | "properties"
+    | "userPropertiesArray"
+  >
+) => {
+  return JSON.stringify({
+    topic: details.topic,
+    payload: details.payload,
+    qos: details.qos,
+    retain: details.retain,
+    codec: details.codec,
+    format: details.format,
+    properties: details.properties,
+    userProperties: details.userPropertiesArray.filter((p) => p.key !== ""),
+  });
+};
 
 export type PublishDetailsStore = ReturnType<typeof createPublishStore>;
 
@@ -63,6 +95,10 @@ export const createPublishStore = (connId: number) => {
     forceEditorTextSetIncrement: 0,
     hasAttemptedPublish: false,
     topicError: null,
+    sourceMessageId: null,
+    sourceMessageName: null,
+    sourceCollectionId: null,
+    baseline: null,
   });
 
   const publish = async () => {
@@ -130,6 +166,92 @@ export const createPublishStore = (connId: number) => {
     });
   };
 
+  // Loads a saved collection message into the editor as a scratch copy
+  // (null = blank new message). Edits are not persisted until markSaved.
+  const setSource = (message: models.CollectionMessage | null) => {
+    if (!message) {
+      setPartial({
+        topic: "",
+        payload: "{\n\n}",
+        qos: 0,
+        retain: false,
+        properties: {
+          payloadFormatIndicator: false,
+          messageExpiryInterval: undefined,
+          contentType: undefined,
+          responseTopic: undefined,
+          correlationData: undefined,
+          subscriptionIdentifier: undefined,
+          topicAlias: undefined,
+        },
+        userPropertiesArray: [],
+        codec: "none",
+        format: "none",
+        hasAttemptedPublish: false,
+        topicError: null,
+        sourceMessageId: null,
+        sourceMessageName: null,
+        sourceCollectionId: null,
+        baseline: null,
+      });
+      return;
+    }
+
+    let userPropertiesArray: { key: string; value: string }[] = [];
+    if (message.userProperties) {
+      try {
+        userPropertiesArray = Object.entries(
+          JSON.parse(message.userProperties)
+        ).map(([key, value]) => ({ key, value: value as string }));
+      } catch (e) {
+        // no parseable properties
+      }
+    }
+    const loaded: Partial<PublishDetails> = {
+      topic: message.topic,
+      payload: message.payload,
+      qos: message.qos,
+      retain: message.retain,
+      codec: (message.encoding || "none") as SupportedCodeEditorCodec,
+      format: (message.format || "none") as SupportedCodeEditorFormat,
+      properties: {
+        payloadFormatIndicator: !!message.headerPayloadFormatIndicator,
+        messageExpiryInterval: message.headerMessageExpiryInterval,
+        contentType: message.headerContentType,
+        responseTopic: message.headerResponseTopic,
+        correlationData: message.headerCorrelationData,
+        subscriptionIdentifier: message.headerSubscriptionIdentifier,
+        topicAlias: message.headerTopicAlias,
+      },
+      userPropertiesArray,
+      hasAttemptedPublish: false,
+      topicError: null,
+      sourceMessageId: message.id,
+      sourceMessageName: message.name,
+      sourceCollectionId: message.collectionId,
+    };
+    setPartial({
+      ...loaded,
+      baseline: snapshotPublishDetails(loaded as PublishDetails),
+    });
+  };
+
+  // Re-baselines after the scratch copy has been written back, or after a
+  // new message has been saved into a collection.
+  const markSaved = (saved: {
+    id: number;
+    name: string;
+    collectionId: number;
+  }) => {
+    update((store) => {
+      store.sourceMessageId = saved.id;
+      store.sourceMessageName = saved.name;
+      store.sourceCollectionId = saved.collectionId;
+      store.baseline = snapshotPublishDetails(store);
+      return store;
+    });
+  };
+
   const store = {
     subscribe,
     setPartial,
@@ -137,6 +259,8 @@ export const createPublishStore = (connId: number) => {
     getUserProperties,
     publish,
     formatPayload,
+    setSource,
+    markSaved,
   };
 
   setContext(contextKey, store);

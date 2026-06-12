@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PublishPanel from "./components/PublishPanel/PublishPanel.svelte";
+  import Sidebar from "./components/Sidebar/Sidebar.svelte";
   import SelectedTopicDisplay from "./components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import MqttDataPanel from "./components/MqttDataPanel/MqttDataPanel.svelte";
   import { createSelectedTopicStore } from "./stores/selected-topic-store";
@@ -119,7 +119,7 @@
         : $panelSizes.rootWindowWidth / 2}
       bind:width={publishPanelWidth}
     >
-      <PublishPanel
+      <Sidebar
         {connection}
         {isPublishDisabled}
         getTopicMatchesSubscription={matchedTopicsStore.getTopicMatch}
