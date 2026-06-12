@@ -27,6 +27,18 @@ func (m *MessageHistory) GetTopicHistory(topic string) ([]MqttMessage, error) {
 	return history, nil
 }
 
+func (m *MessageHistory) GetAllHistory() map[string][]MqttMessage {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	historyCopy := make(map[string][]MqttMessage, len((*m).history))
+	for topic, messages := range (*m).history {
+		messagesCopy := make([]MqttMessage, len(messages))
+		copy(messagesCopy, messages)
+		historyCopy[topic] = messagesCopy
+	}
+	return historyCopy
+}
+
 func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

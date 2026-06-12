@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-12T00:22:37.889Z",
+  "generatedAt": "2026-06-12T04:19:57.470Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3243,6 +3243,12 @@
         },
         {
           "name": "deleteRetainedMessage",
+          "type": "function",
+          "required": false,
+          "default": "> Promise<void>"
+        },
+        {
+          "name": "exportTopicMessages",
           "type": "function",
           "required": false,
           "default": "> Promise<void>"
