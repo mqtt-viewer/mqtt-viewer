@@ -82,7 +82,7 @@
         connection.latencyMs !== undefined
           ? `(${connection.latencyMs} ms)`
           : ""}
-        {#if connection.connectionState === "connected" || connection.connectionState === "connecting"}
+        {#if connection.connectionState === "connected" || connection.connectionState === "connecting" || connection.connectionState === "reconnecting"}
           <Tooltip text="Disconnect">
             <Button on:click={disconnect} disabled={!connectionIsValid}
               ><Icon type="disconnect" /></Button

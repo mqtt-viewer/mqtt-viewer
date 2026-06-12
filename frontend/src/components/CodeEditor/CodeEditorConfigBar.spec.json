@@ -43,7 +43,7 @@
         "none",
         "json",
         "json-prettier",
-        "xml"
+        "hex"
       ],
       "default": "none"
     },

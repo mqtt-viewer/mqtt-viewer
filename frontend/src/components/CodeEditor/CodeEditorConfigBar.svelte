@@ -75,7 +75,9 @@
   <CodeEditorConfigBarOption
     name="format"
     bind:setValue={setFormat}
-    options={isReadyOnly ? ["none", "json", "json-prettier"] : ["none", "json"]}
+    options={isReadyOnly
+      ? ["none", "json", "json-prettier", "hex"]
+      : ["none", "json"]}
     defaultValue={format}
     onChange={(value) => {
       if (value !== undefined) {
@@ -91,6 +93,8 @@
           return "JSON";
         case "json-prettier":
           return "JSONp";
+        case "hex":
+          return "Hex";
         default:
           return "";
       }
@@ -103,6 +107,8 @@
           return "JSON";
         case "json-prettier":
           return "JSON Pretty";
+        case "hex":
+          return "View as hex";
         default:
           return "";
       }

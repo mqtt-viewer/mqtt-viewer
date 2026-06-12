@@ -20,7 +20,7 @@ const chalky = "#e5c07b",
   highlightBackground = "#2c313a",
   background = "#282c34",
   tooltipBackground = "#353a42",
-  selection = "#3E4451",
+  selection = "rgba(124, 140, 255, 0.35)",
   cursor = "#528bff";
 
 /// The colors used in the theme, as CSS color strings.
@@ -53,22 +53,18 @@ const oneDarkTheme = EditorView.theme(
 
     ".cm-scroller": {
       overflow: "auto",
+      backgroundColor: "rgba(15, 15, 15, 0.4)",
     },
 
     ".cm-content": {
       caretColor: cursor,
-      backgroundColor: `rgba(15, 15, 15, 0.4)`,
-    },
-
-    ".cm-readonly .cm-content": {
-      backgroundColor: "rgba(5, 5, 5, 0.7)",
     },
 
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: cursor },
 
     // --- Selection handling ---
     ".cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-      backgroundColor: "unset",
+      backgroundColor: "rgba(124, 140, 255, 0.18)",
     },
 
     "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground":
