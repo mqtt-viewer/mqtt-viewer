@@ -169,6 +169,7 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnConnectionUp: func() {
+				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				appConnection.MqttManager.MessageBuffer.StartHandlingBuffer(MQTT_BUFFER_EMIT_INTERVAL, func(messages []mqtt.MqttMessage) {
 					if len(messages) == 0 {
 						return
