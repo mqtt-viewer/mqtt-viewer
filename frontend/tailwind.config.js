@@ -23,75 +23,96 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: "#7c8cff",
-          light: "#9aa1fe",
+          DEFAULT: "var(--color-primary)",
+          light: "var(--color-primary-light)",
         },
         secondary: {
-          DEFAULT: "#f7d66a",
+          DEFAULT: "var(--color-secondary)",
         },
         "white-text": {
-          DEFAULT: "rgba(255, 255, 255, 0.9)",
+          DEFAULT: "var(--color-white-text)",
+        },
+        emphasis: {
+          DEFAULT: "var(--color-emphasis)",
         },
         "secondary-text": {
-          DEFAULT: "rgb(161, 161, 170)",
+          DEFAULT: "var(--color-secondary-text)",
         },
         outline: {
-          DEFAULT: "rgb(30, 30, 30)",
+          DEFAULT: "var(--color-outline)",
         },
         button: {
-          DEFAULT: "rgb(30, 30, 30)",
+          DEFAULT: "rgb(var(--color-button-rgb) / <alpha-value>)",
+        },
+        "button-border": {
+          DEFAULT: "var(--color-button-border)",
         },
         switch: {
-          DEFAULT: "rgb(38, 38, 42)",
+          DEFAULT: "var(--color-switch)",
         },
         hovered: {
-          DEFAULT: "rgb(40, 40, 40)",
+          DEFAULT: "rgb(var(--color-hovered-rgb) / <alpha-value>)",
         },
         selected: {
-          DEFAULT: "#353535",
+          DEFAULT: "var(--color-selected)",
         },
         divider: {
-          DEFAULT: "#505050",
+          DEFAULT: "var(--color-divider)",
         },
         success: {
-          DEFAULT: "rgb(72, 187, 120)",
+          DEFAULT: "var(--color-success)",
         },
         error: {
-          DEFAULT: "rgb(239, 68, 68)",
-          light: "rgb(240, 110, 110)",
+          DEFAULT: "var(--color-error)",
+          light: "var(--color-error-light)",
         },
         warning: {
-          DEFAULT: "orange",
+          DEFAULT: "var(--color-warning)",
         },
         "highlight-background": {
-          DEFAULT: "#534420",
+          DEFAULT: "var(--color-highlight-background)",
         },
         "highlight-text": {
-          DEFAULT: "F1E2BE",
+          DEFAULT: "var(--color-highlight-text)",
         },
         "elevation-0": {
-          DEFAULT: "#020202",
+          DEFAULT: "var(--color-elevation-0)",
         },
         "elevation-0-hover": {
-          DEFAULT: "rgb(15, 15, 15)",
+          DEFAULT: "var(--color-elevation-0-hover)",
         },
         "elevation-1": {
-          DEFAULT: "rgb(18, 18, 18)",
+          DEFAULT: "rgb(var(--color-elevation-1-rgb) / <alpha-value>)",
         },
         "elevation-1-card": {
-          DEFAULT: "rgb(22, 22, 22)",
+          DEFAULT: "var(--color-elevation-1-card)",
         },
         "elevation-1-selected": {
-          DEFAULT: "rgba(39, 39, 39, 1)",
+          DEFAULT: "var(--color-elevation-1-selected)",
         },
         "elevation-2": {
-          DEFAULT: "rgb(30, 30, 30)",
+          DEFAULT: "var(--color-elevation-2)",
         },
         "elevation-2-selected": {
-          DEFAULT: "rgba(255, 85, 0, 0.3)",
+          DEFAULT: "var(--color-elevation-2-selected)",
         },
         "elevation-2-hover": {
-          DEFAULT: "rgb(50, 50, 50)",
+          DEFAULT: "var(--color-elevation-2-hover)",
+        },
+        "app-bar": {
+          DEFAULT: "var(--color-app-bar)",
+        },
+        toast: {
+          DEFAULT: "var(--color-toast)",
+        },
+        "chip-border": {
+          DEFAULT: "var(--color-chip-border)",
+        },
+        "search-highlight-text": {
+          DEFAULT: "var(--color-search-highlight-text)",
+        },
+        "search-highlight-bg": {
+          DEFAULT: "var(--color-search-highlight-bg)",
         },
       },
     },

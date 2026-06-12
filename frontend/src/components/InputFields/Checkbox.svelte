@@ -18,7 +18,7 @@
   <button
     use:melt={$root}
     class="flex appearance-none items-center justify-center rounded-sm
-             h-5 w-5 hover:opacity-75 ring-1 ring-inset ring-white"
+             h-5 w-5 hover:opacity-75 ring-1 ring-inset ring-emphasis"
     id="checkbox"
   >
     {#if $isIndeterminate}

@@ -14,7 +14,7 @@
   {disabled}
   class={twMerge(
     `w-full border-[1px] border-dashed border-secondary-text text-secondary-text
-    hover:border-white hover:text-white
+    hover:border-emphasis hover:text-emphasis
     transition-colors rounded py-2 flex items-center justify-center`,
     size === "small" ? "py-1.5 text-sm" : "py-2 text-base",
     className,

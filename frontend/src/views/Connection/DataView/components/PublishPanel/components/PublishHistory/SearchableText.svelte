@@ -29,7 +29,7 @@
       {#each displayText.split(new RegExp(`(${searchTerm})`, "i")) as part}
         {@const readable = isTopic ? part?.split("/").join(" / ") : part}
         {#if part.toLowerCase() === searchTerm.toLowerCase()}
-          <span class="font-bold text-[#9890FF] bg-[#9890FF25]">{readable}</span
+          <span class="font-bold text-search-highlight-text bg-search-highlight-bg">{readable}</span
           >
         {:else}
           <span class="text-secondary-text">{readable}</span>

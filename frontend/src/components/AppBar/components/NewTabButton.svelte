@@ -19,7 +19,7 @@
 >
   <span
     class={twMerge(
-      "text-white/100 absolute w-fit whitespace-nowrap overflow-hidden",
+      "text-emphasis absolute w-fit whitespace-nowrap overflow-hidden",
       "transition-[opacity,_width] duration-150 delay-[75ms]",
       "top-1/2 left-[16px] -translate-y-1/2"
     )}

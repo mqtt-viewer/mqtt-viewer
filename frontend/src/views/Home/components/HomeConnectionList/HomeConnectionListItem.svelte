@@ -127,7 +127,7 @@
     >
       <Tooltip text="Edit connection details" placement="top">
         <div
-          class="rounded-full transition-colors text-secondary-text hover:text-white"
+          class="rounded-full transition-colors text-secondary-text hover:text-emphasis"
         >
           <Icon type="edit" size={15} />
         </div>

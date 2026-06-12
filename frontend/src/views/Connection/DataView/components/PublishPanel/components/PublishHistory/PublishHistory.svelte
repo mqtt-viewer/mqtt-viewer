@@ -16,7 +16,7 @@
   export let publishHistoryStore: ReturnType<typeof createPublishHistoryStore>;
 
   const fieldColor = untypedColors["outline"]["DEFAULT"];
-  const fieldHoverColor = untypedColors["hovered"]["DEFAULT"];
+  const fieldHoverColor = "var(--color-hovered)";
 
   let connectionId = getConnectionIdContext();
 

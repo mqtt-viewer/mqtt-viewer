@@ -25,7 +25,7 @@
   class={twMerge(
     "h-[38px] pl-3 pr-2 py-1 flex items-center cursor-pointer whitespace-nowrap",
     "select-none truncate border-outline border-r-[1px]",
-    isSelected ? "bg-elevation-1" : "bg-black opacity-70",
+    isSelected ? "bg-elevation-1" : "bg-app-bar opacity-70",
     isHovered && !isSelected ? "opacity-100" : "",
     className
   )}

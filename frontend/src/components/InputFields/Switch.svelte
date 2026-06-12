@@ -35,7 +35,7 @@
   const onMouseEnter = () => (isHovered = true);
   const onMouseLeave = () => (isHovered = false);
 
-  $: labelColor = isHovered && !disabled ? "text-white" : "text-secondary-text";
+  $: labelColor = isHovered && !disabled ? "text-emphasis" : "text-secondary-text";
 
   $: hoveredSwitchBgColor = isHovered && !disabled ? "bg-hovered" : "bg-switch";
   $: hoveredCheckedSwitchBgColor =

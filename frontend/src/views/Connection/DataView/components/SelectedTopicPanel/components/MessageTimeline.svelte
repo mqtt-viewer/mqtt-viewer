@@ -382,16 +382,16 @@
 
   .vis-time-axis .vis-grid.vis-minor {
     border-width: 0.5px;
-    border-color: rgb(46, 46, 46);
+    border-color: var(--color-timeline-border);
   }
 
   .vis-panel.vis-center {
     border-width: 0.5px;
-    border-color: rgb(46, 46, 46);
+    border-color: var(--color-timeline-border);
   }
 
   .vis-panel.vis-bottom {
     border-width: 0.5px;
-    border-color: rgb(46, 46, 46);
+    border-color: var(--color-timeline-border);
   }
 </style>

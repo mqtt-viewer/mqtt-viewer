@@ -2,6 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens. Dark is the default; the light palette activates via the
+ * `light` class on <html> (set pre-paint in index.html, toggled by the
+ * theme store). Tailwind colors and the CodeMirror theme both resolve
+ * through these variables, so switching themes never remounts editors.
+ *
+ * The `-rgb` triplets exist only for tokens used with Tailwind opacity
+ * modifiers (e.g. bg-hovered/50).
+ */
+:root {
+  --color-primary: #7c8cff;
+  --color-primary-light: #9aa1fe;
+  --color-secondary: #f7d66a;
+  --color-white-text: rgba(255, 255, 255, 0.9);
+  --color-emphasis: #ffffff;
+  --color-secondary-text: rgb(161, 161, 170);
+  --color-outline: rgb(30, 30, 30);
+  --color-button-rgb: 30 30 30;
+  --color-button-border: rgb(75, 85, 99);
+  --color-switch: rgb(38, 38, 42);
+  --color-hovered-rgb: 40 40 40;
+  --color-hovered: rgb(40, 40, 40);
+  --color-selected: #353535;
+  --color-divider: #505050;
+  --color-success: rgb(72, 187, 120);
+  --color-error: rgb(239, 68, 68);
+  --color-error-light: rgb(240, 110, 110);
+  --color-warning: orange;
+  --color-highlight-background: #534420;
+  --color-highlight-text: #f1e2be;
+  --color-elevation-0: #020202;
+  --color-elevation-0-hover: rgb(15, 15, 15);
+  --color-elevation-1-rgb: 18 18 18;
+  --color-elevation-1: rgb(18, 18, 18);
+  --color-elevation-1-card: rgb(22, 22, 22);
+  --color-elevation-1-selected: rgba(39, 39, 39, 1);
+  --color-elevation-2: rgb(30, 30, 30);
+  --color-elevation-2-selected: rgba(255, 85, 0, 0.3);
+  --color-elevation-2-hover: rgb(50, 50, 50);
+  --color-app-bar: #000000;
+  --color-toast: rgb(38, 38, 38);
+  --color-chip-border: rgb(55, 65, 81);
+  --color-timeline-border: rgb(46, 46, 46);
+  --color-search-highlight-text: #9890ff;
+  --color-search-highlight-bg: #9890ff25;
+  --color-flash-rgb: 50 50 50;
+
+  /* CodeMirror editor (dark = One Dark) */
+  --cm-chalky: #e5c07b;
+  --cm-coral: #e06c75;
+  --cm-cyan: #56b6c2;
+  --cm-invalid: #ffffff;
+  --cm-ivory: #abb2bf;
+  --cm-stone: #7d8799;
+  --cm-malibu: #61afef;
+  --cm-sage: #98c379;
+  --cm-whiskey: #d19a66;
+  --cm-violet: #c678dd;
+  --cm-dark-background: #21252b;
+  --cm-highlight-background: #2c313a;
+  --cm-background: #282c34;
+  --cm-tooltip-background: #353a42;
+  --cm-selection: #3e4451;
+  --cm-cursor: #528bff;
+  --cm-content-overlay: rgba(15, 15, 15, 0.4);
+  --cm-readonly-overlay: rgba(5, 5, 5, 0.7);
+  --cm-search-match: #72a1ff59;
+  --cm-search-match-outline: #457dff;
+  --cm-search-match-selected: #6199ff2f;
+  --cm-active-line: #6699ff0b;
+  --cm-selection-match: #aafe661a;
+  --cm-matching-bracket: #bad0f847;
+  --cm-fold-placeholder: #dddddd;
+  --cm-panel-border: black;
+}
+
+:root.light {
+  --color-primary: #5e6ce0;
+  --color-primary-light: #7c8cff;
+  --color-secondary: #dfa900;
+  --color-white-text: rgba(24, 24, 27, 0.92);
+  --color-emphasis: #131316;
+  --color-secondary-text: rgb(95, 95, 105);
+  --color-outline: rgb(218, 218, 222);
+  --color-button-rgb: 232 232 235;
+  --color-button-border: rgb(200, 200, 206);
+  --color-switch: rgb(215, 215, 221);
+  --color-hovered-rgb: 229 229 233;
+  --color-hovered: rgb(229, 229, 233);
+  --color-selected: #dcdce1;
+  --color-divider: #b8b8c0;
+  --color-success: rgb(22, 163, 74);
+  --color-error: rgb(220, 38, 38);
+  --color-error-light: rgb(239, 68, 68);
+  --color-warning: #d97706;
+  --color-highlight-background: #f5e3a8;
+  --color-highlight-text: #6b5500;
+  --color-elevation-0: #ffffff;
+  --color-elevation-0-hover: rgb(244, 244, 245);
+  --color-elevation-1-rgb: 247 247 248;
+  --color-elevation-1: rgb(247, 247, 248);
+  --color-elevation-1-card: rgb(255, 255, 255);
+  --color-elevation-1-selected: rgba(228, 228, 231, 1);
+  --color-elevation-2: rgb(236, 236, 238);
+  --color-elevation-2-selected: rgba(255, 85, 0, 0.22);
+  --color-elevation-2-hover: rgb(224, 224, 227);
+  --color-app-bar: #ececee;
+  --color-toast: rgb(255, 255, 255);
+  --color-chip-border: rgb(205, 205, 212);
+  --color-timeline-border: rgb(212, 212, 218);
+  --color-search-highlight-text: #4a55c7;
+  --color-search-highlight-bg: rgba(94, 108, 224, 0.15);
+  --color-flash-rgb: 190 190 198;
+
+  /* CodeMirror editor (light = One Light) */
+  --cm-chalky: #c18401;
+  --cm-coral: #e45649;
+  --cm-cyan: #0184bc;
+  --cm-invalid: #000000;
+  --cm-ivory: #383a42;
+  --cm-stone: #8f939d;
+  --cm-malibu: #4078f2;
+  --cm-sage: #50a14f;
+  --cm-whiskey: #986801;
+  --cm-violet: #a626a4;
+  --cm-dark-background: #eaeaeb;
+  --cm-highlight-background: #e4e4e6;
+  --cm-background: #fafafa;
+  --cm-tooltip-background: #ffffff;
+  --cm-selection: #d4d9f2;
+  --cm-cursor: #5e6ce0;
+  --cm-content-overlay: rgba(255, 255, 255, 0.4);
+  --cm-readonly-overlay: rgba(250, 250, 250, 0.7);
+  --cm-search-match: #5e6ce033;
+  --cm-search-match-outline: #5e6ce0;
+  --cm-search-match-selected: #5e6ce01f;
+  --cm-active-line: #5e6ce00d;
+  --cm-selection-match: #44883326;
+  --cm-matching-bracket: #5e6ce02e;
+  --cm-fold-placeholder: #555555;
+  --cm-panel-border: rgb(218, 218, 222);
+}
+
 @layer base {
   * {
     -webkit-user-select: none; /* Safari */
@@ -19,15 +162,16 @@
 
   @keyframes flash-background {
     0% {
-      background-color: rgba(50, 50, 50, 1);
+      background-color: rgb(var(--color-flash-rgb) / 1);
     }
     100% {
-      background-color: rgba(50, 50, 50, 0);
+      background-color: rgb(var(--color-flash-rgb) / 0);
     }
   }
   html {
     height: 100%;
     overflow: hidden;
+    background-color: var(--color-elevation-0);
   }
   body {
     font-family: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",

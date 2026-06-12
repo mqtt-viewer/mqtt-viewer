@@ -23,7 +23,7 @@
   );
 
   const fieldColor = untypedColors["outline"]["DEFAULT"];
-  const fieldHoverColor = untypedColors["hovered"]["DEFAULT"];
+  const fieldHoverColor = "var(--color-hovered)";
 
   const inputElName = "search-bar-mqtt-data" + connectionId;
   let inputEl: HTMLInputElement;
@@ -174,7 +174,7 @@
           <button
             class={twMerge(
               "text-left cursor-pointer w-full rounded py-[3px] px-2",
-              "hover:bg-elevation-2-hover text-white-text hover:text-white"
+              "hover:bg-elevation-2-hover text-white-text hover:text-emphasis"
             )}
             on:click={() => {
               console.log("clicked", historyItem);

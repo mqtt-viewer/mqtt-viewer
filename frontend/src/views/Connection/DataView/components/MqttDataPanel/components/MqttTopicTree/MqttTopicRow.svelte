@@ -114,7 +114,7 @@
     on:click={onTopicSelect}
     on:keypress={onTopicSelect}
   >
-    <p class="font-semibold text-white/90 mr-2">{topicLevel}</p>
+    <p class="font-semibold text-white-text mr-2">{topicLevel}</p>
     {#if subtopicCount > 0}
       <div class="w-3 min-w-3 ml-[2px] relative">
         <div class="absolute top-[4px] left-0">
@@ -144,7 +144,7 @@
     {/if}
     {#if message !== undefined}
       <!-- <div class="grow bg-green-800"></div> -->
-      <p class="ml-2 min-w-0 truncate font-normal grow text-white/90">
+      <p class="ml-2 min-w-0 truncate font-normal grow text-white-text">
         {@html syntaxHighlightedMessage}
       </p>
     {/if}
