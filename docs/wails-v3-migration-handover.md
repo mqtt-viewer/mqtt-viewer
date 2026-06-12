@@ -6,26 +6,34 @@ launch, Windows exe + NSIS installer via Linux makensis, `wails3 dev`,
 frontend build/check/tests, storybook smoke tests). These are the things only
 you can do, roughly in order.
 
-## 1. Implement the portal update endpoint (blocks in-app updates)
+## 1. Portal update endpoints — DONE, needs deploy + secrets
 
-`POST /api/cv1/updates/v3/check` on cloud.mqttviewer.app — full request/
-response contract with per-scenario examples in
+Implemented on the `updates-v3` branch of the cloud repo (PR open). Spec in
 [update-endpoint-spec.md](update-endpoint-spec.md).
 
-- Same basic-auth as the other `cv1` endpoints; same request body as the old
-  `/api/cv1/updates/latest` (machine_id, current_version, os, arch).
-- Response returns the GitHub release asset URL + sha256 for the requesting
-  platform. CI uploads a sibling `<asset>.sha256` file per asset to read the
-  digest from.
-- Keep the OLD `/api/cv1/updates/latest` endpoint alive until the v2-era
-  installed base has rolled forward — old clients still poll it and can
-  update to the new zips (layouts stay compatible).
-- Until the endpoint exists, the new app logs a 404 on update checks and
-  carries on — nothing breaks.
+- `POST /api/cv1/updates/v3/check` serves the latest `release_v3` record
+  whose **released** toggle is on — flip it in the PocketBase admin UI when
+  you're happy with a release. CI creates records with `released=false`, so
+  nothing ships until you toggle it.
+- `POST /api/cv1/updates/v3/releases` is called by each release workflow
+  after asset upload (artifacts merge across the per-platform calls).
+- **Secrets to set** (same value in both places):
+  - fly: `CI_RELEASES_USERNAME`, `CI_RELEASES_PASSWORD` (endpoint fails
+    closed without them)
+  - mqtt-viewer GitHub Actions: `CI_RELEASES_USERNAME`, `CI_RELEASES_PASSWORD`
+- The old `/api/cv1/updates/latest` endpoint is untouched — v2-era clients
+  keep working.
+- Full flow verified locally against the packaged mac app: ingest → toggle
+  released → in-app check → updater download → sha256 verify → binary swap →
+  relaunch. Re-runnable client-side check: start the portal locally, then
+  `PORTAL_E2E=1 PORTAL_E2E_ADDR=http://127.0.0.1:8091 go test ./backend/update/ -run TestPortalE2E -v`.
+- Note: the cloud repo's go.mod had been bumped to PocketBase v0.26.1 (May
+  2025) while the code targets v0.22 — HEAD didn't compile. The branch pins
+  v0.22.21; a real PB upgrade is a separate piece of work.
 
-## 2. Push the branch and do a release dry-run
+## 2. Do a release dry-run
 
-The branch is local-only. Push, PR, merge, then publish a **prerelease tag**
+PR [#68](https://github.com/mqtt-viewer/mqtt-viewer/pull/68) is open. Merge, then publish a **prerelease tag**
 (e.g. v0.0.X-test) to exercise all three workflows end to end. Things CI will
 prove that I could not from this machine:
 
