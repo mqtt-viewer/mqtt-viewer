@@ -15,11 +15,11 @@ func TestRegistryLoadsCorrectly(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 		return
 	}
-	if len(*registry.LoadedDescriptors) != 4 {
-		t.Errorf("Expected 4 descriptors, got %v", len(*registry.LoadedDescriptors))
+	if len(*registry.LoadedDescriptors) != 7 {
+		t.Errorf("Expected 7 descriptors, got %v", len(*registry.LoadedDescriptors))
 	}
-	if len(*registry.LoadedFiles) != 2 {
-		t.Errorf("Expected 2 file names, got %v", len(registry.LoadedFileNames))
+	if len(*registry.LoadedFiles) != 3 {
+		t.Errorf("Expected 3 file names, got %v", len(*registry.LoadedFiles))
 	}
 	if !(*registry.LoadedDescriptors)[0].FullName().IsValid() {
 		t.Errorf("Expected first descriptor to have a valid full name, got %v", (*registry.LoadedDescriptors)[0].FullName())
@@ -30,8 +30,8 @@ func TestRegistryLoadsCorrectly(t *testing.T) {
 	if !(*registry.LoadedDescriptors)[2].FullName().IsValid() {
 		t.Errorf("Expected third descriptor to have a valid full name, got %v", (*registry.LoadedDescriptors)[0].FullName())
 	}
-	if len(*registry.LoadedDescriptorsNameMap) != 4 {
-		t.Errorf("Expected 4 descriptors in name map, got %v", len(*registry.LoadedDescriptorsNameMap))
+	if len(*registry.LoadedDescriptorsNameMap) != 7 {
+		t.Errorf("Expected 7 descriptors in name map, got %v", len(*registry.LoadedDescriptorsNameMap))
 	}
 }
 

@@ -210,10 +210,9 @@ func makePublishProperties(properties *PublishProperties) (*mqtt.MessageProperti
 		publishProperties.CorrelationData = correlationData
 	}
 
-	if properties.SubscriptionIdentifier > -1 {
-		subscriptionIdentifier := int(properties.SubscriptionIdentifier)
-		publishProperties.SubscriptionIdentifier = &subscriptionIdentifier
-	}
+	// properties.SubscriptionIdentifier is intentionally ignored — it is a
+	// broker-to-client property and must not appear in a client PUBLISH
+	// [MQTT-3.3.4-6].
 
 	if properties.UserProperties != nil {
 		publishProperties.UserProperties = properties.UserProperties

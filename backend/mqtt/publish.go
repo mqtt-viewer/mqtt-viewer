@@ -77,6 +77,10 @@ func (mm *MqttManager) publishV5(params MqttPublishParams) error {
 	}
 	var publishProperties *paho.PublishProperties
 	if params.Properties != nil {
+		// SubscriptionIdentifier is deliberately not forwarded: a PUBLISH sent
+		// from a client to a server must not contain one [MQTT-3.3.4-6], and
+		// spec-enforcing brokers (e.g. mosquitto >= 2.1) disconnect with a
+		// protocol error if it is present.
 		publishProperties = &paho.PublishProperties{
 			CorrelationData: params.Properties.CorrelationData,
 			ContentType:     params.Properties.ContentType,
@@ -84,10 +88,6 @@ func (mm *MqttManager) publishV5(params MqttPublishParams) error {
 			PayloadFormat:   params.Properties.PayloadFormat,
 			MessageExpiry:   params.Properties.MessageExpiry,
 			TopicAlias:      params.Properties.TopicAlias,
-		}
-
-		if params.Properties.SubscriptionIdentifier != nil && *params.Properties.SubscriptionIdentifier != 0 {
-			publishProperties.SubscriptionIdentifier = params.Properties.SubscriptionIdentifier
 		}
 
 		if params.Properties.UserProperties != nil {
