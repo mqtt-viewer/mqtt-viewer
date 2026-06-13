@@ -32,6 +32,50 @@
   let paused = false;
   let depth = 1;
 
+  // persisted view preferences
+  const SETTINGS_KEY = "mqtt-viewer-topicgraph-settings";
+  let minimapOn = true;
+  let followHottest = false;
+  let cvdSafe = false;
+  let cooldownMs = 60000;
+  const COOLDOWNS: Array<[string, number]> = [
+    ["30s", 30000],
+    ["1m", 60000],
+    ["5m", 300000],
+    ["1h", 3600000],
+  ];
+
+  const loadSettings = () => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (typeof s.minimapOn === "boolean") minimapOn = s.minimapOn;
+      if (typeof s.followHottest === "boolean") followHottest = s.followHottest;
+      if (typeof s.cvdSafe === "boolean") cvdSafe = s.cvdSafe;
+      if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
+    } catch (e) {
+      console.error("topic-graph settings load failed", e);
+    }
+  };
+  const saveSettings = () => {
+    try {
+      localStorage.setItem(
+        SETTINGS_KEY,
+        JSON.stringify({ minimapOn, followHottest, cvdSafe, cooldownMs })
+      );
+    } catch (e) {
+      console.error("topic-graph settings save failed", e);
+    }
+  };
+  const applySettings = () => {
+    if (!renderer) return;
+    renderer.setMinimapVisible(minimapOn);
+    renderer.setFollowHottest(followHottest);
+    renderer.setCvdSafe(cvdSafe);
+    renderer.setCooldownMs(cooldownMs);
+  };
+
   const seed = (data: MqttData) => {
     const walk = (d: MqttData) => {
       for (const key of Object.keys(d)) {
@@ -55,6 +99,7 @@
   $: if (renderer) renderer.setSelected($selectedTopicStore.selectedTopic);
 
   onMount(async () => {
+    loadSettings();
     const w = containerEl.clientWidth || width || 800;
     const h = containerEl.clientHeight || 600;
     renderer = new TopicGraphRenderer(model, {
@@ -67,6 +112,7 @@
     });
     await renderer.init(canvasEl, w, h);
     applyTheme($theme);
+    applySettings();
     seed(initialData);
     renderer.expandToDepth(depth);
     renderer.setSelected($selectedTopicStore.selectedTopic);
@@ -126,6 +172,26 @@
   const togglePause = () => {
     paused = !paused;
   };
+  const toggleMinimap = () => {
+    minimapOn = !minimapOn;
+    renderer?.setMinimapVisible(minimapOn);
+    saveSettings();
+  };
+  const toggleFollow = () => {
+    followHottest = !followHottest;
+    renderer?.setFollowHottest(followHottest);
+    saveSettings();
+  };
+  const toggleCvd = () => {
+    cvdSafe = !cvdSafe;
+    renderer?.setCvdSafe(cvdSafe);
+    saveSettings();
+  };
+  const onCooldown = (e: Event) => {
+    cooldownMs = Number((e.target as HTMLSelectElement).value);
+    renderer?.setCooldownMs(cooldownMs);
+    saveSettings();
+  };
   const toggleFullscreen = () => {
     const el = containerEl?.parentElement ?? containerEl;
     if (!document.fullscreenElement) el?.requestFullscreen?.();
@@ -164,6 +230,19 @@
       {paused ? "paused" : "live"}
     </button>
     <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" on:click={() => renderer?.fitView()}>fit</button>
+    <select
+      class="rounded-md border border-outline bg-elevation-1 px-2 py-1 text-white-text outline-none"
+      value={cooldownMs}
+      on:change={onCooldown}
+      title="recency cooldown duration"
+    >
+      {#each COOLDOWNS as [lbl, ms]}
+        <option value={ms}>cool: {lbl}</option>
+      {/each}
+    </select>
+    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={followHottest} on:click={toggleFollow} title="auto-pan to the hottest topic">follow</button>
+    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={minimapOn} on:click={toggleMinimap} title="toggle minimap">minimap</button>
+    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={cvdSafe} on:click={toggleCvd} title="colour-vision-safe palette">cvd</button>
     <button class="ml-auto rounded-md border border-outline px-2 py-1 hover:text-white-text" on:click={toggleFullscreen}>fullscreen</button>
   </div>
   <div bind:this={containerEl} class="relative min-h-0 w-full grow">

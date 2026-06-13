@@ -14,6 +14,14 @@ const STOPS: Array<[number, RGB]> = [
   [0.78, { r: 61, g: 111, b: 165 }], // blue — cold
 ];
 
+// Colour-vision-safe alternate ramp (blue↔orange; avoids red/green confusion).
+const CVD_STOPS: Array<[number, RGB]> = [
+  [0.0, { r: 242, g: 142, b: 44 }], // orange — just now
+  [0.3, { r: 226, g: 197, b: 79 }], // yellow
+  [0.62, { r: 120, g: 170, b: 200 }], // light blue
+  [0.85, { r: 61, g: 111, b: 165 }], // blue
+];
+
 export const COLD_ENDPOINT_DARK: RGB = { r: 236, g: 234, b: 231 }; // near-white
 export const COLD_ENDPOINT_LIGHT: RGB = { r: 111, g: 143, b: 176 }; // dim blue
 
@@ -32,9 +40,14 @@ function ageToT(ageMs: number, cooldownMs: number): number {
   return Math.max(0, Math.min(1, t));
 }
 
-export function colorForAge(ageMs: number, cooldownMs: number, endpoint: RGB): RGB {
+export function colorForAge(
+  ageMs: number,
+  cooldownMs: number,
+  endpoint: RGB,
+  cvdSafe = false
+): RGB {
   const t = ageToT(ageMs, cooldownMs);
-  const stops: Array<[number, RGB]> = [...STOPS, [1.0, endpoint]];
+  const stops: Array<[number, RGB]> = [...(cvdSafe ? CVD_STOPS : STOPS), [1.0, endpoint]];
   for (let i = 0; i < stops.length - 1; i++) {
     const [p0, c0] = stops[i];
     const [p1, c1] = stops[i + 1];
@@ -54,8 +67,13 @@ export function packRGB(c: RGB): number {
   return (r << 16) | (g << 8) | b;
 }
 
-export function tintForAge(ageMs: number, cooldownMs: number, endpoint: RGB): number {
-  return packRGB(colorForAge(ageMs, cooldownMs, endpoint));
+export function tintForAge(
+  ageMs: number,
+  cooldownMs: number,
+  endpoint: RGB,
+  cvdSafe = false
+): number {
+  return packRGB(colorForAge(ageMs, cooldownMs, endpoint, cvdSafe));
 }
 
 // ---- EWMA decaying-score rate estimator ----

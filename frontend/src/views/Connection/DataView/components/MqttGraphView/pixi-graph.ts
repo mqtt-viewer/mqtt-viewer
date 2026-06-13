@@ -39,6 +39,8 @@ interface NodeVisual {
   badge: Text | null;
   node: TopicNode;
   expanded: boolean;
+  tx: number; // target x (animated toward)
+  ty: number; // target y
 }
 
 export class TopicGraphRenderer {
@@ -64,6 +66,18 @@ export class TopicGraphRenderer {
   private sortKey: SortKey = "rate";
   private filter = "";
   private selected: string | null = null;
+  private cvdSafe = false;
+  private followHottest = false;
+  private followTarget: string | null = null;
+
+  private edges: Array<[NodeVisual, NodeVisual]> = [];
+  private minimap = new Container();
+  private minimapBg = new Graphics();
+  private minimapDots = new Graphics();
+  private minimapView = new Graphics();
+  private minimapW = 210;
+  private minimapH = 140;
+  private minimapVisible = true;
 
   private dragging = false;
   private dragMoved = false;
@@ -100,8 +114,20 @@ export class TopicGraphRenderer {
     this.app.stage.addChild(this.world);
     this.world.position.set(60, height / 2);
 
+    // minimap lives in screen space, above the world
+    this.minimap.addChild(this.minimapBg, this.minimapDots, this.minimapView);
+    this.app.stage.addChild(this.minimap);
+    this.positionMinimap();
+
     this.installPanZoom(canvas);
     this.app.ticker.add(() => this.frame());
+  }
+
+  private positionMinimap(): void {
+    this.minimap.position.set(
+      this.app.screen.width - this.minimapW - 14,
+      this.app.screen.height - this.minimapH - 14
+    );
   }
 
   setEndpoint(rgb: RGB): void {
@@ -124,6 +150,20 @@ export class TopicGraphRenderer {
   }
   setSelected(topic: string | null): void {
     this.selected = topic;
+  }
+  setCvdSafe(on: boolean): void {
+    this.cvdSafe = on;
+  }
+  setCooldownMs(ms: number): void {
+    this.cooldownMs = ms;
+  }
+  setFollowHottest(on: boolean): void {
+    this.followHottest = on;
+    if (!on) this.followTarget = null;
+  }
+  setMinimapVisible(on: boolean): void {
+    this.minimapVisible = on;
+    this.minimap.visible = on;
   }
 
   expandToDepth(depth: number): void {
@@ -200,6 +240,7 @@ export class TopicGraphRenderer {
   resize(width: number, height: number): void {
     this.app.renderer.resize(width, height);
     this.app.stage.hitArea = this.app.screen;
+    this.positionMinimap();
   }
 
   // Fit the current content into the viewport, top-aligned below `topMargin`.
@@ -231,9 +272,18 @@ export class TopicGraphRenderer {
     for (const pn of res.nodes) {
       seen.add(pn.node.topic);
       let v = this.visuals.get(pn.node.topic);
-      if (!v) v = this.createVisual(pn.node);
+      if (!v) {
+        v = this.createVisual(pn.node);
+        // new nodes slide out from their parent's current position
+        const parent = pn.node.parent
+          ? this.visuals.get(pn.node.parent.topic)
+          : undefined;
+        if (parent) v.container.position.set(parent.container.x, parent.container.y);
+        else v.container.position.set(pn.x, pn.y);
+      }
       v.expanded = pn.expanded;
-      v.container.position.set(pn.x, pn.y);
+      v.tx = pn.x;
+      v.ty = pn.y;
       this.updateCaretAndBadge(v);
     }
     // remove visuals no longer present
@@ -244,17 +294,15 @@ export class TopicGraphRenderer {
       }
     }
 
-    // redraw edges (orthogonal elbows)
-    this.edgeLayer.clear();
-    for (const e of res.edges) {
-      const midX = e.x2 - 18;
-      this.edgeLayer
-        .moveTo(e.x1, e.y1)
-        .lineTo(midX, e.y1)
-        .lineTo(midX, e.y2)
-        .lineTo(e.x2, e.y2);
+    // edges as node-pair refs; positions resolved per-frame so they track animation
+    this.edges = [];
+    for (const pn of res.nodes) {
+      const parentNode = pn.node.parent;
+      if (!parentNode || parentNode === this.model.root) continue;
+      const cv = this.visuals.get(pn.node.topic);
+      const pv = this.visuals.get(parentNode.topic);
+      if (cv && pv) this.edges.push([pv, cv]);
     }
-    this.edgeLayer.stroke({ width: 1.25, color: 0x8a8a8a, alpha: 0.28 });
   }
 
   private createVisual(node: TopicNode): NodeVisual {
@@ -282,7 +330,7 @@ export class TopicGraphRenderer {
     label.anchor.set(0, 0.5);
     container.addChild(label);
 
-    const v: NodeVisual = { container, circle, label, caret: null, badge: null, node, expanded: node.expanded };
+    const v: NodeVisual = { container, circle, label, caret: null, badge: null, node, expanded: node.expanded, tx: 0, ty: 0 };
     this.nodeLayer.addChild(container);
     this.visuals.set(node.topic, v);
     return v;
@@ -333,7 +381,21 @@ export class TopicGraphRenderer {
   private frame(): void {
     const nowMs = Date.now();
     const showLabels = this.world.scale.x >= 0.55;
+    let hottestTopic: string | null = null;
+    let hottestMs = -1;
+
     for (const v of this.visuals.values()) {
+      // ease position toward target (animated reflow on sort/expand/filter)
+      const dx = v.tx - v.container.x;
+      const dy = v.ty - v.container.y;
+      if (Math.abs(dx) + Math.abs(dy) > 0.4) {
+        v.container.x += dx * 0.25;
+        v.container.y += dy * 0.25;
+      } else {
+        v.container.x = v.tx;
+        v.container.y = v.ty;
+      }
+
       const score = v.expanded
         ? this.model.ownScore(v.node, nowMs)
         : this.model.aggScore(v.node, nowMs);
@@ -341,13 +403,43 @@ export class TopicGraphRenderer {
       const r = radiusForScore(score, this.rMin, this.rMax, this.k);
       v.circle.scale.set(r / TEX_R);
       const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
-      v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint);
+      v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe);
 
       v.label.x = r + 7;
       v.label.visible = showLabels;
       if (v.badge && v.badge.visible) {
         v.badge.x = r + 9 + v.label.width + 8;
         v.badge.visible = showLabels;
+      }
+
+      if (lastMsg > hottestMs) {
+        hottestMs = lastMsg;
+        hottestTopic = v.node.topic;
+      }
+    }
+
+    // edges: orthogonal elbows resolved from current (animated) node centres
+    this.edgeLayer.clear();
+    for (const [p, c] of this.edges) {
+      const midX = c.container.x - 18;
+      this.edgeLayer
+        .moveTo(p.container.x, p.container.y)
+        .lineTo(midX, p.container.y)
+        .lineTo(midX, c.container.y)
+        .lineTo(c.container.x, c.container.y);
+    }
+    this.edgeLayer.stroke({ width: 1.25, color: 0x8a8a8a, alpha: 0.28 });
+
+    // follow-hottest: ease the viewport so the most-recent topic stays centred
+    if (this.followHottest && hottestTopic) {
+      if (hottestMs > 0) this.followTarget = hottestTopic;
+      const v = this.followTarget ? this.visuals.get(this.followTarget) : undefined;
+      if (v) {
+        const s = this.world.scale.x;
+        const targetX = this.app.screen.width / 2 - v.container.x * s;
+        const targetY = this.app.screen.height / 2 - v.container.y * s;
+        this.world.position.x += (targetX - this.world.position.x) * 0.08;
+        this.world.position.y += (targetY - this.world.position.y) * 0.08;
       }
     }
 
@@ -361,6 +453,48 @@ export class TopicGraphRenderer {
         this.selectionRing.stroke({ width: 2, color: 0xece9e7, alpha: 0.9 });
       }
     }
+
+    if (this.minimapVisible) this.drawMinimap(nowMs);
+  }
+
+  private drawMinimap(nowMs: number): void {
+    const pad = 8;
+    const innerW = this.minimapW - pad * 2;
+    const innerH = this.minimapH - pad * 2;
+    // background
+    this.minimapBg.clear();
+    this.minimapBg.roundRect(0, 0, this.minimapW, this.minimapH, 8).fill({ color: 0x000000, alpha: 0.32 });
+    this.minimapBg.roundRect(0, 0, this.minimapW, this.minimapH, 8).stroke({ width: 1, color: 0x8a8a8a, alpha: 0.3 });
+
+    const cw = Math.max(1, this.contentW + this.colW);
+    const ch = Math.max(1, this.contentH + this.rMax * 2);
+    const s = Math.min(innerW / cw, innerH / ch);
+
+    this.minimapDots.clear();
+    for (const v of this.visuals.values()) {
+      const x = pad + v.tx * s;
+      const y = pad + v.ty * s;
+      const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
+      const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
+      this.minimapDots.circle(x, y, 1.6).fill({ color: tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe), alpha: 0.85 });
+    }
+
+    // viewport rectangle (visible world region mapped into the minimap)
+    const tl = this.world.toLocal({ x: 0, y: 0 });
+    const br = this.world.toLocal({ x: this.app.screen.width, y: this.app.screen.height });
+    const vx = pad + tl.x * s;
+    const vy = pad + tl.y * s;
+    const vw = (br.x - tl.x) * s;
+    const vh = (br.y - tl.y) * s;
+    this.minimapView.clear();
+    this.minimapView
+      .rect(
+        Math.max(pad, vx),
+        Math.max(pad, vy),
+        Math.min(innerW, vw),
+        Math.min(innerH, vh)
+      )
+      .stroke({ width: 1.5, color: 0xe8833a, alpha: 0.9 });
   }
 
   destroy(): void {
