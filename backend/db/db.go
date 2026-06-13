@@ -81,9 +81,14 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 	// avoid an fsync per transaction, which matters once received messages are
 	// persisted in batches at broker rates. busy_timeout keeps writers waiting
 	// rather than erroring under contention.
+	// auto_vacuum=INCREMENTAL lets pruned message pages be released back to the
+	// OS via `PRAGMA incremental_vacuum` so the file tracks the disk budget.
+	// On databases created before this setting it is a no-op until a VACUUM;
+	// pruning still bounds *live* data either way (see prune logic).
 	dsn := dbPath + "?_pragma=busy_timeout(5000)" +
 		"&_pragma=journal_mode(WAL)" +
-		"&_pragma=synchronous(NORMAL)"
+		"&_pragma=synchronous(NORMAL)" +
+		"&_pragma=auto_vacuum(INCREMENTAL)"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: newLogger,
 	})

@@ -28,6 +28,9 @@ type App struct {
 	// whether to persist; kept in sync by loadRetentionSettings / UpdateAppSettings.
 	recordingEnabled atomic.Bool
 	diskBudgetBytes  atomic.Int64
+	// Throttles the (PRAGMA-based) disk-size check so it doesn't run on every
+	// 300ms drain. Unix-nano of the last prune check.
+	lastPruneCheckNanos atomic.Int64
 }
 
 type AppConnection struct {
