@@ -11,10 +11,13 @@
   export let onSearch: (() => void) | null = null;
 
   $: isConnected = connection.connectionState === "connected";
+  $: isBusy =
+    connection.connectionState === "connecting" ||
+    connection.connectionState === "reconnecting";
 
   const toggleConnect = async () => {
     try {
-      if (isConnected) {
+      if (isConnected || isBusy) {
         await connections.disconnect(connection.connectionDetails.id);
       } else {
         await connections.connect(connection.connectionDetails.id);
@@ -37,8 +40,10 @@
       <span class="text-base text-emphasis">{connection.latencyMs} ms</span>
       <span class="size-[5px] rounded-full bg-success"></span>
     </div>
+  {:else if isBusy}
+    <span class="size-[5px] rounded-full bg-warning mr-1"></span>
   {/if}
-  <Tooltip text={isConnected ? "Disconnect" : "Connect"}>
+  <Tooltip text={isConnected || isBusy ? "Disconnect" : "Connect"}>
     <IconButton onClick={toggleConnect}>
       <Icon type={isConnected ? "connected" : "disconnected"} size={16} />
     </IconButton>

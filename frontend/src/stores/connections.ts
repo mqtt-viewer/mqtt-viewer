@@ -33,6 +33,9 @@ export type Connection = DeepOmit<
   showDataPageWhileDisconnected: boolean;
   firstConnectedThisSessionAtMs?: number;
   latencyMs?: number;
+  // True only for a connection just created this session, until its details
+  // dialog has been shown once (see acknowledgeConnectionCreated).
+  justCreated?: boolean;
 };
 
 interface ConnectionStore {
@@ -232,6 +235,7 @@ const addConnection = async () => {
         connectionString,
         connectionState: "disconnected",
         showDataPageWhileDisconnected: false,
+        justCreated: true,
       };
       return store;
     });
@@ -272,6 +276,18 @@ const disconnect = async (connectionId: number) => {
   }
 };
 
+// Clears the just-created flag once the details dialog has auto-opened, so it
+// doesn't reopen on every remount.
+const acknowledgeConnectionCreated = (connectionId: number) => {
+  update((store) => {
+    const connection = store.connections[connectionId];
+    if (connection?.justCreated) {
+      store.connections[connectionId] = { ...connection, justCreated: false };
+    }
+    return store;
+  });
+};
+
 const toggleShowDataPageWhileDisconnected = (
   connectionId: number,
   on: boolean
@@ -293,6 +309,7 @@ export default {
   updateConnectionDetails,
   deleteConnection,
   toggleShowDataPageWhileDisconnected,
+  acknowledgeConnectionCreated,
   connect,
   disconnect,
 };

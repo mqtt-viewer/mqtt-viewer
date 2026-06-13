@@ -1,46 +1,75 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import Icon from "@/components/Icon/Icon.svelte";
-  import Dialog from "@/components/Dialog/Dialog.svelte";
-  import DialogActionBar from "@/components/Dialog/DialogActionBar.svelte";
-  import Button from "@/components/Button/Button.svelte";
-  import BaseInput from "@/components/InputFields/BaseInput.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import ConnectionIdenticon from "@/components/ConnectionIdenticon/ConnectionIdenticon.svelte";
   import ConfirmDeleteConnectionDialog from "@/views/Connection/ConnectionDetailsView/components/ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte";
   import connections, { type Connection } from "@/stores/connections";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import { capitalizeFirstLetter } from "@/util/strings";
   import { writable } from "svelte/store";
+  import InlineNameInput from "./InlineNameInput.svelte";
+  import ConnectionDetailsDialog from "./ConnectionDetailsDialog.svelte";
 
   export let connection: Connection;
 
-  let isRenameOpen = writable(false);
   let isDeleteOpen = writable(false);
-  let renameValue = "";
+  let isEditOpen = writable(false);
+  let isRenaming = false;
 
-  const showConnectionDetails = () => {
-    connections.toggleShowDataPageWhileDisconnected(
-      connection.connectionDetails.id,
-      false
-    );
-  };
+  $: details = connection.connectionDetails;
+  $: state = connection.connectionState;
+  $: isConnected = state === "connected";
+  $: isBusy = state === "connecting" || state === "reconnecting";
 
-  const openRename = () => {
-    renameValue = connection.connectionDetails.name;
-    $isRenameOpen = true;
-  };
+  // status text + dot colour shown at the top of the dropdown
+  $: statusColorClass = isConnected
+    ? "text-success"
+    : isBusy
+      ? "text-warning"
+      : "text-secondary-text";
+  $: statusLabel = isConnected
+    ? `Connected${connection.latencyMs !== undefined ? ` · ${connection.latencyMs} ms` : ""}`
+    : capitalizeFirstLetter(state);
 
-  const commitRename = async () => {
-    const name = renameValue.trim();
-    if (!name || name === connection.connectionDetails.name) {
-      $isRenameOpen = false;
+  // A connection just created this session opens straight into the details
+  // dialog so the user can configure it before connecting.
+  onMount(() => {
+    if (connection.justCreated) {
+      $isEditOpen = true;
+      connections.acknowledgeConnectionCreated(details.id);
+    }
+  });
+
+  const toggleConnect = async () => {
+    // An unconfigured connection can't connect — send them to set it up first.
+    if (!isConnected && !isBusy && !details.host) {
+      $isEditOpen = true;
       return;
     }
     try {
-      await connections.updateConnectionDetails({
-        ...connection.connectionDetails,
-        name,
+      if (isConnected || isBusy) {
+        await connections.disconnect(details.id);
+      } else {
+        await connections.connect(details.id);
+      }
+    } catch (e) {
+      addToast({
+        data: {
+          title: isConnected ? "Failed to disconnect" : "Failed to connect",
+          description: e as string,
+          type: "error",
+        },
       });
+    }
+  };
+
+  const commitRename = async (name: string) => {
+    isRenaming = false;
+    if (!name || name === details.name) return;
+    try {
+      await connections.updateConnectionDetails({ ...details, name });
     } catch (e) {
       addToast({
         data: {
@@ -50,12 +79,11 @@
         },
       });
     }
-    $isRenameOpen = false;
   };
 
   const deleteConnection = async () => {
     try {
-      await connections.deleteConnection(connection.connectionDetails.id);
+      await connections.deleteConnection(details.id);
     } catch (e) {
       addToast({
         data: {
@@ -69,48 +97,53 @@
 </script>
 
 <div class="px-3">
-  <DropdownMenu placement="bottom-start">
-    <div
-      slot="trigger"
-      class="flex items-center gap-2 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"
-    >
-      <div class="size-4 min-w-4"><ConnectionIdenticon {connection} /></div>
-      <span class="text-lg text-emphasis truncate">
-        {connection.connectionDetails.name}
-      </span>
-      <Icon type="down" size={10} />
-    </div>
-    <div class="flex flex-col" slot="menu-content">
-      <DropdownMenuItem onClick={showConnectionDetails}
-        >Connection details</DropdownMenuItem
+  {#if isRenaming}
+    <InlineNameInput
+      name="connection-name"
+      initialValue={details.name}
+      placeholder="Connection name"
+      onCommit={commitRename}
+      onCancel={() => (isRenaming = false)}
+    />
+  {:else}
+    <DropdownMenu placement="bottom-start">
+      <div
+        slot="trigger"
+        class="flex items-center gap-2 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"
       >
-      <DropdownMenuItem onClick={openRename}>Rename</DropdownMenuItem>
-      <DropdownMenuItem
-        class="hover:text-error"
-        onClick={() => ($isDeleteOpen = true)}>Delete</DropdownMenuItem
-      >
-    </div>
-  </DropdownMenu>
+        <div class="size-4 min-w-4"><ConnectionIdenticon {connection} /></div>
+        <span class="text-lg text-emphasis truncate">{details.name}</span>
+        <span class={`size-[6px] rounded-full ${isConnected ? "bg-success" : isBusy ? "bg-warning" : "bg-transparent"}`}
+        ></span>
+        <Icon type="down" size={10} />
+      </div>
+      <div class="flex flex-col min-w-[220px]" slot="menu-content">
+        <div class="px-2 pt-1 pb-2">
+          <div class="text-sm text-secondary-text truncate">
+            {connection.connectionString}
+          </div>
+          <div class={`text-sm ${statusColorClass}`}>{statusLabel}</div>
+        </div>
+        <div class="border-t border-divider my-1"></div>
+        <DropdownMenuItem onClick={toggleConnect}>
+          {isConnected || isBusy ? "Disconnect" : "Connect"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => ($isEditOpen = true)}>
+          Edit connection…
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => (isRenaming = true)}>
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          class="hover:text-error"
+          onClick={() => ($isDeleteOpen = true)}>Delete</DropdownMenuItem
+        >
+      </div>
+    </DropdownMenu>
+  {/if}
 </div>
 
-<Dialog title="Rename connection" isOpen={isRenameOpen} startEmpty>
-  <form
-    class="flex flex-col gap-4 min-w-[300px]"
-    on:submit|preventDefault={commitRename}
-  >
-    <BaseInput
-      bind:value={renameValue}
-      name="connection-name"
-      placeholder="Connection name"
-    />
-    <DialogActionBar>
-      <Button variant="secondary" on:click={() => ($isRenameOpen = false)}
-        >Cancel</Button
-      >
-      <Button type="submit">Rename</Button>
-    </DialogActionBar>
-  </form>
-</Dialog>
+<ConnectionDetailsDialog {connection} isOpen={isEditOpen} />
 
 <ConfirmDeleteConnectionDialog
   isOpen={isDeleteOpen}

@@ -1,8 +1,8 @@
 {
-  "$schema": "../../../design-system/component-spec.schema.json",
-  "name": "ConnectionHeaderBar",
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "ConnectionDetailsDialog",
   "tier": "view",
-  "description": "Storybook coverage for ConnectionHeaderBar.",
+  "description": "Storybook coverage for ConnectionDetailsDialog.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -18,15 +18,12 @@
       "required": true
     },
     {
-      "name": "connectionIsValid",
+      "name": "isOpen",
       "type": "boolean",
       "required": true
     }
   ],
-  "tokens": [
-    "secondary",
-    "secondary-text"
-  ],
+  "tokens": [],
   "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "notes": "Figma is not linked yet."
 }

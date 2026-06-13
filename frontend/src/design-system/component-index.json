@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-12T10:05:01.022Z",
+  "generatedAt": "2026-06-13T04:13:22.423Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2251,36 +2251,6 @@
       "specMissing": false
     },
     {
-      "name": "ConnectionDetailsView",
-      "tier": "view",
-      "description": "Storybook coverage for ConnectionDetailsView.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "connection",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "tokens": [
-        "elevation-1"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.svelte",
-      "specPath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.spec.json",
-      "storyPath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.stories.svelte",
-      "storyId": "Views/Connection/ConnectionDetailsView",
-      "specMissing": false
-    },
-    {
       "name": "ConfirmDeleteConnectionDialog",
       "tier": "view",
       "description": "Storybook coverage for ConfirmDeleteConnectionDialog.",
@@ -3662,6 +3632,39 @@
       "specMissing": false
     },
     {
+      "name": "ConnectionDetailsDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionDetailsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConnectionDetailsDialog",
+      "specMissing": false
+    },
+    {
       "name": "ConnectionRow",
       "tier": "view",
       "description": "Storybook coverage for ConnectionRow.",
@@ -4178,42 +4181,6 @@
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.stories.svelte",
       "storyId": "Views/Connection/DataView/Sidebar/SidebarTopBar",
-      "specMissing": false
-    },
-    {
-      "name": "ConnectionHeaderBar",
-      "tier": "view",
-      "description": "Storybook coverage for ConnectionHeaderBar.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "connection",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "connectionIsValid",
-          "type": "boolean",
-          "required": true
-        }
-      ],
-      "tokens": [
-        "secondary",
-        "secondary-text"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/components/ConnectionHeaderBar.svelte",
-      "specPath": "src/views/Connection/components/ConnectionHeaderBar.spec.json",
-      "storyPath": "src/views/Connection/components/ConnectionHeaderBar.stories.svelte",
-      "storyId": "Views/Connection/ConnectionHeaderBar",
       "specMissing": false
     },
     {

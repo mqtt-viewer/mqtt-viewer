@@ -70,14 +70,12 @@
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
 | Views/Connection | [x] | [ ] | [x] | [ ] |
-| Views/Connection/ConnectionDetailsView | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem | [x] | [ ] | [x] | [x] |
-| Views/Connection/ConnectionHeaderBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/MqttDataPanel | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree | [x] | [ ] | [x] | [ ] |
@@ -102,6 +100,7 @@
 | Views/Connection/DataView/Sidebar/CollectionFolder | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
@@ -125,7 +124,7 @@
 
 ## Summary
 
-- Components scanned: 99
-- Story present: 99
+- Components scanned: 98
+- Story present: 98
 - Figma-linked: 0
 - Missing specs: 0

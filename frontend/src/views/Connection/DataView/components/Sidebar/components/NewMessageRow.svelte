@@ -9,7 +9,7 @@
     class="flex items-center gap-2 w-full px-1 py-1 rounded text-white-text hover:bg-hovered"
     on:click={onClick}
   >
-    <Icon type="plusCircle" size={22} />
+    <span class="text-primary"><Icon type="plusCircle" size={22} /></span>
     <span class="text-base">New message</span>
   </button>
 </div>
