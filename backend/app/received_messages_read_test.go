@@ -23,7 +23,7 @@ func TestReceivedMessageWindowPagesNewestFirstInArrivalOrder(t *testing.T) {
 	app.recordReceivedMessages(conn.ConnectionDetails.ID, batch)
 
 	// Newest window of 10.
-	win1, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "seq", 0, 10)
+	win1, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "seq", 0, 0, 10)
 	if err != nil {
 		t.Fatalf("window 1: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestReceivedMessageWindowPagesNewestFirstInArrivalOrder(t *testing.T) {
 	smallestID := win1[0].Id
 	var beforeID uint
 	fmt.Sscanf(smallestID, "%d", &beforeID)
-	win2, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "seq", beforeID, 10)
+	win2, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "seq", beforeID, 0, 10)
 	if err != nil {
 		t.Fatalf("window 2: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestReceivedMessageWindowReconstructsProperties(t *testing.T) {
 	}
 	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
 
-	win, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "p", 0, 10)
+	win, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)
 	if err != nil || len(win) != 1 {
 		t.Fatalf("window: %v len=%d", err, len(win))
 	}

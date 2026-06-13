@@ -202,13 +202,18 @@ export function GetReceivedMessageCount(connectionID: number, topic: string): $C
 }
 
 /**
- * GetReceivedMessageWindow returns a page of a topic's durable history in
- * arrival (ascending) order. Pages newest-first via keyset pagination: pass
- * beforeID = 0 for the newest window, then the smallest id of the returned
- * page as beforeID to fetch the next-older window. limit <= 0 uses the default.
+ * GetReceivedMessageWindow returns a page of a topic's durable history, always
+ * in arrival (ascending) order, via keyset pagination on id:
+ * 
+ *   - afterID > 0:  the window immediately NEWER than afterID (id > afterID).
+ *   - else, beforeID > 0:  the window immediately OLDER than beforeID (id < beforeID).
+ *   - both 0:  the newest window.
+ * 
+ * So "load older" passes the window's smallest id as beforeID; "load newer"
+ * passes its largest id as afterID. limit <= 0 uses the default window size.
  */
-export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
-    return $Call.ByID(2230097254, connectionID, topic, beforeID, limit).then(($result: any) => {
+export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
+    return $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit).then(($result: any) => {
         return $$createType15($result);
     });
 }

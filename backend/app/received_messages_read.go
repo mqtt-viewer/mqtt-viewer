@@ -10,15 +10,34 @@ import (
 // DefaultReceivedMessageWindow is the page size for timeline windowing.
 const DefaultReceivedMessageWindow = 5000
 
-// GetReceivedMessageWindow returns a page of a topic's durable history in
-// arrival (ascending) order. Pages newest-first via keyset pagination: pass
-// beforeID = 0 for the newest window, then the smallest id of the returned
-// page as beforeID to fetch the next-older window. limit <= 0 uses the default.
-func (a *App) GetReceivedMessageWindow(connectionID uint, topic string, beforeID uint, limit int) ([]mqtt.MqttMessage, error) {
+// GetReceivedMessageWindow returns a page of a topic's durable history, always
+// in arrival (ascending) order, via keyset pagination on id:
+//
+//   - afterID > 0:  the window immediately NEWER than afterID (id > afterID).
+//   - else, beforeID > 0:  the window immediately OLDER than beforeID (id < beforeID).
+//   - both 0:  the newest window.
+//
+// So "load older" passes the window's smallest id as beforeID; "load newer"
+// passes its largest id as afterID. limit <= 0 uses the default window size.
+func (a *App) GetReceivedMessageWindow(connectionID uint, topic string, beforeID uint, afterID uint, limit int) ([]mqtt.MqttMessage, error) {
 	if limit <= 0 {
 		limit = DefaultReceivedMessageWindow
 	}
 	query := a.Db.Where("connection_id = ? AND topic = ?", connectionID, topic)
+
+	if afterID > 0 {
+		// Forward window: oldest-first is already arrival order.
+		var rows []models.ReceivedMessage
+		if err := query.Where("id > ?", afterID).Order("id asc").Limit(limit).Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		out := make([]mqtt.MqttMessage, len(rows))
+		for i := range rows {
+			out[i] = mqttMessageFromReceived(&rows[i])
+		}
+		return out, nil
+	}
+
 	if beforeID > 0 {
 		query = query.Where("id < ?", beforeID)
 	}
@@ -26,10 +45,10 @@ func (a *App) GetReceivedMessageWindow(connectionID uint, topic string, beforeID
 	if err := query.Order("id desc").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	// rows are newest-first; reverse to arrival order for the timeline.
+	// Newest-first from the query; reverse to arrival order for the timeline.
 	out := make([]mqtt.MqttMessage, len(rows))
-	for i, row := range rows {
-		out[len(rows)-1-i] = mqttMessageFromReceived(&row)
+	for i := range rows {
+		out[len(rows)-1-i] = mqttMessageFromReceived(&rows[i])
 	}
 	return out, nil
 }
