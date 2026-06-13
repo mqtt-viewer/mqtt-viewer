@@ -33,11 +33,14 @@ function lerpRGB(a: RGB, b: RGB, f: number): RGB {
   return { r: lerp(a.r, b.r, f), g: lerp(a.g, b.g, f), b: lerp(a.b, b.b, f) };
 }
 
-// Non-linear age->ramp position so the first seconds get visual room.
+// Age -> ramp position. Linear so a topic stays warm while it's actively
+// publishing and only cools toward the cold endpoint as it genuinely idles:
+// a 2 msg/s topic (gaps < 0.5s) reads red; one stale ~half the cooldown reads
+// teal; one stale a full cooldown reads cold. (A log curve cooled far too fast
+// — 1s stale already mapped past teal — so everything looked permanently cold.)
 function ageToT(ageMs: number, cooldownMs: number): number {
-  if (ageMs <= 0) return 0;
-  const t = Math.log1p(ageMs) / Math.log1p(cooldownMs);
-  return Math.max(0, Math.min(1, t));
+  if (ageMs <= 0 || cooldownMs <= 0) return 0;
+  return Math.max(0, Math.min(1, ageMs / cooldownMs));
 }
 
 export function colorForAge(

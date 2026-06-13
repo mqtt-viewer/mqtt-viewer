@@ -57,9 +57,12 @@ export class TopicGraphRenderer {
   rowH = 34;
   colW = 240;
   cooldownMs = 60000;
-  rMin = 4;
-  rMax = 22;
-  k = 3.0;
+  // size = rMin + k·√(EWMA score). Tuned to the typical score range (idle ~0,
+  // a 0.1 msg/s topic ~1.4, ~0.5/s ~7, a busy 2/s leaf ~28, a spike caps out):
+  // structural/idle ≈ rMin, mid ≈ 10-12, busy ≈ 16, anything hotter clamps at rMax.
+  rMin = 3.5;
+  rMax = 20;
+  k = 2.4;
 
   private endpoint: RGB = COLD_ENDPOINT_DARK;
   private textColor = 0xbdb7b0;

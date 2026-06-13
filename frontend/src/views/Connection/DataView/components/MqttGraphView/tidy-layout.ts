@@ -100,7 +100,13 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
   const h = hierarchy<TopicNode>(model.root, childrenAccessor);
   const layout = tree<TopicNode>()
     .nodeSize([rowH, colW])
-    .separation((a, b) => (a.parent === b.parent ? 1 : 1.25));
+    .separation((a, b) => {
+      // top-level topics (depth 1 under the synthetic root) get extra breathing
+      // room so distinct namespaces read as separate groups and shallow chains
+      // don't collide; deeper siblings pack tighter.
+      if (a.depth === 1 && b.depth === 1) return 1.9;
+      return a.parent === b.parent ? 1 : 1.4;
+    });
   const rootPoint = layout(h);
 
   const all = rootPoint.descendants();
