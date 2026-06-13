@@ -33,8 +33,11 @@ func (a *App) UpdateAppSettings(params UpdateAppSettingsParams) (models.AppSetti
 	if err := a.Db.Save(&settings).Error; err != nil {
 		return models.AppSettings{}, err
 	}
-	// Apply the (possibly changed) in-RAM budget live to every connection.
+	// Apply the (possibly changed) in-RAM budget live to every connection, and
+	// refresh the cached recording flag + disk budget read on the drain path.
 	a.applyMemoryBudgetToAllConnections(settings.MemoryBudgetBytes)
+	a.recordingEnabled.Store(settings.RecordingEnabled)
+	a.diskBudgetBytes.Store(settings.DiskBudgetBytes)
 	return settings, nil
 }
 

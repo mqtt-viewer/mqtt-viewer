@@ -95,6 +95,10 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 		panic(err)
 	}
 
+	// Prime cached retention settings (recording flag + disk budget) used on
+	// the message-buffer drain hot path.
+	a.loadRetentionSettings()
+
 	go func() {
 		err := protobuf.WriteSparkplugProtoFiles(a.Paths.ResourcePath)
 		if err != nil {
@@ -186,6 +190,9 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					if a.Mode != AppModes.Test {
 						a.EventRuntime.EventsEmit(appConnection.EventSet.MqttMessages, messages)
 					}
+					// Durably persist the batch when recording is enabled.
+					// One transaction per drain — no per-message fsync.
+					a.recordReceivedMessages(appConnection.ConnectionId, messages)
 				})
 				if a.Mode != AppModes.Test {
 					a.EventRuntime.EventsEmit(appConnection.EventSet.MqttConnected, nil)
