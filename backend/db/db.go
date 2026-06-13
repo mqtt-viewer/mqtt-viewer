@@ -83,9 +83,12 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 	// avoid an fsync per transaction, which matters once received messages are
 	// persisted in batches at broker rates. busy_timeout keeps writers waiting
 	// rather than erroring under contention.
+	// foreign_keys is per-connection and defaults OFF, so it must be in the DSN
+	// (applied to every pooled connection), not a one-off Exec on a single one.
 	dsn := dbPath + "?_pragma=busy_timeout(5000)" +
 		"&_pragma=journal_mode(WAL)" +
-		"&_pragma=synchronous(NORMAL)"
+		"&_pragma=synchronous(NORMAL)" +
+		"&_pragma=foreign_keys(1)"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: newLogger,
 	})

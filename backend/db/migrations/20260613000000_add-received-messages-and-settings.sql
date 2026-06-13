@@ -7,7 +7,7 @@ CREATE TABLE `app_settings` (
   `has_seen_history_prompt` numeric NULL
 );
 -- Seed defaults: 512 MB in-RAM budget, recording off, 1 GB disk budget.
-INSERT INTO `app_settings` (`id`, `memory_budget_bytes`, `recording_enabled`, `disk_budget_bytes`, `has_seen_history_prompt`)
+INSERT OR IGNORE INTO `app_settings` (`id`, `memory_budget_bytes`, `recording_enabled`, `disk_budget_bytes`, `has_seen_history_prompt`)
 VALUES (1, 536870912, 0, 1073741824, 0);
 -- Create "received_messages" table (durable, opt-in message history)
 CREATE TABLE `received_messages` (
@@ -30,8 +30,8 @@ CREATE TABLE `received_messages` (
   `received_at` datetime NULL,
   CONSTRAINT `fk_connections_received_messages` FOREIGN KEY (`connection_id`) REFERENCES `connections` (`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
 );
--- Per-topic paged lookup: WHERE connection_id=? AND topic=? ORDER BY id DESC,
--- with keyset pagination on id. Covering the id column keeps window scans fast.
+-- Per-topic paged lookup: WHERE connection_id=? AND topic=? ORDER BY id DESC/ASC,
+-- with keyset pagination on id. Its leftmost prefix (connection_id) also serves
+-- the per-connection cascade deletes. Prune deletes oldest globally by id, which
+-- uses the integer primary key (rowid) directly, so no extra index is needed.
 CREATE INDEX `received_messages_conn_topic_id` ON `received_messages` (`connection_id`, `topic`, `id`);
--- Global oldest-first scans for prune-to-budget.
-CREATE INDEX `received_messages_conn_id` ON `received_messages` (`connection_id`, `id`);

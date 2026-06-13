@@ -102,6 +102,12 @@ export const createSelectedTopicStore = (
       const decoded = forTopic.map(decode);
       if (store.onNewMessages !== null) store.onNewMessages(decoded);
       update((s) => {
+        // Live messages carry their receive-time UUID, while disk rows carry
+        // numeric ids. We only ever page the keyset by disk id, so a live
+        // message's UUID resolves to 0 here and never moves the cursor — the
+        // newestId stays the largest real disk id. Mixed ids in `history` are
+        // fine for display/selection (all unique); never derive the cursor
+        // from history[last].id, always from window.newestId.
         const window =
           s.window === null
             ? null
