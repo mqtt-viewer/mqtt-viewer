@@ -20,6 +20,26 @@ type MqttMessage struct {
 	Time                 time.Time
 }
 
+// estimatedBytes approximates the heap cost of retaining this message, used to
+// keep the in-memory history under its byte budget. It need not be exact —
+// just proportional and dominated by the variable parts (payload, topic,
+// properties) so eviction tracks real memory growth.
+func (m *MqttMessage) estimatedBytes() int {
+	// Fixed per-message overhead: struct fields, id/uuid, time.Time, and the
+	// always-allocated property/middleware map headers for v5 messages.
+	const baseOverhead = 256
+	n := baseOverhead + len(m.Topic) + len(m.Payload) + len(m.Id)
+	if m.Properties != nil {
+		n += len(m.Properties.CorrelationData) +
+			len(m.Properties.ContentType) +
+			len(m.Properties.ResponseTopic)
+		for key, value := range m.Properties.UserProperties {
+			n += len(key) + len(value) + 16
+		}
+	}
+	return n
+}
+
 type MessageProperties struct {
 	CorrelationData        []byte            `json:"correlationData"`
 	ContentType            string            `json:"contentType"`

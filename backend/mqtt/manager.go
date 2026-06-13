@@ -57,7 +57,12 @@ func (m *MqttManager) SetConnectionCallbacks(callbacks MqttConnectionCallbacks) 
 }
 
 func (m *MqttManager) ClearConnectionHistory() {
-	m.MessageHistory = newMessageHistory()
+	m.MessageHistory.Clear()
+}
+
+// SetMessageMemoryBudget bounds the in-RAM message history for this connection.
+func (m *MqttManager) SetMessageMemoryBudget(budgetBytes int64) {
+	m.MessageHistory.SetBudgetBytes(budgetBytes)
 }
 
 func (m *MqttManager) SetConnectionState(state ConnectionState, reason *error) {
