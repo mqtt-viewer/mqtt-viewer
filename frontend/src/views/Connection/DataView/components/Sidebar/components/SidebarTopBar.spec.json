@@ -1,0 +1,39 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "SidebarTopBar",
+  "tier": "view",
+  "description": "Storybook coverage for SidebarTopBar.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "collapseSidebar",
+      "type": "string",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onSearch",
+      "type": "function",
+      "required": false,
+      "default": "> void) | null = null"
+    }
+  ],
+  "tokens": [
+    "emphasis",
+    "success"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

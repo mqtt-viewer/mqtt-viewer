@@ -1,0 +1,45 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "SidebarCollapsedRail",
+  "tier": "view",
+  "description": "Storybook coverage for SidebarCollapsedRail.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "expand",
+      "type": "string",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onNewMessage",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onSearch",
+      "type": "function",
+      "required": false,
+      "default": "> void) | null = null"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "success"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

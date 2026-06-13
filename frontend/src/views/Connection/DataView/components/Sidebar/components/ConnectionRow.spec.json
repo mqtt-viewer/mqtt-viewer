@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "ConnectionRow",
+  "tier": "view",
+  "description": "Storybook coverage for ConnectionRow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "emphasis",
+    "hovered",
+    "error"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

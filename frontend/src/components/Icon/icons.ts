@@ -43,6 +43,10 @@ import {
   Info,
   Sun,
   Moon,
+  SidebarSimple,
+  DotsThree,
+  ArrowLeft,
+  PlusCircle,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -63,6 +67,7 @@ export const ICON_MAP = {
   warning: Warning,
   message: EnvelopeSimple,
   menu: DotsThreeOutlineVertical,
+  menuDots: DotsThree,
   info: Info,
   lightMode: Sun,
   darkMode: Moon,
@@ -81,6 +86,9 @@ export const ICON_MAP = {
   expand: ArrowsOutSimple,
   plus: Plus,
   plusSquare: PlusSquare,
+  plusCircle: PlusCircle,
+  back: ArrowLeft,
+  sidebar: SidebarSimple,
   search: MagnifyingGlass,
   refresh: ArrowsClockwise,
   connect: Play,

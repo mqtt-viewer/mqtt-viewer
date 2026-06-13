@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-12T04:22:12.166Z",
+  "generatedAt": "2026-06-13T04:13:22.423Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2251,36 +2251,6 @@
       "specMissing": false
     },
     {
-      "name": "ConnectionDetailsView",
-      "tier": "view",
-      "description": "Storybook coverage for ConnectionDetailsView.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "connection",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "tokens": [
-        "elevation-1"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.svelte",
-      "specPath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.spec.json",
-      "storyPath": "src/views/Connection/ConnectionDetailsView/ConnectionDetailsView.stories.svelte",
-      "storyId": "Views/Connection/ConnectionDetailsView",
-      "specMissing": false
-    },
-    {
       "name": "ConfirmDeleteConnectionDialog",
       "tier": "view",
       "description": "Storybook coverage for ConfirmDeleteConnectionDialog.",
@@ -2869,66 +2839,6 @@
       "specMissing": false
     },
     {
-      "name": "PublishPanel",
-      "tier": "view",
-      "description": "Storybook coverage for PublishPanel.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "connection",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "isOpen",
-          "type": "boolean",
-          "required": true
-        },
-        {
-          "name": "isPublishDisabled",
-          "type": "boolean",
-          "required": true
-        },
-        {
-          "name": "open",
-          "type": "function",
-          "required": false,
-          "default": "> void"
-        },
-        {
-          "name": "close",
-          "type": "function",
-          "required": false,
-          "default": "> void"
-        },
-        {
-          "name": "getTopicMatchesSubscription",
-          "type": "function",
-          "required": true
-        }
-      ],
-      "tokens": [
-        "secondary",
-        "secondary-text",
-        "warning",
-        "elevation-1"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/PublishPanel.svelte",
-      "specPath": "src/views/Connection/DataView/components/PublishPanel/PublishPanel.spec.json",
-      "storyPath": "src/views/Connection/DataView/components/PublishPanel/PublishPanel.stories.svelte",
-      "storyId": "Views/Connection/DataView/PublishPanel",
-      "specMissing": false
-    },
-    {
       "name": "HeadersTab",
       "tier": "view",
       "description": "Storybook coverage for HeadersTab.",
@@ -3009,171 +2919,6 @@
       "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PayloadTab.spec.json",
       "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PayloadTab.stories.svelte",
       "storyId": "Views/Connection/DataView/PublishPanel/PayloadTab",
-      "specMissing": false
-    },
-    {
-      "name": "PublishHistory",
-      "tier": "view",
-      "description": "Storybook coverage for PublishHistory.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "publishHistoryStore",
-          "type": "store",
-          "required": true
-        }
-      ],
-      "tokens": [],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistory.svelte",
-      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistory.spec.json",
-      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistory.stories.svelte",
-      "storyId": "Views/Connection/DataView/PublishPanel/PublishHistory",
-      "specMissing": false
-    },
-    {
-      "name": "PublishHistoryItem",
-      "tier": "view",
-      "description": "Storybook coverage for PublishHistoryItem.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "topic",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "payload",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "retain",
-          "type": "boolean",
-          "required": true
-        },
-        {
-          "name": "timestamp",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "searchString",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "encoding",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "format",
-          "type": "enum",
-          "required": true,
-          "options": [
-            "none",
-            "json",
-            "json-prettier",
-            "xml"
-          ]
-        },
-        {
-          "name": "onClick",
-          "type": "function",
-          "required": false,
-          "default": "> void"
-        },
-        {
-          "name": "onCrossClick",
-          "type": "function",
-          "required": false,
-          "default": "> void"
-        }
-      ],
-      "tokens": [
-        "secondary",
-        "white-text",
-        "secondary-text",
-        "hovered"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistoryItem.svelte",
-      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistoryItem.spec.json",
-      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/PublishHistoryItem.stories.svelte",
-      "storyId": "Views/Connection/DataView/PublishPanel/PublishHistory/PublishHistoryItem",
-      "specMissing": false
-    },
-    {
-      "name": "SearchableText",
-      "tier": "view",
-      "description": "Storybook coverage for SearchableText.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [
-        {
-          "name": "text",
-          "type": "string",
-          "required": false,
-          "default": ""
-        },
-        {
-          "name": "syntaxHighlight",
-          "type": "boolean",
-          "required": false,
-          "default": false
-        },
-        {
-          "name": "isTopic",
-          "type": "boolean",
-          "required": false,
-          "default": false
-        },
-        {
-          "name": "searchTerm",
-          "type": "string",
-          "required": false,
-          "default": ""
-        },
-        {
-          "name": "config",
-          "type": "object",
-          "required": false,
-          "default": "{"
-        }
-      ],
-      "tokens": [
-        "secondary",
-        "secondary-text"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/SearchableText.svelte",
-      "specPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/SearchableText.spec.json",
-      "storyPath": "src/views/Connection/DataView/components/PublishPanel/components/PublishHistory/SearchableText.stories.svelte",
-      "storyId": "Views/Connection/DataView/PublishPanel/PublishHistory/SearchableText",
       "specMissing": false
     },
     {
@@ -3635,9 +3380,9 @@
       "specMissing": false
     },
     {
-      "name": "ConnectionHeaderBar",
+      "name": "Sidebar",
       "tier": "view",
-      "description": "Storybook coverage for ConnectionHeaderBar.",
+      "description": "Storybook coverage for Sidebar.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -3653,9 +3398,685 @@
           "required": true
         },
         {
-          "name": "connectionIsValid",
+          "name": "isOpen",
           "type": "boolean",
           "required": true
+        },
+        {
+          "name": "isPublishDisabled",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "open",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "close",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "getTopicMatchesSubscription",
+          "type": "function",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/Sidebar.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/Sidebar.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/Sidebar.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar",
+      "specMissing": false
+    },
+    {
+      "name": "AddToCollectionMenu",
+      "tier": "view",
+      "description": "Storybook coverage for AddToCollectionMenu.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "currentCollectionId",
+          "type": "number",
+          "required": false,
+          "default": "null"
+        },
+        {
+          "name": "placeholder",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "Add message to..."
+          ],
+          "default": "Add message to..."
+        },
+        {
+          "name": "onSelect",
+          "type": "number",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onCreate",
+          "type": "function",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "divider"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/AddToCollectionMenu.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/AddToCollectionMenu.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/AddToCollectionMenu.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/AddToCollectionMenu",
+      "specMissing": false
+    },
+    {
+      "name": "CollectionFolder",
+      "tier": "view",
+      "description": "Storybook coverage for CollectionFolder.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "collection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onOpenMessage",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/CollectionFolder",
+      "specMissing": false
+    },
+    {
+      "name": "CollectionsSection",
+      "tier": "view",
+      "description": "Storybook coverage for CollectionsSection.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "scope",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onOpenMessage",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/CollectionsSection",
+      "specMissing": false
+    },
+    {
+      "name": "ConfirmDeleteDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConfirmDeleteDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onConfirm",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "error",
+        "error-light"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConfirmDeleteDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConfirmDeleteDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConfirmDeleteDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConfirmDeleteDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionDetailsDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionDetailsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConnectionDetailsDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionRow",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionRow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "emphasis",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConnectionRow",
+      "specMissing": false
+    },
+    {
+      "name": "HistoryItem",
+      "tier": "view",
+      "description": "Storybook coverage for HistoryItem.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "entry",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "publishHistoryStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "hovered",
+        "divider",
+        "error",
+        "elevation-1",
+        "chip-border"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/HistoryItem",
+      "specMissing": false
+    },
+    {
+      "name": "HistorySection",
+      "tier": "view",
+      "description": "Storybook coverage for HistorySection.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "publishHistoryStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onOpenEntry",
+          "type": "number",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/HistorySection.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/HistorySection.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/HistorySection.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/HistorySection",
+      "specMissing": false
+    },
+    {
+      "name": "InlineNameInput",
+      "tier": "view",
+      "description": "Storybook coverage for InlineNameInput.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "initialValue",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "placeholder",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onCommit",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onCancel",
+          "type": "function",
+          "required": false,
+          "default": "> void = () => {}"
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/InlineNameInput.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/InlineNameInput.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/InlineNameInput.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/InlineNameInput",
+      "specMissing": false
+    },
+    {
+      "name": "NewMessageRow",
+      "tier": "view",
+      "description": "Storybook coverage for NewMessageRow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "onClick",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "white-text",
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/NewMessageRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/NewMessageRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/NewMessageRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/NewMessageRow",
+      "specMissing": false
+    },
+    {
+      "name": "PublishView",
+      "tier": "view",
+      "description": "Storybook coverage for PublishView.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "isPublishDisabled",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "getTopicMatchesSubscription",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "publishStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "publishHistoryStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onBack",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "emphasis",
+        "secondary-text",
+        "warning"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/PublishView.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/PublishView.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/PublishView.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/PublishView",
+      "specMissing": false
+    },
+    {
+      "name": "SavedMessageRow",
+      "tier": "view",
+      "description": "Storybook coverage for SavedMessageRow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onOpenMessage",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/SavedMessageRow",
+      "specMissing": false
+    },
+    {
+      "name": "SearchMessagesModal",
+      "tier": "view",
+      "description": "Storybook coverage for SearchMessagesModal.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "collectionsStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "publishHistoryStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "onOpenMessage",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onOpenEntry",
+          "type": "number",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "hovered"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SearchMessagesModal.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/SearchMessagesModal.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SearchMessagesModal.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/SearchMessagesModal",
+      "specMissing": false
+    },
+    {
+      "name": "SearchableText",
+      "tier": "view",
+      "description": "Storybook coverage for SearchableText.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "isTopic",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "searchTerm",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "config",
+          "type": "object",
+          "required": false,
+          "default": "{ contextChars: 40, maxDisplayChars: 80 }"
         }
       ],
       "tokens": [
@@ -3664,10 +4085,102 @@
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/views/Connection/components/ConnectionHeaderBar.svelte",
-      "specPath": "src/views/Connection/components/ConnectionHeaderBar.spec.json",
-      "storyPath": "src/views/Connection/components/ConnectionHeaderBar.stories.svelte",
-      "storyId": "Views/Connection/ConnectionHeaderBar",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SearchableText.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/SearchableText.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SearchableText.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/SearchableText",
+      "specMissing": false
+    },
+    {
+      "name": "SidebarCollapsedRail",
+      "tier": "view",
+      "description": "Storybook coverage for SidebarCollapsedRail.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "expand",
+          "type": "string",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onSearch",
+          "type": "function",
+          "required": false,
+          "default": "> void) | null = null"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "success"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SidebarCollapsedRail.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarCollapsedRail.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarCollapsedRail.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/SidebarCollapsedRail",
+      "specMissing": false
+    },
+    {
+      "name": "SidebarTopBar",
+      "tier": "view",
+      "description": "Storybook coverage for SidebarTopBar.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "collapseSidebar",
+          "type": "string",
+          "required": false,
+          "default": "> void"
+        },
+        {
+          "name": "onSearch",
+          "type": "function",
+          "required": false,
+          "default": "> void) | null = null"
+        }
+      ],
+      "tokens": [
+        "emphasis",
+        "success"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/SidebarTopBar",
       "specMissing": false
     },
     {

@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "NewMessageRow",
+  "tier": "view",
+  "description": "Storybook coverage for NewMessageRow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "onClick",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "white-text",
+    "hovered"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "InlineNameInput",
+  "tier": "view",
+  "description": "Storybook coverage for InlineNameInput.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "initialValue",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "placeholder",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "onCommit",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onCancel",
+      "type": "function",
+      "required": false,
+      "default": "> void = () => {}"
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

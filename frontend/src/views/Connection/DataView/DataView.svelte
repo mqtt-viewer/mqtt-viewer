@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PublishPanel from "./components/PublishPanel/PublishPanel.svelte";
+  import Sidebar from "./components/Sidebar/Sidebar.svelte";
   import SelectedTopicDisplay from "./components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import MqttDataPanel from "./components/MqttDataPanel/MqttDataPanel.svelte";
   import { createSelectedTopicStore } from "./stores/selected-topic-store";
@@ -8,6 +8,9 @@
   import { createMatchedTopicsStore } from "./stores/matched-topics";
   import panelSizes from "@/stores/panel-sizes";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import Button from "@/components/Button/Button.svelte";
+  import Icon from "@/components/Icon/Icon.svelte";
+  import connections from "@/stores/connections";
   import {
     DeleteRetainedMessage,
     ExportTopicMessages,
@@ -42,6 +45,29 @@
     $panelSizes.resizablePanelSizes["publish-panel"]?.isOpen ?? true;
   $: isSelectedTopicPanelOpen = $selectedTopicStore.selectedTopic !== null;
   $: isPublishDisabled = connection.connectionState !== "connected";
+  $: isConnecting =
+    connection.connectionState === "connecting" ||
+    connection.connectionState === "reconnecting";
+  // Fresh tab that has never connected this session: prompt to connect
+  // instead of showing an empty topic tree. Once connected (or after a first
+  // connect that left retained data), show the tree.
+  $: showNotConnectedState =
+    !connection.firstConnectedThisSessionAtMs &&
+    connection.connectionState !== "connected";
+
+  const connect = async () => {
+    try {
+      await connections.connect(connection.connectionDetails.id);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to connect",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
 
   // Unfortunately I can't get the behaviour I'd like due
   // to fit-content/flex limitations, so I'm manually calculating the
@@ -119,7 +145,7 @@
         : $panelSizes.rootWindowWidth / 2}
       bind:width={publishPanelWidth}
     >
-      <PublishPanel
+      <Sidebar
         {connection}
         {isPublishDisabled}
         getTopicMatchesSubscription={matchedTopicsStore.getTopicMatch}
@@ -131,7 +157,22 @@
     <div
       class="grow h-full max-h-full min-w-0 overflow-x-hidden overflow-y-auto"
     >
-      <MqttDataPanel {connection} {selectedTopicStore} width={dataViewWidth} />
+      {#if showNotConnectedState}
+        <div
+          class="size-full flex flex-col items-center justify-center gap-4 bg-elevation-0 text-secondary-text"
+        >
+          <Icon type="disconnected" size={32} />
+          <div class="text-lg text-emphasis">Not connected</div>
+          <div class="text-base max-w-[320px] text-center">
+            Connect to this broker to start browsing topics and messages.
+          </div>
+          <Button on:click={connect} disabled={isConnecting}>
+            {isConnecting ? "Connecting…" : "Connect"}
+          </Button>
+        </div>
+      {:else}
+        <MqttDataPanel {connection} {selectedTopicStore} width={dataViewWidth} />
+      {/if}
     </div>
     {#if isSelectedTopicPanelOpen}
       <ResizableContainer

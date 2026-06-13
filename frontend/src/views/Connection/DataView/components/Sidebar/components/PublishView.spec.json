@@ -1,0 +1,60 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "PublishView",
+  "tier": "view",
+  "description": "Storybook coverage for PublishView.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "isPublishDisabled",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "getTopicMatchesSubscription",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "publishStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "publishHistoryStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "collectionsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "onBack",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "emphasis",
+    "secondary-text",
+    "warning"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

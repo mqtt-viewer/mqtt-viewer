@@ -1,0 +1,55 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "AddToCollectionMenu",
+  "tier": "view",
+  "description": "Storybook coverage for AddToCollectionMenu.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "collectionsStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "currentCollectionId",
+      "type": "number",
+      "required": false,
+      "default": "null"
+    },
+    {
+      "name": "placeholder",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "Add message to..."
+      ],
+      "default": "Add message to..."
+    },
+    {
+      "name": "onSelect",
+      "type": "number",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onCreate",
+      "type": "function",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "secondary-text",
+    "divider"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

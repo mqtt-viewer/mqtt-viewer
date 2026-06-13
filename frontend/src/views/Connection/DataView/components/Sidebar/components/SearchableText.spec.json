@@ -1,0 +1,46 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "SearchableText",
+  "tier": "view",
+  "description": "Storybook coverage for SearchableText.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "text",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "isTopic",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "searchTerm",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "config",
+      "type": "object",
+      "required": false,
+      "default": "{ contextChars: 40, maxDisplayChars: 80 }"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+}

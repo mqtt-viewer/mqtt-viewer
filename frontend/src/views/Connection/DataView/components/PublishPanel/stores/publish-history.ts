@@ -7,9 +7,10 @@ import { writable } from "svelte/store";
 import { app, models } from "wailsjs/go/models";
 
 import type { DeepOmit } from "@/util/types";
-import type { PublishDetails, PublishDetailsStore } from "./publish-details";
-import type { SupportedCodeEditorCodec } from "@/components/CodeEditor/codec";
-import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatting";
+import {
+  publishDetailsFromStoredMessage,
+  type PublishDetailsStore,
+} from "./publish-details";
 
 export type PublishHistory = DeepOmit<models.PublishHistory, "convertValues">[];
 
@@ -38,52 +39,17 @@ export const createPublishHistoryStore = (
       }
       // @ts-ignore
       set({ publishHistory: publishHistories });
-      setPublishDetailsFromHistoryEntry(publishHistories[0]);
     } catch (e) {
       console.error(e);
     }
   };
 
   const setPublishDetailsFromHistoryEntry = (entry: models.PublishHistory) => {
-    console.log("setting publish details from history entry", entry);
-    let firstUserProperties = {};
-    if (!!entry.userProperties) {
-      try {
-        firstUserProperties = JSON.parse(entry.userProperties);
-      } catch (e) {
-        // Do nothing, no parseable properties
-      }
-    }
-
-    const properties: app.PublishProperties = {
-      payloadFormatIndicator: !!entry.headerPayloadFormatIndicator,
-      messageExpiryInterval: entry.headerMessageExpiryInterval,
-      contentType: entry.headerContentType,
-      responseTopic: entry.headerResponseTopic,
-      correlationData: entry.headerCorrelationData,
-      subscriptionIdentifier: entry.headerSubscriptionIdentifier,
-      topicAlias: entry.headerTopicAlias,
-    };
-    const userPropertiesArray = Object.entries(firstUserProperties).map(
-      ([key, value]) => {
-        return { key, value } as { key: string; value: string };
-      }
-    );
-    const publishDetails: Partial<PublishDetails> = {
+    publishDetailsStore.setPartial({
+      ...publishDetailsFromStoredMessage(entry),
       connectionId: connId,
-      topic: entry.topic,
-      payload: entry.payload,
-      qos: entry.qos,
-      retain: entry.retain,
-      properties: properties,
-      codec: entry.encoding as SupportedCodeEditorCodec,
-      format: entry.format as SupportedCodeEditorFormat,
       hasAttemptedPublish: true,
-      topicError: null,
-      userPropertiesArray,
-    };
-    console.log("built publish details", publishDetails);
-    publishDetailsStore.setPartial(publishDetails);
+    });
   };
 
   const savePublishEntry = async (params: {

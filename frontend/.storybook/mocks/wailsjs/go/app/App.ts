@@ -90,6 +90,167 @@ export async function GetAllSubscriptionsByConnectionId(): Promise<{
   };
 }
 
+// In-memory collections so storybook interactions behave like the app
+let nextCollectionId = 100;
+let nextCollectionMessageId = 100;
+const mockCollectionsState: models.Collection[] = [
+  new models.Collection({
+    id: 1,
+    name: "Funzone",
+    messages: [
+      {
+        id: 1,
+        collectionId: 1,
+        name: "Doorbell ping",
+        topic: "home/doorbell/ping",
+        payload: '{"ding":"dong"}',
+        qos: 0,
+        retain: false,
+        encoding: "none",
+        format: "json",
+      },
+      {
+        id: 2,
+        collectionId: 1,
+        name: "All-lights off",
+        topic: "home/lights/all",
+        payload: '{"state":"off"}',
+        qos: 1,
+        retain: true,
+        encoding: "none",
+        format: "json",
+      },
+    ],
+  }),
+  new models.Collection({
+    id: 2,
+    connectionId: 1,
+    name: "Development",
+    messages: [
+      {
+        id: 3,
+        collectionId: 2,
+        name: "Backyard sensor",
+        topic: "backyard/sensors/1",
+        payload: '{"temp":45,"hello":"world"}',
+        qos: 0,
+        retain: false,
+        encoding: "none",
+        format: "json",
+      },
+    ],
+  }),
+];
+
+const findMockCollectionMessage = (id: number) => {
+  for (const collection of mockCollectionsState) {
+    const message = collection.messages.find((m) => m.id === id);
+    if (message) return { collection, message };
+  }
+  return null;
+};
+
+export async function GetCollectionsForConnection(
+  _connectionId: number
+): Promise<models.Collection[]> {
+  return mockCollectionsState;
+}
+
+export async function CreateCollection(
+  params: app.CreateCollectionParams
+): Promise<models.Collection> {
+  const collection = new models.Collection({
+    id: nextCollectionId++,
+    name: params.name,
+    connectionId: params.connectionId,
+    messages: [],
+  });
+  mockCollectionsState.push(collection);
+  return collection;
+}
+
+export async function RenameCollection(
+  id: number,
+  name: string
+): Promise<models.Collection> {
+  const collection = mockCollectionsState.find((c) => c.id === id);
+  if (collection) collection.name = name;
+  return collection ?? new models.Collection({ id, name });
+}
+
+export async function DeleteCollection(id: number): Promise<void> {
+  const index = mockCollectionsState.findIndex((c) => c.id === id);
+  if (index >= 0) mockCollectionsState.splice(index, 1);
+}
+
+export async function SaveCollectionMessage(
+  params: app.SaveCollectionMessageParams
+): Promise<models.CollectionMessage> {
+  if (params.id) {
+    const found = findMockCollectionMessage(params.id);
+    if (found) {
+      Object.assign(found.message, params);
+      return found.message;
+    }
+  }
+  const message = new models.CollectionMessage({
+    ...params,
+    id: nextCollectionMessageId++,
+  });
+  const collection = mockCollectionsState.find(
+    (c) => c.id === params.collectionId
+  );
+  collection?.messages.push(message);
+  return message;
+}
+
+export async function RenameCollectionMessage(
+  id: number,
+  name: string
+): Promise<models.CollectionMessage> {
+  const found = findMockCollectionMessage(id);
+  if (found) found.message.name = name;
+  return found?.message ?? new models.CollectionMessage({ id, name });
+}
+
+export async function MoveCollectionMessage(
+  id: number,
+  targetCollectionId: number
+): Promise<models.CollectionMessage> {
+  const found = findMockCollectionMessage(id);
+  if (!found) return new models.CollectionMessage({ id });
+  found.collection.messages = found.collection.messages.filter(
+    (m) => m.id !== id
+  );
+  found.message.collectionId = targetCollectionId;
+  const target = mockCollectionsState.find((c) => c.id === targetCollectionId);
+  target?.messages.push(found.message);
+  return found.message;
+}
+
+export async function DuplicateCollectionMessage(
+  id: number
+): Promise<models.CollectionMessage> {
+  const found = findMockCollectionMessage(id);
+  if (!found) return new models.CollectionMessage({ id });
+  const copy = new models.CollectionMessage({
+    ...found.message,
+    id: nextCollectionMessageId++,
+    name: `${found.message.name} copy`,
+  });
+  found.collection.messages.push(copy);
+  return copy;
+}
+
+export async function DeleteCollectionMessage(id: number): Promise<void> {
+  const found = findMockCollectionMessage(id);
+  if (found) {
+    found.collection.messages = found.collection.messages.filter(
+      (m) => m.id !== id
+    );
+  }
+}
+
 export async function GetEnvInfo(): Promise<app.EnvInfo> {
   return new app.EnvInfo({
     isDev: true,
