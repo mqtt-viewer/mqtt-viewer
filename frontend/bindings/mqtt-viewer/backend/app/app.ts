@@ -193,6 +193,15 @@ export function NewConnection(): $CancellablePromise<$models.Connection | null> 
     });
 }
 
+/**
+ * OpenChartWindow opens (or focuses) a separate window rendering the standalone
+ * chart for a topic. The new window shares this Go backend and its event
+ * stream, so it live-updates from the same messages as the main window.
+ */
+export function OpenChartWindow(params: $models.OpenChartWindowParams): $CancellablePromise<void> {
+    return $Call.ByID(1350566632, params);
+}
+
 export function PublishMqtt(connId: number, message: $models.PublishParams): $CancellablePromise<void> {
     return $Call.ByID(3575117605, connId, message);
 }

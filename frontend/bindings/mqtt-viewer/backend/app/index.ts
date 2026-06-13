@@ -12,6 +12,7 @@ export {
     CreateCollectionParams,
     EnvInfo,
     MqttStats,
+    OpenChartWindowParams,
     PublishParams,
     PublishProperties,
     SaveCollectionMessageParams,

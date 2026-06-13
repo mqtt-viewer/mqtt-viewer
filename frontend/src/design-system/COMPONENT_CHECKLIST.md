@@ -69,6 +69,7 @@
 
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
+| Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
@@ -87,6 +88,11 @@
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/UserPropertiesTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/SelectedTopicPanel | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/ChartOptions | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/ChartView | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/FieldPicker | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/SeriesLegend | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/TopicChart | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/SelectedTopicPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/SelectedTopicPanel/MessageTimeline | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/SelectedTopicPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -124,7 +130,7 @@
 
 ## Summary
 
-- Components scanned: 98
-- Story present: 98
+- Components scanned: 104
+- Story present: 104
 - Figma-linked: 0
 - Missing specs: 0

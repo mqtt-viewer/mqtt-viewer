@@ -6,6 +6,8 @@ import panelSizes from "@/stores/panel-sizes";
 import subscriptions from "@/stores/subscriptions";
 import tabs from "@/stores/tabs";
 import { createSelectedTopicStore } from "@/views/Connection/DataView/stores/selected-topic-store";
+import { createChartSeriesStore } from "@/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/chart-series-store";
+import { payloadTree } from "@/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/payload-fields";
 import { createExpandedTopicsStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/expanded-topics";
 import { createHighlightedMqttTopicsStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/highlighted-topics";
 import { createSearchStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/search";
@@ -341,6 +343,16 @@ export const mockCollections = [
   },
 ];
 
+export const createMockChartSeriesStore = () =>
+  createChartSeriesStore([
+    { path: "temp", label: "temp", color: "#f5a623", visible: true },
+    { path: "humidity", label: "humidity", color: "#7788fc", visible: true },
+  ]);
+
+export const mockPayloadTree = payloadTree(
+  '{"temp":24.6,"humidity":61,"sensor":{"rssi":-72},"status":"ok"}'
+);
+
 export const createMockCollectionsStore = () => {
   const { subscribe } = writable({
     collections: mockCollections,
@@ -383,6 +395,14 @@ export const createMockPublishHistoryStore = () => {
 const propDefaults: Record<string, () => unknown> = {
   actionButtons: () => [{ icon: "copy", tooltip: "Copy", onClick: noop }],
   actionLabel: () => "Choose file",
+  chartSeriesStore: () => createMockChartSeriesStore(),
+  paused: () => false,
+  showPoints: () => true,
+  windowMinutes: () => 0,
+  onToggle: () => noop,
+  onAddFromPayload: () => noop,
+  onPopOut: () => noop,
+  node: () => mockPayloadTree,
   allowPress: () => true,
   ariaLabel: () => "Storybook tabs",
   bgColor: () => undefined,
@@ -588,6 +608,17 @@ const propDefaults: Record<string, () => unknown> = {
 };
 
 const componentDefaults: Record<string, Record<string, unknown>> = {
+  FieldPicker: {
+    node: mockPayloadTree,
+    selected: new Map([
+      ["temp", "#f5a623"],
+      ["humidity", "#7788fc"],
+    ]),
+    onToggle: noop,
+  },
+  TopicChart: { style: "line" },
+  ChartView: { topic: "factory/line/temperature" },
+  ChartOptions: { style: "line" },
   BaseNumberInput: { value: 42, label: "Port", name: "port" },
   BigAddConnectionButton: { onClick: noop },
   Button: { variant: "secondary", iconType: "plus", iconPlacement: "left" },

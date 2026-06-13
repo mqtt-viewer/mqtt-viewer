@@ -1,0 +1,40 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "SeriesLegend",
+  "tier": "view",
+  "description": "Storybook coverage for SeriesLegend.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "chartSeriesStore",
+      "type": "store",
+      "required": true
+    },
+    {
+      "name": "topic",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onAddFromPayload",
+      "type": "function",
+      "required": false,
+      "default": "> void) | null = null"
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "emphasis",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

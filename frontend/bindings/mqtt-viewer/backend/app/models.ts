@@ -182,6 +182,43 @@ export class MqttStats {
     }
 }
 
+/**
+ * OpenChartWindowParams carries the state needed to render a detached chart:
+ * which connection + topic, and the numeric field paths to plot.
+ */
+export class OpenChartWindowParams {
+    "connectionId": number;
+    "topic": string;
+    "fields": string[];
+
+    /** Creates a new OpenChartWindowParams instance. */
+    constructor($$source: Partial<OpenChartWindowParams> = {}) {
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+        if (!("fields" in $$source)) {
+            this["fields"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new OpenChartWindowParams instance from a string or object.
+     */
+    static createFrom($$source: any = {}): OpenChartWindowParams {
+        const $$createField2_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fields" in $$parsedSource) {
+            $$parsedSource["fields"] = $$createField2_0($$parsedSource["fields"]);
+        }
+        return new OpenChartWindowParams($$parsedSource as Partial<OpenChartWindowParams>);
+    }
+}
+
 export class PublishParams {
     "topic": string;
     "qos": number;
@@ -214,7 +251,7 @@ export class PublishParams {
      * Creates a new PublishParams instance from a string or object.
      */
     static createFrom($$source: any = {}): PublishParams {
-        const $$createField4_0 = $$createType6;
+        const $$createField4_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("properties" in $$parsedSource) {
             $$parsedSource["properties"] = $$createField4_0($$parsedSource["properties"]);
@@ -246,7 +283,7 @@ export class PublishProperties {
      * Creates a new PublishProperties instance from a string or object.
      */
     static createFrom($$source: any = {}): PublishProperties {
-        const $$createField7_0 = $$createType7;
+        const $$createField7_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("userProperties" in $$parsedSource) {
             $$parsedSource["userProperties"] = $$createField7_0($$parsedSource["userProperties"]);
@@ -440,7 +477,7 @@ export class StartupOptions {
      * Creates a new StartupOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): StartupOptions {
-        const $$createField0_0 = $$createType9;
+        const $$createField0_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("PathsOverride" in $$parsedSource) {
             $$parsedSource["PathsOverride"] = $$createField0_0($$parsedSource["PathsOverride"]);
@@ -456,7 +493,8 @@ const $$createType2 = Connection.createFrom;
 const $$createType3 = $Create.Map($Create.Any, $$createType2);
 const $$createType4 = mqtt$0.ConnectionStats.createFrom;
 const $$createType5 = $Create.Map($Create.Any, $$createType4);
-const $$createType6 = PublishProperties.createFrom;
-const $$createType7 = $Create.Map($Create.Any, $Create.Any);
-const $$createType8 = paths$0.Paths.createFrom;
-const $$createType9 = $Create.Nullable($$createType8);
+const $$createType6 = $Create.Array($Create.Any);
+const $$createType7 = PublishProperties.createFrom;
+const $$createType8 = $Create.Map($Create.Any, $Create.Any);
+const $$createType9 = paths$0.Paths.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);

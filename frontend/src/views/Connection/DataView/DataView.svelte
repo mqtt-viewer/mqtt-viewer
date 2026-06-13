@@ -14,6 +14,7 @@
   import {
     DeleteRetainedMessage,
     ExportTopicMessages,
+    OpenChartWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
@@ -193,6 +194,12 @@
           mqttVersion={connection.connectionDetails.mqttVersion === "3"
             ? "3"
             : "5"}
+          openChartWindow={(topic, fields) =>
+            OpenChartWindow({
+              connectionId: connection.connectionDetails.id,
+              topic,
+              fields,
+            })}
         />
       </ResizableContainer>
     {/if}

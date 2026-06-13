@@ -1,0 +1,47 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "FieldPicker",
+  "tier": "view",
+  "description": "Storybook coverage for FieldPicker.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "node",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "depth",
+      "type": "string",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "selected",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onToggle",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "emphasis",
+    "secondary-text",
+    "hovered",
+    "success"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}
