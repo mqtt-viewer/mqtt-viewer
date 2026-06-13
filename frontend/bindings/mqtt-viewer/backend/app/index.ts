@@ -16,5 +16,6 @@ export {
     PublishProperties,
     SaveCollectionMessageParams,
     SavePublishHistoryEntryParams,
-    StartupOptions
+    StartupOptions,
+    UpdateAppSettingsParams
 } from "./models.js";

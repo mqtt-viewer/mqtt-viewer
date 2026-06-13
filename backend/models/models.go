@@ -9,6 +9,44 @@ type Global struct {
 	LocalPasswordsEncrypted *bool `json:"localPasswordsEncrypted"`
 }
 
+// AppSettings is a single-row table (id = 1) holding app-wide preferences for
+// message retention. MemoryBudgetBytes bounds the in-RAM message history (the
+// always-on leak guard); RecordingEnabled + DiskBudgetBytes control opt-in
+// durable history on disk; HasSeenHistoryPrompt gates the first-run popup.
+type AppSettings struct {
+	ID                   uint  `json:"id" gorm:"primaryKey"`
+	MemoryBudgetBytes    int64 `json:"memoryBudgetBytes"`
+	RecordingEnabled     bool  `json:"recordingEnabled"`
+	DiskBudgetBytes      int64 `json:"diskBudgetBytes"`
+	HasSeenHistoryPrompt bool  `json:"hasSeenHistoryPrompt"`
+}
+
+// ReceivedMessage is a durable record of a message received from the broker,
+// written in batches only when recording is enabled. Mirrors the message shape
+// of PublishHistory; payload is a blob to avoid UTF-8 inflation of raw bytes.
+// id is autoincrement, so it doubles as a stable arrival-order cursor for
+// keyset-paginated window lookups. Indexes are defined in the SQL migration.
+type ReceivedMessage struct {
+	ID           uint   `json:"id" gorm:"primaryKey"`
+	ConnectionID uint   `json:"connectionId"`
+	Topic        string `json:"topic"`
+	QoS          uint   `json:"qos"`
+	Retain       bool   `json:"retain"`
+	Payload      []byte `json:"payload"`
+	Encoding     string `json:"encoding"`
+	Format       string `json:"format"`
+	//JSON key-value properties stored as string
+	UserProperties               *string   `json:"userProperties"`
+	HeaderContentType            *string   `json:"headerContentType"`
+	HeaderResponseTopic          *string   `json:"headerResponseTopic"`
+	HeaderCorrelationData        *string   `json:"headerCorrelationData"`
+	HeaderPayloadFormatIndicator *bool     `json:"headerPayloadFormatIndicator"`
+	HeaderMessageExpiryInterval  *int32    `json:"headerMessageExpiryInterval"`
+	HeaderTopicAlias             *int32    `json:"headerTopicAlias"`
+	HeaderSubscriptionIdentifier *int32    `json:"headerSubscriptionIdentifier"`
+	ReceivedAt                   time.Time `json:"receivedAt"`
+}
+
 type Connection struct {
 	ID                   uint             `json:"id" gorm:"primaryKey"`
 	CreatedAt            time.Time        `json:"createdAt"`

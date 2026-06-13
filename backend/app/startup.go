@@ -161,6 +161,7 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 		}
 	}
 	mqttManager := mqtt.NewMqttManager(withMqttModule, onLatencyUpdate)
+	mqttManager.SetMessageMemoryBudget(a.memoryBudgetBytes())
 
 	appConnection := AppConnection{
 		ctx:          &withName,

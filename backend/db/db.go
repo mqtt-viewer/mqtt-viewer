@@ -77,7 +77,14 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 			loggerConfig,
 		)
 	}
-	db, err := gorm.Open(sqlite.Open(dbPath+"?_pragma=busy_timeout(5000)"), &gorm.Config{
+	// WAL + synchronous=NORMAL let writes and reads proceed concurrently and
+	// avoid an fsync per transaction, which matters once received messages are
+	// persisted in batches at broker rates. busy_timeout keeps writers waiting
+	// rather than erroring under contention.
+	dsn := dbPath + "?_pragma=busy_timeout(5000)" +
+		"&_pragma=journal_mode(WAL)" +
+		"&_pragma=synchronous(NORMAL)"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: newLogger,
 	})
 	if err != nil {
