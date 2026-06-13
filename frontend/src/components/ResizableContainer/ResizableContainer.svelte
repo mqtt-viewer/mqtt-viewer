@@ -24,17 +24,11 @@
       panelSizes.updatePanelSize(id, size, !collapsed);
     })();
 
-  // let defaultSize = $panelSizes.resizablePanelSizes[id] || minSize;
-  let defaultSize = minSize;
+  let defaultSize = $panelSizes.resizablePanelSizes[id]?.size || minSize;
   if (defaultSize < minSize) defaultSize = minSize;
   if (defaultSize > maxSize) defaultSize = maxSize;
   let edgeHovered = false;
   let size = defaultSize;
-
-  // $: $panelSizes.resizablePanelSizes[id],
-  //   (() => {
-  //     size = $panelSizes.resizablePanelSizes[id];
-  //   })();
 
   let resizing = false;
   let linuxFirstMovementX = -999;
