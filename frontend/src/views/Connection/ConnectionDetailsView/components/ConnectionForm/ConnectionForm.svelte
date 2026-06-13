@@ -54,7 +54,7 @@
       extend: [validator({ schema: ConnectionFormValidationSchema })],
       onSubmit: (values) => {},
       initialValues: {
-        customIconSeed,
+        customIconSeed: customIconSeed ?? undefined,
       },
     });
 
@@ -63,7 +63,7 @@
       connections.updateConnectionDetails({
         ...connection.connectionDetails,
         ...values,
-        clientId: values.hasCustomClientId ? values.clientId : undefined,
+        clientId: values.hasCustomClientId ? (values.clientId ?? null) : null,
       });
       if (!values.hasCustomClientId) {
         setFields("clientId", "", true);
@@ -238,7 +238,7 @@
         disabled={isAllFieldsDisabled}
         name="username"
         label="Username"
-        value={username}
+        value={username ?? undefined}
       />
     </div>
     <div class="w-1/2">
@@ -247,7 +247,7 @@
         type="password"
         name="password"
         label="Password"
-        value={password}
+        value={password ?? undefined}
       />
     </div>
   </div>
@@ -259,14 +259,14 @@
     }}
     name="hasCustomClientId"
     label="Use custom Client ID"
-    defaultChecked={hasCustomClientId}
+    defaultChecked={hasCustomClientId ?? undefined}
   />
   {#if $data.hasCustomClientId}
     <BaseInput
       disabled={isAllFieldsDisabled}
       name="clientId"
       label="Client ID"
-      value={clientId}
+      value={clientId ?? undefined}
       errorMessage={$errors.clientId?.[0]}
     />
   {/if}
@@ -280,7 +280,7 @@
         onChange={(checked) => setFields(`isCertsEnabled`, checked, true)}
         name="isCertsEnabled"
         label="Use custom certificates"
-        defaultChecked={isCertsEnabled}
+        defaultChecked={isCertsEnabled ?? undefined}
       />
     </div>
     <div style:display={$data.isCertsEnabled && isSslTls ? undefined : "none"}>
@@ -288,7 +288,7 @@
         onChange={(checked) => setFields(`skipCertVerification`, checked, true)}
         name="skipCertVerification"
         label="Skip certificate validation (insecure)"
-        defaultChecked={skipCertVerification}
+        defaultChecked={skipCertVerification ?? undefined}
       />
     </div>
   </div>
@@ -301,7 +301,7 @@
           variant="certificate"
           actionLabel="Add CA Certificate"
           valueLabel="CA"
-          defaultValue={certCa}
+          defaultValue={certCa ?? undefined}
           onFileChosen={(filePath) => setFields("certCa", filePath, true)}
           onFileRemoved={() => {
             setFields("certCa", "", true);
@@ -312,7 +312,7 @@
           variant="certificate"
           actionLabel="Add Client Certificate"
           valueLabel="Client"
-          defaultValue={certClient}
+          defaultValue={certClient ?? undefined}
           onFileChosen={(filePath) => setFields("certClient", filePath, true)}
           onFileRemoved={() => {
             setFields("certClient", "", true);
@@ -323,7 +323,7 @@
           variant="certificate"
           actionLabel="Add Client Key"
           valueLabel="Client Key"
-          defaultValue={certClientKey}
+          defaultValue={certClientKey ?? undefined}
           onFileChosen={(filePath) =>
             setFields("certClientKey", filePath, true)}
           onFileRemoved={() => {
@@ -338,7 +338,7 @@
     onChange={(checked) => setFields(`isProtoEnabled`, checked, true)}
     name="isProtoEnabled"
     label="Automatically encode/decode Sparkplug messages"
-    defaultChecked={isProtoEnabled}
+    defaultChecked={isProtoEnabled ?? undefined}
   />
 </form>
 <ConfirmDeleteConnectionDialog

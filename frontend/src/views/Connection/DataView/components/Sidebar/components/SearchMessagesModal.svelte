@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { models } from "wailsjs/go/models";
+  import type * as models from "bindings/mqtt-viewer/backend/models/models";
   import type { Writable } from "svelte/store";
   import moment from "moment";
   import Dialog from "@/components/Dialog/Dialog.svelte";
@@ -30,7 +30,10 @@
   const syncQuery = _.debounce((q: string) => (debouncedQuery = q), 150);
   $: syncQuery(query);
 
-  const matchesQuery = (q: string, ...fields: (string | undefined)[]) => {
+  const matchesQuery = (
+    q: string,
+    ...fields: (string | null | undefined)[]
+  ) => {
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
     return fields.some((f) => !!f && f.toLowerCase().includes(needle));

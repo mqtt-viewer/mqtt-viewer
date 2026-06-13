@@ -3,9 +3,10 @@
   import { getSortedObjectDiffs } from "./shared/diff-helpers";
 
   export let isComparing: boolean;
-  export let userProperties: { [key: string]: string } | null;
-  export let userPropertiesToCompare: { [key: string]: string } | undefined =
-    undefined;
+  export let userProperties: { [key: string]: string | undefined } | null;
+  export let userPropertiesToCompare:
+    | { [key: string]: string | undefined }
+    | undefined = undefined;
 
   $: diffedUserProperties = getSortedObjectDiffs({
     objectLeft: userPropertiesToCompare ?? {},

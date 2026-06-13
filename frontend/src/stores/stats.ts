@@ -1,9 +1,12 @@
 import { get, writable } from "svelte/store";
 import _ from "lodash";
-import { GetMqttStats } from "wailsjs/go/app/App";
-import { app } from "wailsjs/go/models";
+import { GetMqttStats } from "bindings/mqtt-viewer/backend/app/app";
+import * as app from "bindings/mqtt-viewer/backend/app/models";
+import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 
-export type MqttStats = Omit<app.MqttStats, "convertValues">;
+export type MqttStats = Omit<app.MqttStats, "statsByConnection"> & {
+  statsByConnection: { [connId: number]: mqtt.ConnectionStats };
+};
 
 export enum StatsMode {
   ConnPerSec = "conn-per-sec",
@@ -55,7 +58,7 @@ const toggleMode = () => {
 
 const getStats = async () => {
   try {
-    const stats = await GetMqttStats();
+    const stats = (await GetMqttStats()) as MqttStats;
     const currentState = get({ subscribe });
     const diffFromLast: MqttStats = {
       totalBytesReceived:

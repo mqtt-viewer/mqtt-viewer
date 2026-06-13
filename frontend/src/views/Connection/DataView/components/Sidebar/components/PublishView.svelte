@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { models } from "wailsjs/go/models";
+  import type * as models from "bindings/mqtt-viewer/backend/models/models";
   import Button from "@/components/Button/Button.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";

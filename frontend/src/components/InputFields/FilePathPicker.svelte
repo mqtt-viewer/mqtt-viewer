@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChooseCertFile, ChooseDirectory } from "wailsjs/go/app/App";
+  import { ChooseCertFile, ChooseDirectory } from "bindings/mqtt-viewer/backend/app/app";
   import Icon from "../Icon/Icon.svelte";
   import Tooltip from "../Tooltip/Tooltip.svelte";
   import Button from "../Button/Button.svelte";

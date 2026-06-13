@@ -8,12 +8,29 @@ import {
   MoveCollectionMessage,
   DuplicateCollectionMessage,
   DeleteCollectionMessage,
-} from "wailsjs/go/app/App";
+} from "bindings/mqtt-viewer/backend/app/app";
 import { writable } from "svelte/store";
-import { app, models } from "wailsjs/go/models";
+import * as app from "bindings/mqtt-viewer/backend/app/models";
+import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import { addToast } from "@/components/Toast/Toast.svelte";
 
 export type CollectionScope = "global" | "connection";
+
+// v3 bindings type nullable Go pointer fields as `T | null` and keep them as
+// required keys, but callers build these params with the nullable fields either
+// `undefined` or omitted entirely. Make nullable fields optional keys that also
+// accept `undefined`; the generated `createFrom` normalises the runtime shape.
+type NullableKeys<T> = {
+  [K in keyof T]-?: null extends T[K] ? K : never;
+}[keyof T];
+
+type SaveMessageParams = Partial<
+  Pick<app.SaveCollectionMessageParams, NullableKeys<app.SaveCollectionMessageParams>>
+> &
+  Omit<
+    app.SaveCollectionMessageParams,
+    NullableKeys<app.SaveCollectionMessageParams>
+  >;
 
 interface CollectionsState {
   collections: models.Collection[];
@@ -132,9 +149,7 @@ export const createCollectionsStore = (connId: number) => {
     });
   };
 
-  const saveMessage = async (
-    params: Omit<app.SaveCollectionMessageParams, "convertValues">
-  ) => {
+  const saveMessage = async (params: SaveMessageParams) => {
     const saved = await SaveCollectionMessage(
       app.SaveCollectionMessageParams.createFrom(params)
     );

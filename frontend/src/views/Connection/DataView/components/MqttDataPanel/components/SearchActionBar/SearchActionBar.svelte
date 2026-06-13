@@ -13,7 +13,10 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import _ from "lodash";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
-  import { ClearConnectionHistory, ExportAllMessages } from "wailsjs/go/app/App";
+  import {
+    ClearConnectionHistory,
+    ExportAllMessages,
+  } from "bindings/mqtt-viewer/backend/app/app";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import SearchAndHistory from "./SearchAndHistory.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";

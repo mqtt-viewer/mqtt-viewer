@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { mqtt } from "wailsjs/go/models";
+  import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
   import { base64ToUtf8 } from "@/components/CodeEditor/codec";
   import HeaderRow from "./shared/HeaderRow.svelte";
   import { getSortedObjectDiffs } from "./shared/diff-helpers";

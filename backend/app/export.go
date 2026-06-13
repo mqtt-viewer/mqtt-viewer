@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type exportedMessage struct {
@@ -53,16 +53,16 @@ func (a *App) ExportAllMessages(connId uint) (string, error) {
 }
 
 func (a *App) saveMessagesToFile(messages []exportedMessage, defaultFilename string) (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export message history",
-		DefaultFilename: defaultFilename,
-		Filters: []runtime.FileFilter{
+	path, err := application.Get().Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
+		Title:    "Export message history",
+		Filename: defaultFilename,
+		Filters: []application.FileFilter{
 			{
 				DisplayName: "JSON Files (*.json)",
 				Pattern:     "*.json",
 			},
 		},
-	})
+	}).PromptForSingleSelection()
 	if err != nil {
 		return "", err
 	}

@@ -14,7 +14,7 @@
   import {
     DeleteRetainedMessage,
     ExportTopicMessages,
-  } from "wailsjs/go/app/App";
+  } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
 

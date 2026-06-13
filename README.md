@@ -50,7 +50,7 @@ MQTT Viewer is built using [Wails](https://wails.io/), a Go-based application fr
 
 - [Go](https://golang.org/doc/install)
 - [Node.js](https://nodejs.org/en/download/)
-- [Wails](https://wails.io/docs/gettingstarted/installation) (install via `go get github.com/wailsapp/wails/v2/cmd/wails@2.9.1`)
+- [Wails v3](https://v3.wails.io/quick-start/installation/) (install via `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98`)
 - [pnpm](https://pnpm.io/installation) (install via `npm install -g pnpm`)
 - [Just](https://github.com/casey/just?tab=readme-ov-file#cross-platform) - optional, but recommended for running commands in the project
 - [Atlas](https://github.com/ariga/atlas) - optional, only necessary if you need to create database migrations
@@ -63,9 +63,9 @@ MQTT Viewer is built using [Wails](https://wails.io/), a Go-based application fr
 4. Navigate to the frontend directory with `cd frontend`
 5. Install the Node.js dependencies with `pnpm install`
 6. Navigate back to the root directory with `cd ..`
-7. Run the application with `just dev` (or `wails dev` if you don't have Just installed)
+7. Run the application with `wails3 dev`
 
-If there are problems with Wails, try running `wails doctor` to check your installation.
+If there are problems with Wails, try running `wails3 doctor` to check your installation.
 
 Please open an issue if you have any problems.
 

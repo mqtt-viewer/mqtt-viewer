@@ -1,0 +1,75 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application for Windows
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+        vars:
+          BUILD_FLAGS:
+            ref: .BUILD_FLAGS
+          DEV:
+            ref: .DEV
+      - task: common:generate:icons
+    cmds:
+      - task: generate:syso
+        vars:
+          ARCH: '{{.ARCH}}'
+      - go build {{.BUILD_FLAGS}} -o "{{.BIN_DIR}}/{{.APP_NAME}}.exe"
+      - cmd: powershell Remove-item *.syso
+        platforms: [windows]
+      - cmd: rm -f *.syso
+        platforms: [linux, darwin]
+    vars:
+      BUILD_FLAGS: '{{if eq .DEV "true"}}-buildvcs=false -gcflags=all="-l" -ldflags="{{.LD_FLAGS}}"{{else}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui {{.LD_FLAGS}}"{{end}}'
+    env:
+      GOOS: windows
+      CGO_ENABLED: 0
+      GOARCH: '{{.ARCH | default ARCH}}'
+
+  package:
+    summary: Packages the application into an NSIS installer
+    cmds:
+      - task: create:nsis:installer
+        vars:
+          ARCH: '{{.ARCH}}'
+          LD_FLAGS:
+            ref: .LD_FLAGS
+
+  generate:syso:
+    summary: Generates Windows `.syso` file
+    dir: build
+    cmds:
+      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.json -out ../wails_windows_{{.ARCH}}.syso
+    vars:
+      ARCH: '{{.ARCH | default ARCH}}'
+
+  create:nsis:installer:
+    summary: Creates an NSIS installer
+    dir: build/windows/nsis
+    deps:
+      - task: build
+        vars:
+          ARCH: '{{.ARCH}}'
+          LD_FLAGS:
+            ref: .LD_FLAGS
+    cmds:
+      # Create the Microsoft WebView2 bootstrapper if it doesn't exist
+      - wails3 generate webview2bootstrapper -dir "{{.ROOT_DIR}}/build/windows/nsis"
+      - |
+        {{if eq OS "windows"}}
+        makensis {{if .VERSION}}-DINFO_PRODUCTVERSION="{{trimPrefix "v" .VERSION}}" {{end}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi
+        {{else}}
+        makensis {{if .VERSION}}-DINFO_PRODUCTVERSION="{{trimPrefix "v" .VERSION}}" {{end}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
+        {{end}}
+    vars:
+      ARCH: '{{.ARCH | default ARCH}}'
+      ARG_FLAG: '{{if eq .ARCH "amd64"}}AMD64{{else}}ARM64{{end}}'
+
+  run:
+    cmds:
+      - '{{.BIN_DIR}}/{{.APP_NAME}}.exe'

@@ -2,9 +2,9 @@ import {
   GetFilterHistoriesForConnection,
   SaveFilterHistoryEntry,
   DeleteFilterHistoryEntry,
-} from "wailsjs/go/app/App";
+} from "bindings/mqtt-viewer/backend/app/app";
 import { writable } from "svelte/store";
-import { models } from "wailsjs/go/models";
+import * as models from "bindings/mqtt-viewer/backend/models/models";
 
 import type { DeepOmit } from "@/util/types";
 

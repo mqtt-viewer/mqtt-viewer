@@ -5,10 +5,11 @@ import {
   UpdateConnection,
   GetAllConnections,
   NewConnection,
-} from "wailsjs/go/app/App";
+} from "bindings/mqtt-viewer/backend/app/app";
 import { get, writable } from "svelte/store";
-import { events, type app } from "wailsjs/go/models";
-import { EventsOn } from "wailsjs/runtime";
+import * as events from "bindings/mqtt-viewer/events/models";
+import type * as app from "bindings/mqtt-viewer/backend/app/models";
+import { Events } from "@wailsio/runtime";
 import tabsStore from "@/stores/tabs";
 import subscriptionsStore, { type Subscription } from "./subscriptions";
 import type { DeepOmit } from "@/util/types";
@@ -55,7 +56,8 @@ const init = async () => {
     const connectionsArray: Connection[] = [];
     Object.keys(appConnections).forEach((id) => {
       const connId = parseInt(id);
-      const appConn = appConnections[connId];
+      const appConn = appConnections[id as `${number}`];
+      if (!appConn) return;
       const connection = getConnectionFromAppConnection(appConn);
       connections[connId] = connection;
       connectionsArray.push(connection);
@@ -67,7 +69,8 @@ const init = async () => {
     for (const connection of connectionsArray) {
       registerConnectionEvents(connection);
     }
-    EventsOn(events.GlobalEvent.ConnectionDeleted, async (id: number) => {
+    Events.On(events.GlobalEvent.ConnectionDeleted, async (e) => {
+      const id: number = e.data;
       await tabs.closeTab(id);
       await subscriptions.removeConnection(id);
       update((store) => {
@@ -103,15 +106,16 @@ const registerConnectionEvents = (connection: Connection) => {
   const {
     connectionDetails: { id, name },
   } = connection;
-  EventsOn(connection.eventSet.mqttConnected, () => {
+  Events.On(connection.eventSet.mqttConnected, () => {
     console.log(id, name, "connected");
     updateConnectionState(connection.connectionDetails.id, "connected");
   });
-  EventsOn(connection.eventSet.mqttConnecting, () => {
+  Events.On(connection.eventSet.mqttConnecting, () => {
     console.log(id, name, "connecting");
     updateConnectionState(connection.connectionDetails.id, "connecting");
   });
-  EventsOn(connection.eventSet.mqttReconnecting, (err) => {
+  Events.On(connection.eventSet.mqttReconnecting, (e) => {
+    const err = e.data;
     console.log(id, name, "reconnecting");
     updateConnectionState(connection.connectionDetails.id, "reconnecting");
     if (!!err) {
@@ -124,7 +128,8 @@ const registerConnectionEvents = (connection: Connection) => {
       });
     }
   });
-  EventsOn(connection.eventSet.mqttDisconnected, (err) => {
+  Events.On(connection.eventSet.mqttDisconnected, (e) => {
+    const err = e.data;
     console.log(id, name, "disconnected");
     updateConnectionState(connection.connectionDetails.id, "disconnected");
     if (!!err) {
@@ -137,7 +142,8 @@ const registerConnectionEvents = (connection: Connection) => {
       });
     }
   });
-  EventsOn(connection.eventSet.mqttLatency, (latencyMs) => {
+  Events.On(connection.eventSet.mqttLatency, (e) => {
+    const latencyMs = e.data;
     if (latencyMs) {
       update((store) => {
         const thisConnection =

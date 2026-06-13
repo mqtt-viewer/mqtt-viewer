@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { models } from "wailsjs/go/models";
+  import type * as models from "bindings/mqtt-viewer/backend/models/models";
   import type { Connection } from "@/stores/connections";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import { createPublishStore } from "../PublishPanel/stores/publish-details";

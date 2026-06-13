@@ -20,7 +20,10 @@ const config: StorybookConfig = {
       resolve: {
         alias: {
           "@": fileURLToPath(new URL("../src", import.meta.url)),
-          wailsjs: fileURLToPath(new URL("./mocks/wailsjs", import.meta.url)),
+          bindings: fileURLToPath(new URL("./mocks/bindings", import.meta.url)),
+          "@wailsio/runtime": fileURLToPath(
+            new URL("./mocks/wailsio-runtime.ts", import.meta.url)
+          ),
         },
       },
     });
