@@ -60,6 +60,7 @@ export class TopicGraphRenderer {
   k = 3.0;
 
   private endpoint: RGB = COLD_ENDPOINT_DARK;
+  private textColor = 0xbdb7b0;
   private sortKey: SortKey = "rate";
   private filter = "";
   private selected: string | null = null;
@@ -105,6 +106,13 @@ export class TopicGraphRenderer {
 
   setEndpoint(rgb: RGB): void {
     this.endpoint = rgb;
+  }
+  setTextColor(hex: number): void {
+    this.textColor = hex;
+    for (const v of this.visuals.values()) {
+      v.label.style.fill = hex;
+      if (v.badge) v.badge.style.fill = hex;
+    }
   }
   setSort(key: SortKey): void {
     this.sortKey = key;
@@ -266,7 +274,7 @@ export class TopicGraphRenderer {
     const label = new Text({
       text: node.name || node.topic,
       style: {
-        fill: 0xbdb7b0,
+        fill: this.textColor,
         fontSize: 12,
         fontFamily: "Inter, system-ui, sans-serif",
       },
@@ -311,7 +319,7 @@ export class TopicGraphRenderer {
     if (showBadge && !v.badge) {
       v.badge = new Text({
         text: "",
-        style: { fill: 0x8a8a8a, fontSize: 10, fontFamily: "Inter, system-ui, sans-serif" },
+        style: { fill: this.textColor, fontSize: 10, fontFamily: "Inter, system-ui, sans-serif" },
       });
       v.badge.anchor.set(0, 0.5);
       v.container.addChild(v.badge);

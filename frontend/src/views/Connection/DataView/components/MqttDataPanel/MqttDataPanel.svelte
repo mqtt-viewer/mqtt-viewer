@@ -2,6 +2,7 @@
   import { twMerge } from "tailwind-merge";
   import SearchActionBar from "./components/SearchActionBar/SearchActionBar.svelte";
   import MqttTopicTree from "./components/MqttTopicTree/MqttTopicTree.svelte";
+  import MqttGraphView from "../MqttGraphView/MqttGraphView.svelte";
 
   import { createMqttDataStore } from "./stores/mqtt-data";
   import { createExpandedTopicsStore } from "./stores/expanded-topics";
@@ -29,6 +30,8 @@
 
   const defaultSortState = $defaultSorts[DEFAULT_SORT_PERSIST_KEY];
 
+  let view: "list" | "graph" = "list";
+
   const expandedTopicsStore = createExpandedTopicsStore();
   const searchStore = createSearchStore();
   const sortStore = createSortStore(
@@ -42,31 +45,57 @@
 </script>
 
 <div class={twMerge("bg-elevation-0 h-full w-full min-w-0 flex flex-col")}>
-  <SearchActionBar
-    getAllTopics={mqttDataStore.getAllTopics}
-    {searchStore}
-    {expandedTopicsStore}
-    {sortStore}
-  />
-  <div
-    class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
-  >
-    <MqttTopicTree
-      {width}
-      selectedTopic={$selectedTopicStore.selectedTopic}
-      mqttData={$mqttDataStore}
-      highlightedTopicStore={mqttHighlightStore}
-      {expandedTopicsStore}
-      sortKey={$sortStore.key}
-      sortDir={$sortStore.dir}
-      searchText={$searchStore.text}
-      onTopicSelect={(row) => {
-        if (row.message === undefined) {
-          expandedTopicsStore.toggleMqttTopicExpansion(row.topic);
-        } else if ($selectedTopicStore.selectedTopic !== row.topic) {
-          selectedTopicStore.selectTopic(row.topic);
-        }
-      }}
-    />
+  <div class="flex items-center px-2 pt-2">
+    <div
+      class="inline-flex overflow-hidden rounded-md border border-outline text-xs text-secondary-text"
+    >
+      <button
+        class={twMerge("px-2.5 py-1", view === "list" && "bg-elevation-2 text-white-text")}
+        on:click={() => (view = "list")}>List</button
+      >
+      <button
+        class={twMerge("px-2.5 py-1", view === "graph" && "bg-elevation-2 text-white-text")}
+        on:click={() => (view = "graph")}>Graph</button
+      >
+    </div>
   </div>
+
+  {#if view === "list"}
+    <SearchActionBar
+      getAllTopics={mqttDataStore.getAllTopics}
+      {searchStore}
+      {expandedTopicsStore}
+      {sortStore}
+    />
+    <div
+      class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
+    >
+      <MqttTopicTree
+        {width}
+        selectedTopic={$selectedTopicStore.selectedTopic}
+        mqttData={$mqttDataStore}
+        highlightedTopicStore={mqttHighlightStore}
+        {expandedTopicsStore}
+        sortKey={$sortStore.key}
+        sortDir={$sortStore.dir}
+        searchText={$searchStore.text}
+        onTopicSelect={(row) => {
+          if (row.message === undefined) {
+            expandedTopicsStore.toggleMqttTopicExpansion(row.topic);
+          } else if ($selectedTopicStore.selectedTopic !== row.topic) {
+            selectedTopicStore.selectTopic(row.topic);
+          }
+        }}
+      />
+    </div>
+  {:else}
+    <div class="grow min-h-0 w-full">
+      <MqttGraphView
+        {connection}
+        {selectedTopicStore}
+        {width}
+        initialData={$mqttDataStore}
+      />
+    </div>
+  {/if}
 </div>

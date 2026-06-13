@@ -55,6 +55,11 @@ export class TopicModel {
     return this.nodeCount;
   }
 
+  clear(): void {
+    this.root = new TopicNode("", "", -1, null);
+    this.nodeCount = 0;
+  }
+
   // Record a message arrival on `topic` at time `tMs`.
   ingest(topic: string, tMs: number): void {
     const levels = topic.split("/");
