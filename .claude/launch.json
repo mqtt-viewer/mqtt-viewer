@@ -12,6 +12,13 @@
       "runtimeExecutable": "wails",
       "runtimeArgs": ["dev", "-noreload", "-skipbindings"],
       "port": 34115
+    },
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "exec", "vite", "--port", "5180", "--strictPort"],
+      "port": 5180,
+      "autoPort": false
     }
   ]
 }
