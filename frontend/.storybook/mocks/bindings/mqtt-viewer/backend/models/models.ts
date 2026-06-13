@@ -3,6 +3,22 @@
 const assign = <T extends object>(target: T, source: any = {}) =>
   Object.assign(target, source);
 
+export class AppSettings {
+  id = 1;
+  memoryBudgetBytes = 512 * 1024 * 1024;
+  recordingEnabled = false;
+  diskBudgetBytes = 1 * 1024 * 1024 * 1024;
+  hasSeenHistoryPrompt = false;
+
+  static createFrom(source: any = {}) {
+    return new AppSettings(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class Subscription {
   id = 0;
   createdAt: any = null;

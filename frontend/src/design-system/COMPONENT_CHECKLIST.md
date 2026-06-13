@@ -62,7 +62,9 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
+| Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
 
 ## Views (`Views/*`)
@@ -124,7 +126,7 @@
 
 ## Summary
 
-- Components scanned: 98
-- Story present: 98
+- Components scanned: 100
+- Story present: 100
 - Figma-linked: 0
 - Missing specs: 0
