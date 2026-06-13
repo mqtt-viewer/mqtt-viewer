@@ -89,7 +89,7 @@ Each received message **snaps the topic's core to red**, then it **cools continu
 - **Ramp (warm → cold):** red → orange → amber → teal → blue → cold-endpoint.
 - **Cold endpoint is theme-aware:** **white** in dark mode, **dim blue** in light mode (so idle nodes never vanish into a white background).
 - **Cooldown duration is configurable per connection.** Default ~**60s** red→cold; range ~5s up to **1 hour** (for low-traffic brokers that would otherwise wash uniformly cold).
-- Map age→ramp position non-linearly so early seconds get visual room: `t = ln(1 + age) / ln(1 + duration)`, clamped 0–1.
+- Map age→ramp position **linearly**: `t = clamp(age / duration, 0, 1)`. (A log curve was tried and cooled far too fast — a 2 msg/s topic never looked red — see §15.)
 - Collapsed-node color = **max recency (hottest)** descendant — so a folded branch glows red the instant *anything* under it fires. (Size sums; color takes the max — they answer different questions.)
 
 #### Proposed ramp stops (tunable; must be validated in both themes)
@@ -208,14 +208,19 @@ Color and size are **redundant-ish** but independent (rate vs recency); together
 
 ---
 
-## 15. Open questions / assumptions to validate
+## 15. Open questions / assumptions
 
-1. Exact ramp stops + default cooldown duration — tune against a real broker in both themes.
-2. `rMin`/`rMax`/`k` size constants and EWMA half-life — tune to rate distribution.
-3. Retained-message recency seeding (§13) — confirm behavior.
-4. Whether `$SYS` is shown by default or behind a toggle.
-5. Light-mode cold endpoint exact value (`#6F8FB0` proposed).
-6. Minimap density representation at extreme topic counts.
+Resolved (tuned against simulated traffic, commit fd1bb10):
+1. **Cooldown curve + default** — age→ramp is **linear** (`t = age/cooldown`), default 60s. A logarithmic curve was tried first and cooled far too fast (1s stale → past teal); linear keeps actively-publishing topics warm and only cools genuinely idle ones.
+2. **Size constants** — `rMin 3.5`, `rMax 20`, `k 2.4` (size = `rMin + k·√score`); EWMA half-life ~10s (`tau 14s`, "balanced"; user-selectable responsive/balanced/smooth).
+3. **Light-mode cold endpoint** — `#6F8FB0` (dim blue), confirmed readable.
+4. **Group spacing** — top-level namespaces use d3-tree separation 1.9 so distinct roots read as groups.
+
+Still open (need the real app / product call):
+5. **Retained-message recency seeding** (§13) — seeding from the snapshot uses `latestMessageTime` (so old retained values start cold); live retained-on-connect timestamps are a backend concern — confirm in `wails dev`.
+6. Whether `$SYS` (`$app` in the sim) is shown by default or behind a toggle.
+7. Minimap density representation at extreme (10k+) topic counts.
+8. Final visual pass on ramp stops in the real app under real traffic.
 
 ---
 
