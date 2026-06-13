@@ -129,16 +129,18 @@ func (a *App) OpenChartWindow(p OpenChartWindowParams) error
   live append — identical data path to the in-panel chart, just a different
   shell.
 
-**UX / handoff**
+**UX / handoff (v1, as built)**
 
 - A **pop-out ⤢** button in the Chart tab calls `OpenChartWindow` with the
   current topic + selected fields.
-- Once popped out, the in-panel Chart tab shows a compact "Charting in a
-  separate window" state with **Focus window** and **Bring back** actions
-  (re-dock = close the window, resume in-panel). Both surfaces live-update
-  fine, so showing both is also acceptable; the placeholder keeps it tidy.
-- Closing the chart window (or "Bring back") re-docks: the panel resumes the
-  in-tab chart with the same series.
+- Both surfaces live-update independently (shared event stream), so the
+  in-panel chart simply keeps working alongside the window. Clicking pop-out
+  again **focuses** the existing window (focus-or-create) rather than
+  duplicating. **Re-dock = close the window**; the in-panel chart is always
+  present.
+- (A dedicated "Charting in a separate window" placeholder with Focus/Bring-
+  back was considered but skipped for v1 — keeping both live is simpler and
+  needs no window→panel state sync.)
 
 **Shared code:** `TopicChart`, `SeriesLegend`, `ChartOptions`,
 `chart-series-store`, `payload-fields` are reused verbatim between the in-panel
