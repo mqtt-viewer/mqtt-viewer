@@ -152,6 +152,9 @@ func (a *App) DeleteConnection(id uint) error {
 		if err := deleteCollectionsForConnection(tx, id); err != nil {
 			return err
 		}
+		if res := tx.Where("connection_id = ?", id).Delete(&models.ReceivedMessage{}); res.Error != nil {
+			return res.Error
+		}
 		if res := tx.Delete(&models.Connection{}, id); res.Error != nil {
 			return res.Error
 		}

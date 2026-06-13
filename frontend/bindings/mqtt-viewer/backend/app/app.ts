@@ -46,6 +46,14 @@ export function ClearConnectionHistory(connId: number): $CancellablePromise<void
     return $Call.ByID(4129774215, connId);
 }
 
+/**
+ * ClearReceivedMessages deletes all durable history (optionally for one
+ * connection) and compacts the file.
+ */
+export function ClearReceivedMessages(connectionID: number): $CancellablePromise<void> {
+    return $Call.ByID(3528502082, connectionID);
+}
+
 export function ConnectMqtt(connId: number): $CancellablePromise<void> {
     return $Call.ByID(1025617036, connId);
 }
@@ -136,6 +144,13 @@ export function GetCollectionsForConnection(connectionID: number): $CancellableP
     });
 }
 
+/**
+ * GetDatabaseSizeBytes reports the live database size (for the settings readout).
+ */
+export function GetDatabaseSizeBytes(): $CancellablePromise<number> {
+    return $Call.ByID(1735793535);
+}
+
 export function GetEnvInfo(): $CancellablePromise<$models.EnvInfo> {
     return $Call.ByID(3369643427).then(($result: any) => {
         return $$createType11($result);
@@ -175,6 +190,26 @@ export function GetPanelSizes(): $CancellablePromise<models$0.PanelSize[]> {
 export function GetPublishHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.PublishHistory[]> {
     return $Call.ByID(3102818020, connectionID).then(($result: any) => {
         return $$createType20($result);
+    });
+}
+
+/**
+ * GetReceivedMessageCount returns how many durable messages exist for a topic
+ * (drives the window-count UI).
+ */
+export function GetReceivedMessageCount(connectionID: number, topic: string): $CancellablePromise<number> {
+    return $Call.ByID(4098527297, connectionID, topic);
+}
+
+/**
+ * GetReceivedMessageWindow returns a page of a topic's durable history in
+ * arrival (ascending) order. Pages newest-first via keyset pagination: pass
+ * beforeID = 0 for the newest window, then the smallest id of the returned
+ * page as beforeID to fetch the next-older window. limit <= 0 uses the default.
+ */
+export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
+    return $Call.ByID(2230097254, connectionID, topic, beforeID, limit).then(($result: any) => {
+        return $$createType15($result);
     });
 }
 
