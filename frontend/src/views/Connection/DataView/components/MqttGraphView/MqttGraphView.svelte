@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { EventsOn } from "wailsjs/runtime/runtime";
-  import type { mqtt } from "wailsjs/go/models";
+  import { Events } from "@wailsio/runtime";
+  import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { MqttData } from "../MqttDataPanel/stores/mqtt-data";
@@ -72,13 +72,11 @@
     renderer.setSelected($selectedTopicStore.selectedTopic);
     renderer.fitView();
 
-    unsubMsgs = EventsOn(
-      connection.eventSet.mqttMessages,
-      (messages: mqtt.MqttMessage[]) => {
-        for (const m of messages) model.ingest(m.topic, m.timeMs || Date.now());
-      }
-    );
-    unsubClear = EventsOn(connection.eventSet.mqttClearHistory, () => {
+    unsubMsgs = Events.On(connection.eventSet.mqttMessages, (e) => {
+      const messages: mqtt.MqttMessage[] = e.data;
+      for (const m of messages) model.ingest(m.topic, m.timeMs || Date.now());
+    });
+    unsubClear = Events.On(connection.eventSet.mqttClearHistory, () => {
       model.clear();
       renderer?.relayout();
     });
