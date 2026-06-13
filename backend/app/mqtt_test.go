@@ -321,8 +321,9 @@ func TestMakePublishProperties(t *testing.T) {
 	if *messageProperties.TopicAlias != 1 {
 		t.Errorf("Expected TopicAlias 1, got %v", *messageProperties.TopicAlias)
 	}
-	if *messageProperties.SubscriptionIdentifier != 2 {
-		t.Errorf("Expected SubscriptionIdentifier 2, got %v", *messageProperties.SubscriptionIdentifier)
+	// Subscription identifiers must never be set on outgoing publishes [MQTT-3.3.4-6]
+	if messageProperties.SubscriptionIdentifier != nil {
+		t.Errorf("Expected SubscriptionIdentifier to be nil, got %v", *messageProperties.SubscriptionIdentifier)
 	}
 	if len(messageProperties.UserProperties) != 1 {
 		t.Errorf("Expected 1 user property, got %v", len(messageProperties.UserProperties))
