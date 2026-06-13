@@ -32,28 +32,36 @@
   let paused = false;
   let depth = 1;
 
-  // persisted view preferences
-  const SETTINGS_KEY = "mqtt-viewer-topicgraph-settings";
+  // persisted view preferences (scoped per connection)
+  const settingsKey = () =>
+    `mqtt-viewer-topicgraph-settings:${connection.connectionDetails.id}`;
   let minimapOn = true;
   let followHottest = false;
   let cvdSafe = false;
   let cooldownMs = 60000;
+  let tauMs = 14000; // EWMA half-life ~10s by default
   const COOLDOWNS: Array<[string, number]> = [
     ["30s", 30000],
     ["1m", 60000],
     ["5m", 300000],
     ["1h", 3600000],
   ];
+  const SMOOTHING: Array<[string, number]> = [
+    ["responsive", 5000],
+    ["balanced", 14000],
+    ["smooth", 40000],
+  ];
 
   const loadSettings = () => {
     try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
+      const raw = localStorage.getItem(settingsKey());
       if (!raw) return;
       const s = JSON.parse(raw);
       if (typeof s.minimapOn === "boolean") minimapOn = s.minimapOn;
       if (typeof s.followHottest === "boolean") followHottest = s.followHottest;
       if (typeof s.cvdSafe === "boolean") cvdSafe = s.cvdSafe;
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
+      if (typeof s.tauMs === "number") tauMs = s.tauMs;
     } catch (e) {
       console.error("topic-graph settings load failed", e);
     }
@@ -61,8 +69,8 @@
   const saveSettings = () => {
     try {
       localStorage.setItem(
-        SETTINGS_KEY,
-        JSON.stringify({ minimapOn, followHottest, cvdSafe, cooldownMs })
+        settingsKey(),
+        JSON.stringify({ minimapOn, followHottest, cvdSafe, cooldownMs, tauMs })
       );
     } catch (e) {
       console.error("topic-graph settings save failed", e);
@@ -74,6 +82,7 @@
     renderer.setFollowHottest(followHottest);
     renderer.setCvdSafe(cvdSafe);
     renderer.setCooldownMs(cooldownMs);
+    model.tauMs = tauMs;
   };
 
   const seed = (data: MqttData) => {
@@ -146,12 +155,14 @@
       }
     });
     ro.observe(containerEl);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
   });
 
   onDestroy(() => {
     unsubMsgs?.();
     unsubClear?.();
     ro?.disconnect();
+    document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (liveTimer) clearInterval(liveTimer);
     renderer?.destroy();
   });
@@ -192,10 +203,26 @@
     renderer?.setCooldownMs(cooldownMs);
     saveSettings();
   };
+  const onSmoothing = (e: Event) => {
+    tauMs = Number((e.target as HTMLSelectElement).value);
+    model.tauMs = tauMs;
+    saveSettings();
+  };
   const toggleFullscreen = () => {
     const el = containerEl?.parentElement ?? containerEl;
     if (!document.fullscreenElement) el?.requestFullscreen?.();
     else document.exitFullscreen?.();
+  };
+  const onFullscreenChange = () => {
+    // the container resizes when entering/leaving fullscreen; refit once settled
+    requestAnimationFrame(() => {
+      const cw = containerEl?.clientWidth ?? 0;
+      const ch = containerEl?.clientHeight ?? 0;
+      if (cw > 0 && ch > 0 && renderer) {
+        renderer.resize(cw, ch);
+        renderer.fitView();
+      }
+    });
   };
 </script>
 
@@ -238,6 +265,16 @@
     >
       {#each COOLDOWNS as [lbl, ms]}
         <option value={ms}>cool: {lbl}</option>
+      {/each}
+    </select>
+    <select
+      class="rounded-md border border-outline bg-elevation-1 px-2 py-1 text-white-text outline-none"
+      value={tauMs}
+      on:change={onSmoothing}
+      title="rate smoothing (EWMA window)"
+    >
+      {#each SMOOTHING as [lbl, ms]}
+        <option value={ms}>rate: {lbl}</option>
       {/each}
     </select>
     <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={followHottest} on:click={toggleFollow} title="auto-pan to the hottest topic">follow</button>
