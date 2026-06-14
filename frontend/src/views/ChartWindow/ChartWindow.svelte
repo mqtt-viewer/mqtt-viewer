@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import connections from "@/stores/connections";
   import IconContext from "@/components/Icon/IconContext.svelte";
@@ -52,6 +52,12 @@
     );
     // Loads historical and begins live-appending from the shared event stream.
     await selectedTopicStore.selectTopic(topic);
+  });
+
+  onDestroy(() => {
+    // Drop the app-global event listeners when the window closes so we don't
+    // leak a listener (and a forever-growing history) on the shared backend.
+    selectedTopicStore?.destroy();
   });
 </script>
 

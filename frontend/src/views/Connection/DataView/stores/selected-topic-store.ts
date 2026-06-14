@@ -55,8 +55,13 @@ export const createSelectedTopicStore = (
     }
   );
 
+  // Unsubscribe fns for the app-global event listeners; called by destroy()
+  // so a torn-down store (e.g. a closed pop-out window) stops accumulating
+  // history and leaking listeners on the shared backend event stream.
+  let unsubscribers: Array<() => void> = [];
+
   const registerMessageListener = () => {
-    Events.On(connectionEventSet.mqttMessages, (e) => {
+    const offMessages = Events.On(connectionEventSet.mqttMessages, (e) => {
       const messages: mqtt.MqttMessage[] = e.data;
       const { selectedTopic, onNewMessages } = get({ subscribe });
       if (selectedTopic === null) return;
@@ -81,11 +86,20 @@ export const createSelectedTopicStore = (
         });
       }
     });
-    Events.On(connectionEventSet.mqttClearHistory, () => {
+    const offClear = Events.On(connectionEventSet.mqttClearHistory, () => {
       update((store) => {
         return { ...store, history: [], selectedTopic: null };
       });
     });
+    unsubscribers = [offMessages, offClear];
+  };
+
+  // Tear down event listeners. Call when the owning surface unmounts (the
+  // pop-out chart window in particular) so we don't leak a listener — and a
+  // growing history buffer — on the shared, app-global backend event stream.
+  const destroy = () => {
+    for (const off of unsubscribers) off();
+    unsubscribers = [];
   };
 
   const selectTopic = async (
@@ -171,5 +185,6 @@ export const createSelectedTopicStore = (
     setOnNewMessages,
     setComparing,
     setAutoSelect,
+    destroy,
   };
 };

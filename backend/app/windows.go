@@ -29,6 +29,21 @@ func chartWindowKey(connectionID uint, topic string) string {
 	return fmt.Sprintf("%d|%s", connectionID, topic)
 }
 
+// buildChartWindowURL builds the route the detached chart window loads. Kept
+// separate (and pure) so the encoding is unit-testable without a running app.
+func buildChartWindowURL(params OpenChartWindowParams) string {
+	query := url.Values{}
+	query.Set("view", "chart")
+	query.Set("conn", fmt.Sprint(params.ConnectionID))
+	query.Set("topic", params.Topic)
+	if len(params.Fields) > 0 {
+		if encoded, err := json.Marshal(params.Fields); err == nil {
+			query.Set("fields", string(encoded))
+		}
+	}
+	return "/?" + query.Encode()
+}
+
 // OpenChartWindow opens (or focuses) a separate window rendering the standalone
 // chart for a topic. The new window shares this Go backend and its event
 // stream, so it live-updates from the same messages as the main window.
@@ -39,24 +54,18 @@ func (a *App) OpenChartWindow(params OpenChartWindowParams) error {
 	}
 	key := chartWindowKey(params.ConnectionID, params.Topic)
 
+	// Hold the lock across the whole check-create-insert so two near-simultaneous
+	// calls for the same topic can't both miss the map and open duplicate
+	// windows (TOCTOU). Window creation here is a cheap, non-blocking call.
 	chartWindowsMu.Lock()
+	defer chartWindowsMu.Unlock()
+
 	if existing, ok := chartWindows[key]; ok && existing != nil {
-		chartWindowsMu.Unlock()
 		existing.Focus()
 		return nil
 	}
-	chartWindowsMu.Unlock()
 
-	query := url.Values{}
-	query.Set("view", "chart")
-	query.Set("conn", fmt.Sprint(params.ConnectionID))
-	query.Set("topic", params.Topic)
-	if len(params.Fields) > 0 {
-		if encoded, err := json.Marshal(params.Fields); err == nil {
-			query.Set("fields", string(encoded))
-		}
-	}
-	windowURL := "/?" + query.Encode()
+	windowURL := buildChartWindowURL(params)
 
 	title := params.Topic + " — chart"
 	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -71,15 +80,17 @@ func (a *App) OpenChartWindow(params OpenChartWindowParams) error {
 		},
 		URL: windowURL,
 	})
-
-	chartWindowsMu.Lock()
 	chartWindows[key] = window
-	chartWindowsMu.Unlock()
 
 	window.OnWindowEvent(events.Common.WindowClosing, func(_ *application.WindowEvent) {
 		chartWindowsMu.Lock()
-		delete(chartWindows, key)
-		chartWindowsMu.Unlock()
+		defer chartWindowsMu.Unlock()
+		// Only remove our own entry: if the user reopened the chart (a new
+		// window now occupies this key), deleting unconditionally would evict
+		// the live window and break focus-or-create.
+		if chartWindows[key] == window {
+			delete(chartWindows, key)
+		}
 	})
 
 	return nil

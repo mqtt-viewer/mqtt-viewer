@@ -19,6 +19,10 @@
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
   let resizeObserver: ResizeObserver | null = null;
+  // Drives the sliding time-window: when windowMinutes>0 the x-axis min/max are
+  // anchored to Date.now(), so without fresh data the view would freeze. Tick
+  // re-renders ~1s so the window keeps sliding even when no messages arrive.
+  let windowTick: ReturnType<typeof setInterval> | null = null;
 
   const seriesData = (history: MqttHistoryMessage[], path: string) => {
     const points: [number, number][] = [];
@@ -65,6 +69,10 @@
         splitLine: { lineStyle: { color: "#2e2e2e" } },
       },
       series: visible.map((s) => ({
+        // id keys the series by its full payload path so replaceMerge and the
+        // tooltip stay stable even when two paths share a last segment (and
+        // thus the same display label, e.g. a.temp / b.temp -> "temp").
+        id: s.path,
         name: s.label,
         type: "line",
         showSymbol: showPoints,
@@ -96,6 +104,18 @@
     paused,
     render();
 
+  // Keep the ticker running only while a finite, unpaused window is shown.
+  const syncWindowTick = () => {
+    const wantTick = windowMinutes > 0 && !paused;
+    if (wantTick && windowTick === null) {
+      windowTick = setInterval(render, 1000);
+    } else if (!wantTick && windowTick !== null) {
+      clearInterval(windowTick);
+      windowTick = null;
+    }
+  };
+  $: windowMinutes, paused, syncWindowTick();
+
   onMount(() => {
     chart = echarts.init(container, undefined, { renderer: "canvas" });
     render();
@@ -104,6 +124,7 @@
   });
 
   onDestroy(() => {
+    if (windowTick !== null) clearInterval(windowTick);
     resizeObserver?.disconnect();
     chart?.dispose();
     chart = null;
