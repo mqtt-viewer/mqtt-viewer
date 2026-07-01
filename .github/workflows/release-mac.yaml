@@ -63,7 +63,7 @@ jobs:
 
       - name: Install pnpm
         shell: bash
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.28.0
 
       # Dependencies
 
