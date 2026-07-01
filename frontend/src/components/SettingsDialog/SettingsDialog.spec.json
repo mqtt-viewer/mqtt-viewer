@@ -1,0 +1,30 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "SettingsDialog",
+  "tier": "component",
+  "description": "Storybook coverage for SettingsDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "open",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "emphasis",
+    "secondary-text",
+    "outline"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

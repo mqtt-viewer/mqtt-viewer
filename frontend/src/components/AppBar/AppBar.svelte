@@ -10,6 +10,7 @@
   import { writable } from "svelte/store";
   import NotificationsButton from "./components/NotificationsButton.svelte";
   import FeedbackDialog from "./components/FeedbackDialog/FeedbackDialog.svelte";
+  import SettingsDialog from "@/components/SettingsDialog/SettingsDialog.svelte";
   import theme from "@/stores/theme";
 
   let className = "";
@@ -26,6 +27,7 @@
   $: countOpenTabs = $tabs.tabs.length;
 
   let feedbackDialogOpen = writable(false);
+  let settingsDialogOpen = writable(false);
 </script>
 
 <div
@@ -73,6 +75,15 @@
         feedbackDialogOpen.set(true);
       }}><div class="px-1">Feedback</div></IconButton
     >
+    <IconButton
+      tooltipText="Settings"
+      onClick={() => {
+        settingsDialogOpen.set(true);
+      }}
+    >
+      <Icon type="settings" />
+    </IconButton>
   </div>
 </div>
 <FeedbackDialog open={feedbackDialogOpen} />
+<SettingsDialog open={settingsDialogOpen} />

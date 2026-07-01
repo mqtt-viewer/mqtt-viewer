@@ -30,6 +30,7 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 	dbPath := path.Join(resourcePath, name)
 
 	var err error
+	isNewFile := false
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		// remove stale sidecar files left behind by a deleted db so they
@@ -45,6 +46,7 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 			return nil, err
 		}
 		file.Close()
+		isNewFile = true
 	} else if err != nil {
 		return nil, err
 	}
@@ -77,7 +79,17 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 			loggerConfig,
 		)
 	}
-	db, err := gorm.Open(sqlite.Open(dbPath+"?_pragma=busy_timeout(5000)"), &gorm.Config{
+	// WAL + synchronous=NORMAL let writes and reads proceed concurrently and
+	// avoid an fsync per transaction, which matters once received messages are
+	// persisted in batches at broker rates. busy_timeout keeps writers waiting
+	// rather than erroring under contention.
+	// foreign_keys is per-connection and defaults OFF, so it must be in the DSN
+	// (applied to every pooled connection), not a one-off Exec on a single one.
+	dsn := dbPath + "?_pragma=busy_timeout(5000)" +
+		"&_pragma=journal_mode(WAL)" +
+		"&_pragma=synchronous(NORMAL)" +
+		"&_pragma=foreign_keys(1)"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: newLogger,
 	})
 	if err != nil {
@@ -85,6 +97,18 @@ func NewDb(resourcePath string, options *NewDbOptions) (*DB, error) {
 	}
 	if res := db.Exec("PRAGMA foreign_keys = ON"); res.Error != nil {
 		return nil, res.Error
+	}
+	// auto_vacuum can only be changed on a database with no tables (then it
+	// persists in the header). Set it on freshly created files and VACUUM to
+	// commit it, so pruned message pages can later be released to the OS via
+	// PRAGMA incremental_vacuum. Existing databases keep their current mode.
+	if isNewFile {
+		if res := db.Exec("PRAGMA auto_vacuum = INCREMENTAL"); res.Error != nil {
+			return nil, res.Error
+		}
+		if res := db.Exec("VACUUM"); res.Error != nil {
+			return nil, res.Error
+		}
 	}
 	slog.Info("connected to database at " + dbPath)
 

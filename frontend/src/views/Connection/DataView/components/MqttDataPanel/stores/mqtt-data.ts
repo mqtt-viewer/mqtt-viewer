@@ -23,16 +23,21 @@ export const createMqttDataStore = (
   highlightedTopicStore: HighlightedMqttTopicsStore,
   eventSet?: events.ConnectionEventsSet
 ) => {
-  const { subscribe, set, update } = writable<MqttData>({}, (set) => {
-    if (eventSet !== undefined) {
-      Events.On(eventSet.mqttMessages, (e) => {
-        const messages: mqtt.MqttMessage[] = e.data;
-        processMessages(messages);
-      });
-      Events.On(eventSet.mqttClearHistory, () => {
-        resetMqttData();
-      });
-    }
+  const { subscribe, set, update } = writable<MqttData>({}, () => {
+    if (eventSet === undefined) return;
+    // Capture the unsubscribe handles and tear them down when the last store
+    // subscriber leaves, so listeners don't accumulate across tab churn.
+    const offMessages = Events.On(eventSet.mqttMessages, (e: any) => {
+      const messages: mqtt.MqttMessage[] = e.data;
+      processMessages(messages);
+    });
+    const offClear = Events.On(eventSet.mqttClearHistory, () => {
+      resetMqttData();
+    });
+    return () => {
+      offMessages?.();
+      offClear?.();
+    };
   });
 
   const processMessages = (messages: mqtt.MqttMessage[]) => {

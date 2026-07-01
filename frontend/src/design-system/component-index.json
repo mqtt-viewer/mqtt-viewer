@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-13T10:55:01.065Z",
+  "generatedAt": "2026-07-01T23:02:11.330Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1243,6 +1243,31 @@
       "specMissing": false
     },
     {
+      "name": "HistoryRetentionPrompt",
+      "tier": "component",
+      "description": "Storybook coverage for HistoryRetentionPrompt.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte",
+      "specPath": "src/components/HistoryRetentionPrompt/HistoryRetentionPrompt.spec.json",
+      "storyPath": "src/components/HistoryRetentionPrompt/HistoryRetentionPrompt.stories.svelte",
+      "storyId": "Components/HistoryRetentionPrompt",
+      "specMissing": false
+    },
+    {
       "name": "Icon",
       "tier": "primitive",
       "description": "Storybook coverage for Icon.",
@@ -2034,6 +2059,40 @@
       "specPath": "src/components/ResizableContainer/ResizableContainer.spec.json",
       "storyPath": "src/components/ResizableContainer/ResizableContainer.stories.svelte",
       "storyId": "Primitives/ResizableContainer",
+      "specMissing": false
+    },
+    {
+      "name": "SettingsDialog",
+      "tier": "component",
+      "description": "Storybook coverage for SettingsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "emphasis",
+        "secondary-text",
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/SettingsDialog/SettingsDialog.svelte",
+      "specPath": "src/components/SettingsDialog/SettingsDialog.spec.json",
+      "storyPath": "src/components/SettingsDialog/SettingsDialog.stories.svelte",
+      "storyId": "Components/SettingsDialog",
       "specMissing": false
     },
     {

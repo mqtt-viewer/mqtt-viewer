@@ -97,6 +97,13 @@
       : null;
   $: prevMessageRetained = previousMessage?.retain ?? false;
   $: previousMessagePayload = previousMessage?.payload.toString() ?? null;
+
+  // Windowed durable history (recording on): older/newer/latest navigation.
+  $: isDiskHistory = $selectedTopicStore.historySource === "disk";
+  $: historyWindow = $selectedTopicStore.window;
+  $: totalHistoryCount = $selectedTopicStore.totalCount;
+  $: shownHistoryCount = $selectedTopicStore.history.length;
+  $: atLatestWindow = historyWindow?.isNewest ?? true;
 </script>
 
 <div
@@ -172,6 +179,37 @@
       }}
     />
   </div>
+  {#if isDiskHistory && totalHistoryCount > shownHistoryCount}
+    <div
+      class="flex items-center gap-2 text-sm text-secondary-text mt-1 mb-1 select-none"
+    >
+      <Button
+        variant="text"
+        iconType="left"
+        iconPlacement="left"
+        iconSize={12}
+        on:click={() => selectedTopicStore.loadOlderWindow()}>Older</Button
+      >
+      <Button
+        variant="text"
+        iconType="right"
+        iconPlacement="right"
+        iconSize={12}
+        disabled={atLatestWindow}
+        on:click={() => selectedTopicStore.loadNewerWindow()}>Newer</Button
+      >
+      {#if !atLatestWindow}
+        <Button variant="text" on:click={() => selectedTopicStore.jumpToLatest()}
+          >Jump to latest</Button
+        >
+      {/if}
+      <div class="grow"></div>
+      <span class="whitespace-nowrap">
+        Showing {shownHistoryCount.toLocaleString()} of {totalHistoryCount.toLocaleString()}
+        {atLatestWindow ? "(latest)" : ""}
+      </span>
+    </div>
+  {/if}
   {#if selectedMessage === null}
     <div class="mt-12 flex justify-center text-secondary-text">
       No message selected

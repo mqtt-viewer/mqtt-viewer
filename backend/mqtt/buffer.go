@@ -47,10 +47,16 @@ func (mb *MessageBuffer) StopHandlingBuffer() {
 }
 
 func (mb *MessageBuffer) useBufferContents(useContentsFunc func(messages []MqttMessage)) {
+	// Snapshot and reset under the lock, then run the (possibly slow: event
+	// emit + DB persist + prune) callback unlocked, so incoming messages aren't
+	// blocked on the buffer mutex while a drain is in flight.
 	mb.mu.Lock()
-	defer mb.mu.Unlock()
-	useContentsFunc(mb.buffer)
+	messages := mb.buffer
 	mb.buffer = []MqttMessage{}
+	mb.mu.Unlock()
+	if len(messages) > 0 {
+		useContentsFunc(messages)
+	}
 }
 
 func (mb *MessageBuffer) addMessageToBuffer(mqttMessage MqttMessage) {

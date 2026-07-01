@@ -19,6 +19,7 @@
   import PleaseUpdate from "./views/PleaseUpdate/PleaseUpdate.svelte";
   import UpdateDialog from "./components/UpdateDialog/UpdateDialog.svelte";
   import ChartWindow from "./views/ChartWindow/ChartWindow.svelte";
+  import HistoryRetentionPrompt from "./components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte";
 
   // Detached chart windows (opened by OpenChartWindow) load the same assets at
   // /?view=chart&...; render only the standalone chart, not the full app shell.
@@ -88,6 +89,7 @@
       <AppBarBottom />
       <MaxOpenTabsDialog />
       <UpdateDialog />
+      <HistoryRetentionPrompt />
     {/await}
     <Toast />
   </IconContext>
