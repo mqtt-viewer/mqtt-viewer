@@ -10,6 +10,7 @@ import (
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
+	"sync/atomic"
 )
 
 type App struct {
@@ -23,6 +24,13 @@ type App struct {
 	AppConnections map[uint]*AppConnection
 	Updater        *update.Updater
 	ProtoRegistry  *protobuf.ProtoRegistry
+	// Cached so the 300ms message-buffer drain doesn't hit the DB to decide
+	// whether to persist; kept in sync by loadRetentionSettings / UpdateAppSettings.
+	recordingEnabled atomic.Bool
+	diskBudgetBytes  atomic.Int64
+	// Throttles the (PRAGMA-based) disk-size check so it doesn't run on every
+	// 300ms drain. Unix-nano of the last prune check.
+	lastPruneCheckNanos atomic.Int64
 }
 
 type AppConnection struct {

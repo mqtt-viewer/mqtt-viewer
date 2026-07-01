@@ -46,6 +46,40 @@ export async function ChooseDirectory(_currentPath: string): Promise<string> {
 export async function ClearConnectionHistory(
   _connectionId: number
 ): Promise<void> {}
+
+// App settings / message retention mocks.
+let mockAppSettings = new models.AppSettings({
+  id: 1,
+  memoryBudgetBytes: 512 * 1024 * 1024,
+  recordingEnabled: false,
+  diskBudgetBytes: 1 * 1024 * 1024 * 1024,
+  hasSeenHistoryPrompt: false,
+});
+let mockDatabaseSizeBytes = 250 * 1024 * 1024;
+
+export async function GetAppSettings(): Promise<models.AppSettings> {
+  return mockAppSettings;
+}
+
+export async function UpdateAppSettings(params: {
+  memoryBudgetBytes: number;
+  recordingEnabled: boolean;
+  diskBudgetBytes: number;
+  hasSeenHistoryPrompt: boolean;
+}): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({ id: 1, ...params });
+  return mockAppSettings;
+}
+
+export async function GetDatabaseSizeBytes(): Promise<number> {
+  return mockDatabaseSizeBytes;
+}
+
+export async function ClearReceivedMessages(
+  _connectionId: number
+): Promise<void> {
+  mockDatabaseSizeBytes = 0;
+}
 export async function ConnectMqtt(_connectionId: number): Promise<void> {}
 export async function DeleteConnection(_connectionId: number): Promise<void> {}
 export async function DeleteFilterHistoryEntry(
@@ -292,6 +326,23 @@ export async function GetMessageHistory(
   _topic: string
 ): Promise<any[]> {
   return mockMqttMessages;
+}
+
+export async function GetReceivedMessageWindow(
+  _connectionId: number,
+  _topic: string,
+  _beforeID: number,
+  _afterID: number,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessages;
+}
+
+export async function GetReceivedMessageCount(
+  _connectionId: number,
+  _topic: string
+): Promise<number> {
+  return mockMqttMessages.length;
 }
 
 export async function GetMqttStats(): Promise<app.MqttStats> {

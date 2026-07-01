@@ -449,6 +449,39 @@ export class StartupOptions {
     }
 }
 
+export class UpdateAppSettingsParams {
+    "memoryBudgetBytes": number;
+    "recordingEnabled": boolean;
+    "diskBudgetBytes": number;
+    "hasSeenHistoryPrompt": boolean;
+
+    /** Creates a new UpdateAppSettingsParams instance. */
+    constructor($$source: Partial<UpdateAppSettingsParams> = {}) {
+        if (!("memoryBudgetBytes" in $$source)) {
+            this["memoryBudgetBytes"] = 0;
+        }
+        if (!("recordingEnabled" in $$source)) {
+            this["recordingEnabled"] = false;
+        }
+        if (!("diskBudgetBytes" in $$source)) {
+            this["diskBudgetBytes"] = 0;
+        }
+        if (!("hasSeenHistoryPrompt" in $$source)) {
+            this["hasSeenHistoryPrompt"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new UpdateAppSettingsParams instance from a string or object.
+     */
+    static createFrom($$source: any = {}): UpdateAppSettingsParams {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new UpdateAppSettingsParams($$parsedSource as Partial<UpdateAppSettingsParams>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = models$0.Connection.createFrom;
 const $$createType1 = events$0.ConnectionEventsSet.createFrom;

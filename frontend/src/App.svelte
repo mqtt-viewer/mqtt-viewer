@@ -18,6 +18,7 @@
   import AppBarBottom from "./components/AppBarBottom/AppBarBottom.svelte";
   import PleaseUpdate from "./views/PleaseUpdate/PleaseUpdate.svelte";
   import UpdateDialog from "./components/UpdateDialog/UpdateDialog.svelte";
+  import HistoryRetentionPrompt from "./components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte";
 
   gsap.registerPlugin(Flip);
   gsap.registerPlugin(Draggable);
@@ -79,6 +80,7 @@
       <AppBarBottom />
       <MaxOpenTabsDialog />
       <UpdateDialog />
+      <HistoryRetentionPrompt />
     {/await}
     <Toast />
   </IconContext>

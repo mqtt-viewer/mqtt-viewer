@@ -235,6 +235,9 @@ export const createMockSelectedTopicStore = () => {
           ? '{"temp":21.4,"unit":"C"}'
           : '{"humidity":42.8}',
     })) as any,
+    historySource: "memory",
+    window: null,
+    totalCount: mockMqttMessages.length,
     options: {
       autoSelect: true,
       compare: true,

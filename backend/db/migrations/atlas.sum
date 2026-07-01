@@ -1,4 +1,4 @@
-h1:JL8XpwRX445IGJtimbjaxOWq31Zjwhx8cuotdSx5Ym4=
+h1:3xmFFWPSwGkou4wq6nLdyrK0UOnLsjQFMcRYQ1nYh/A=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -9,3 +9,4 @@ h1:JL8XpwRX445IGJtimbjaxOWq31Zjwhx8cuotdSx5Ym4=
 20250320051532_add-global-and-encrypt-passwords.sql h1:M2WqmmtMsFew0UtUV/g83BNB7H28piWVP4Ib9C09DzQ=
 20250405054934_remove-proto-descriptor-from-subscription.sql h1:emOyawli9u0jz8pDMhwe+jcBeT7ys1lmwCLhLhhCqQc=
 20260612000000_add-collections.sql h1:/p8pdfn65hKsKkPAaSSQL/ibNTlmf9fyCc2Oz+K+hxY=
+20260613000000_add-received-messages-and-settings.sql h1:d1KzWMXKevL+GkkBxEWeTOpCAGPzSqV+i6AGnQIsgI8=
