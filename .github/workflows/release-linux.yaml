@@ -7,18 +7,19 @@ on:
 env:
   GO_VERSION: "1.25.x"
   WAILS_VERSION: "v3.0.0-alpha.98"
-  NODE_VERSION: "20.15.0"
+  NODE_VERSION: "22.17.0"
 
 jobs:
   release:
     strategy:
+      fail-fast: false
       matrix:
         build:
           - arch: amd64
-            os: blacksmith
+            os: ubuntu-latest
             tag: linux_amd64
           - arch: arm64
-            os: blacksmith-arm
+            os: ubuntu-24.04-arm
             tag: linux_arm64
     runs-on: ${{ matrix.build.os }}
     name: Release MQTT Viewer (${{ matrix.build.tag }})
