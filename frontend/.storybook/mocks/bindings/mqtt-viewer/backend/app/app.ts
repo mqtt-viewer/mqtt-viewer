@@ -289,6 +289,12 @@ export async function DeleteCollectionMessage(id: number): Promise<void> {
   }
 }
 
+export async function OpenChartWindow(_params: {
+  connectionId: number;
+  topic: string;
+  fields: string[];
+}): Promise<void> {}
+
 export async function GetEnvInfo(): Promise<app.EnvInfo> {
   return new app.EnvInfo({
     isDev: true,

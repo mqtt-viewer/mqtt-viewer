@@ -87,6 +87,12 @@ export const createSelectedTopicStore = (
     () => registerMessageListener()
   );
 
+  // The live teardown for the Wails listeners while the store has
+  // subscribers; destroy() lets a surface that owns the store outright (the
+  // pop-out chart window) drop the listeners explicitly, same as the last
+  // subscriber leaving.
+  let activeTeardown: (() => void) | null = null;
+
   // Returns a teardown so the writable unsubscribes its Wails listeners when
   // the last store subscriber leaves (fixes the previous listener leak).
   const registerMessageListener = () => {
@@ -135,11 +141,15 @@ export const createSelectedTopicStore = (
         totalCount: 0,
       }));
     });
-    return () => {
+    activeTeardown = () => {
       offMessages?.();
       offClear?.();
+      activeTeardown = null;
     };
+    return () => activeTeardown?.();
   };
+
+  const destroy = () => activeTeardown?.();
 
   const isRecordingEnabled = async (): Promise<boolean> => {
     try {
@@ -312,6 +322,7 @@ export const createSelectedTopicStore = (
     setOnNewMessages,
     setComparing,
     setAutoSelect,
+    destroy,
     loadOlderWindow,
     loadNewerWindow,
     jumpToLatest,

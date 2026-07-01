@@ -9,8 +9,9 @@
   export let defaultTab = 0;
   export let tabs: { title: string }[] = [];
   export let ariaLabel = "Tabs";
+  export let onTabChange: (index: number) => void = () => {};
 
-  const tabIds = ["tab-1", "tab-2", "tab-3"];
+  const tabIds = ["tab-1", "tab-2", "tab-3", "tab-4"];
 
   const {
     elements: { root, list, content, trigger },
@@ -18,6 +19,13 @@
   } = createTabs({
     defaultValue: tabIds[defaultTab],
   });
+
+  // Lets a parent switch tabs programmatically (e.g. "View chart →").
+  export const setTab = (index: number) => {
+    if (index >= 0 && index < tabIds.length) value.set(tabIds[index]);
+  };
+
+  $: onTabChange(tabIds.indexOf($value));
 
   const [send, receive] = crossfade({
     duration: 250,
@@ -71,5 +79,11 @@
     class="grow min-h-0 max-h-full overflow-auto"
   >
     <slot name="tab-3" />
+  </div>
+  <div
+    use:melt={$content(tabIds[3])}
+    class="grow min-h-0 max-h-full overflow-auto"
+  >
+    <slot name="tab-4" />
   </div>
 </div>

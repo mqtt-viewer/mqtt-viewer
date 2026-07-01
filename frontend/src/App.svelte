@@ -18,7 +18,13 @@
   import AppBarBottom from "./components/AppBarBottom/AppBarBottom.svelte";
   import PleaseUpdate from "./views/PleaseUpdate/PleaseUpdate.svelte";
   import UpdateDialog from "./components/UpdateDialog/UpdateDialog.svelte";
+  import ChartWindow from "./views/ChartWindow/ChartWindow.svelte";
   import HistoryRetentionPrompt from "./components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte";
+
+  // Detached chart windows (opened by OpenChartWindow) load the same assets at
+  // /?view=chart&...; render only the standalone chart, not the full app shell.
+  const isChartWindow =
+    new URLSearchParams(window.location.search).get("view") === "chart";
 
   gsap.registerPlugin(Flip);
   gsap.registerPlugin(Draggable);
@@ -52,10 +58,13 @@
   $: pleaseUpdate = false;
 </script>
 
-<main
-  class="h-full w-full flex flex-col bg-elevation-0"
-  bind:clientWidth={appWidth}
->
+{#if isChartWindow}
+  <ChartWindow />
+{:else}
+  <main
+    class="h-full w-full flex flex-col bg-elevation-0"
+    bind:clientWidth={appWidth}
+  >
   <IconContext>
     {#await initialization.init()}
       <span>Loading....</span>
@@ -84,4 +93,5 @@
     {/await}
     <Toast />
   </IconContext>
-</main>
+  </main>
+{/if}
