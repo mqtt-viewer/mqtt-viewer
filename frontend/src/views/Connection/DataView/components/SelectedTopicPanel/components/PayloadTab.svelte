@@ -32,8 +32,9 @@
   // Optional: when present, a "Chart fields" toggle reveals the numeric picker.
   export let chartSeriesStore: ChartSeriesStore | null = null;
   export let onViewChart: (() => void) | null = null;
+  // Bindable so the Chart tab's "Add value from payload" can open the picker.
+  export let showFieldPicker = false;
 
-  let showFieldPicker = false;
   let showRawImageBytes = false;
   // Reset the raw-bytes escape hatch when switching messages.
   $: payloadB64, (showRawImageBytes = false);

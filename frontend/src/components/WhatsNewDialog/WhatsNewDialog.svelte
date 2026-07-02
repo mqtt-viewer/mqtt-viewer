@@ -1,7 +1,7 @@
 <script lang="ts" context="module">
   import { writable } from "svelte/store";
 
-  // Exported so Settings (or anywhere) can reopen the current version's notes.
+  // Exported so Settings and the status bar (or anywhere) can open the notes.
   export const whatsNewOpen = writable(false);
 
   // Set true once the first-run retention prompt has resolved (either it was
@@ -14,7 +14,11 @@
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import WhatsNewContent from "./WhatsNewContent.svelte";
   import env from "@/stores/env";
-  import { entryForVersion, shouldShowChangelog } from "@/changelog";
+  import {
+    changelogForDisplay,
+    entryForVersion,
+    shouldShowChangelog,
+  } from "@/changelog";
   import {
     GetAppSettings,
     AcknowledgeChangelog,
@@ -23,7 +27,10 @@
   let checked = false;
   let acknowledged = false;
 
-  $: entry = $env.version ? entryForVersion($env.version) : null;
+  // Newest first; includes the unreleased staging entry on dev builds only.
+  $: entries = changelogForDisplay($env.version);
+  // Open on the running version's tab when it has notes, else the newest.
+  $: initialVersion = entryForVersion($env.version)?.version ?? null;
 
   // Auto-open once per version: wait for the version to load and the
   // first-run prompt to clear, then compare against the last-seen version.
@@ -58,8 +65,8 @@
   };
 </script>
 
-{#if entry}
-  <Dialog title={entry.headline} isOpen={whatsNewOpen} showCloseButton={false}>
-    <WhatsNewContent {entry} onClose={close} />
+{#if entries.length}
+  <Dialog title="What's new" isOpen={whatsNewOpen} showCloseButton={false}>
+    <WhatsNewContent {entries} {initialVersion} onClose={close} />
   </Dialog>
 {/if}

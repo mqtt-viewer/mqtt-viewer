@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-02T03:36:11.225Z",
+  "generatedAt": "2026-07-02T06:54:38.803Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2284,7 +2284,7 @@
     {
       "name": "WhatsNewContent",
       "tier": "component",
-      "description": "Layout for a changelog entry: intro, emoji-bulleted sections, optional outro, dismiss button.",
+      "description": "Tabbed changelog: a tab per release (newest left), each showing intro, titled sections, optional outro, and a dismiss button.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2295,9 +2295,14 @@
       },
       "props": [
         {
-          "name": "entry",
-          "type": "object",
+          "name": "entries",
+          "type": "array",
           "required": true
+        },
+        {
+          "name": "initialVersion",
+          "type": "string",
+          "required": false
         },
         {
           "name": "onClose",
@@ -2306,7 +2311,11 @@
         }
       ],
       "tokens": [
-        "secondary-text"
+        "secondary-text",
+        "emphasis",
+        "white-text",
+        "outline",
+        "primary"
       ],
       "dependencies": [
         "Button"

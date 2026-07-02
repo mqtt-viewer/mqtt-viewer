@@ -20,6 +20,7 @@ export interface PayloadNode {
   path: string; // dotted/indexed path from root
   type: PayloadNodeType;
   value?: number | string | boolean | null; // for leaves
+  chartable?: boolean; // leaf can be charted (a number, or a numeric string)
   children?: PayloadNode[];
 }
 
@@ -48,17 +49,40 @@ const typeOf = (v: unknown): PayloadNodeType => {
 const isFiniteNumber = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v);
 
+// A string that is a plain decimal/scientific number and nothing else. Rejects
+// empty/whitespace, hex ("0x1f"), Infinity/NaN, and unit-suffixed values ("24C").
+const NUMERIC_STRING = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 /**
- * Returns the numeric leaf fields of a payload. A bare numeric payload yields a
- * single field with path "". Non-JSON (and JSON with no numbers) yields [].
+ * Coerces a leaf value to a finite number for charting. Numbers pass through;
+ * quoted numerics (e.g. "24.6", "-72") are cast to float. Everything else
+ * (non-numeric strings, booleans, null, objects) yields null.
+ */
+const coerceNumber = (v: unknown): number | null => {
+  if (isFiniteNumber(v)) return v;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (NUMERIC_STRING.test(trimmed)) {
+      const n = Number(trimmed);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+};
+
+/**
+ * Returns the numeric leaf fields of a payload. Numbers and quoted numerics
+ * (e.g. "24.6") both count. A bare numeric payload yields a single field with
+ * path "". Non-JSON (and JSON with no numbers) yields [].
  */
 export function numericFields(payload: string): NumericField[] {
   const parsed = parse(payload);
   if (parsed === undefined) return [];
   const out: NumericField[] = [];
   const walk = (value: unknown, path: string) => {
-    if (isFiniteNumber(value)) {
-      out.push({ path, value });
+    const num = coerceNumber(value);
+    if (num !== null) {
+      out.push({ path, value: num });
       return;
     }
     if (Array.isArray(value)) {
@@ -86,7 +110,7 @@ export function valueAtPath(payload: string, path: string): number | null {
       current = (current as Record<string, unknown>)[segment];
     }
   }
-  return isFiniteNumber(current) ? current : null;
+  return coerceNumber(current);
 }
 
 /**
@@ -118,7 +142,14 @@ export function payloadTree(payload: string): PayloadNode | null {
         ),
       };
     }
-    return { key, path, type, value: value as number | string | boolean | null };
+    const leaf: PayloadNode = {
+      key,
+      path,
+      type,
+      value: value as number | string | boolean | null,
+    };
+    if (coerceNumber(value) !== null) leaf.chartable = true;
+    return leaf;
   };
   return build(parsed, "value", "");
 }
