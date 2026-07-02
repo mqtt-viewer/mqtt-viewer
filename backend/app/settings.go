@@ -41,6 +41,20 @@ func (a *App) UpdateAppSettings(params UpdateAppSettingsParams) (models.AppSetti
 	return settings, nil
 }
 
+// AcknowledgeChangelog records that the user has seen the "What's new" dialog
+// for the given app version, so it isn't shown again until the next update.
+func (a *App) AcknowledgeChangelog(version string) (models.AppSettings, error) {
+	var settings models.AppSettings
+	if err := a.Db.First(&settings, 1).Error; err != nil {
+		return models.AppSettings{}, err
+	}
+	settings.LastSeenChangelogVersion = version
+	if err := a.Db.Save(&settings).Error; err != nil {
+		return models.AppSettings{}, err
+	}
+	return settings, nil
+}
+
 // memoryBudgetBytes returns the configured in-RAM budget, falling back to the
 // default if settings are unavailable or unset.
 func (a *App) memoryBudgetBytes() int64 {

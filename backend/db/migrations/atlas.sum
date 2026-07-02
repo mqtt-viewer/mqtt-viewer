@@ -1,4 +1,4 @@
-h1:3xmFFWPSwGkou4wq6nLdyrK0UOnLsjQFMcRYQ1nYh/A=
+h1:Xx7rwvXxxmGcNpl8oyeeYjY2palcz2dBykG/tzs3eRM=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -10,3 +10,4 @@ h1:3xmFFWPSwGkou4wq6nLdyrK0UOnLsjQFMcRYQ1nYh/A=
 20250405054934_remove-proto-descriptor-from-subscription.sql h1:emOyawli9u0jz8pDMhwe+jcBeT7ys1lmwCLhLhhCqQc=
 20260612000000_add-collections.sql h1:/p8pdfn65hKsKkPAaSSQL/ibNTlmf9fyCc2Oz+K+hxY=
 20260613000000_add-received-messages-and-settings.sql h1:d1KzWMXKevL+GkkBxEWeTOpCAGPzSqV+i6AGnQIsgI8=
+20260702032219_add-changelog-version.sql h1:ELFjvpUawUhnM7QIlqDMU2pc7j2Lm5708LKEGTJoyvg=

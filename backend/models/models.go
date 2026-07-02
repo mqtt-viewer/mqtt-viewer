@@ -13,12 +13,15 @@ type Global struct {
 // message retention. MemoryBudgetBytes bounds the in-RAM message history (the
 // always-on leak guard); RecordingEnabled + DiskBudgetBytes control opt-in
 // durable history on disk; HasSeenHistoryPrompt gates the first-run popup.
+// LastSeenChangelogVersion records which version's "What's new" dialog the
+// user has dismissed, so it shows once per version.
 type AppSettings struct {
-	ID                   uint  `json:"id" gorm:"primaryKey"`
-	MemoryBudgetBytes    int64 `json:"memoryBudgetBytes"`
-	RecordingEnabled     bool  `json:"recordingEnabled"`
-	DiskBudgetBytes      int64 `json:"diskBudgetBytes"`
-	HasSeenHistoryPrompt bool  `json:"hasSeenHistoryPrompt"`
+	ID                       uint   `json:"id" gorm:"primaryKey"`
+	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
+	RecordingEnabled         bool   `json:"recordingEnabled"`
+	DiskBudgetBytes          int64  `json:"diskBudgetBytes"`
+	HasSeenHistoryPrompt     bool   `json:"hasSeenHistoryPrompt"`
+	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,

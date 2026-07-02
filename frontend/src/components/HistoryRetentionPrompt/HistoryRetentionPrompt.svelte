@@ -10,6 +10,7 @@
     GetAppSettings,
     UpdateAppSettings,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
 
   const MB = 1024 * 1024;
   const GB = 1024 * 1024 * 1024;
@@ -36,9 +37,13 @@
         diskBudgetGb =
           Math.round((settings.diskBudgetBytes / GB) * 100) / 100 || 1;
         isOpen.set(true);
+      } else {
+        // No prompt needed — the What's New dialog may show straight away.
+        firstRunGateCleared.set(true);
       }
     } catch (e) {
       console.error("Failed to load app settings for history prompt", e);
+      firstRunGateCleared.set(true);
     }
   });
 
@@ -71,6 +76,7 @@
     } finally {
       isSaving = false;
       isOpen.set(false);
+      firstRunGateCleared.set(true);
     }
   };
 

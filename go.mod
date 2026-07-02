@@ -85,4 +85,3 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
-

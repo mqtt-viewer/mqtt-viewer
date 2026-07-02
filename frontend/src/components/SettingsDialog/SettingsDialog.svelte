@@ -11,6 +11,8 @@
     GetDatabaseSizeBytes,
     ClearReceivedMessages,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import env from "@/stores/env";
+  import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
 
   export let open = writable(false);
 
@@ -197,6 +199,16 @@
         >
           {isClearing ? "Clearing…" : "Clear recorded history"}
         </Button>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-secondary-text">MQTT Viewer {$env.version}</span>
+        <Button
+          variant="text"
+          on:click={() => {
+            open.set(false);
+            whatsNewOpen.set(true);
+          }}>What's new</Button
+        >
       </div>
     </section>
 

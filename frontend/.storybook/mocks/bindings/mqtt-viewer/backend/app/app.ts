@@ -54,6 +54,7 @@ let mockAppSettings = new models.AppSettings({
   recordingEnabled: false,
   diskBudgetBytes: 1 * 1024 * 1024 * 1024,
   hasSeenHistoryPrompt: false,
+  lastSeenChangelogVersion: "",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
 
@@ -68,6 +69,16 @@ export async function UpdateAppSettings(params: {
   hasSeenHistoryPrompt: boolean;
 }): Promise<models.AppSettings> {
   mockAppSettings = new models.AppSettings({ id: 1, ...params });
+  return mockAppSettings;
+}
+
+export async function AcknowledgeChangelog(
+  version: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    lastSeenChangelogVersion: version,
+  });
   return mockAppSettings;
 }
 

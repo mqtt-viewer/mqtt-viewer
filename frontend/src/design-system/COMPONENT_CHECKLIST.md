@@ -66,6 +66,8 @@
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
+| Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
+| Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
 
 ## Views (`Views/*`)
 
@@ -132,7 +134,7 @@
 
 ## Summary
 
-- Components scanned: 106
-- Story present: 106
+- Components scanned: 108
+- Story present: 108
 - Figma-linked: 0
 - Missing specs: 0
