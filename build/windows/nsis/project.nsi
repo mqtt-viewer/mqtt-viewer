@@ -35,9 +35,15 @@ Unicode true
 ####
 !include "wails_tools.nsh"
 
-# The version information for this two must consist of 4 parts
-VIProductVersion "${INFO_PRODUCTVERSION}.0"
-VIFileVersion    "${INFO_PRODUCTVERSION}.0"
+# VIProductVersion/VIFileVersion must be numeric X.X.X.X, so pre-release
+# suffixes (e.g. 0.7.0-beta1) live only in INFO_PRODUCTVERSION display keys;
+# INFO_FILEVERSION carries the bare X.X.X (passed by the taskfile, which
+# strips everything after a - or +).
+!ifndef INFO_FILEVERSION
+  !define INFO_FILEVERSION "${INFO_PRODUCTVERSION}"
+!endif
+VIProductVersion "${INFO_FILEVERSION}.0"
+VIFileVersion    "${INFO_FILEVERSION}.0"
 
 VIAddVersionKey "CompanyName"     "${INFO_COMPANYNAME}"
 VIAddVersionKey "FileDescription" "${INFO_PRODUCTNAME} Installer"
