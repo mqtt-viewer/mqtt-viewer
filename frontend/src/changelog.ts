@@ -56,35 +56,35 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "July 2026",
     headline: "MQTT Viewer 1.0 is here",
     intro:
-      "This one's been a long time coming. After years of betas, MQTT Viewer is officially 1.0. It's the same tool you already know, now with the polish (and the version number) to match. Thank you for debugging alongside it all this way. Here's what's packed in.",
+      "After years of betas, MQTT Viewer is officially 1.0. Thanks for sticking with it. Here's what's new.",
     sections: [
       {
-        title: "Chart your data, live",
-        body: "Tick any numeric field in a topic's payload and watch it plot over time. Pop the chart out into its own window and keep an eye on it while you work elsewhere.",
+        title: "Live charting",
+        body: "Tick any numeric field in a payload to chart it over time. Charts can pop out into their own window.",
       },
       {
-        title: "A home for the messages you reuse",
-        body: "Save messages into collections, per connection or global, and publish them again with a click. Your publish history lives in the sidebar too, and search covers all of it.",
+        title: "Saved message collections",
+        body: "Save messages into collections, per connection or global, and publish them again with a click. Publish history and search are in the sidebar too.",
       },
       {
-        title: "History that minds its manners",
-        body: "Message history now stays within a memory budget you control, so a viewer left open over the weekend won't eat your RAM. If you want history to survive restarts, turn on recording and page back through it whenever you like.",
+        title: "Bounded memory",
+        body: "Message history stays within a memory budget you set, so the app won't eat your RAM if you leave it open. Turn on recording if you want history to survive restarts.",
       },
       {
-        title: "Images, decoded",
-        body: "Publish a PNG, JPEG, GIF, WebP or BMP and the payload tab shows the actual picture, with a raw-bytes view one click away.",
+        title: "Image previews",
+        body: "PNG, JPEG, GIF, WebP and BMP payloads now show as actual images, with the raw bytes one click away.",
       },
       {
-        title: "Notes like this one",
-        body: "After each update you'll get a short, friendly summary of what changed. You can reopen it any time from Settings, or by clicking the version number at the bottom of the window.",
+        title: "Release notes",
+        body: "After each update you'll see a short summary of what changed, like this one. You can reopen it any time from Settings, or by clicking the version number at the bottom of the window.",
       },
       {
-        title: "Better on Linux, faster everywhere",
-        body: "Fedora and friends no longer crash at startup (there's a proper rpm and deb now), AppImages render correctly again, and updates install themselves through a new built-in updater.",
+        title: "Linux fixes and auto-updates",
+        body: "There are proper rpm and deb packages now, so Fedora no longer crashes at startup. AppImages render correctly again, and the app can update itself.",
       },
     ],
     outro:
-      "Found a rough edge? The Feedback button comes straight to me. 1.0 is a milestone, not a finish line.",
+      "Found a bug or a rough edge? Use the Feedback button, I really want to know.",
   },
   {
     version: "0.7.0",
