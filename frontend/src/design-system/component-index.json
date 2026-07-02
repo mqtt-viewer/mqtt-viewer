@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-01T23:02:11.330Z",
+  "generatedAt": "2026-07-02T00:17:53.127Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3480,6 +3480,12 @@
         },
         {
           "name": "payloadLeftForCompare",
+          "type": "string",
+          "required": false,
+          "default": "null"
+        },
+        {
+          "name": "payloadB64",
           "type": "string",
           "required": false,
           "default": "null"
