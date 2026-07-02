@@ -65,6 +65,7 @@
         ] as MqttHistoryMessage)
       : null;
   $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
+  $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
 
   $: selectedMessagePayload,
@@ -229,6 +230,7 @@
               bind:format={$selectedTopicStore.options.format}
               {isComparing}
               payload={selectedMessagePayload}
+              payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
               {chartSeriesStore}
               onViewChart={viewChart}
@@ -264,6 +266,7 @@
               bind:format={$selectedTopicStore.options.format}
               {isComparing}
               payload={selectedMessagePayload}
+              payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
               {chartSeriesStore}
               onViewChart={viewChart}

@@ -29,6 +29,12 @@
       "default": "null"
     },
     {
+      "name": "payloadB64",
+      "type": "string",
+      "required": false,
+      "default": "null"
+    },
+    {
       "name": "codec",
       "type": "enum",
       "required": true,

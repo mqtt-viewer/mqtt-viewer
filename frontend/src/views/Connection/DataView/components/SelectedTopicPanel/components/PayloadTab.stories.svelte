@@ -6,8 +6,12 @@
 
   const componentName = "PayloadTab";
   const storyId = "Views/Connection/DataView/SelectedTopicPanel/PayloadTab";
-  const props: string[] = ["isComparing","payload","payloadLeftForCompare","codec","format"];
+  const props: string[] = ["isComparing","payload","payloadLeftForCompare","payloadB64","codec","format"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
+
+  // 1x1 red PNG — exercises the image-payload preview (issue #35)
+  const TINY_PNG =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
   const { Story } = defineMeta({
     title: "Views/Connection/DataView/SelectedTopicPanel/PayloadTab",
@@ -23,3 +27,15 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<Story
+  name="Image payload"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: "PNG…",
+    payloadB64: TINY_PNG,
+    format: "none",
+  }}
+  {template}
+/>

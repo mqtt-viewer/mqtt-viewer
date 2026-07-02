@@ -52,6 +52,7 @@ import {
   EyeSlash,
   ArrowSquareOut,
   Pause,
+  Image,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -107,6 +108,7 @@ export const ICON_MAP = {
   hide: EyeSlash,
   popOut: ArrowSquareOut,
   pause: Pause,
+  image: Image,
 
   // States
   lastConnected: ClockCounterClockwise,

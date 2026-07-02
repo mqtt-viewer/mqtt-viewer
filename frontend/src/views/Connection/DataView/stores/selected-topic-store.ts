@@ -21,6 +21,9 @@ export type MqttHistoryMessage = Omit<
   "payload" | "convertValues"
 > & {
   payload: string;
+  // The original base64 payload, kept alongside the utf8-decoded text so
+  // binary payloads (e.g. images) can be rendered from their real bytes.
+  payloadB64: string;
 };
 
 // When recording is on, history is paged from disk in windows; this tracks the
@@ -56,6 +59,7 @@ export type SelectedTopicStore = ReturnType<typeof createSelectedTopicStore>;
 const decode = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
   ...m,
   payload: base64ToUtf8(m.payload as unknown as string),
+  payloadB64: m.payload as unknown as string,
 });
 
 const numericId = (id: string): number => {

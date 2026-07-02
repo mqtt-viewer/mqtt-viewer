@@ -236,6 +236,7 @@ export const createMockSelectedTopicStore = () => {
         message.id === "message-1"
           ? '{"temp":21.4,"unit":"C"}'
           : '{"humidity":42.8}',
+      payloadB64: message.payload,
     })) as any,
     historySource: "memory",
     window: null,

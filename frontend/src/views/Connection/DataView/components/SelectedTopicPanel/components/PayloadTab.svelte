@@ -15,10 +15,18 @@
   import FieldPicker from "./Chart/FieldPicker.svelte";
   import { payloadTree, hasNumericFields } from "./Chart/payload-fields";
   import type { ChartSeriesStore } from "./Chart/chart-series-store";
+  import {
+    detectImage,
+    imageDataUrl,
+    base64ByteSize,
+    formatByteSize,
+  } from "./image-payload";
 
   export let isComparing: boolean;
   export let payload: string;
   export let payloadLeftForCompare: string | null = null;
+  // Raw base64 payload; when its bytes are an image, a preview is rendered.
+  export let payloadB64: string | null = null;
   export let codec: SupportedCodeEditorCodec;
   export let format: SupportedCodeEditorFormat;
   // Optional: when present, a "Chart fields" toggle reveals the numeric picker.
@@ -26,6 +34,12 @@
   export let onViewChart: (() => void) | null = null;
 
   let showFieldPicker = false;
+  let showRawImageBytes = false;
+  // Reset the raw-bytes escape hatch when switching messages.
+  $: payloadB64, (showRawImageBytes = false);
+
+  $: detectedImage = isComparing ? null : detectImage(payloadB64);
+  $: showImagePreview = detectedImage !== null && !showRawImageBytes;
 
   $: processPayload = (payload: string) => {
     let p = payload;
@@ -82,6 +96,17 @@
         textToCopyOnLeft={processedPayloadLeft}
       />
     </div>
+    {#if detectedImage && showRawImageBytes}
+      <Tooltip text="Show image preview">
+        <button
+          class="flex items-center gap-1 text-sm px-2 py-1 rounded whitespace-nowrap text-secondary-text hover:text-emphasis"
+          on:click={() => (showRawImageBytes = false)}
+        >
+          <Icon type="image" size={14} />
+          Preview
+        </button>
+      </Tooltip>
+    {/if}
     {#if canChart}
       <Tooltip text={showFieldPicker ? "Show raw payload" : "Pick values to chart"}>
         <button
@@ -97,7 +122,26 @@
     {/if}
   </div>
 
-  {#if showFieldPicker && tree}
+  {#if showImagePreview && detectedImage && payloadB64}
+    <div class="grow w-full min-h-0 flex flex-col">
+      <div class="grow min-h-0 flex items-center justify-center overflow-auto p-2">
+        <img
+          src={imageDataUrl(payloadB64, detectedImage.mime)}
+          alt="{detectedImage.label} payload"
+          class="max-w-full max-h-full object-contain"
+        />
+      </div>
+      <div
+        class="flex items-center justify-between px-2 py-1 border-t border-divider text-sm text-secondary-text"
+      >
+        <span>{detectedImage.label} · {formatByteSize(base64ByteSize(payloadB64))}</span>
+        <button
+          class="text-primary"
+          on:click={() => (showRawImageBytes = true)}>View raw bytes</button
+        >
+      </div>
+    </div>
+  {:else if showFieldPicker && tree}
     <div class="grow w-full min-h-0 overflow-auto px-1 py-1">
       <FieldPicker
         node={tree}
