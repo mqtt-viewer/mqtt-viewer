@@ -56,12 +56,9 @@
 
       <div class="flex flex-col gap-3">
         {#each entry.sections as section}
-          <div class="flex gap-3 items-start">
-            <span class="text-lg leading-6 select-none">{section.emoji}</span>
-            <div class="flex flex-col gap-[2px]">
-              <span class="text-emphasis">{section.title}</span>
-              <span class="text-secondary-text text-base">{section.body}</span>
-            </div>
+          <div class="flex flex-col gap-[2px] border-l-2 border-outline pl-3">
+            <span class="text-emphasis">{section.title}</span>
+            <span class="text-secondary-text text-base">{section.body}</span>
           </div>
         {/each}
       </div>

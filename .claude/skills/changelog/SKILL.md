@@ -10,8 +10,8 @@ The changelog is the in-app "What's new" dialog. It lives in one file:
 staging entry, and (at release time) promotes that entry to a version.
 
 **Read `docs/WRITING_STYLE.md` first and follow it.** The hard rules: warm and
-first person, British spelling, concise, and NO em dashes (none, not even one).
-It must not read like an AI wrote it.
+first person, British spelling, concise, NO em dashes, and NO emojis. It must
+not read like an AI wrote it.
 
 ## How the changelog is structured
 
@@ -21,8 +21,8 @@ It must not read like an AI wrote it.
   shows on dev builds, so users never read half-finished notes.
 - Released entries have `released: true`, a bare semver `version` (e.g.
   `"1.0.0"`), and a `date` like `"July 2026"`.
-- Each entry has `headline`, `intro`, `sections` (each `{ emoji, title, body }`),
-  and an optional `outro`.
+- Each entry has `headline`, `intro`, `sections` (each `{ title, body }`), and
+  an optional `outro`.
 
 ## Adding changes (the common case)
 
@@ -46,7 +46,7 @@ It must not read like an AI wrote it.
    ```
 
 3. **Write the sections.** Group related changes into one section each. A section
-   is one emoji, a short benefit-first title, and one or two sentences of body.
+   is a short benefit-first title (no emoji) and one or two sentences of body.
    Lead with what the user can now do. Follow the style guide. Reuse or extend an
    existing section rather than adding a near-duplicate.
 
@@ -69,7 +69,7 @@ When cutting release `vX.Y.Z` (see `docs/RELEASING.md`):
 
 ## What NOT to do
 
-- No em dashes. The changelog test fails if any slip in.
+- No em dashes and no emojis. The changelog test fails if any slip in.
 - No version guessing ahead of release. Keep changes in the staging entry.
 - No marketing voice. See `docs/WRITING_STYLE.md`.
 - Don't hand-edit `frontend/src/design-system/component-index.json`.

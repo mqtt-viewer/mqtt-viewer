@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-02T06:44:53.365Z",
+  "generatedAt": "2026-07-02T06:54:38.803Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2284,7 +2284,7 @@
     {
       "name": "WhatsNewContent",
       "tier": "component",
-      "description": "Tabbed changelog: a tab per release (newest left), each showing intro, emoji-bulleted sections, optional outro, and a dismiss button.",
+      "description": "Tabbed changelog: a tab per release (newest left), each showing intro, titled sections, optional outro, and a dismiss button.",
       "status": "story-only",
       "figma": {
         "fileKey": "",

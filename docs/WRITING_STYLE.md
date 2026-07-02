@@ -24,34 +24,40 @@ Warm, direct, and a little dry. First person. Talks to one user, not a crowd.
 3. **No em dashes. None.** This is the fastest tell that a machine wrote it, and
    it is a hard rule here. Where you reach for one, use a full stop, a comma, a
    colon, or brackets instead. "It's fast, and it stays fast." not "It's
-   fast — and it stays fast." This applies to en dashes used as connectors too;
-   a hyphen inside a compound word (built-in, opt-in, pop-out) is fine.
+   fast [em dash] and it stays fast." This applies to en dashes used as
+   connectors too; a hyphen inside a compound word (built-in, opt-in, pop-out)
+   is fine.
 
-4. **Concise.** Short sentences. Cut the throat-clearing. Say the thing, then
+4. **No emojis. None.** Standing rule. No emoji in the changelog, dialog copy,
+   UI text, or docs. Let the words carry it. If you need to separate or lead
+   items, use a heading, a title, or plain punctuation, never a picture.
+
+5. **Concise.** Short sentences. Cut the throat-clearing. Say the thing, then
    stop. If a sentence still works with a word removed, remove it.
 
-5. **Plain words over corporate ones.** No "seamless", "leverage", "elevate",
+6. **Plain words over corporate ones.** No "seamless", "leverage", "elevate",
    "unleash", "robust", "powerful", "revolutionary", "delve", "supercharge",
    "unlock", "empower". Say what it does in the words you'd use out loud.
 
-6. **Concrete, not abstract.** "Tick a numeric field and watch it plot" beats
+7. **Concrete, not abstract.** "Tick a numeric field and watch it plot" beats
    "enables real-time data visualisation". Name the button, the payload, the
    actual thing on screen.
 
-7. **A bit of warmth is good.** A wink is fine ("But wait, there's more"). Thank
+8. **A bit of warmth is good.** A wink is fine ("But wait, there's more"). Thank
    people. Admit when something was overdue. Do not force jokes and do not gush.
 
-8. **No hedging filler.** Drop "simply", "just", "easily", "of course", "in
+9. **No hedging filler.** Drop "simply", "just", "easily", "of course", "in
    order to", "please note that". They add nothing.
 
-9. **Honest, never hype.** Don't oversell. "This should fix it" is more honest
-   than "completely eliminates all issues". Milestones are milestones, not
-   finish lines.
+10. **Honest, never hype.** Don't oversell. "This should fix it" is more honest
+    than "completely eliminates all issues". Milestones are milestones, not
+    finish lines.
 
 ## Changelog specifics
 
-- Group changes into a few sections, each led by a single emoji, a short title,
-  and one or two sentences of body. See `frontend/src/changelog.ts`.
+- Group changes into a few sections, each with a short title and one or two
+  sentences of body. No emoji or icon on the title. See
+  `frontend/src/changelog.ts`.
 - Section titles are benefit-first and plain: "Chart your data, live", not
   "Charting improvements".
 - Write for someone mid-task who just updated and wants to know what changed.
@@ -60,7 +66,7 @@ Warm, direct, and a little dry. First person. Talks to one user, not a crowd.
 
 ## Quick before / after
 
-- No: "We've completely revamped the charting experience — unlocking powerful
+- No: "We've completely revamped the charting experience, unlocking powerful
   new real-time visualisation capabilities."
 - Yes: "You can now chart values that arrive as text, like a quoted `\"24.6\"`.
   They plot just like plain numbers."

@@ -6,16 +6,15 @@
 //
 // One entry sits at the top with released: false. It is the staging area for
 // the next release: new changes get added here as they land, and at release
-// time it is promoted to a real version + date (see the `changelog` skill and
-// docs/RELEASING.md). It never auto-shows and is only visible in the dialog on
-// dev builds, so users never read half-finished notes.
+// time it is promoted to a real version + date (see the `release` and
+// `changelog` skills and docs/RELEASING.md). It never auto-shows and is only
+// visible in the dialog on dev builds, so users never read half-finished notes.
 //
-// Writing: keep it warm, plain, first person, British spelling, and with NO em
-// dashes. The full brief is docs/WRITING_STYLE.md. These notes are read by
-// people mid-task, not by a release pipeline.
+// Writing: keep it warm, plain, first person, British spelling, with NO em
+// dashes and NO emojis. The full brief is docs/WRITING_STYLE.md. These notes
+// are read by people mid-task, not by a release pipeline.
 
 export interface ChangelogSection {
-  emoji: string;
   title: string;
   body: string;
 }
@@ -42,12 +41,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
-        emoji: "📈",
         title: "Chart values that arrive as text",
         body: "Numeric readings often turn up wrapped in quotes, like \"24.6\". You can now chart those too, so a quoted number plots just like a plain one. Values that aren't really numbers stay out of the way.",
       },
       {
-        emoji: "🎯",
         title: "Adding a value to a chart is clearer",
         body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
       },
@@ -62,32 +59,26 @@ export const CHANGELOG: ChangelogEntry[] = [
       "This one's been a long time coming. After years of betas, MQTT Viewer is officially 1.0. It's the same tool you already know, now with the polish (and the version number) to match. Thank you for debugging alongside it all this way. Here's what's packed in.",
     sections: [
       {
-        emoji: "📈",
         title: "Chart your data, live",
         body: "Tick any numeric field in a topic's payload and watch it plot over time. Pop the chart out into its own window and keep an eye on it while you work elsewhere.",
       },
       {
-        emoji: "🗂️",
         title: "A home for the messages you reuse",
         body: "Save messages into collections, per connection or global, and publish them again with a click. Your publish history lives in the sidebar too, and search covers all of it.",
       },
       {
-        emoji: "🧠",
         title: "History that minds its manners",
         body: "Message history now stays within a memory budget you control, so a viewer left open over the weekend won't eat your RAM. If you want history to survive restarts, turn on recording and page back through it whenever you like.",
       },
       {
-        emoji: "🖼️",
         title: "Images, decoded",
         body: "Publish a PNG, JPEG, GIF, WebP or BMP and the payload tab shows the actual picture, with a raw-bytes view one click away.",
       },
       {
-        emoji: "📝",
         title: "Notes like this one",
         body: "After each update you'll get a short, friendly summary of what changed. You can reopen it any time from Settings, or by clicking the version number at the bottom of the window.",
       },
       {
-        emoji: "🐧",
         title: "Better on Linux, faster everywhere",
         body: "Fedora and friends no longer crash at startup (there's a proper rpm and deb now), AppImages render correctly again, and updates install themselves through a new built-in updater.",
       },
@@ -104,22 +95,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       "A big one: charting, collections, bounded memory, image previews, and a new engine under the hood.",
     sections: [
       {
-        emoji: "📈",
         title: "Topic charting",
         body: "Chart numeric payload fields over time, live, with a pop-out window.",
       },
       {
-        emoji: "🗂️",
         title: "Message library",
         body: "Collections of saved messages, publish history, and search, all in the new sidebar.",
       },
       {
-        emoji: "🧠",
         title: "Bounded memory and durable history",
         body: "History stays within a configurable memory budget, with opt-in recording to disk.",
       },
       {
-        emoji: "🖼️",
         title: "Image payload previews",
         body: "Image payloads render as images, not noise.",
       },

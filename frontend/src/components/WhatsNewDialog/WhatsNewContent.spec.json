@@ -2,7 +2,7 @@
   "$schema": "../../design-system/component-spec.schema.json",
   "name": "WhatsNewContent",
   "tier": "component",
-  "description": "Tabbed changelog: a tab per release (newest left), each showing intro, emoji-bulleted sections, optional outro, and a dismiss button.",
+  "description": "Tabbed changelog: a tab per release (newest left), each showing intro, titled sections, optional outro, and a dismiss button.",
   "status": "story-only",
   "figma": {
     "fileKey": "",

@@ -98,18 +98,29 @@ describe("content", () => {
     }
   });
 
-  // House style: no em dashes anywhere users can read (docs/WRITING_STYLE.md).
+  // House style: no em dashes and no emojis anywhere users can read
+  // (docs/WRITING_STYLE.md).
+  const userFacingText = (e: ChangelogEntry): string[] => [
+    e.headline,
+    e.intro,
+    e.outro ?? "",
+    ...e.sections.flatMap((s) => [s.title, s.body]),
+  ];
+
   it("contains no em or en dashes in any user-facing copy", () => {
-    const texts = (e: ChangelogEntry): string[] => [
-      e.headline,
-      e.intro,
-      e.outro ?? "",
-      ...e.sections.flatMap((s) => [s.title, s.body]),
-    ];
     for (const e of CHANGELOG) {
-      for (const t of texts(e)) {
+      for (const t of userFacingText(e)) {
         expect(t.includes("—"), `em dash in: ${t}`).toBe(false);
         expect(t.includes("–"), `en dash in: ${t}`).toBe(false);
+      }
+    }
+  });
+
+  it("contains no emojis in any user-facing copy", () => {
+    const emoji = /\p{Extended_Pictographic}/u;
+    for (const e of CHANGELOG) {
+      for (const t of userFacingText(e)) {
+        expect(emoji.test(t), `emoji in: ${t}`).toBe(false);
       }
     }
   });
