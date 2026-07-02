@@ -2,6 +2,7 @@
   import EnvStore from "@/stores/env";
   import LicenseStatus from "./components/LicenseStatus.svelte";
   import MessageStats from "./components/MessageStats.svelte";
+  import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
 </script>
 
 <div
@@ -12,5 +13,9 @@
   <MessageStats />
   <div class="flex-grow" />
   <LicenseStatus />
-  <span class="cursor-default">{$EnvStore.version}</span>
+  <button
+    class="hover:text-emphasis transition-colors"
+    title="What's new"
+    on:click={() => whatsNewOpen.set(true)}>{$EnvStore.version}</button
+  >
 </div>

@@ -1,8 +1,18 @@
-// The in-app changelog. One entry per released version; the newest entry for
-// the running version is shown once in the "What's new" dialog (tracked via
-// app_settings.lastSeenChangelogVersion), and it stays reachable from
-// Settings. Keep the writing warm and plain — these notes are read by people
-// mid-task, not by a release pipeline.
+// The in-app changelog. The "What's new" dialog shows released versions as
+// tabs, newest on the left, and can be opened any time from Settings or by
+// clicking the version in the bottom status bar. The newest released entry is
+// also shown once automatically after an update (tracked via
+// app_settings.lastSeenChangelogVersion).
+//
+// One entry sits at the top with released: false. It is the staging area for
+// the next release: new changes get added here as they land, and at release
+// time it is promoted to a real version + date (see the `changelog` skill and
+// docs/RELEASING.md). It never auto-shows and is only visible in the dialog on
+// dev builds, so users never read half-finished notes.
+//
+// Writing: keep it warm, plain, first person, British spelling, and with NO em
+// dashes. The full brief is docs/WRITING_STYLE.md. These notes are read by
+// people mid-task, not by a release pipeline.
 
 export interface ChangelogSection {
   emoji: string;
@@ -11,8 +21,10 @@ export interface ChangelogSection {
 }
 
 export interface ChangelogEntry {
-  // Bare semver, no leading v.
+  // Bare semver (no leading v) once released; "unreleased" while in development.
   version: string;
+  // false for the staging entry that gathers changes for the next release.
+  released: boolean;
   date: string;
   headline: string;
   intro: string;
@@ -22,11 +34,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "unreleased",
+    released: false,
+    date: "In development",
+    headline: "In the next update",
+    intro:
+      "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
+    sections: [
+      {
+        emoji: "📈",
+        title: "Chart values that arrive as text",
+        body: "Numeric readings often turn up wrapped in quotes, like \"24.6\". You can now chart those too, so a quoted number plots just like a plain one. Values that aren't really numbers stay out of the way.",
+      },
+      {
+        emoji: "🎯",
+        title: "Adding a value to a chart is clearer",
+        body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
+      },
+    ],
+  },
+  {
     version: "1.0.0",
+    released: true,
     date: "July 2026",
     headline: "MQTT Viewer 1.0 is here",
     intro:
-      "This one's been a long time coming. After years of betas, MQTT Viewer is officially 1.0 — the same tool, now with the polish (and the version number) to match. Thank you for debugging alongside it all this way. Here's what's packed in.",
+      "This one's been a long time coming. After years of betas, MQTT Viewer is officially 1.0. It's the same tool you already know, now with the polish (and the version number) to match. Thank you for debugging alongside it all this way. Here's what's packed in.",
     sections: [
       {
         emoji: "📈",
@@ -36,7 +69,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         emoji: "🗂️",
         title: "A home for the messages you reuse",
-        body: "Save messages into collections — per connection or global — and publish them again with a click. Your publish history lives in the sidebar too, and search covers all of it.",
+        body: "Save messages into collections, per connection or global, and publish them again with a click. Your publish history lives in the sidebar too, and search covers all of it.",
       },
       {
         emoji: "🧠",
@@ -46,12 +79,12 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         emoji: "🖼️",
         title: "Images, decoded",
-        body: "Publish a PNG, JPEG, GIF, WebP or BMP and the payload tab shows the actual picture — with a raw-bytes view one click away.",
+        body: "Publish a PNG, JPEG, GIF, WebP or BMP and the payload tab shows the actual picture, with a raw-bytes view one click away.",
       },
       {
         emoji: "📝",
         title: "Notes like this one",
-        body: "After each update you'll get a short, human summary of what changed — this dialog. You can revisit it any time from Settings.",
+        body: "After each update you'll get a short, friendly summary of what changed. You can reopen it any time from Settings, or by clicking the version number at the bottom of the window.",
       },
       {
         emoji: "🐧",
@@ -60,10 +93,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
     ],
     outro:
-      "Found a rough edge? The Feedback button goes straight to us — 1.0 is a milestone, not a finish line.",
+      "Found a rough edge? The Feedback button comes straight to me. 1.0 is a milestone, not a finish line.",
   },
   {
     version: "0.7.0",
+    released: true,
     date: "July 2026",
     headline: "What's new in 0.7.0",
     intro:
@@ -77,11 +111,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         emoji: "🗂️",
         title: "Message library",
-        body: "Collections of saved messages, publish history, and search — all in the new sidebar.",
+        body: "Collections of saved messages, publish history, and search, all in the new sidebar.",
       },
       {
         emoji: "🧠",
-        title: "Bounded memory + durable history",
+        title: "Bounded memory and durable history",
         body: "History stays within a configurable memory budget, with opt-in recording to disk.",
       },
       {
@@ -96,10 +130,18 @@ export const CHANGELOG: ChangelogEntry[] = [
 const normalise = (version: string): string =>
   version.trim().replace(/^v/i, "");
 
-// Returns the changelog entry for an exact app version, or null. Dev builds
-// ("v0.0.0-dev" etc.) and versions without notes get nothing.
+/** Released entries only, newest first. */
+export const releasedEntries = (): ChangelogEntry[] =>
+  CHANGELOG.filter((e) => e.released);
+
+/** The staging entry for the next release, or null if there isn't one. */
+export const unreleasedEntry = (): ChangelogEntry | null =>
+  CHANGELOG.find((e) => !e.released) ?? null;
+
+// Returns the released changelog entry for an exact app version, or null. Dev
+// builds ("v0.0.0-dev" etc.) and versions without notes get nothing.
 export const entryForVersion = (version: string): ChangelogEntry | null =>
-  CHANGELOG.find((e) => e.version === normalise(version)) ?? null;
+  releasedEntries().find((e) => e.version === normalise(version)) ?? null;
 
 export const shouldShowChangelog = (
   appVersion: string,
@@ -108,4 +150,20 @@ export const shouldShowChangelog = (
   const entry = entryForVersion(appVersion);
   if (!entry) return false;
   return normalise(lastSeenVersion) !== normalise(appVersion);
+};
+
+/**
+ * The entries to show in the dialog for a given running version, newest first.
+ * Released entries are always included. The unreleased staging entry is shown
+ * only on builds whose version has no released entry (i.e. dev builds), so it
+ * can be previewed without ever reaching users on a shipped release.
+ */
+export const changelogForDisplay = (version: string): ChangelogEntry[] => {
+  const released = releasedEntries();
+  const unreleased = unreleasedEntry();
+  const showUnreleased =
+    unreleased !== null &&
+    unreleased.sections.length > 0 &&
+    entryForVersion(version) === null;
+  return showUnreleased ? [unreleased, ...released] : released;
 };

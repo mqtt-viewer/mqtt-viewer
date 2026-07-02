@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   CHANGELOG,
+  changelogForDisplay,
   entryForVersion,
+  releasedEntries,
   shouldShowChangelog,
+  unreleasedEntry,
+  type ChangelogEntry,
 } from "./changelog";
 
 describe("entryForVersion", () => {
@@ -14,6 +18,10 @@ describe("entryForVersion", () => {
   it("returns null for versions without notes", () => {
     expect(entryForVersion("v0.0.0-dev")).toBeNull();
     expect(entryForVersion("")).toBeNull();
+  });
+
+  it("never matches the unreleased staging entry", () => {
+    expect(entryForVersion("unreleased")).toBeNull();
   });
 });
 
@@ -28,18 +36,81 @@ describe("shouldShowChangelog", () => {
     expect(shouldShowChangelog("1.0.0", "v1.0.0")).toBe(false);
   });
 
-  it("does not show for versions without an entry", () => {
+  it("does not show for versions without an entry (incl. dev builds)", () => {
     expect(shouldShowChangelog("v0.0.0-dev", "")).toBe(false);
+  });
+});
+
+describe("released / unreleased split", () => {
+  it("releasedEntries are all released and semver-versioned, newest first", () => {
+    const released = releasedEntries();
+    expect(released.length).toBeGreaterThan(0);
+    for (const e of released) {
+      expect(e.released).toBe(true);
+      expect(e.version).toMatch(/^\d+\.\d+\.\d+$/);
+    }
+    // 1.0.0 comes before 0.7.0 in the list.
+    const versions = released.map((e) => e.version);
+    expect(versions.indexOf("1.0.0")).toBeLessThan(versions.indexOf("0.7.0"));
+  });
+
+  it("has at most one unreleased staging entry, flagged not-released", () => {
+    const unreleased = CHANGELOG.filter((e) => !e.released);
+    expect(unreleased.length).toBeLessThanOrEqual(1);
+    if (unreleased.length === 1) {
+      expect(unreleasedEntry()).toBe(unreleased[0]);
+      expect(unreleasedEntry()?.released).toBe(false);
+    }
+  });
+});
+
+describe("changelogForDisplay", () => {
+  it("shows the unreleased entry on dev builds (no matching release)", () => {
+    const shown = changelogForDisplay("v0.0.0-dev");
+    if (unreleasedEntry()) {
+      expect(shown[0].released).toBe(false); // newest, leftmost tab
+      expect(shown.slice(1).every((e) => e.released)).toBe(true);
+    } else {
+      expect(shown.every((e) => e.released)).toBe(true);
+    }
+  });
+
+  it("hides the unreleased entry on a released build", () => {
+    const shown = changelogForDisplay("1.0.0");
+    expect(shown.every((e) => e.released)).toBe(true);
+    expect(shown.some((e) => e.version === "1.0.0")).toBe(true);
   });
 });
 
 describe("content", () => {
   it("every entry has a version, headline, intro and sections", () => {
     for (const e of CHANGELOG) {
-      expect(e.version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(e.version.length).toBeGreaterThan(0);
       expect(e.headline.length).toBeGreaterThan(0);
       expect(e.intro.length).toBeGreaterThan(0);
       expect(e.sections.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("released entries use bare semver versions", () => {
+    for (const e of releasedEntries()) {
+      expect(e.version).toMatch(/^\d+\.\d+\.\d+$/);
+    }
+  });
+
+  // House style: no em dashes anywhere users can read (docs/WRITING_STYLE.md).
+  it("contains no em or en dashes in any user-facing copy", () => {
+    const texts = (e: ChangelogEntry): string[] => [
+      e.headline,
+      e.intro,
+      e.outro ?? "",
+      ...e.sections.flatMap((s) => [s.title, s.body]),
+    ];
+    for (const e of CHANGELOG) {
+      for (const t of texts(e)) {
+        expect(t.includes("—"), `em dash in: ${t}`).toBe(false);
+        expect(t.includes("–"), `en dash in: ${t}`).toBe(false);
+      }
     }
   });
 });
