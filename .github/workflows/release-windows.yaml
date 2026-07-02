@@ -69,6 +69,11 @@ jobs:
         with:
           args: install nsis
 
+      # The choco nsis package doesn't shim makensis into PATH
+      - name: Add makensis to PATH
+        shell: bash
+        run: echo 'C:\Program Files (x86)\NSIS' >> "$GITHUB_PATH"
+
       # Build exe + NSIS installer
 
       - name: Build and package Windows app
