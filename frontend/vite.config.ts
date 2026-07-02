@@ -10,6 +10,14 @@ const storybookConfigDir = fileURLToPath(
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [svelte()],
+  // The Wails dev proxy (ExternalAssetHandler) dials the frontend dev server
+  // over IPv4 (`tcp4 127.0.0.1:<port>`). Vite's default `localhost` host can
+  // resolve to IPv6 `::1` only, leaving the proxy with a permanent
+  // "connection refused" and a blank webview. Pin the dev server to IPv4 so
+  // `wails3 dev` can always reach it.
+  server: {
+    host: "127.0.0.1",
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

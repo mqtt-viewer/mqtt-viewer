@@ -7,7 +7,7 @@ on:
 env:
   GO_VERSION: "1.25.x"
   WAILS_VERSION: "v3.0.0-alpha.98"
-  NODE_VERSION: "20.15.0"
+  NODE_VERSION: "22.17.0"
 
 jobs:
   release:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Install pnpm
         shell: bash
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.28.0
 
       # Dependencies
 
@@ -68,6 +68,11 @@ jobs:
         uses: crazy-max/ghaction-chocolatey@v3
         with:
           args: install nsis
+
+      # The choco nsis package doesn't shim makensis into PATH
+      - name: Add makensis to PATH
+        shell: bash
+        run: echo 'C:\Program Files (x86)\NSIS' >> "$GITHUB_PATH"
 
       # Build exe + NSIS installer
 

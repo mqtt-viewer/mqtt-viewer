@@ -17,6 +17,8 @@
   import DropdownCloseOnClick from "@/components/DropdownMenu/DropdownCloseOnClick.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Topic from "./components/Topic.svelte";
+  import ChartView from "./components/Chart/ChartView.svelte";
+  import { createChartSeriesStore } from "./components/Chart/chart-series-store";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -24,8 +26,33 @@
   export let mqttVersion: "3" | "5";
   export let deleteRetainedMessage: (topic: string) => Promise<void>;
   export let exportTopicMessages: (topic: string) => Promise<void>;
+  // Optional: opens the chart in a separate window (wired by DataView).
+  export let openChartWindow:
+    | ((topic: string, fields: string[]) => void)
+    | null = null;
 
   $: selectedTopicString = $selectedTopicStore.selectedTopic;
+
+  // Per-topic chart series; reset whenever the selected topic changes.
+  const chartSeriesStore = createChartSeriesStore();
+  let lastChartedTopic: string | null = null;
+  $: if ($selectedTopicStore.selectedTopic !== lastChartedTopic) {
+    lastChartedTopic = $selectedTopicStore.selectedTopic;
+    chartSeriesStore.clear();
+  }
+
+  // Tab control: the Chart tab is last (index 3 for v5 incl. Headers/Properties,
+  // index 1 for v3 which only has Payload + Chart).
+  let tabsRef: { setTab: (index: number) => void } | null = null;
+  let activeTabIndex = 0;
+  $: chartTabIndex = mqttVersion === "3" ? 1 : 3;
+  $: isChartTabActive = activeTabIndex === chartTabIndex;
+  const viewChart = () => tabsRef?.setTab(chartTabIndex);
+  const popOut = () =>
+    openChartWindow?.(
+      $selectedTopicStore.selectedTopic ?? "",
+      $chartSeriesStore.map((s) => s.path)
+    );
 
   let selectedMessageId: string | null = null;
   $: selectedMessageIndex = $selectedTopicStore.history.findIndex(
@@ -38,6 +65,7 @@
         ] as MqttHistoryMessage)
       : null;
   $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
+  $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
 
   $: selectedMessagePayload,
@@ -70,6 +98,13 @@
       : null;
   $: prevMessageRetained = previousMessage?.retain ?? false;
   $: previousMessagePayload = previousMessage?.payload.toString() ?? null;
+
+  // Windowed durable history (recording on): older/newer/latest navigation.
+  $: isDiskHistory = $selectedTopicStore.historySource === "disk";
+  $: historyWindow = $selectedTopicStore.window;
+  $: totalHistoryCount = $selectedTopicStore.totalCount;
+  $: shownHistoryCount = $selectedTopicStore.history.length;
+  $: atLatestWindow = historyWindow?.isNewest ?? true;
 </script>
 
 <div
@@ -145,30 +180,83 @@
       }}
     />
   </div>
+  {#if isDiskHistory && totalHistoryCount > shownHistoryCount}
+    <div
+      class="flex items-center gap-2 text-sm text-secondary-text mt-1 mb-1 select-none"
+    >
+      <Button
+        variant="text"
+        iconType="left"
+        iconPlacement="left"
+        iconSize={12}
+        on:click={() => selectedTopicStore.loadOlderWindow()}>Older</Button
+      >
+      <Button
+        variant="text"
+        iconType="right"
+        iconPlacement="right"
+        iconSize={12}
+        disabled={atLatestWindow}
+        on:click={() => selectedTopicStore.loadNewerWindow()}>Newer</Button
+      >
+      {#if !atLatestWindow}
+        <Button variant="text" on:click={() => selectedTopicStore.jumpToLatest()}
+          >Jump to latest</Button
+        >
+      {/if}
+      <div class="grow"></div>
+      <span class="whitespace-nowrap">
+        Showing {shownHistoryCount.toLocaleString()} of {totalHistoryCount.toLocaleString()}
+        {atLatestWindow ? "(latest)" : ""}
+      </span>
+    </div>
+  {/if}
   {#if selectedMessage === null}
     <div class="mt-12 flex justify-center text-secondary-text">
       No message selected
     </div>
   {:else}
     {#if mqttVersion === "3"}
-      <div class="w-full min-h-0 grow mt-3">
-        {#if selectedMessagePayload !== null}
-          <PayloadTab
-            bind:codec={$selectedTopicStore.options.decoding}
-            bind:format={$selectedTopicStore.options.format}
-            {isComparing}
-            payload={selectedMessagePayload}
-            payloadLeftForCompare={previousMessagePayload}
+      <Tabs
+        class="w-full grow min-h-0"
+        bind:this={tabsRef}
+        onTabChange={(i) => (activeTabIndex = i)}
+        tabs={[{ title: "Payload" }, { title: "Chart" }]}
+      >
+        <div slot="tab-1" class="size-full pt-2">
+          {#if selectedMessagePayload !== null}
+            <PayloadTab
+              bind:codec={$selectedTopicStore.options.decoding}
+              bind:format={$selectedTopicStore.options.format}
+              {isComparing}
+              payload={selectedMessagePayload}
+              payloadB64={selectedMessagePayloadB64}
+              payloadLeftForCompare={previousMessagePayload}
+              {chartSeriesStore}
+              onViewChart={viewChart}
+            />
+          {/if}
+        </div>
+        <div slot="tab-2" class="size-full pt-2">
+          <ChartView
+            {selectedTopicStore}
+            {chartSeriesStore}
+            topic={selectedTopicString ?? ""}
+            onAddFromPayload={() => tabsRef?.setTab(0)}
+            onPopOut={openChartWindow ? popOut : null}
           />
-        {/if}
-      </div>
+        </div>
+      </Tabs>
     {:else}
       <Tabs
         class="w-full grow min-h-0"
+        bind:this={tabsRef}
+        onTabChange={(i) => (activeTabIndex = i)}
         tabs={[
           { title: "Payload" },
           { title: "Headers" },
           { title: "Properties" },
+          { title: "Chart" },
         ]}
       >
         <div slot="tab-1" class="size-full pt-2">
@@ -178,7 +266,10 @@
               bind:format={$selectedTopicStore.options.format}
               {isComparing}
               payload={selectedMessagePayload}
+              payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
+              {chartSeriesStore}
+              onViewChart={viewChart}
             />
           {/if}
         </div>
@@ -201,15 +292,26 @@
             />
           {/if}
         </div>
+        <div slot="tab-4" class="size-full pt-2">
+          <ChartView
+            {selectedTopicStore}
+            {chartSeriesStore}
+            topic={selectedTopicString ?? ""}
+            onAddFromPayload={() => tabsRef?.setTab(0)}
+            onPopOut={openChartWindow ? popOut : null}
+          />
+        </div>
       </Tabs>
     {/if}
-    <SelectedMessageArrivalDetails
-      class="mt-2"
-      {isComparing}
-      selectedArrivedAtMs={selectedMessage.timeMs}
-      selectedRetain={selectedMessageRetained}
-      previousRetain={prevMessageRetained}
-      previousArrivedAtMs={previousMessage?.timeMs ?? null}
-    />
+    {#if !isChartTabActive}
+      <SelectedMessageArrivalDetails
+        class="mt-2"
+        {isComparing}
+        selectedArrivedAtMs={selectedMessage.timeMs}
+        selectedRetain={selectedMessageRetained}
+        previousRetain={prevMessageRetained}
+        previousArrivedAtMs={previousMessage?.timeMs ?? null}
+      />
+    {/if}
   {/if}
 </div>

@@ -47,6 +47,12 @@ import {
   DotsThree,
   ArrowLeft,
   PlusCircle,
+  ChartLine,
+  Eye,
+  EyeSlash,
+  ArrowSquareOut,
+  Pause,
+  Image,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -97,6 +103,12 @@ export const ICON_MAP = {
   feature: Confetti,
   bug: Bug,
   download: DownloadSimple,
+  chart: ChartLine,
+  show: Eye,
+  hide: EyeSlash,
+  popOut: ArrowSquareOut,
+  pause: Pause,
+  image: Image,
 
   // States
   lastConnected: ClockCounterClockwise,

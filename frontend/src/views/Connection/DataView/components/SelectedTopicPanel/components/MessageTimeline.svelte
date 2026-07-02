@@ -204,30 +204,43 @@
     })();
 
   let innerSelectedTopic = $selectedTopicStore.selectedTopic;
+  // Tracks the loaded history window so a window switch (same topic, replaced
+  // history) rebuilds the dataset. Live appends keep the same oldestId, so
+  // they don't trigger a rebuild.
+  let innerWindowOldestId = $selectedTopicStore.window?.oldestId ?? null;
 
-  $: $selectedTopicStore.selectedTopic,
-    (() => {
-      if (!timeline || $selectedTopicStore.selectedTopic === "") return;
-      if (innerSelectedTopic === $selectedTopicStore.selectedTopic) return;
-      innerSelectedTopic = $selectedTopicStore.selectedTopic;
-      timelineDataSet = new DataSet<DataItem, "id">();
-      const timelineData = getTimelineData($selectedTopicStore.history);
-      timelineDataSet.add(timelineData);
-      selectedTopicStore.setOnNewMessages((messages) => {
-        timelineDataSet.add(getTimelineData(messages));
-      });
-      timeline.setItems(timelineDataSet);
+  const rebuildTimelineFromHistory = () => {
+    timelineDataSet = new DataSet<DataItem, "id">();
+    timelineDataSet.add(getTimelineData($selectedTopicStore.history));
+    selectedTopicStore.setOnNewMessages((messages) => {
+      timelineDataSet.add(getTimelineData(messages));
+    });
+    timeline.setItems(timelineDataSet);
+    // Select the most recent message in the (re)loaded window by default.
+    if (timelineDataSet.length > 0) {
+      const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
+      timeline.setSelection([lastMessage.id]);
+      onMessageSelect(lastMessage.id.toString());
+      timeline.moveTo(lastMessage.start, { animation: true });
+    }
+    timelineIsFocused = true;
+    document.getElementById("timeline")?.focus();
+  };
 
-      // Select the most recent message if it exists by default
-      if (timelineDataSet.length > 0) {
-        const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
-        timeline.setSelection([lastMessage.id]);
-        onMessageSelect(lastMessage.id.toString());
-        timeline.moveTo(lastMessage.start, { animation: true });
+  $: {
+    const topic = $selectedTopicStore.selectedTopic;
+    const windowOldestId = $selectedTopicStore.window?.oldestId ?? null;
+    if (timeline && topic !== "" && topic !== null) {
+      if (
+        innerSelectedTopic !== topic ||
+        innerWindowOldestId !== windowOldestId
+      ) {
+        innerSelectedTopic = topic;
+        innerWindowOldestId = windowOldestId;
+        rebuildTimelineFromHistory();
       }
-      timelineIsFocused = true;
-      document.getElementById("timeline")?.focus();
-    })();
+    }
+  }
 
   $: selectNextOrPreviousMessage = (action: "next" | "previous") => {
     if (!timeline || !timelineDataSet) return;

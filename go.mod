@@ -85,5 +85,3 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
-
-// replace github.com/wailsapp/wails/v2 v2.5.1 => C:\Users\sam\go\pkg\mod

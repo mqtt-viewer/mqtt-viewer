@@ -3,7 +3,8 @@ import { System, Window } from "@wailsio/runtime";
 import _ from "lodash";
 import { GetEnvInfo } from "bindings/mqtt-viewer/backend/app/app";
 
-const IS_BETA = true;
+// 1.0 shipped — the BETA badge is retired.
+const IS_BETA = false;
 
 interface EnvStore {
   env: {

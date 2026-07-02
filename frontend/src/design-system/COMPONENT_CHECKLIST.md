@@ -62,13 +62,18 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
+| Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
+| Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
+| Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
 
 ## Views (`Views/*`)
 
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
+| Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
@@ -87,6 +92,11 @@
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/UserPropertiesTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/SelectedTopicPanel | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/ChartOptions | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/ChartView | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/FieldPicker | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/SeriesLegend | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/SelectedTopicPanel/Chart/TopicChart | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/SelectedTopicPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/SelectedTopicPanel/MessageTimeline | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/SelectedTopicPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -124,7 +134,7 @@
 
 ## Summary
 
-- Components scanned: 98
-- Story present: 98
+- Components scanned: 108
+- Story present: 108
 - Figma-linked: 0
 - Missing specs: 0

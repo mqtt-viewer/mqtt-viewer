@@ -1,0 +1,45 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "ChartOptions",
+  "tier": "view",
+  "description": "Storybook coverage for ChartOptions.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "style",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "line",
+        "area"
+      ],
+      "default": "line"
+    },
+    {
+      "name": "showPoints",
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "windowMinutes",
+      "type": "string",
+      "required": false,
+      "default": 0
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "emphasis",
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

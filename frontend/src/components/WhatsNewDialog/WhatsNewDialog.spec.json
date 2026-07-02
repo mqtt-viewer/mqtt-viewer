@@ -1,0 +1,20 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "WhatsNewDialog",
+  "tier": "component",
+  "description": "Once-per-version changelog dialog; auto-opens on the first launch of a new version and is reopenable from Settings.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [],
+  "tokens": [
+    "secondary-text"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet. Wiring shell: version/gate logic lives here, layout in WhatsNewContent."
+}

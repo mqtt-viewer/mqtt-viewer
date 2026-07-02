@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-06-13T04:13:22.423Z",
+  "generatedAt": "2026-07-02T03:36:11.225Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1243,6 +1243,31 @@
       "specMissing": false
     },
     {
+      "name": "HistoryRetentionPrompt",
+      "tier": "component",
+      "description": "Storybook coverage for HistoryRetentionPrompt.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte",
+      "specPath": "src/components/HistoryRetentionPrompt/HistoryRetentionPrompt.spec.json",
+      "storyPath": "src/components/HistoryRetentionPrompt/HistoryRetentionPrompt.stories.svelte",
+      "storyId": "Components/HistoryRetentionPrompt",
+      "specMissing": false
+    },
+    {
       "name": "Icon",
       "tier": "primitive",
       "description": "Storybook coverage for Icon.",
@@ -2037,6 +2062,40 @@
       "specMissing": false
     },
     {
+      "name": "SettingsDialog",
+      "tier": "component",
+      "description": "Storybook coverage for SettingsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "emphasis",
+        "secondary-text",
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/SettingsDialog/SettingsDialog.svelte",
+      "specPath": "src/components/SettingsDialog/SettingsDialog.spec.json",
+      "storyPath": "src/components/SettingsDialog/SettingsDialog.stories.svelte",
+      "storyId": "Components/SettingsDialog",
+      "specMissing": false
+    },
+    {
       "name": "SparkplugLogo",
       "tier": "primitive",
       "description": "Storybook coverage for SparkplugLogo.",
@@ -2220,6 +2279,95 @@
       "specPath": "src/components/UpdateDialog/UpdateDialog.spec.json",
       "storyPath": "src/components/UpdateDialog/UpdateDialog.stories.svelte",
       "storyId": "Components/UpdateDialog",
+      "specMissing": false
+    },
+    {
+      "name": "WhatsNewContent",
+      "tier": "component",
+      "description": "Layout for a changelog entry: intro, emoji-bulleted sections, optional outro, dismiss button.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "entry",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "onClose",
+          "type": "function",
+          "required": false
+        }
+      ],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [
+        "Button"
+      ],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/WhatsNewDialog/WhatsNewContent.svelte",
+      "specPath": "src/components/WhatsNewDialog/WhatsNewContent.spec.json",
+      "storyPath": "src/components/WhatsNewDialog/WhatsNewContent.stories.svelte",
+      "storyId": "Components/WhatsNewDialog/WhatsNewContent",
+      "specMissing": false
+    },
+    {
+      "name": "WhatsNewDialog",
+      "tier": "component",
+      "description": "Once-per-version changelog dialog; auto-opens on the first launch of a new version and is reopenable from Settings.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet. Wiring shell: version/gate logic lives here, layout in WhatsNewContent.",
+      "sourcePath": "src/components/WhatsNewDialog/WhatsNewDialog.svelte",
+      "specPath": "src/components/WhatsNewDialog/WhatsNewDialog.spec.json",
+      "storyPath": "src/components/WhatsNewDialog/WhatsNewDialog.stories.svelte",
+      "storyId": "Components/WhatsNewDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ChartWindow",
+      "tier": "view",
+      "description": "Storybook coverage for ChartWindow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/ChartWindow/ChartWindow.svelte",
+      "specPath": "src/views/ChartWindow/ChartWindow.spec.json",
+      "storyPath": "src/views/ChartWindow/ChartWindow.stories.svelte",
+      "storyId": "Views/ChartWindow",
       "specMissing": false
     },
     {
@@ -3013,6 +3161,268 @@
       "specMissing": false
     },
     {
+      "name": "ChartOptions",
+      "tier": "view",
+      "description": "Storybook coverage for ChartOptions.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "style",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "line",
+            "area"
+          ],
+          "default": "line"
+        },
+        {
+          "name": "showPoints",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "windowMinutes",
+          "type": "string",
+          "required": false,
+          "default": 0
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "emphasis",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/ChartOptions.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/ChartOptions.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/ChartOptions.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/Chart/ChartOptions",
+      "specMissing": false
+    },
+    {
+      "name": "ChartView",
+      "tier": "view",
+      "description": "Storybook coverage for ChartView.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "selectedTopicStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "chartSeriesStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onAddFromPayload",
+          "type": "function",
+          "required": false,
+          "default": "> void) | null = null"
+        },
+        {
+          "name": "onPopOut",
+          "type": "function",
+          "required": false,
+          "default": "> void) | null = null"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "outline",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/ChartView.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/ChartView.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/ChartView.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/Chart/ChartView",
+      "specMissing": false
+    },
+    {
+      "name": "FieldPicker",
+      "tier": "view",
+      "description": "Storybook coverage for FieldPicker.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "node",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "depth",
+          "type": "string",
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "selected",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onToggle",
+          "type": "function",
+          "required": false,
+          "default": "> void"
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "emphasis",
+        "secondary-text",
+        "hovered",
+        "success"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/FieldPicker.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/FieldPicker.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/FieldPicker.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/Chart/FieldPicker",
+      "specMissing": false
+    },
+    {
+      "name": "SeriesLegend",
+      "tier": "view",
+      "description": "Storybook coverage for SeriesLegend.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "chartSeriesStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onAddFromPayload",
+          "type": "function",
+          "required": false,
+          "default": "> void) | null = null"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "emphasis",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/SeriesLegend.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/SeriesLegend.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/SeriesLegend.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/Chart/SeriesLegend",
+      "specMissing": false
+    },
+    {
+      "name": "TopicChart",
+      "tier": "view",
+      "description": "Storybook coverage for TopicChart.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "selectedTopicStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "chartSeriesStore",
+          "type": "store",
+          "required": true
+        },
+        {
+          "name": "paused",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "style",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "line",
+            "area"
+          ],
+          "default": "line"
+        },
+        {
+          "name": "showPoints",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "windowMinutes",
+          "type": "string",
+          "required": false,
+          "default": 0
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/TopicChart.svelte",
+      "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/TopicChart.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/Chart/TopicChart.stories.svelte",
+      "storyId": "Views/Connection/DataView/SelectedTopicPanel/Chart/TopicChart",
+      "specMissing": false
+    },
+    {
       "name": "HeadersTab",
       "tier": "view",
       "description": "Storybook coverage for HeadersTab.",
@@ -3131,6 +3541,12 @@
         },
         {
           "name": "payloadLeftForCompare",
+          "type": "string",
+          "required": false,
+          "default": "null"
+        },
+        {
+          "name": "payloadB64",
           "type": "string",
           "required": false,
           "default": "null"

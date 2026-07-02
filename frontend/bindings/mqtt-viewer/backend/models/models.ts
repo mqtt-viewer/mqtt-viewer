@@ -3,11 +3,60 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
+import {Create as $Create} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as time$0 from "../../../time/models.js";
+
+/**
+ * AppSettings is a single-row table (id = 1) holding app-wide preferences for
+ * message retention. MemoryBudgetBytes bounds the in-RAM message history (the
+ * always-on leak guard); RecordingEnabled + DiskBudgetBytes control opt-in
+ * durable history on disk; HasSeenHistoryPrompt gates the first-run popup.
+ * LastSeenChangelogVersion records which version's "What's new" dialog the
+ * user has dismissed, so it shows once per version.
+ */
+export class AppSettings {
+    "id": number;
+    "memoryBudgetBytes": number;
+    "recordingEnabled": boolean;
+    "diskBudgetBytes": number;
+    "hasSeenHistoryPrompt": boolean;
+    "lastSeenChangelogVersion": string;
+
+    /** Creates a new AppSettings instance. */
+    constructor($$source: Partial<AppSettings> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("memoryBudgetBytes" in $$source)) {
+            this["memoryBudgetBytes"] = 0;
+        }
+        if (!("recordingEnabled" in $$source)) {
+            this["recordingEnabled"] = false;
+        }
+        if (!("diskBudgetBytes" in $$source)) {
+            this["diskBudgetBytes"] = 0;
+        }
+        if (!("hasSeenHistoryPrompt" in $$source)) {
+            this["hasSeenHistoryPrompt"] = false;
+        }
+        if (!("lastSeenChangelogVersion" in $$source)) {
+            this["lastSeenChangelogVersion"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AppSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AppSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AppSettings($$parsedSource as Partial<AppSettings>);
+    }
+}
 
 export class Collection {
     "id": number;

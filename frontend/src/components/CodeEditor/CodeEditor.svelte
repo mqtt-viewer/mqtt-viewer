@@ -91,6 +91,5 @@
     readOnly && "cm-readonly"
   )}
   bind:this={dom}
-  on:focus={() => console.log("editor focused", text)}
-  on:blur={() => console.log("editor blurred", text)}
+  on:focusout={() => onChange.flush()}
 ></div>

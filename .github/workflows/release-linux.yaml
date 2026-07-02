@@ -7,18 +7,19 @@ on:
 env:
   GO_VERSION: "1.25.x"
   WAILS_VERSION: "v3.0.0-alpha.98"
-  NODE_VERSION: "20.15.0"
+  NODE_VERSION: "22.17.0"
 
 jobs:
   release:
     strategy:
+      fail-fast: false
       matrix:
         build:
           - arch: amd64
-            os: blacksmith
+            os: ubuntu-latest
             tag: linux_amd64
           - arch: arm64
-            os: blacksmith-arm
+            os: ubuntu-24.04-arm
             tag: linux_arm64
     runs-on: ${{ matrix.build.os }}
     name: Release MQTT Viewer (${{ matrix.build.tag }})
@@ -52,6 +53,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      # Dependencies (gtk3 / WebKit2GTK 4.1 stack, matching the -tags gtk3
+      # build). Must come before the wails3 CLI install: the CLI links the
+      # same webview stack, so `go install -tags gtk3` needs these headers.
+      - name: Install Ubuntu prerequisites
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libfuse2 zip rpm
+
       # -tags gtk3: the CLI links the same webview stack as the app; without
       # the tag it requires gtk4 dev headers, which we don't install.
       - name: Install wails3 CLI
@@ -65,13 +73,7 @@ jobs:
 
       - name: Install pnpm
         shell: bash
-        run: npm install -g pnpm
-
-      # Dependencies (gtk3 / WebKit2GTK 4.1 stack, matching the -tags gtk3 build)
-
-      - name: Install Ubuntu prerequisites
-        shell: bash
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libfuse2 zip rpm
+        run: npm install -g pnpm@10.28.0
 
       # Build + package (binary, AppImage, deb, rpm)
 
