@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-02T03:36:11.225Z",
+  "generatedAt": "2026-07-02T04:07:22.703Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2984,6 +2984,53 @@
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.stories.svelte",
       "storyId": "Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory",
+      "specMissing": false
+    },
+    {
+      "name": "MqttGraphView",
+      "tier": "view",
+      "description": "Volume-weighted tidy-tree topic explorer (PixiJS): node size = message rate, colour = recency, with collapse, pan/zoom, minimap and follow-hottest.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "selectedTopicStore",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "initialData",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": false,
+          "default": "0"
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "outline"
+      ],
+      "dependencies": [],
+      "notes": "Figma page: Topic Graph — Exploration (Direction D). Canvas renderer; story exercises mount + toolbar.",
+      "sourcePath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttGraphView",
       "specMissing": false
     },
     {

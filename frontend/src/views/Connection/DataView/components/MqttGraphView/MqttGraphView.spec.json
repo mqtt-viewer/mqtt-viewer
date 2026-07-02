@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "MqttGraphView",
+  "tier": "view",
+  "description": "Volume-weighted tidy-tree topic explorer (PixiJS): node size = message rate, colour = recency, with collapse, pan/zoom, minimap and follow-hottest.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "selectedTopicStore",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "initialData",
+      "type": "object",
+      "required": false
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": false,
+      "default": "0"
+    }
+  ],
+  "tokens": [
+    "secondary-text",
+    "outline"
+  ],
+  "dependencies": [],
+  "notes": "Figma page: Topic Graph — Exploration (Direction D). Canvas renderer; story exercises mount + toolbar."
+}
