@@ -10,7 +10,8 @@
 
   $: indent = depth * 14;
   $: isContainer = node.type === "object" || node.type === "array";
-  $: isNumber = node.type === "number";
+  // Numbers and quoted numerics (e.g. "24.6") can both be charted.
+  $: isChartable = node.chartable === true;
   $: color = selected.get(node.path);
   $: open = node.type === "array" ? "[" : "{";
   $: close = node.type === "array" ? "]" : "}";
@@ -51,20 +52,20 @@
 {:else}
   <div
     class={`flex items-center font-mono text-base py-[2px] pr-1 rounded ${
-      isNumber ? "hover:bg-hovered cursor-pointer" : ""
+      isChartable ? "hover:bg-hovered cursor-pointer" : ""
     }`}
     style:padding-left={`${indent}px`}
-    on:click={isNumber ? () => onToggle(node.path) : undefined}
-    role={isNumber ? "button" : undefined}
-    tabindex={isNumber ? 0 : undefined}
-    on:keydown={isNumber
+    on:click={isChartable ? () => onToggle(node.path) : undefined}
+    role={isChartable ? "button" : undefined}
+    tabindex={isChartable ? 0 : undefined}
+    on:keydown={isChartable
       ? (e) => (e.key === "Enter" || e.key === " ") && onToggle(node.path)
       : undefined}
   >
     {#if depth > 0}<span class="text-secondary-text">{node.key}:&nbsp;</span>{/if}
     <span class={valueClass}>{valueText}</span>
     <div class="grow"></div>
-    {#if isNumber}
+    {#if isChartable}
       <span
         class="size-4 min-w-4 rounded-[3px] border flex items-center justify-center"
         style:border-color={color ?? "var(--color-secondary-text)"}
