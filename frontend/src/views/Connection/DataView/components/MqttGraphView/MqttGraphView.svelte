@@ -340,25 +340,42 @@
       }
     );
 
+    let liveTick = 0;
     liveTimer = window.setInterval(() => {
       if (!renderer) return;
       renderer.notifyData();
-      if (!paused && (sortKey === "rate" || sortKey === "recency")) {
+      liveTick++;
+      // On big trees the periodic re-sort relayout (a full d3-hierarchy pass +
+      // visual reconciliation) is too expensive to run every 1.2s tick, so it
+      // only runs every 4th tick (~5s) once the tree crosses 2000 topics.
+      const dueThisTick = model.topicCount <= 2000 || liveTick % 4 === 0;
+      if (!paused && dueThisTick && (sortKey === "rate" || sortKey === "recency")) {
         renderer.relayout();
       }
       // keep the hover inspector's numbers live while the pointer rests
       if (hover) hover = buildHover(hover.topic, hover.x, hover.y);
     }, 1200);
 
+    // Panel-drag resize: a ResizeObserver can fire many times per drag frame.
+    // Pause the ticker immediately on every event (beginResize), but only
+    // reallocate the canvas backing store once, on the trailing edge of a
+    // ~150ms debounce, using the latest observed dimensions.
+    let resizeDebounce: number | null = null;
     ro = new ResizeObserver(() => {
       const cw = containerEl.clientWidth;
       const ch = containerEl.clientHeight;
       if (cw <= 0 || ch <= 0 || !renderer) return;
-      renderer.resize(cw, ch);
-      if (!everSized) {
-        everSized = true;
-        renderer.fitView();
-      }
+      renderer.beginResize();
+      if (resizeDebounce !== null) window.clearTimeout(resizeDebounce);
+      resizeDebounce = window.setTimeout(() => {
+        resizeDebounce = null;
+        if (!renderer) return;
+        renderer.endResize(cw, ch);
+        if (!everSized) {
+          everSized = true;
+          renderer.fitView();
+        }
+      }, 150);
     });
     ro.observe(containerEl);
     document.addEventListener("fullscreenchange", onFullscreenChange);

@@ -54,15 +54,18 @@ export interface GraphOptions {
 interface NodeVisual {
   container: Container;
   circle: Sprite;
-  label: Text;
+  label: Text | null; // lazily created/pooled — only exists while visible & labels-on
   caret: Graphics | null;
   caretHover: boolean;
-  badge: Text | null;
+  badge: Text | null; // lazily created/pooled, same lifecycle as label
   node: TopicNode;
   expanded: boolean;
   tx: number; // target x (animated toward)
   ty: number; // target y
   lastRippleMsg: number; // last-rendered message timestamp (for ripple spawn edge-detect)
+  culled: boolean; // outside the viewport (+ margin) — skips all per-frame work
+  moving: boolean; // still easing toward (tx, ty)
+  r: number; // last-computed radius (cached so culled nodes keep a sane value)
 }
 
 interface Ripple {
@@ -112,6 +115,8 @@ export class TopicGraphRenderer {
   // tree-view flash reference duration (MqttTopicRow.FLASH_DURATION_MS); the
   // canvas ripple runs on the same clock so both views "feel" the same
   private readonly RIPPLE_DURATION_MS = 1200;
+  // global cap on live ripples so a busy broker can't pile up unbounded draw calls
+  private readonly RIPPLE_CAP = 40;
   private minimap = new Container();
   private minimapBg = new Graphics();
   private minimapDots = new Graphics();
@@ -119,6 +124,37 @@ export class TopicGraphRenderer {
   private minimapW = 210;
   private minimapH = 140;
   private minimapVisible = true;
+  private lastMinimapDrawMs = 0;
+  private readonly MINIMAP_INTERVAL_MS = 250;
+
+  // ---- LOD / frame-work reduction ----
+  private readonly LABEL_ZOOM_THRESHOLD = 0.55;
+  private readonly CULL_MARGIN = 150;
+  private frameCount = 0;
+  private readonly SLOW_TICK_EVERY = 6; // ~10 Hz slow tick at 60fps
+  private forceSlowTick = true; // always run a slow tick on the very first frame
+  private visibleNodeCount = 0;
+  private edgesDirty = true;
+
+  // ---- label/badge pooling (lazy creation is the biggest win at scale) ----
+  private labelPool: Text[] = [];
+  private badgePool: Text[] = [];
+  private readonly LABEL_POOL_CAP = 300;
+  private textColorDirty = false;
+
+  // ---- adaptive frame rate ----
+  private frameMsEma = 8;
+  private readonly EMA_ALPHA = 0.08;
+  private slowFrameStreak = 0;
+  private fastFrameStreak = 0;
+  private currentMaxFps = 60;
+  private visibilityHandler = () => {
+    if (document.hidden) this.app.ticker.stop();
+    else this.app.ticker.start();
+  };
+
+  // ---- resize pause ----
+  private resizePending: { w: number; h: number } | null = null;
 
   private dragging = false;
   private dragMoved = false;
@@ -167,6 +203,8 @@ export class TopicGraphRenderer {
 
     this.installPanZoom(canvas);
     this.app.ticker.add(() => this.frame());
+
+    document.addEventListener("visibilitychange", this.visibilityHandler);
   }
 
   private positionMinimap(): void {
@@ -181,10 +219,14 @@ export class TopicGraphRenderer {
   }
   setTextColor(hex: number): void {
     this.textColor = hex;
+    // active labels/badges update immediately; pooled (inactive) ones are
+    // recoloured lazily on reuse via textColorDirty, so we don't have to walk
+    // a pool of up to LABEL_POOL_CAP idle Text objects here
     for (const v of this.visuals.values()) {
-      v.label.style.fill = hex;
+      if (v.label) v.label.style.fill = hex;
       if (v.badge) v.badge.style.fill = hex;
     }
+    this.textColorDirty = true;
   }
   setThemeUi(ui: ThemeUi): void {
     this.setTextColor(ui.text);
@@ -243,10 +285,13 @@ export class TopicGraphRenderer {
   scheduleRelayout(): void {
     if (this.relayoutQueued) return;
     this.relayoutQueued = true;
+    // adaptive debounce: big trees relayout (a d3-hierarchy pass + full visual
+    // reconciliation) far less often so a busy broker doesn't thrash the layout
+    const delay = this.model.topicCount <= 2000 ? 250 : 1000;
     setTimeout(() => {
       this.relayoutQueued = false;
       this.relayout();
-    }, 250);
+    }, delay);
   }
 
   private installPanZoom(canvas: HTMLCanvasElement): void {
@@ -304,6 +349,24 @@ export class TopicGraphRenderer {
     this.positionMinimap();
   }
 
+  // Panel-drag resize support: pause the ticker for the duration of a drag
+  // (many ResizeObserver events fire per drag) and only reallocate the canvas
+  // backing store once, on the trailing edge. Caller (Svelte component) debounces
+  // the endResize call; beginResize should be called on every observer event.
+  beginResize(): void {
+    this.app.ticker.stop();
+  }
+
+  endResize(width: number, height: number): void {
+    this.resize(width, height);
+    this.app.ticker.start();
+  }
+
+  // Snapshot for the dev harness FPS overlay / perf instrumentation.
+  getPerfCounts(): { placedNodes: number; visibleNodes: number } {
+    return { placedNodes: this.visuals.size, visibleNodes: this.visibleNodeCount };
+  }
+
   // Fit the current content into the viewport, top-aligned below `topMargin`.
   fitView(topMargin = 16): void {
     const vw = this.app.screen.width;
@@ -345,6 +408,10 @@ export class TopicGraphRenderer {
       v.expanded = pn.expanded;
       v.tx = pn.x;
       v.ty = pn.y;
+      // re-arm easing: settled nodes drop out of the fast-path position loop
+      // (moving = false), so any relayout that changes a node's target must
+      // mark it moving again or it would freeze at its old position
+      if (v.container.x !== pn.x || v.container.y !== pn.y) v.moving = true;
       this.updateCaretAndBadge(v);
     }
     // remove visuals no longer present
@@ -365,6 +432,13 @@ export class TopicGraphRenderer {
       const pv = this.visuals.get(parentNode.topic);
       if (cv && pv) this.edges.push([pv, cv]);
     }
+
+    // structural change: force a full (slow-tick + edge rebuild) pass on the
+    // very next frame regardless of the 6-frame cadence, and refresh the
+    // minimap immediately rather than waiting out its throttle window
+    this.forceSlowTick = true;
+    this.edgesDirty = true;
+    this.lastMinimapDrawMs = 0;
   }
 
   // Ease the viewport so `node` and its currently-visible descendants fill the
@@ -463,21 +537,15 @@ export class TopicGraphRenderer {
     });
     container.addChild(circle);
 
-    const label = new Text({
-      text: node.name || node.topic,
-      style: {
-        fill: this.textColor,
-        fontSize: 12,
-        fontFamily: "Mona Sans, system-ui, sans-serif",
-      },
-    });
-    label.anchor.set(0, 0.5);
-    container.addChild(label);
-
+    // Label/badge are NOT created here — they're the biggest per-node memory/CPU
+    // cost (a Pixi Text = a canvas-rendered texture) and most nodes in a busy
+    // tree are either culled or below the label zoom threshold at any moment.
+    // They're created on demand in the slow tick (see acquireLabel/acquireBadge)
+    // and released back into a pool rather than destroyed.
     const v: NodeVisual = {
       container,
       circle,
-      label,
+      label: null,
       caret: null,
       caretHover: false,
       badge: null,
@@ -486,10 +554,85 @@ export class TopicGraphRenderer {
       tx: 0,
       ty: 0,
       lastRippleMsg: node.expanded ? node.ownLastMsg : node.aggLastMsg,
+      culled: false,
+      moving: true,
+      r: this.rMin,
     };
     this.nodeLayer.addChild(container);
     this.visuals.set(node.topic, v);
     return v;
+  }
+
+  // ---- label/badge pooling ----
+  // Pool holds detached, hidden Text objects keyed by nothing in particular —
+  // any pooled label can serve any node since text/style/position are reset on
+  // acquire. Capped at LABEL_POOL_CAP; anything beyond that is destroyed rather
+  // than pooled (bounds worst-case memory when the tree briefly has huge churn).
+  private acquireLabel(v: NodeVisual, fontSize = 12): Text {
+    if (v.label) return v.label;
+    let t = this.labelPool.pop();
+    if (t) {
+      t.style.fontSize = fontSize;
+      t.style.fill = this.textColor;
+      t.visible = true;
+    } else {
+      t = new Text({
+        text: "",
+        style: {
+          fill: this.textColor,
+          fontSize,
+          fontFamily: "Mona Sans, system-ui, sans-serif",
+        },
+      });
+      t.anchor.set(0, 0.5);
+    }
+    v.container.addChild(t);
+    v.label = t;
+    return t;
+  }
+
+  private releaseLabel(v: NodeVisual): void {
+    if (!v.label) return;
+    const t = v.label;
+    v.container.removeChild(t);
+    v.label = null;
+    if (this.labelPool.length < this.LABEL_POOL_CAP) {
+      t.visible = false;
+      this.labelPool.push(t);
+    } else {
+      t.destroy();
+    }
+  }
+
+  private acquireBadge(v: NodeVisual): Text {
+    if (v.badge) return v.badge;
+    let t = this.badgePool.pop();
+    if (t) {
+      t.style.fill = this.textColor;
+      t.visible = true;
+    } else {
+      t = new Text({
+        text: "",
+        style: { fill: this.textColor, fontSize: 10, fontFamily: "Mona Sans, system-ui, sans-serif" },
+      });
+      t.anchor.set(0, 0.5);
+    }
+    v.container.addChild(t);
+    v.badge = t;
+    return t;
+  }
+
+  private releaseBadge(v: NodeVisual): void {
+    if (!v.badge) return;
+    const t = v.badge;
+    v.container.removeChild(t);
+    v.badge = null;
+    if (this.badgePool.length < this.LABEL_POOL_CAP) {
+      t.visible = false;
+      this.badgePool.push(t);
+    } else {
+      t.destroy();
+    }
   }
 
   // caret geometry is centred on (0,0); frame() slides it left of the node
@@ -506,9 +649,13 @@ export class TopicGraphRenderer {
     v.caret.fill({ color: v.caretHover ? 0xbdbdbd : 0x8a8a8a, alpha: a });
   }
 
+  // Creates (once) and redraws the caret graphic. Caret visibility for LOD
+  // (zoomed out below the label threshold) and culling is handled per-frame in
+  // the slow tick, not here — this only runs on structural relayout.
   private updateCaretAndBadge(v: NodeVisual): void {
     const hasChildren = v.node.children.size > 0;
-    // caret (toggles expand) for nodes with children
+    // caret (toggles expand) for nodes with children — a Graphics, not a Text,
+    // so it's cheap enough to keep eagerly (unlike labels/badges)
     if (hasChildren && !v.caret) {
       const caret = new Graphics();
       caret.eventMode = "static";
@@ -534,110 +681,218 @@ export class TopicGraphRenderer {
       v.container.addChildAt(caret, 0);
     }
     if (v.caret) this.drawCaret(v);
+  }
 
-    // +N badge for collapsed nodes with descendants
-    const showBadge = !v.expanded && v.node.descendantCount > 0;
-    if (showBadge && !v.badge) {
-      v.badge = new Text({
-        text: "",
-        style: { fill: this.textColor, fontSize: 10, fontFamily: "Mona Sans, system-ui, sans-serif" },
-      });
-      v.badge.anchor.set(0, 0.5);
-      v.container.addChild(v.badge);
-    }
-    if (v.badge) {
-      v.badge.visible = showBadge;
-      if (showBadge) v.badge.text = `+${v.node.descendantCount}`;
-    }
+  // World-space visible rect (screen corners projected into world space),
+  // expanded by CULL_MARGIN so nodes just off-screen don't pop in/out.
+  private computeVisibleRect(): { minX: number; minY: number; maxX: number; maxY: number } {
+    const tl = this.world.toLocal({ x: 0, y: 0 });
+    const br = this.world.toLocal({ x: this.app.screen.width, y: this.app.screen.height });
+    const m = this.CULL_MARGIN;
+    return {
+      minX: Math.min(tl.x, br.x) - m,
+      minY: Math.min(tl.y, br.y) - m,
+      maxX: Math.max(tl.x, br.x) + m,
+      maxY: Math.max(tl.y, br.y) + m,
+    };
   }
 
   private frame(): void {
     const nowMs = Date.now();
-    const showLabels = this.world.scale.x >= 0.55;
+    this.updateAdaptiveFps();
+
+    const showLabels = this.world.scale.x >= this.LABEL_ZOOM_THRESHOLD;
+    const lodDetail = this.world.scale.x >= this.LABEL_ZOOM_THRESHOLD;
     let hottestTopic: string | null = null;
     let hottestMs = -1;
 
+    this.frameCount++;
+    const runSlowTick = this.forceSlowTick || this.frameCount % this.SLOW_TICK_EVERY === 0;
+    this.forceSlowTick = false;
+
+    const rect = this.computeVisibleRect();
+    let anyMoved = false;
+    this.visibleNodeCount = 0;
+
     for (const v of this.visuals.values()) {
-      // ease position toward target (animated reflow on sort/expand/filter)
-      const dx = v.tx - v.container.x;
-      const dy = v.ty - v.container.y;
-      if (Math.abs(dx) + Math.abs(dy) > 0.4) {
-        v.container.x += dx * 0.25;
-        v.container.y += dy * 0.25;
+      // ease position toward target (animated reflow on sort/expand/filter) —
+      // always runs (fast path) but is a no-op once a node has settled, so
+      // this loop body is cheap for the (common) majority of stationary nodes
+      if (v.moving) {
+        const dx = v.tx - v.container.x;
+        const dy = v.ty - v.container.y;
+        if (Math.abs(dx) + Math.abs(dy) > 0.4) {
+          v.container.x += dx * 0.25;
+          v.container.y += dy * 0.25;
+          anyMoved = true;
+        } else {
+          v.container.x = v.tx;
+          v.container.y = v.ty;
+          v.moving = false;
+        }
+      }
+
+      // viewport culling: skip ALL further per-frame work for offscreen nodes
+      const wasCulled = v.culled;
+      const culled =
+        v.container.x < rect.minX ||
+        v.container.x > rect.maxX ||
+        v.container.y < rect.minY ||
+        v.container.y > rect.maxY;
+      v.culled = culled;
+      if (culled) {
+        if (v.container.visible) {
+          v.container.visible = false;
+          // release pooled resources on the cull transition so labels/badges
+          // from panned-away regions are reusable elsewhere instead of
+          // accumulating on invisible containers
+          if (v.label) this.releaseLabel(v);
+          if (v.badge) this.releaseBadge(v);
+        }
+        // follow-hottest must still consider offscreen nodes: panning the
+        // viewport to them is the whole point of the mode
+        if (this.followHottest) {
+          const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
+          if (lastMsg > hottestMs) {
+            hottestMs = lastMsg;
+            hottestTopic = v.node.topic;
+          }
+        }
+        continue;
+      }
+      if (!v.container.visible) v.container.visible = true;
+      this.visibleNodeCount++;
+      // a node transitioning culled -> visible needs its slow-tick state
+      // (radius/tint/label) refreshed immediately rather than waiting for the
+      // next 10Hz tick, or it'll render with stale (or default) values for a beat
+      const justRevealed = wasCulled && !culled;
+
+      if (runSlowTick || justRevealed) {
+        const score = v.expanded
+          ? this.model.ownScore(v.node, nowMs)
+          : this.model.aggScore(v.node, nowMs);
+        const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
+        const r = radiusForScore(score, this.rMin, this.rMax, this.k);
+        v.r = r;
+        v.circle.scale.set(r / TEX_R);
+        const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
+        v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe);
+
+        // labels/badges: acquire lazily when visible + zoomed in enough, release otherwise
+        if (showLabels) {
+          const label = this.acquireLabel(v);
+          // leaf label bug fix: always render just this node's own segment name,
+          // never the full topic path — an empty segment (topic with a trailing
+          // slash) renders as "/" rather than falling back to node.topic
+          label.text = v.node.name === "" ? "/" : v.node.name;
+          if (this.textColorDirty) label.style.fill = this.textColor;
+
+          // expanded parents have an outgoing edge to the right — lift their
+          // label above the line so it isn't struck through; leaves/collapsed
+          // stay centred
+          const hasVisibleKids = v.expanded && v.node.children.size > 0;
+          if (hasVisibleKids) {
+            label.anchor.y = 1;
+            label.y = -4;
+            label.x = r + 4;
+          } else {
+            label.anchor.y = 0.5;
+            label.y = 0;
+            label.x = r + 7;
+          }
+          label.visible = true;
+
+          const showBadge = !v.expanded && v.node.descendantCount > 0;
+          if (showBadge) {
+            const badge = this.acquireBadge(v);
+            if (this.textColorDirty) badge.style.fill = this.textColor;
+            badge.text = `+${v.node.descendantCount}`;
+            badge.x = r + 9 + label.width + 8;
+            badge.visible = true;
+          } else if (v.badge) {
+            this.releaseBadge(v);
+          }
+        } else {
+          if (v.label) this.releaseLabel(v);
+          if (v.badge) this.releaseBadge(v);
+        }
+
+        // keep the caret clear of the node edge, however large the node grows;
+        // below the label zoom threshold carets are untargetable at that scale
+        // (and just visual noise), so hide the Graphics entirely
+        if (v.caret) {
+          v.caret.visible = lodDetail;
+          if (lodDetail) v.caret.position.x = -(r + 10);
+        }
+
+        if (lastMsg > hottestMs) {
+          hottestMs = lastMsg;
+          hottestTopic = v.node.topic;
+        }
+
+        // message-arrival pulse: spawn a ripple when the rendered last-message
+        // time advances, unless this node already rippled very recently (avoid
+        // overdraw on hot topics ticking many times a second). No ripples at all
+        // when zoomed out past the LOD threshold — they're imperceptible and
+        // just cost draw calls.
+        if (lodDetail && lastMsg > v.lastRippleMsg) {
+          v.lastRippleMsg = lastMsg;
+          const recent = this.ripples.find(
+            (rp) => rp.visual === v && nowMs - rp.startMs < 150
+          );
+          if (!recent) {
+            if (this.ripples.length >= this.RIPPLE_CAP) this.ripples.shift();
+            this.ripples.push({ visual: v, startMs: nowMs });
+          }
+        } else if (lastMsg > v.lastRippleMsg) {
+          // still track the edge even while suppressed, so a zoom-in afterwards
+          // doesn't replay a backlog of "new" messages as ripples
+          v.lastRippleMsg = lastMsg;
+        }
       } else {
-        v.container.x = v.tx;
-        v.container.y = v.ty;
-      }
-
-      const score = v.expanded
-        ? this.model.ownScore(v.node, nowMs)
-        : this.model.aggScore(v.node, nowMs);
-      const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
-      const r = radiusForScore(score, this.rMin, this.rMax, this.k);
-      v.circle.scale.set(r / TEX_R);
-      const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
-      v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe);
-
-      // expanded parents have an outgoing edge to the right — lift their label
-      // above the line so it isn't struck through; leaves/collapsed stay centred
-      const hasVisibleKids = v.expanded && v.node.children.size > 0;
-      if (hasVisibleKids) {
-        v.label.anchor.y = 1;
-        v.label.y = -4;
-        v.label.x = r + 4;
-      } else {
-        v.label.anchor.y = 0.5;
-        v.label.y = 0;
-        v.label.x = r + 7;
-      }
-      v.label.visible = showLabels;
-      if (v.badge && v.badge.visible) {
-        v.badge.x = r + 9 + v.label.width + 8;
-        v.badge.visible = showLabels;
-      }
-
-      // keep the caret clear of the node edge, however large the node grows
-      if (v.caret) v.caret.position.x = -(r + 10);
-
-      if (lastMsg > hottestMs) {
-        hottestMs = lastMsg;
-        hottestTopic = v.node.topic;
-      }
-
-      // message-arrival pulse: spawn a ripple when the rendered last-message
-      // time advances, unless this node already rippled very recently (avoid
-      // overdraw on hot topics ticking many times a second)
-      if (lastMsg > v.lastRippleMsg) {
-        v.lastRippleMsg = lastMsg;
-        const recent = this.ripples.find(
-          (rp) => rp.visual === v && nowMs - rp.startMs < 150
-        );
-        if (!recent) this.ripples.push({ visual: v, startMs: nowMs });
+        // fast path, non-slow-tick frame: still need an up to date hottest-topic
+        // candidate for follow-hottest, using the last-known lastMsg cheaply
+        const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
+        if (lastMsg > hottestMs) {
+          hottestMs = lastMsg;
+          hottestTopic = v.node.topic;
+        }
       }
     }
+    if (runSlowTick) this.textColorDirty = false;
 
-    // edges: orthogonal elbows resolved from current (animated) node centres
-    this.edgeLayer.clear();
-    for (const [p, c] of this.edges) {
-      const midX = c.container.x - 18;
-      this.edgeLayer
-        .moveTo(p.container.x, p.container.y)
-        .lineTo(midX, p.container.y)
-        .lineTo(midX, c.container.y)
-        .lineTo(c.container.x, c.container.y);
+    // edges: rebuild the Graphics only when something actually changed this
+    // frame (a node moved, a relayout happened, or the slow tick ran — radii
+    // shift label anchors but edges only depend on positions, so moved/relayout
+    // are the real triggers; slow tick is included because cull transitions
+    // change which edges are worth drawing)
+    if (anyMoved || this.edgesDirty || runSlowTick) {
+      this.edgeLayer.clear();
+      for (const [p, c] of this.edges) {
+        // skip drawing an edge when both endpoints are culled
+        if (p.culled && c.culled) continue;
+        const midX = c.container.x - 18;
+        this.edgeLayer
+          .moveTo(p.container.x, p.container.y)
+          .lineTo(midX, p.container.y)
+          .lineTo(midX, c.container.y)
+          .lineTo(c.container.x, c.container.y);
+      }
+      this.edgeLayer.stroke({ width: 1.25, color: 0x8a8a8a, alpha: 0.28 });
+      this.edgesDirty = false;
     }
-    this.edgeLayer.stroke({ width: 1.25, color: 0x8a8a8a, alpha: 0.28 });
 
     // message-arrival pulse ripples: expanding ring, eased out, fading
     this.pulseLayer.clear();
     if (this.ripples.length > 0) {
       const stillLive: Ripple[] = [];
       for (const rp of this.ripples) {
+        if (rp.visual.culled) continue; // drop ripples whose visual is culled
         const elapsed = nowMs - rp.startMs;
         if (elapsed >= this.RIPPLE_DURATION_MS) continue;
         const t = elapsed / this.RIPPLE_DURATION_MS;
         const eased = 1 - (1 - t) * (1 - t);
-        const r = rp.visual.circle.width / 2;
+        const r = rp.visual.r;
         const radius = r + eased * 16;
         const alpha = 0.85 * (1 - t);
         this.pulseLayer
@@ -649,13 +904,17 @@ export class TopicGraphRenderer {
     }
 
     // thin outline ring marks collapsed aggregates ("this circle sums a subtree")
-    this.aggRingLayer.clear();
-    for (const v of this.visuals.values()) {
-      if (v.expanded || v.node.descendantCount === 0) continue;
-      const r = v.circle.width / 2;
-      this.aggRingLayer
-        .circle(v.container.x, v.container.y, r + 2.5)
-        .stroke({ width: 1, color: v.circle.tint as number, alpha: 0.55 });
+    if (runSlowTick) {
+      this.aggRingLayer.clear();
+      if (lodDetail) {
+        for (const v of this.visuals.values()) {
+          if (v.culled || v.expanded || v.node.descendantCount === 0) continue;
+          const r = v.r;
+          this.aggRingLayer
+            .circle(v.container.x, v.container.y, r + 2.5)
+            .stroke({ width: 1, color: v.circle.tint as number, alpha: 0.55 });
+        }
+      }
     }
 
     // eased viewport animation (zoom-to-subtree / focus-from-sidebar)
@@ -691,14 +950,48 @@ export class TopicGraphRenderer {
     this.selectionRing.clear();
     if (this.selected) {
       const v = this.visuals.get(this.selected);
-      if (v) {
-        const r = v.circle.width / 2;
+      if (v && !v.culled) {
+        const r = v.r;
         this.selectionRing.circle(v.container.x, v.container.y, r + 5);
         this.selectionRing.stroke({ width: 2, color: this.accentColor, alpha: 0.9 });
       }
     }
 
-    if (this.minimapVisible) this.drawMinimap(nowMs);
+    if (this.minimapVisible) {
+      const dueMinimap = nowMs - this.lastMinimapDrawMs >= this.MINIMAP_INTERVAL_MS;
+      if (dueMinimap) {
+        this.lastMinimapDrawMs = nowMs;
+        this.drawMinimap(nowMs);
+      }
+    }
+  }
+
+  // EMA of ticker.deltaMS drives an adaptive frame-rate cap: sustained slow
+  // frames (busy tree, big relayout, etc.) drop the cap to 30fps to keep
+  // interactions responsive; sustained fast frames restore 60fps. Hysteresis
+  // (60-frame streaks in each direction) prevents flapping at the boundary.
+  private updateAdaptiveFps(): void {
+    const ms = this.app.ticker.elapsedMS;
+    this.frameMsEma = this.frameMsEma + this.EMA_ALPHA * (ms - this.frameMsEma);
+
+    if (this.frameMsEma > 14) {
+      this.slowFrameStreak++;
+      this.fastFrameStreak = 0;
+    } else if (this.frameMsEma < 8) {
+      this.fastFrameStreak++;
+      this.slowFrameStreak = 0;
+    } else {
+      this.slowFrameStreak = 0;
+      this.fastFrameStreak = 0;
+    }
+
+    if (this.currentMaxFps !== 30 && this.slowFrameStreak > 60) {
+      this.currentMaxFps = 30;
+      this.app.ticker.maxFPS = 30;
+    } else if (this.currentMaxFps !== 60 && this.fastFrameStreak > 60) {
+      this.currentMaxFps = 60;
+      this.app.ticker.maxFPS = 60;
+    }
   }
 
   private drawMinimap(nowMs: number): void {
@@ -746,6 +1039,11 @@ export class TopicGraphRenderer {
   }
 
   destroy(): void {
+    document.removeEventListener("visibilitychange", this.visibilityHandler);
+    for (const t of this.labelPool) t.destroy();
+    for (const t of this.badgePool) t.destroy();
+    this.labelPool = [];
+    this.badgePool = [];
     this.app.destroy(true, { children: true });
     this.visuals.clear();
   }

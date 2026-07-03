@@ -55,6 +55,7 @@
     "@vitest/browser": "3.2.6",
     "ajv": "^8.20.0",
     "autoprefixer": "^10.4.19",
+    "mqtt": "^5.15.1",
     "phosphor-svelte": "^1.4.2",
     "playwright": "^1.60.0",
     "postcss": "^8.5.10",

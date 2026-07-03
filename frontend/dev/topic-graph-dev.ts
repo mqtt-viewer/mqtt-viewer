@@ -1,5 +1,6 @@
-// Dev harness entry — mounts the Topic Graph renderer against synthetic traffic.
-// Open at http://localhost:5173/dev/topic-graph.html
+// Dev harness entry — mounts the Topic Graph renderer against synthetic traffic
+// (or a real broker via ?broker=). Open at http://localhost:5173/dev/topic-graph.html
+import mqtt from "mqtt";
 import { TopicGraphRenderer } from "@/views/Connection/DataView/components/MqttGraphView/pixi-graph";
 import { TopicModel } from "@/views/Connection/DataView/components/MqttGraphView/topic-model";
 import { startMockTraffic } from "@/views/Connection/DataView/components/MqttGraphView/mock-source";
@@ -7,6 +8,10 @@ import type { SortKey } from "@/views/Connection/DataView/components/MqttGraphVi
 
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
 const statusEl = document.getElementById("status") as HTMLSpanElement;
+
+const params = new URLSearchParams(window.location.search);
+const scale = Number(params.get("scale") ?? "1") || 1;
+const brokerUrl = params.get("broker");
 
 const model = new TopicModel();
 const renderer = new TopicGraphRenderer(
@@ -26,12 +31,104 @@ const sizeOf = () => ({
   h: window.innerHeight || canvas.clientHeight || document.body.clientHeight || 760,
 });
 
+// ---- FPS meter ----
+// Tracks ticker frames over rolling 1s windows and exposes window.__perf,
+// updated once a second, plus appends fps to the status line.
+interface PerfSnapshot {
+  fps: number;
+  avgFrameMs: number;
+  worstFrameMs: number;
+  placedNodes: number;
+  visibleNodes: number;
+}
+declare global {
+  interface Window {
+    __perf?: PerfSnapshot;
+    __r?: TopicGraphRenderer;
+    __m?: TopicModel;
+  }
+}
+
+function installPerfMeter(r: TopicGraphRenderer): void {
+  let frames = 0;
+  let windowStart = performance.now();
+  let worstMs = 0;
+  let sumMs = 0;
+  let lastFrameTime = performance.now();
+
+  r.app.ticker.add(() => {
+    const now = performance.now();
+    const dt = now - lastFrameTime;
+    lastFrameTime = now;
+    frames++;
+    sumMs += dt;
+    if (dt > worstMs) worstMs = dt;
+
+    const elapsed = now - windowStart;
+    if (elapsed >= 1000) {
+      const fps = (frames * 1000) / elapsed;
+      const avgFrameMs = sumMs / frames;
+      const counts = r.getPerfCounts();
+      window.__perf = {
+        fps: Math.round(fps * 10) / 10,
+        avgFrameMs: Math.round(avgFrameMs * 100) / 100,
+        worstFrameMs: Math.round(worstMs * 100) / 100,
+        placedNodes: counts.placedNodes,
+        visibleNodes: counts.visibleNodes,
+      };
+      frames = 0;
+      sumMs = 0;
+      worstMs = 0;
+      windowStart = now;
+      updateStatus();
+    }
+  });
+}
+
+let baseStatus = "";
+function updateStatus(): void {
+  const p = window.__perf;
+  const fpsPart = p ? ` · ${p.fps} fps (avg ${p.avgFrameMs}ms, worst ${p.worstFrameMs}ms) · visible ${p.visibleNodes}/${p.placedNodes}` : "";
+  statusEl.textContent = `${baseStatus}${fpsPart}`;
+}
+
+async function connectBroker(url: string): Promise<void> {
+  baseStatus = `connecting to ${url}...`;
+  updateStatus();
+  const client = mqtt.connect(url);
+  client.on("connect", () => {
+    baseStatus = `connected to ${url}`;
+    updateStatus();
+    client.subscribe("#", { qos: 0 });
+  });
+  client.on("message", (topic) => {
+    model.ingest(topic, Date.now());
+  });
+  client.on("error", (err) => {
+    baseStatus = `broker error: ${err.message}`;
+    updateStatus();
+  });
+  client.on("close", () => {
+    baseStatus = `broker connection closed (${url})`;
+    updateStatus();
+  });
+}
+
 async function main() {
   const { w, h } = sizeOf();
   await renderer.init(canvas, w, h);
   (window as any).__r = renderer;
   (window as any).__m = model;
-  const mock = startMockTraffic(model, 1);
+  installPerfMeter(renderer);
+
+  let mockTopicCount = 0;
+  if (brokerUrl) {
+    await connectBroker(brokerUrl);
+  } else {
+    const mock = startMockTraffic(model, scale);
+    mockTopicCount = mock.topicCount;
+    baseStatus = `${model.topicCount} topics · ${mockTopicCount} simulated`;
+  }
 
   // give it a moment of traffic so the tree exists, then lay out + fit
   setTimeout(() => {
@@ -53,7 +150,10 @@ async function main() {
       settle++;
     }
     if (settle < 6) setTimeout(() => renderer.fitView(), 300);
-    statusEl.textContent = `${model.topicCount} topics · ${mock.topicCount} simulated`;
+    baseStatus = brokerUrl
+      ? `${model.topicCount} topics · broker ${brokerUrl}`
+      : `${model.topicCount} topics · ${mockTopicCount} simulated`;
+    updateStatus();
   }, 500);
 
   let lastW = w;

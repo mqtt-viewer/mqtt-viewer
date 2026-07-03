@@ -77,18 +77,22 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
     }
   };
 
+  // Decorate-sort-undecorate: compute each child's sort key exactly once
+  // (sortValue(n) calls model.aggScore, which is not free) into a side array,
+  // sort that by the cached key, then read the node back off — instead of
+  // calling sortValue() from inside the comparator, which re-derives the score
+  // for every comparison (O(n log n) score computations instead of O(n)).
   const sortChildren = (n: TopicNode): TopicNode[] => {
     let kids = [...n.children.values()];
     if (filtering) kids = kids.filter((k) => keep.has(k));
-    kids.sort((a, b) => {
-      const va = sortValue(a);
-      const vb = sortValue(b);
-      if (typeof va === "string" || typeof vb === "string") {
-        return String(va).localeCompare(String(vb));
+    const decorated = kids.map((node) => ({ node, key: sortValue(node) }));
+    decorated.sort((a, b) => {
+      if (typeof a.key === "string" || typeof b.key === "string") {
+        return String(a.key).localeCompare(String(b.key));
       }
-      return va - vb;
+      return (a.key as number) - (b.key as number);
     });
-    return kids;
+    return decorated.map((d) => d.node);
   };
 
   // children accessor for d3: collapsed nodes are leaves in the layout.
