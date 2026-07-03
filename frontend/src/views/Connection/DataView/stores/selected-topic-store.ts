@@ -45,6 +45,10 @@ interface SelectedTopicData {
   historySource: "memory" | "disk";
   window: HistoryWindow | null;
   totalCount: number;
+  // True while the initial history/window fetch for the current selection is
+  // in flight. The panel shows a loading state in the timeline area while
+  // this is true so opening a topic is instant even for a very busy topic.
+  isLoadingHistory: boolean;
   options: {
     autoSelect: boolean;
     compare: boolean;
@@ -62,6 +66,28 @@ const decode = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
   payloadB64: m.payload as unknown as string,
 });
 
+const yieldToEventLoop = () => new Promise<void>((r) => setTimeout(r, 0));
+
+// Decodes a large message batch without blocking the main thread: decoding
+// (base64 -> utf8) is CPU-bound and a busy topic can have up to
+// HISTORY_WINDOW_SIZE messages in a single window, so we slice the work into
+// chunks and yield to the event loop between them, letting the panel/loading
+// state and the rest of the UI keep rendering while it runs.
+const decodeChunked = async (
+  messages: mqtt.MqttMessage[],
+  chunk = 400
+): Promise<MqttHistoryMessage[]> => {
+  const result: MqttHistoryMessage[] = new Array(messages.length);
+  for (let i = 0; i < messages.length; i += chunk) {
+    const end = Math.min(i + chunk, messages.length);
+    for (let j = i; j < end; j++) {
+      result[j] = decode(messages[j]);
+    }
+    if (end < messages.length) await yieldToEventLoop();
+  }
+  return result;
+};
+
 const numericId = (id: string): number => {
   const n = parseInt(id, 10);
   return Number.isNaN(n) ? 0 : n;
@@ -71,6 +97,19 @@ export const createSelectedTopicStore = (
   connectionId: number,
   connectionEventSet: events.ConnectionEventsSet
 ) => {
+  // Monotonically increasing token identifying the "current" selection/fetch.
+  // Every async load (selectTopic, loadOlderWindow, loadNewerWindow,
+  // jumpToLatest) captures the token at call time and, before applying its
+  // result, checks it's still the current token and the selected topic
+  // hasn't changed. This guards against a slow fetch for a topic the user
+  // has since clicked away from (or a superseded window navigation) landing
+  // late and clobbering newer state.
+  let requestToken = 0;
+  const isStale = (token: number, topic: string) => {
+    const store = get({ subscribe });
+    return token !== requestToken || store.selectedTopic !== topic;
+  };
+
   const { subscribe, set, update } = writable<SelectedTopicData>(
     {
       connectionId,
@@ -80,6 +119,7 @@ export const createSelectedTopicStore = (
       historySource: "memory",
       window: null,
       totalCount: 0,
+      isLoadingHistory: false,
       onNewMessages: null,
       options: {
         autoSelect: true,
@@ -106,6 +146,13 @@ export const createSelectedTopicStore = (
       if (store.selectedTopic === null) return;
       // Only the newest view receives live messages; older windows are frozen.
       if (store.historySource === "disk" && !store.window?.isNewest) return;
+      // While the initial history/window fetch is in flight, its result will
+      // replace `history` wholesale once it lands. Rather than buffer and
+      // reconcile live messages against it, we simply ignore live appends
+      // during the load: the fetched window is the newest data on disk (or
+      // the full bounded RAM history in memory mode) anyway, so nothing is
+      // lost, and this keeps the loading path simple and race-free.
+      if (store.isLoadingHistory) return;
 
       const forTopic = messages.filter((m) => m.topic === store.selectedTopic);
       if (forTopic.length === 0) return;
@@ -137,12 +184,14 @@ export const createSelectedTopicStore = (
       });
     });
     const offClear = Events.On(connectionEventSet.mqttClearHistory, () => {
+      requestToken++;
       update((s) => ({
         ...s,
         history: [],
         selectedTopic: null,
         window: null,
         totalCount: 0,
+        isLoadingHistory: false,
       }));
     });
     activeTeardown = () => {
@@ -169,39 +218,57 @@ export const createSelectedTopicStore = (
     onNewMessages?: (messages: MqttHistoryMessage[]) => void
   ) => {
     const { connectionId } = get({ subscribe });
+    const token = ++requestToken;
+
+    // Open the panel and show a loading state immediately, synchronously,
+    // before any await below — the panel's visibility is driven by
+    // `selectedTopic !== null`, so this is what makes selecting a topic feel
+    // instant even when the fetch/decode below takes a while.
+    update((store) => ({
+      ...store,
+      selectedTopic: topic,
+      history: [],
+      window: null,
+      totalCount: 0,
+      isLoadingHistory: true,
+      options: { ...store.options, autoSelect: true },
+      onNewMessages: onNewMessages ?? null,
+    }));
+
     const recording = await isRecordingEnabled();
+    if (isStale(token, topic)) return;
 
     if (recording) {
       const [count, windowMessages] = await Promise.all([
         GetReceivedMessageCount(connectionId, topic),
         GetReceivedMessageWindow(connectionId, topic, 0, 0, HISTORY_WINDOW_SIZE),
       ]);
-      const decoded = windowMessages.map(decode);
+      if (isStale(token, topic)) return;
+      const decoded = await decodeChunked(windowMessages);
+      if (isStale(token, topic)) return;
       update((store) => ({
         ...store,
-        selectedTopic: topic,
         history: decoded,
         historySource: "disk",
         window: windowFromMessages(decoded, true),
         totalCount: count,
-        options: { ...store.options, autoSelect: true },
-        onNewMessages: onNewMessages ?? null,
+        isLoadingHistory: false,
       }));
       return;
     }
 
     // Memory mode: the in-RAM history is already bounded by the memory budget.
     const history = await GetMessageHistory(connectionId, topic);
-    const decoded = history.map(decode);
+    if (isStale(token, topic)) return;
+    const decoded = await decodeChunked(history);
+    if (isStale(token, topic)) return;
     update((store) => ({
       ...store,
-      selectedTopic: topic,
       history: decoded,
       historySource: "memory",
       window: null,
       totalCount: decoded.length,
-      options: { ...store.options, autoSelect: true },
-      onNewMessages: onNewMessages ?? null,
+      isLoadingHistory: false,
     }));
   };
 
@@ -222,15 +289,19 @@ export const createSelectedTopicStore = (
     const store = get({ subscribe });
     if (store.historySource !== "disk" || store.window === null) return;
     if (store.selectedTopic === null) return;
+    const topic = store.selectedTopic;
+    const token = requestToken;
     const older = await GetReceivedMessageWindow(
       store.connectionId,
-      store.selectedTopic,
+      topic,
       store.window.oldestId,
       0,
       HISTORY_WINDOW_SIZE
     );
     if (older.length === 0) return;
-    const decoded = older.map(decode);
+    if (isStale(token, topic)) return;
+    const decoded = await decodeChunked(older);
+    if (isStale(token, topic)) return;
     update((s) => ({
       ...s,
       history: decoded,
@@ -244,22 +315,26 @@ export const createSelectedTopicStore = (
     const store = get({ subscribe });
     if (store.historySource !== "disk" || store.window === null) return;
     if (store.selectedTopic === null) return;
+    const topic = store.selectedTopic;
+    const token = requestToken;
     const newer = await GetReceivedMessageWindow(
       store.connectionId,
-      store.selectedTopic,
+      topic,
       0,
       store.window.newestId,
       HISTORY_WINDOW_SIZE
     );
+    if (isStale(token, topic)) return;
     if (newer.length === 0) {
-      // Already at the latest — just mark the current window live.
+      // Already at the latest, just mark the current window live.
       update((s) => ({
         ...s,
         window: s.window ? { ...s.window, isNewest: true } : null,
       }));
       return;
     }
-    const decoded = newer.map(decode);
+    const decoded = await decodeChunked(newer);
+    if (isStale(token, topic)) return;
     const reachedLatest = newer.length < HISTORY_WINDOW_SIZE;
     update((s) => ({
       ...s,
@@ -272,14 +347,18 @@ export const createSelectedTopicStore = (
   const jumpToLatest = async () => {
     const store = get({ subscribe });
     if (store.historySource !== "disk" || store.selectedTopic === null) return;
+    const topic = store.selectedTopic;
+    const token = requestToken;
     const windowMessages = await GetReceivedMessageWindow(
       store.connectionId,
-      store.selectedTopic,
+      topic,
       0,
       0,
       HISTORY_WINDOW_SIZE
     );
-    const decoded = windowMessages.map(decode);
+    if (isStale(token, topic)) return;
+    const decoded = await decodeChunked(windowMessages);
+    if (isStale(token, topic)) return;
     update((s) => ({
       ...s,
       history: decoded,
@@ -288,12 +367,14 @@ export const createSelectedTopicStore = (
   };
 
   const deselectTopic = () => {
+    requestToken++;
     update((store) => ({
       ...store,
       selectedTopic: null,
       history: [],
       window: null,
       totalCount: 0,
+      isLoadingHistory: false,
       onNewMessages: null,
     }));
   };

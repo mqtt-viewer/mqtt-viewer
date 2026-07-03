@@ -105,6 +105,7 @@
   $: totalHistoryCount = $selectedTopicStore.totalCount;
   $: shownHistoryCount = $selectedTopicStore.history.length;
   $: atLatestWindow = historyWindow?.isNewest ?? true;
+  $: isLoadingHistory = $selectedTopicStore.isLoadingHistory;
 </script>
 
 <div
@@ -170,17 +171,25 @@
     </div></PanelHeader
   >
   <div class="h-[100px] min-h-[100px] overflow-hidden relative">
-    <MessageTimeline
-      {connectionId}
-      {firstConnectedAtMs}
-      {selectedTopicStore}
-      bind:isAutoSelectingMostRecent={$selectedTopicStore.options.autoSelect}
-      onMessageSelect={(id) => {
-        selectedMessageId = id;
-      }}
-    />
+    {#if isLoadingHistory}
+      <div
+        class="size-full flex items-center justify-center text-secondary-text"
+      >
+        Loading history...
+      </div>
+    {:else}
+      <MessageTimeline
+        {connectionId}
+        {firstConnectedAtMs}
+        {selectedTopicStore}
+        bind:isAutoSelectingMostRecent={$selectedTopicStore.options.autoSelect}
+        onMessageSelect={(id) => {
+          selectedMessageId = id;
+        }}
+      />
+    {/if}
   </div>
-  {#if isDiskHistory && totalHistoryCount > shownHistoryCount}
+  {#if !isLoadingHistory && isDiskHistory && totalHistoryCount > shownHistoryCount}
     <div
       class="flex items-center gap-2 text-sm text-secondary-text mt-1 mb-1 select-none"
     >
@@ -211,7 +220,10 @@
       </span>
     </div>
   {/if}
-  {#if selectedMessage === null}
+  {#if isLoadingHistory}
+    <!-- The timeline area above already shows the loading state; avoid
+      flashing "No message selected" underneath it while history loads. -->
+  {:else if selectedMessage === null}
     <div class="mt-12 flex justify-center text-secondary-text">
       No message selected
     </div>

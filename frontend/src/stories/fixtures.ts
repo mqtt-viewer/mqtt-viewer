@@ -241,6 +241,7 @@ export const createMockSelectedTopicStore = () => {
     historySource: "memory",
     window: null,
     totalCount: mockMqttMessages.length,
+    isLoadingHistory: false,
     options: {
       autoSelect: true,
       compare: true,
