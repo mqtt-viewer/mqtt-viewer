@@ -19,9 +19,11 @@
   } from "vis-timeline/peer";
   import { DataSet } from "vis-data";
   import { untypedColors } from "@/util/resolvedTailwindConfig";
-  import type {
-    MqttHistoryMessage,
-    SelectedTopicStore,
+  import {
+    MAX_LOADED_MESSAGES,
+    type HistoryDelta,
+    type MqttHistoryMessage,
+    type SelectedTopicStore,
   } from "../../../stores/selected-topic-store";
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
@@ -37,6 +39,10 @@
   let timeline: Timeline;
   let minTimelineTime = moment(firstConnectedAtMs).add(-1, "minutes").toDate();
   let maxTimelineTime = moment().add(10, "minutes").toDate();
+  // The lower bound applied to the timeline. Normally pinned to session
+  // start, but widened to allow panning back into disk history recorded
+  // before this app session — see recomputeMin().
+  let currentMin = minTimelineTime;
   let timelineEnsureNowVisibleInterval: NodeJS.Timeout;
   let timelineUpdateMaxInteral: NodeJS.Timeout;
   let defaultTimelineOptions: TimelineOptions = {
@@ -56,6 +62,11 @@
   let selectedMessageId: string | number | null = null;
   let selectedMessageIndex: number | null = null;
 
+  // Guards the auto-select-most-recent DataSet "add" listener while a
+  // prepend is being applied, since DataSet "add" events fire synchronously
+  // and we never want an older-history prepend to steal the selection.
+  let applyingPrepend = false;
+
   const getTimelineData = (messages: MqttHistoryMessage[]) => {
     const timelineData: DataItemCollectionType = [];
     messages.forEach((message) => {
@@ -69,6 +80,103 @@
     return timelineData;
   };
 
+  // Recomputes currentMin: normally session start minus a minute, but when
+  // disk history is loaded and there may be more to load older than what's
+  // currently in view, extend further back to leave room to pan/trigger a
+  // lazy load. Once we know we're at the oldest disk row, tighten back up.
+  const recomputeMin = () => {
+    const window = $selectedTopicStore.window;
+    const history = $selectedTopicStore.history;
+    const sessionMin = moment(firstConnectedAtMs).add(-1, "minutes").toDate();
+    if (window === null || history.length === 0) {
+      currentMin = sessionMin;
+      return;
+    }
+    const oldestLoadedTime = history[0].timeMs;
+    const slackMs = window.atOldest ? 60 * 1000 : 60 * 60 * 1000;
+    const extendedMin = moment(oldestLoadedTime).add(-slackMs, "ms").toDate();
+    currentMin = extendedMin < sessionMin ? extendedMin : sessionMin;
+  };
+
+  // Single place all timeline.setOptions calls go through so nothing
+  // accidentally resets `min` back to the (stale) default.
+  const applyTimelineOptions = () => {
+    if (!timeline) return;
+    timeline.setOptions({
+      ...defaultTimelineOptions,
+      min: currentMin,
+      max: maxTimelineTime,
+    });
+  };
+
+  // Checks whether the current visible range is close enough to the edge of
+  // what's loaded that we should kick off loading the next window. Only
+  // applies in disk mode with a window; a no-op otherwise (the store's
+  // single-flight guard also makes repeat calls harmless).
+  const checkLazyLoad = (startMs: number, endMs: number) => {
+    const window = $selectedTopicStore.window;
+    if ($selectedTopicStore.historySource !== "disk" || window === null) {
+      return;
+    }
+    const history = $selectedTopicStore.history;
+    if (history.length === 0) return;
+    const margin = 0.25 * (endMs - startMs);
+    const oldestLoadedMs = history[0].timeMs;
+    const newestLoadedMs = history[history.length - 1].timeMs;
+    if (!window.atOldest && startMs < oldestLoadedMs + margin) {
+      selectedTopicStore.loadOlderWindow();
+    }
+    if (!window.isNewest && endMs > newestLoadedMs - margin) {
+      selectedTopicStore.loadNewerWindow();
+    }
+  };
+
+  const handleHistoryDelta = (delta: HistoryDelta) => {
+    if (delta.kind === "append") {
+      timelineDataSet.add(getTimelineData(delta.messages));
+      return;
+    }
+    if (delta.kind === "prepend") {
+      applyingPrepend = true;
+      timelineDataSet.add(getTimelineData(delta.messages));
+      applyingPrepend = false;
+      recomputeMin();
+      applyTimelineOptions();
+      // The view may still extend past the new oldest point (or new/newer
+      // point), so re-check whether another load should kick off. Cap the
+      // cascade so a zoomed-out view can't loop through the whole table.
+      if ($selectedTopicStore.history.length < MAX_LOADED_MESSAGES) {
+        const range = timeline.getWindow();
+        checkLazyLoad(range.start.getTime(), range.end.getTime());
+      }
+      return;
+    }
+    // trim
+    timelineDataSet.remove(delta.ids);
+    if (selectedMessageId !== null && delta.ids.includes(selectedMessageId.toString())) {
+      selectedMessageId = null;
+      selectedMessageIndex = null;
+      onMessageSelect(null);
+    }
+  };
+
+  // Selects the last message in the store's (time-ordered) history — used
+  // instead of reading timelineDataSet.get() insertion order, which breaks
+  // once prepends are involved.
+  const selectLastHistoryMessage = () => {
+    const history = $selectedTopicStore.history;
+    if (history.length === 0) return;
+    const lastMessage = history[history.length - 1];
+    selectedMessageId = lastMessage.id;
+    selectedMessageIndex = history.length - 1;
+    timeline.setSelection([lastMessage.id]);
+    onMessageSelect(lastMessage.id.toString());
+    const item = timelineDataSet.get(lastMessage.id);
+    if (item) {
+      timeline.moveTo(item.start, { animation: true });
+    }
+  };
+
   onMount(() => {
     let container = document.getElementsByClassName(
       `timeline timeline-${connectionId}`
@@ -76,19 +184,15 @@
     timelineDataSet = new DataSet<DataItem, "id">();
     const timelineData = getTimelineData($selectedTopicStore.history);
     timelineDataSet.add(timelineData);
-    selectedTopicStore.setOnNewMessages((messages) => {
-      timelineDataSet.add(getTimelineData(messages));
-    });
+    selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
+    recomputeMin();
+    defaultTimelineOptions = { ...defaultTimelineOptions, min: currentMin };
     timeline = new Timeline(container, timelineDataSet, defaultTimelineOptions);
     if (timelineDataSet.length > 0) {
-      const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
-      selectedMessageId = lastMessage.id;
-      selectedMessageIndex = timelineDataSet.length - 1;
-      timeline.setSelection([lastMessage.id]);
-      onMessageSelect(lastMessage.id.toString());
+      selectLastHistoryMessage();
     }
 
-    timeline.setWindow(minTimelineTime, maxTimelineTime, {
+    timeline.setWindow(currentMin, maxTimelineTime, {
       animation: false,
     });
 
@@ -100,29 +204,42 @@
       }
       const selectedId = properties.items[0];
       const selectedMessage = timelineDataSet.get(selectedId);
-      const messageIndex = timelineDataSet
-        .get()
-        .findIndex((message) => message.id === selectedId);
-      const lastMessageId =
-        timelineDataSet.get()[timelineDataSet.length - 1].id;
-      if (!selectedId || selectedId !== lastMessageId) {
+      const history = $selectedTopicStore.history;
+      const messageIndex = history.findIndex(
+        (message) => message.id === selectedId
+      );
+      const lastHistoryMessage = history[history.length - 1];
+      if (!selectedId || !lastHistoryMessage || selectedId !== lastHistoryMessage.id) {
         isAutoSelectingMostRecent = false;
       }
       selectedMessageId = selectedId;
-      selectedMessageIndex = messageIndex;
+      selectedMessageIndex = messageIndex === -1 ? null : messageIndex;
       onMessageSelect(selectedId.toString());
       if (selectedMessage) {
         timeline.moveTo(selectedMessage.start, { animation: true });
       }
     });
 
+    timeline.on(
+      "rangechanged",
+      (properties: { start: Date; end: Date; byUser: boolean }) => {
+        if (!properties.byUser) return;
+        const startMs = properties.start.getTime();
+        const endMs = properties.end.getTime();
+        const history = $selectedTopicStore.history;
+        const newestLoadedMs =
+          history.length > 0 ? history[history.length - 1].timeMs : null;
+        if (newestLoadedMs !== null && endMs < newestLoadedMs) {
+          isAutoSelectingMostRecent = false;
+        }
+        checkLazyLoad(startMs, endMs);
+      }
+    );
+
     timelineUpdateMaxInteral = setInterval(
       () => {
         maxTimelineTime = moment().add(10, "minutes").toDate();
-        timeline.setOptions({
-          ...defaultTimelineOptions,
-          max: maxTimelineTime,
-        });
+        applyTimelineOptions();
       },
       9 * 60 * 1000
     );
@@ -131,10 +248,7 @@
     timelineEnsureNowVisibleInterval = setInterval(() => {
       if (maxTimelineTime.getMilliseconds() < new Date().getTime()) {
         maxTimelineTime = moment().add(10, "minutes").toDate();
-        timeline.setOptions({
-          ...defaultTimelineOptions,
-          max: maxTimelineTime,
-        });
+        applyTimelineOptions();
       }
     }, 1000);
   });
@@ -150,7 +264,7 @@
     if (!!timelineEnsureNowVisibleInterval) {
       clearInterval(timelineEnsureNowVisibleInterval);
     }
-    selectedTopicStore.setOnNewMessages(null);
+    selectedTopicStore.setOnHistoryDelta(null);
   });
 
   const turnAutoSelectMostRecentOn = (
@@ -158,14 +272,7 @@
     timelineDataSet: DataSet<DataItem, "id">
   ) => {
     if (!timelineDataSet || !timeline) return;
-    const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
-    if (lastMessage) {
-      selectedMessageId = lastMessage.id;
-      selectedMessageIndex = timelineDataSet.length - 1;
-      timeline.setSelection([lastMessage.id]);
-      onMessageSelect(lastMessage.id.toString());
-      timeline.moveTo(lastMessage.start, { animation: true });
-    }
+    selectLastHistoryMessage();
     timelineDataSet.on("add", selectMostRecentData);
   };
 
@@ -181,10 +288,14 @@
     properties: { items: IdType[] },
     senderId: string
   ) => {
+    // Prepends fire "add" too, but must never steal the selection.
+    if (applyingPrepend) return;
     if (properties.items.length === 0) return;
     const lastMessageId = properties.items[properties.items.length - 1];
     selectedMessageId = lastMessageId;
-    selectedMessageIndex = timelineDataSet.length - 1;
+    selectedMessageIndex = $selectedTopicStore.history.findIndex(
+      (message) => message.id === lastMessageId
+    );
     timeline.setSelection([lastMessageId]);
     onMessageSelect(lastMessageId.toString());
     const lastMessage = timelineDataSet.get(lastMessageId);
@@ -204,24 +315,22 @@
     })();
 
   let innerSelectedTopic = $selectedTopicStore.selectedTopic;
-  // Tracks the loaded history window so a window switch (same topic, replaced
-  // history) rebuilds the dataset. Live appends keep the same oldestId, so
-  // they don't trigger a rebuild.
-  let innerWindowOldestId = $selectedTopicStore.window?.oldestId ?? null;
+  // Tracks historyRevision so a wholesale replacement (new topic, jump to
+  // latest, clear-history) rebuilds the dataset. Incremental changes
+  // (prepend/append/trim) do NOT bump historyRevision and are instead
+  // applied via handleHistoryDelta, so they don't trigger a rebuild here.
+  let innerHistoryRevision = $selectedTopicStore.historyRevision;
 
   const rebuildTimelineFromHistory = () => {
     timelineDataSet = new DataSet<DataItem, "id">();
     timelineDataSet.add(getTimelineData($selectedTopicStore.history));
-    selectedTopicStore.setOnNewMessages((messages) => {
-      timelineDataSet.add(getTimelineData(messages));
-    });
+    selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
     timeline.setItems(timelineDataSet);
+    recomputeMin();
+    applyTimelineOptions();
     // Select the most recent message in the (re)loaded window by default.
     if (timelineDataSet.length > 0) {
-      const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
-      timeline.setSelection([lastMessage.id]);
-      onMessageSelect(lastMessage.id.toString());
-      timeline.moveTo(lastMessage.start, { animation: true });
+      selectLastHistoryMessage();
     }
     timelineIsFocused = true;
     document.getElementById("timeline")?.focus();
@@ -229,14 +338,14 @@
 
   $: {
     const topic = $selectedTopicStore.selectedTopic;
-    const windowOldestId = $selectedTopicStore.window?.oldestId ?? null;
+    const historyRevision = $selectedTopicStore.historyRevision;
     if (timeline && topic !== "" && topic !== null) {
       if (
         innerSelectedTopic !== topic ||
-        innerWindowOldestId !== windowOldestId
+        innerHistoryRevision !== historyRevision
       ) {
         innerSelectedTopic = topic;
-        innerWindowOldestId = windowOldestId;
+        innerHistoryRevision = historyRevision;
         rebuildTimelineFromHistory();
       }
     }
@@ -244,21 +353,45 @@
 
   $: selectNextOrPreviousMessage = (action: "next" | "previous") => {
     if (!timeline || !timelineDataSet) return;
-    if (selectedMessageIndex === null) return;
+    if (selectedMessageId === null) return;
+    const history = $selectedTopicStore.history;
+    if (history.length === 0) return;
+    // Derive the index from the selected id rather than trusting
+    // selectedMessageIndex: prepends and trims shift every index in
+    // `history`, so a stored index goes stale as soon as one happens.
+    const currentIndex = history.findIndex(
+      (message) => message.id === selectedMessageId
+    );
+    if (currentIndex === -1) return;
     let nextMessageIndex =
-      action === "next" ? selectedMessageIndex + 1 : selectedMessageIndex - 1;
-    if (nextMessageIndex >= timelineDataSet.length) {
+      action === "next" ? currentIndex + 1 : currentIndex - 1;
+    if (nextMessageIndex < 0) {
+      const window = $selectedTopicStore.window;
+      if (
+        $selectedTopicStore.historySource === "disk" &&
+        window !== null &&
+        !window.atOldest
+      ) {
+        // Older messages exist on disk but aren't loaded yet: kick off the
+        // load and leave the selection where it is; the user can step
+        // previous again once the older window arrives.
+        selectedTopicStore.loadOlderWindow();
+        return;
+      }
+      nextMessageIndex = history.length - 1;
+    }
+    if (nextMessageIndex >= history.length) {
       nextMessageIndex = 0;
     }
-    if (nextMessageIndex < 0) {
-      nextMessageIndex = timelineDataSet.length - 1;
-    }
-    const nextMessage = timelineDataSet.get()[nextMessageIndex];
+    const nextMessage = history[nextMessageIndex];
     selectedMessageId = nextMessage.id;
     selectedMessageIndex = nextMessageIndex;
     timeline.setSelection([nextMessage.id]);
     onMessageSelect(nextMessage.id.toString());
-    timeline.moveTo(nextMessage.start, { animation: true });
+    const item = timelineDataSet.get(nextMessage.id);
+    if (item) {
+      timeline.moveTo(item.start, { animation: true });
+    }
   };
 
   $: zoomIn = () => {
@@ -302,6 +435,13 @@
     event.preventDefault();
     event.stopPropagation();
   };
+
+  $: loadingWindowLabel =
+    $selectedTopicStore.isLoadingWindow === "older"
+      ? "Loading older messages..."
+      : $selectedTopicStore.isLoadingWindow === "newer"
+        ? "Loading newer messages..."
+        : null;
 </script>
 
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
@@ -321,13 +461,20 @@
   id="timeline"
   class={`
     py-[1px]
-    timeline timeline-${connectionId} rounded-sm relative 
+    timeline timeline-${connectionId} rounded-sm relative
     ${timelineIsFocused ? "border-[1px] border-primary-light/40" : "border-[1px] border-outline"}
   `}
   style:--primary={untypedColors["primary"]["DEFAULT"]}
   style:--primary-light={untypedColors["primary"]["light"]}
   style:--secondary={untypedColors["secondary"]["DEFAULT"]}
 >
+  {#if loadingWindowLabel !== null}
+    <div
+      class="absolute z-10 top-[2px] left-[4px] text-secondary-text text-xs bg-elevation-1/80 rounded px-1 pointer-events-none"
+    >
+      {loadingWindowLabel}
+    </div>
+  {/if}
   <div
     class="absolute z-10 size-[10px] bottom-[9px] right-[9px] text-secondary-text cursor-pointer"
   >

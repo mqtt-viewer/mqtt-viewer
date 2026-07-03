@@ -62,7 +62,12 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
   const sortValue = (n: TopicNode): number | string => {
     switch (sortKey) {
       case "rate":
-        return -model.aggScore(n, nowMs);
+        // read-only: layout sorting must not perturb the live decay state
+        // (model.aggScore mutates node.agg on every call, which every other
+        // reader — hover inspector, per-frame radius/tint — relies on for
+        // real elapsed-time decay). peekAggScore computes the same decayed
+        // value without writing it back.
+        return -model.peekAggScore(n, nowMs);
       case "recency":
         return -n.aggLastMsg;
       case "stale":

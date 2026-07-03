@@ -242,13 +242,15 @@ export const createMockSelectedTopicStore = () => {
     window: null,
     totalCount: mockMqttMessages.length,
     isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
     options: {
       autoSelect: true,
       compare: true,
       decoding: "none",
       format: "json",
     },
-    onNewMessages: null,
+    onHistoryDelta: null,
   });
   return store;
 };

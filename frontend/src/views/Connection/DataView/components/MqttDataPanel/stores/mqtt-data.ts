@@ -3,7 +3,10 @@ import type * as events from "bindings/mqtt-viewer/events/models";
 import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 import { Events } from "@wailsio/runtime";
 import { base64ToUtf8 } from "@/components/CodeEditor/codec";
-import type { HighlightedMqttTopicsStore } from "./highlighted-topics";
+import type {
+  HighlightCause,
+  HighlightedMqttTopicsStore,
+} from "./highlighted-topics";
 
 export type MqttData = {
   [topicLevel: string]: {
@@ -40,117 +43,145 @@ export const createMqttDataStore = (
     };
   });
 
+  // A batch may carry many messages for the same topic (e.g. a busy sensor
+  // publishing at high frequency within one 300ms drain). Only the last
+  // message per topic ends up in the tree, so decoding/timestamping every
+  // message is wasted work — collapse the batch to one entry per topic first,
+  // keeping a running count so messageCount still reflects every message.
   const processMessages = (messages: mqtt.MqttMessage[]) => {
+    const latestByTopic = new Map<
+      string,
+      { last: mqtt.MqttMessage; count: number }
+    >();
     for (const message of messages) {
-      const topicLevels = message.topic.split("/");
-
-      for (let i = 0; i < topicLevels.length; i++) {
-        const topic = topicLevels.slice(0, i + 1).join("/");
-        if (i !== topicLevels.length - 1) {
-          highlightedTopicStore.markTopicForHighlight(
-            topic,
-            message.id,
-            "child-update"
-          );
-        } else {
-          highlightedTopicStore.markTopicForHighlight(
-            topic,
-            message.id,
-            "message-update"
-          );
-        }
+      const existing = latestByTopic.get(message.topic);
+      if (existing === undefined) {
+        latestByTopic.set(message.topic, { last: message, count: 1 });
+      } else {
+        existing.last = message;
+        existing.count += 1;
       }
-      const timestamp = new Date(message.timeMs);
-      const decodedMessage = base64ToUtf8(message.payload as unknown as string);
-      const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
-      update((mqttData) => {
-        return insertMqttMessage(
+    }
+
+    const highlightMarks: Array<{
+      topic: string;
+      messageId: string;
+      cause: HighlightCause;
+    }> = [];
+
+    update((mqttData) => {
+      for (const { last: message, count } of latestByTopic.values()) {
+        const topicLevels = message.topic.split("/");
+        const timestamp = new Date(message.timeMs);
+        const decodedMessage = base64ToUtf8(
+          message.payload as unknown as string
+        );
+        const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
+
+        let prefix = "";
+        for (let i = 0; i < topicLevels.length; i++) {
+          prefix = i === 0 ? topicLevels[0] : `${prefix}/${topicLevels[i]}`;
+          highlightMarks.push({
+            topic: prefix,
+            messageId: message.id,
+            cause:
+              i !== topicLevels.length - 1 ? "child-update" : "message-update",
+          });
+        }
+
+        insertMqttMessage(
           mqttData,
           topicLevels,
           0,
           decodedMessage,
           isDecodedProto,
-          timestamp
+          timestamp,
+          count
         );
-      });
-    }
+      }
+      return mqttData;
+    });
+
+    highlightedTopicStore.markTopicsForHighlight(highlightMarks);
   };
 
+  // Returns true when a new topic-level key was created in mqttData, so the
+  // caller can maintain subtopicCount (the number of direct child keys) by
+  // incrementing it, instead of rescanning every sibling on each insert —
+  // that scan is O(siblings) and made wide subtrees quadratic per batch.
   const insertMqttMessage = (
     mqttData: MqttData,
     topicLevels: string[],
     currentTopicLevel: number,
     message: string,
     isDecodedProto: boolean,
-    timestamp: Date
-  ) => {
+    timestamp: Date,
+    count: number
+  ): boolean => {
     const topicLevel = topicLevels[currentTopicLevel];
     if (mqttData[topicLevel] !== undefined) {
       if (currentTopicLevel === topicLevels.length - 1) {
-        mqttData[topicLevel].messageCount += 1;
+        mqttData[topicLevel].messageCount += count;
         mqttData[topicLevel].message = message;
         mqttData[topicLevel].isDecodedProto = isDecodedProto;
         mqttData[topicLevel].latestMessageTime = timestamp;
 
-        return mqttData;
+        return false;
       }
-      const children = insertMqttMessage(
+      const createdChild = insertMqttMessage(
         mqttData[topicLevel].children,
         topicLevels,
         currentTopicLevel + 1,
         message,
         isDecodedProto,
-        timestamp
+        timestamp,
+        count
       );
       mqttData[topicLevel].isDecodedProto = isDecodedProto;
-      mqttData[topicLevel].messageCount += 1;
-      mqttData[topicLevel].children = children;
-      mqttData[topicLevel].subtopicCount = getSubtopicCount(children);
+      mqttData[topicLevel].messageCount += count;
+      if (createdChild) {
+        mqttData[topicLevel].subtopicCount += 1;
+      }
       mqttData[topicLevel].latestMessageTime = timestamp;
-      return mqttData;
+      return false;
     }
 
     if (currentTopicLevel === topicLevels.length - 1) {
       const topic = topicLevels.join("/");
       mqttData[topicLevel] = {
         subtopicCount: 0,
-        messageCount: 1,
+        messageCount: count,
         topic,
         isDecodedProto,
         message,
         children: {},
         latestMessageTime: timestamp,
       };
-      return mqttData;
+      return true;
     }
 
-    const children = insertMqttMessage(
-      {},
+    const children: MqttData = {};
+    insertMqttMessage(
+      children,
       topicLevels,
       currentTopicLevel + 1,
       message,
       false,
-      timestamp
+      timestamp,
+      count
     );
     const topic = topicLevels.slice(0, currentTopicLevel + 1).join("/");
     mqttData[topicLevel] = {
-      subtopicCount: getSubtopicCount(children),
-      messageCount: 1,
+      // The recursive call above created exactly one child key.
+      subtopicCount: 1,
+      messageCount: count,
       topic,
       message: undefined,
       isDecodedProto: false,
       children,
       latestMessageTime: timestamp,
     };
-    return mqttData;
-  };
-
-  const getSubtopicCount = (mqttData: MqttData) => {
-    let subtopicCount = 0;
-    for (const key in mqttData) {
-      subtopicCount += 1;
-    }
-    return subtopicCount;
+    return true;
   };
 
   const getAllTopics = () => {

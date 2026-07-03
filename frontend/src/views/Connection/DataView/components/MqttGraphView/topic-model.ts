@@ -48,6 +48,21 @@ export class TopicModel {
   autoExpandDepth = 1;
   private nodeCount = 0;
 
+  // Set whenever a change could alter the LAID-OUT (visible) tree: a new node
+  // arriving under an expanded ancestor chain, a removal, or an expansion
+  // toggle. Collapsed-subtree arrivals do NOT set this — they only update
+  // counters/badges, which the slow tick picks up without a relayout. Callers
+  // that schedule relayouts should check-and-clear this flag rather than
+  // topicCount, so the debounce is a no-op when nothing visible changed.
+  visibleDirty = false;
+
+  // Bumped every time the set of nodes eligible to appear in the layout
+  // changes shape: a node is added/removed, or an expansion toggle flips which
+  // subtrees are reachable. Positions alone (score-driven sort order) do not
+  // bump this. Used by the renderer to skip edge-array rebuilds when only
+  // positions moved.
+  structureGen = 0;
+
   constructor(tauMs = 14000) {
     this.tauMs = tauMs;
   }
@@ -59,6 +74,25 @@ export class TopicModel {
   clear(): void {
     this.root = new TopicNode("", "", -1, null);
     this.nodeCount = 0;
+    this.visibleDirty = true;
+    this.structureGen++;
+  }
+
+  // true if every ancestor up to (but not including) the synthetic root is
+  // expanded — i.e. `node` would actually be reachable by the layout's
+  // childrenAccessor. The node itself need not be expanded to appear.
+  private isVisibleInTree(node: TopicNode): boolean {
+    for (let p = node.parent; p && p !== this.root; p = p.parent) {
+      if (!p.expanded) return false;
+    }
+    return true;
+  }
+
+  // Mark a toggled node's visibility state dirty (expand/collapse always
+  // changes the laid-out tree, whether it reveals or hides a subtree).
+  markExpansionChanged(): void {
+    this.visibleDirty = true;
+    this.structureGen++;
   }
 
   // Record a message arrival on `topic` at time `tMs`.
@@ -76,6 +110,14 @@ export class TopicModel {
         this.nodeCount++;
         // every ancestor gains a descendant
         for (let p = node; p && p !== this.root; p = p.parent!) p.descendantCount++;
+        // only a node reachable under a fully-expanded ancestor chain can
+        // change what the layout actually draws; a new node buried under a
+        // collapsed ancestor is invisible until that ancestor expands, at
+        // which point expandToDepth/the caret toggle marks things dirty itself
+        if (this.isVisibleInTree(child)) {
+          this.visibleDirty = true;
+          this.structureGen++;
+        }
       }
       node = child;
       // each node on the path accumulates the subtree aggregate
@@ -97,5 +139,18 @@ export class TopicModel {
   // current own rate-score, decayed to now
   ownScore(node: TopicNode, nowMs: number): number {
     return decayScore(node.own, nowMs, this.tauMs);
+  }
+
+  // Read-only variant of aggScore: returns the subtree rate decayed to `nowMs`
+  // WITHOUT mutating node.agg.lastMs/score. Used by the layout's sort pass,
+  // which must compute many nodes' scores per pass without perturbing the
+  // live decay state that aggScore's mutating read maintains for every other
+  // caller (hover inspector, per-frame radius/tint, etc).
+  peekAggScore(node: TopicNode, nowMs: number): number {
+    const s = node.agg;
+    if (s.lastMs === 0) return s.score;
+    const dt = nowMs - s.lastMs;
+    if (dt <= 0) return s.score;
+    return s.score * Math.exp(-dt / this.tauMs);
   }
 }

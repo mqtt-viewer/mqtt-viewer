@@ -16,6 +16,12 @@ import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatti
 
 export const HISTORY_WINDOW_SIZE = 5000;
 
+// Upper bound on how many disk-mode messages we keep loaded in memory at
+// once. Once incremental loading (prepend/append) pushes past this, we evict
+// from the end away from the change so the timeline never grows unbounded
+// while the user pans through a busy topic's history.
+export const MAX_LOADED_MESSAGES = 20000;
+
 export type MqttHistoryMessage = Omit<
   mqtt.MqttMessage,
   "payload" | "convertValues"
@@ -26,6 +32,14 @@ export type MqttHistoryMessage = Omit<
   payloadB64: string;
 };
 
+// A delta describing how `history` just changed, so consumers (the vis
+// timeline) can apply the same change incrementally instead of rebuilding
+// wholesale.
+export type HistoryDelta =
+  | { kind: "append"; messages: MqttHistoryMessage[] } // live messages or loadNewer results
+  | { kind: "prepend"; messages: MqttHistoryMessage[] } // loadOlder results
+  | { kind: "trim"; ids: string[] }; // evicted messages (either end)
+
 // When recording is on, history is paged from disk in windows; this tracks the
 // current window so the user can move older/newer. In memory mode (recording
 // off) the whole bounded RAM history is shown and window is null.
@@ -35,6 +49,9 @@ interface HistoryWindow {
   // true when showing the most recent messages: live messages append here and
   // there is no newer window to load.
   isNewest: boolean;
+  // true once we know there is nothing older on disk than history[0] (the
+  // last older-fetch returned fewer than HISTORY_WINDOW_SIZE rows).
+  atOldest: boolean;
 }
 
 interface SelectedTopicData {
@@ -49,13 +66,21 @@ interface SelectedTopicData {
   // in flight. The panel shows a loading state in the timeline area while
   // this is true so opening a topic is instant even for a very busy topic.
   isLoadingHistory: boolean;
+  // Bumped only on a wholesale replacement of `history` (selectTopic result
+  // applied, jumpToLatest, clear-history, deselect). Incremental changes
+  // (prepend/append/trim) do NOT bump this. The timeline component rebuilds
+  // its dataset only when this changes, and otherwise applies deltas.
+  historyRevision: number;
+  // In-flight indicator for an incremental older/newer load; also doubles as
+  // the single-flight guard for loadOlderWindow/loadNewerWindow.
+  isLoadingWindow: "older" | "newer" | null;
   options: {
     autoSelect: boolean;
     compare: boolean;
     decoding: SupportedCodeEditorCodec;
     format: SupportedCodeEditorFormat;
   };
-  onNewMessages: null | ((messages: MqttHistoryMessage[]) => void);
+  onHistoryDelta: null | ((delta: HistoryDelta) => void);
 }
 
 export type SelectedTopicStore = ReturnType<typeof createSelectedTopicStore>;
@@ -120,7 +145,9 @@ export const createSelectedTopicStore = (
       window: null,
       totalCount: 0,
       isLoadingHistory: false,
-      onNewMessages: null,
+      historyRevision: 0,
+      isLoadingWindow: null,
+      onHistoryDelta: null,
       options: {
         autoSelect: true,
         compare: false,
@@ -157,7 +184,6 @@ export const createSelectedTopicStore = (
       const forTopic = messages.filter((m) => m.topic === store.selectedTopic);
       if (forTopic.length === 0) return;
       const decoded = forTopic.map(decode);
-      if (store.onNewMessages !== null) store.onNewMessages(decoded);
       update((s) => {
         // Live messages carry their receive-time UUID, while disk rows carry
         // numeric ids. We only ever page the keyset by disk id, so a live
@@ -182,6 +208,14 @@ export const createSelectedTopicStore = (
           window,
         };
       });
+      if (store.onHistoryDelta !== null) {
+        store.onHistoryDelta({ kind: "append", messages: decoded });
+      }
+      // Memory mode's RAM history is already bounded by the backend budget;
+      // only disk mode needs the frontend cap enforced here.
+      if (store.historySource === "disk") {
+        enforceCap("append");
+      }
     });
     const offClear = Events.On(connectionEventSet.mqttClearHistory, () => {
       requestToken++;
@@ -192,6 +226,8 @@ export const createSelectedTopicStore = (
         window: null,
         totalCount: 0,
         isLoadingHistory: false,
+        historyRevision: s.historyRevision + 1,
+        isLoadingWindow: null,
       }));
     });
     activeTeardown = () => {
@@ -213,9 +249,70 @@ export const createSelectedTopicStore = (
     }
   };
 
+  // Enforces MAX_LOADED_MESSAGES by evicting from the end AWAY from the
+  // change that just happened: a prepend grew the oldest end, so we evict
+  // from the newest end (and vice versa for append/live append). Emits a
+  // trim delta with the evicted ids after state has been updated.
+  const enforceCap = (changeEnd: "prepend" | "append") => {
+    const store = get({ subscribe });
+    const excess = store.history.length - MAX_LOADED_MESSAGES;
+    if (excess <= 0) return;
+
+    let evicted: MqttHistoryMessage[];
+    let kept: MqttHistoryMessage[];
+    if (changeEnd === "prepend") {
+      // Grew at the oldest end: evict the newest `excess` messages.
+      kept = store.history.slice(0, store.history.length - excess);
+      evicted = store.history.slice(store.history.length - excess);
+    } else {
+      // Grew at the newest end: evict the oldest `excess` messages.
+      evicted = store.history.slice(0, excess);
+      kept = store.history.slice(excess);
+    }
+
+    update((s) => {
+      if (s.window === null) return { ...s, history: kept };
+      let window = s.window;
+      if (changeEnd === "prepend") {
+        // Evicted from the newest end: no longer the newest window: recompute
+        // newestId as the largest numeric id among kept messages, scanning
+        // from the end and skipping non-numeric (UUID) ids.
+        let newestId = window.newestId;
+        for (let i = kept.length - 1; i >= 0; i--) {
+          const n = numericId(kept[i].id);
+          if (n !== 0) {
+            newestId = n;
+            break;
+          }
+        }
+        window = { ...window, isNewest: false, newestId };
+      } else {
+        // Evicted from the oldest end: recompute oldestId as the first kept
+        // message's numeric id, scanning forward past non-numeric ids.
+        let oldestId = window.oldestId;
+        for (let i = 0; i < kept.length; i++) {
+          const n = numericId(kept[i].id);
+          if (n !== 0) {
+            oldestId = n;
+            break;
+          }
+        }
+        window = { ...window, atOldest: false, oldestId };
+      }
+      return { ...s, history: kept, window };
+    });
+
+    if (store.onHistoryDelta !== null) {
+      store.onHistoryDelta({
+        kind: "trim",
+        ids: evicted.map((m) => m.id),
+      });
+    }
+  };
+
   const selectTopic = async (
     topic: string,
-    onNewMessages?: (messages: MqttHistoryMessage[]) => void
+    onHistoryDelta?: (delta: HistoryDelta) => void
   ) => {
     const { connectionId } = get({ subscribe });
     const token = ++requestToken;
@@ -231,8 +328,10 @@ export const createSelectedTopicStore = (
       window: null,
       totalCount: 0,
       isLoadingHistory: true,
+      historyRevision: store.historyRevision + 1,
+      isLoadingWindow: null,
       options: { ...store.options, autoSelect: true },
-      onNewMessages: onNewMessages ?? null,
+      onHistoryDelta: onHistoryDelta ?? null,
     }));
 
     const recording = await isRecordingEnabled();
@@ -253,6 +352,8 @@ export const createSelectedTopicStore = (
         window: windowFromMessages(decoded, true),
         totalCount: count,
         isLoadingHistory: false,
+        historyRevision: store.historyRevision + 1,
+        isLoadingWindow: null,
       }));
       return;
     }
@@ -269,6 +370,8 @@ export const createSelectedTopicStore = (
       window: null,
       totalCount: decoded.length,
       isLoadingHistory: false,
+      historyRevision: store.historyRevision + 1,
+      isLoadingWindow: null,
     }));
   };
 
@@ -276,21 +379,28 @@ export const createSelectedTopicStore = (
     messages: MqttHistoryMessage[],
     isNewest: boolean
   ): HistoryWindow | null => {
-    if (messages.length === 0) return { oldestId: 0, newestId: 0, isNewest };
+    if (messages.length === 0) {
+      return { oldestId: 0, newestId: 0, isNewest, atOldest: true };
+    }
     return {
       oldestId: numericId(messages[0].id),
       newestId: numericId(messages[messages.length - 1].id),
       isNewest,
+      atOldest: messages.length < HISTORY_WINDOW_SIZE,
     };
   };
 
-  // Loads the window immediately OLDER than the current one (moves left).
+  // Loads the window immediately OLDER than the current one and prepends it
+  // to the loaded history (moves left without discarding what's loaded).
   const loadOlderWindow = async () => {
     const store = get({ subscribe });
     if (store.historySource !== "disk" || store.window === null) return;
     if (store.selectedTopic === null) return;
+    if (store.isLoadingWindow !== null) return;
+    if (store.window.atOldest) return;
     const topic = store.selectedTopic;
     const token = requestToken;
+    update((s) => ({ ...s, isLoadingWindow: "older" }));
     const older = await GetReceivedMessageWindow(
       store.connectionId,
       topic,
@@ -298,25 +408,45 @@ export const createSelectedTopicStore = (
       0,
       HISTORY_WINDOW_SIZE
     );
-    if (older.length === 0) return;
     if (isStale(token, topic)) return;
     const decoded = await decodeChunked(older);
     if (isStale(token, topic)) return;
-    update((s) => ({
-      ...s,
-      history: decoded,
-      window: windowFromMessages(decoded, false),
-    }));
+    update((s) => {
+      const history = [...decoded, ...s.history];
+      const window =
+        s.window === null
+          ? null
+          : {
+              ...s.window,
+              oldestId:
+                decoded.length > 0
+                  ? numericId(decoded[0].id)
+                  : s.window.oldestId,
+              atOldest: decoded.length < HISTORY_WINDOW_SIZE,
+            };
+      return { ...s, history, window, isLoadingWindow: null };
+    });
+    // Re-read the callback: it may have been re-registered while the fetch
+    // and decode above were awaiting (e.g. the timeline rebuilt).
+    const onHistoryDelta = get({ subscribe }).onHistoryDelta;
+    if (onHistoryDelta !== null) {
+      onHistoryDelta({ kind: "prepend", messages: decoded });
+    }
+    enforceCap("prepend");
   };
 
-  // Loads the window immediately NEWER than the current one (moves right). If
+  // Loads the window immediately NEWER than the current one and appends it
+  // to the loaded history (moves right without discarding what's loaded). If
   // it returns a partial window we've reached the latest, so live resumes.
   const loadNewerWindow = async () => {
     const store = get({ subscribe });
     if (store.historySource !== "disk" || store.window === null) return;
     if (store.selectedTopic === null) return;
+    if (store.isLoadingWindow !== null) return;
+    if (store.window.isNewest) return;
     const topic = store.selectedTopic;
     const token = requestToken;
+    update((s) => ({ ...s, isLoadingWindow: "newer" }));
     const newer = await GetReceivedMessageWindow(
       store.connectionId,
       topic,
@@ -330,17 +460,32 @@ export const createSelectedTopicStore = (
       update((s) => ({
         ...s,
         window: s.window ? { ...s.window, isNewest: true } : null,
+        isLoadingWindow: null,
       }));
       return;
     }
     const decoded = await decodeChunked(newer);
     if (isStale(token, topic)) return;
     const reachedLatest = newer.length < HISTORY_WINDOW_SIZE;
-    update((s) => ({
-      ...s,
-      history: decoded,
-      window: windowFromMessages(decoded, reachedLatest),
-    }));
+    update((s) => {
+      const history = [...s.history, ...decoded];
+      const window =
+        s.window === null
+          ? null
+          : {
+              ...s.window,
+              newestId: numericId(decoded[decoded.length - 1].id),
+              isNewest: reachedLatest,
+            };
+      return { ...s, history, window, isLoadingWindow: null };
+    });
+    // Re-read the callback: it may have been re-registered while the fetch
+    // and decode above were awaiting (e.g. the timeline rebuilt).
+    const onHistoryDelta = get({ subscribe }).onHistoryDelta;
+    if (onHistoryDelta !== null) {
+      onHistoryDelta({ kind: "append", messages: decoded });
+    }
+    enforceCap("append");
   };
 
   // Jumps back to the newest window and resumes live appends.
@@ -348,7 +493,10 @@ export const createSelectedTopicStore = (
     const store = get({ subscribe });
     if (store.historySource !== "disk" || store.selectedTopic === null) return;
     const topic = store.selectedTopic;
-    const token = requestToken;
+    // A jump replaces the loaded history wholesale, so bump the token to
+    // invalidate any in-flight older/newer load: with accumulation, a stale
+    // prepend landing after the jump would corrupt the fresh window.
+    const token = ++requestToken;
     const windowMessages = await GetReceivedMessageWindow(
       store.connectionId,
       topic,
@@ -363,6 +511,8 @@ export const createSelectedTopicStore = (
       ...s,
       history: decoded,
       window: windowFromMessages(decoded, true),
+      historyRevision: s.historyRevision + 1,
+      isLoadingWindow: null,
     }));
   };
 
@@ -375,14 +525,16 @@ export const createSelectedTopicStore = (
       window: null,
       totalCount: 0,
       isLoadingHistory: false,
-      onNewMessages: null,
+      historyRevision: store.historyRevision + 1,
+      isLoadingWindow: null,
+      onHistoryDelta: null,
     }));
   };
 
-  const setOnNewMessages = (
-    onNewMessages: null | ((messages: MqttHistoryMessage[]) => void)
+  const setOnHistoryDelta = (
+    onHistoryDelta: null | ((delta: HistoryDelta) => void)
   ) => {
-    update((store) => ({ ...store, onNewMessages }));
+    update((store) => ({ ...store, onHistoryDelta }));
   };
 
   const setComparing = (compare: boolean) => {
@@ -404,7 +556,7 @@ export const createSelectedTopicStore = (
     subscribe,
     selectTopic,
     deselectTopic,
-    setOnNewMessages,
+    setOnHistoryDelta,
     setComparing,
     setAutoSelect,
     destroy,

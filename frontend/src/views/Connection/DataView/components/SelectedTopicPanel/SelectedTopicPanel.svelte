@@ -105,7 +105,9 @@
   $: totalHistoryCount = $selectedTopicStore.totalCount;
   $: shownHistoryCount = $selectedTopicStore.history.length;
   $: atLatestWindow = historyWindow?.isNewest ?? true;
+  $: atOldestWindow = historyWindow?.atOldest ?? true;
   $: isLoadingHistory = $selectedTopicStore.isLoadingHistory;
+  $: isLoadingWindow = $selectedTopicStore.isLoadingWindow;
 </script>
 
 <div
@@ -198,15 +200,18 @@
         iconType="left"
         iconPlacement="left"
         iconSize={12}
-        on:click={() => selectedTopicStore.loadOlderWindow()}>Older</Button
+        disabled={atOldestWindow || isLoadingWindow !== null}
+        on:click={() => selectedTopicStore.loadOlderWindow()}
+        >Load older</Button
       >
       <Button
         variant="text"
         iconType="right"
         iconPlacement="right"
         iconSize={12}
-        disabled={atLatestWindow}
-        on:click={() => selectedTopicStore.loadNewerWindow()}>Newer</Button
+        disabled={atLatestWindow || isLoadingWindow !== null}
+        on:click={() => selectedTopicStore.loadNewerWindow()}
+        >Load newer</Button
       >
       {#if !atLatestWindow}
         <Button variant="text" on:click={() => selectedTopicStore.jumpToLatest()}

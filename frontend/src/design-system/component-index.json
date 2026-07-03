@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-03T01:13:39.404Z",
+  "generatedAt": "2026-07-03T04:22:31.793Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -4009,7 +4009,9 @@
         "secondary",
         "white-text",
         "secondary-text",
-        "divider"
+        "divider",
+        "elevation-2-hover",
+        "emphasis"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",

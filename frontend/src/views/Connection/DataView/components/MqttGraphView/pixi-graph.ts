@@ -84,6 +84,12 @@ export class TopicGraphRenderer {
   private aggRingLayer = new Graphics(); // outline rings marking collapsed subtree aggregates
   private circleTex!: Texture;
   private visuals = new Map<string, NodeVisual>();
+  // visuals eligible for the aggregate ring (collapsed node with a non-empty
+  // subtree) — this is a purely structural property (v.expanded, descendantCount)
+  // that only changes during relayout, so it's maintained there rather than
+  // re-evaluated for every visual on every slow tick. The slow tick still
+  // checks v.culled inline since culling is per-frame viewport state.
+  private aggRingCandidates = new Set<NodeVisual>();
   private cb: GraphCallbacks;
 
   rowH = 34;
@@ -126,6 +132,12 @@ export class TopicGraphRenderer {
   private minimapVisible = true;
   private lastMinimapDrawMs = 0;
   private readonly MINIMAP_INTERVAL_MS = 250;
+  // above this many visuals, drawMinimap subsamples (draws every Nth node so
+  // the dot count stays roughly capped) and this redraw loop stretches its
+  // throttle window — see drawMinimap and MINIMAP_SUBSAMPLE_TARGET
+  private readonly MINIMAP_SUBSAMPLE_THRESHOLD = 3000;
+  private readonly MINIMAP_SUBSAMPLE_TARGET = 3000;
+  private readonly MINIMAP_INTERVAL_MS_LARGE = 1000;
 
   // ---- LOD / frame-work reduction ----
   private readonly LABEL_ZOOM_THRESHOLD = 0.55;
@@ -164,6 +176,10 @@ export class TopicGraphRenderer {
   private viewAnim: { x: number; y: number; scale: number } | null = null;
   private relayoutQueued = false;
   private lastTopicCount = -1;
+  // topology signature from the previous relayout (see relayout()); starts as
+  // a value no real signature can equal so the very first relayout always
+  // rebuilds the edge array
+  private lastTopologySig = "";
   private contentW = 0;
   private contentH = 0;
 
@@ -272,17 +288,26 @@ export class TopicGraphRenderer {
       n.children.forEach(walk);
     };
     this.model.root.children.forEach(walk);
+    this.model.markExpansionChanged();
     this.relayout();
   }
 
-  // call after ingesting messages; cheaply relayouts only if the topic set grew
+  // call after ingesting messages; cheaply relayouts only if the LAID-OUT tree
+  // could actually have changed. model.visibleDirty is only set by arrivals
+  // reachable under a fully-expanded ancestor chain, so a busy broker whose
+  // new topics land under collapsed nodes no longer thrashes the layout —
+  // their counters/badges still update, just via the next slow tick rather
+  // than a relayout.
   notifyData(): void {
-    if (this.model.topicCount !== this.lastTopicCount) {
+    if (this.model.visibleDirty) {
       this.scheduleRelayout();
     }
   }
 
   scheduleRelayout(): void {
+    // nothing visible changed since the last relayout: no-op rather than
+    // queueing a debounce timer that will just re-run an identical layout
+    if (!this.model.visibleDirty) return;
     if (this.relayoutQueued) return;
     this.relayoutQueued = true;
     // adaptive debounce: big trees relayout (a d3-hierarchy pass + full visual
@@ -382,6 +407,11 @@ export class TopicGraphRenderer {
   relayout(): void {
     const nowMs = Date.now();
     this.lastTopicCount = this.model.topicCount;
+    // consumed: this relayout is the response to whatever made the visible
+    // tree dirty, so clear it before running (an arrival during layoutTopicTree
+    // itself, e.g. from another tab of the same event loop tick, would still
+    // be free to set it again for the next pass)
+    this.model.visibleDirty = false;
     const res = layoutTopicTree(this.model, {
       rowH: this.rowH,
       colW: this.colW,
@@ -392,6 +422,17 @@ export class TopicGraphRenderer {
     this.contentW = res.width;
     this.contentH = res.height;
 
+    // topology signature: node count + the model's structure-generation
+    // counter. The counter only bumps on add/remove/expansion-change, so two
+    // relayouts with the same signature are guaranteed to share the same node
+    // set and parent links — only scores/positions could have moved. Filter
+    // changes don't bump structureGen, so a filter edit still forces a rebuild
+    // (its result set differs from the unfiltered layout) via the filter check.
+    const topology = `${this.model.topicCount}:${this.model.structureGen}:${this.filter}`;
+    const topologyChanged = topology !== this.lastTopologySig;
+    this.lastTopologySig = topology;
+
+    let anyPositionChanged = false;
     const seen = new Set<string>();
     for (const pn of res.nodes) {
       seen.add(pn.node.topic);
@@ -406,6 +447,7 @@ export class TopicGraphRenderer {
         else v.container.position.set(pn.x, pn.y);
       }
       v.expanded = pn.expanded;
+      if (v.tx !== pn.x || v.ty !== pn.y) anyPositionChanged = true;
       v.tx = pn.x;
       v.ty = pn.y;
       // re-arm easing: settled nodes drop out of the fast-path position loop
@@ -413,6 +455,14 @@ export class TopicGraphRenderer {
       // mark it moving again or it would freeze at its old position
       if (v.container.x !== pn.x || v.container.y !== pn.y) v.moving = true;
       this.updateCaretAndBadge(v);
+      // aggregate-ring eligibility (collapsed + has descendants) is structural
+      // and only changes here, at relayout time — recompute membership so the
+      // slow tick can iterate just this set instead of every visual
+      if (!v.expanded && v.node.descendantCount > 0) {
+        this.aggRingCandidates.add(v);
+      } else {
+        this.aggRingCandidates.delete(v);
+      }
     }
     // remove visuals no longer present
     for (const [topic, v] of this.visuals) {
@@ -420,25 +470,38 @@ export class TopicGraphRenderer {
         v.container.destroy({ children: true });
         this.visuals.delete(topic);
         this.ripples = this.ripples.filter((rp) => rp.visual !== v);
+        this.aggRingCandidates.delete(v);
+        anyPositionChanged = true; // a removal always changes what's drawn
       }
     }
 
-    // edges as node-pair refs; positions resolved per-frame so they track animation
-    this.edges = [];
-    for (const pn of res.nodes) {
-      const parentNode = pn.node.parent;
-      if (!parentNode || parentNode === this.model.root) continue;
-      const cv = this.visuals.get(pn.node.topic);
-      const pv = this.visuals.get(parentNode.topic);
-      if (cv && pv) this.edges.push([pv, cv]);
+    // edges: the node-pair array only needs rebuilding when topology changed
+    // (a node/link was added or removed, or an expansion toggle changed which
+    // links are reachable) — positions are resolved per-frame off the visuals
+    // themselves, so a pure re-sort (same nodes, new order/positions) can keep
+    // the existing array and just redraw the Graphics from it.
+    if (topologyChanged) {
+      this.edges = [];
+      for (const pn of res.nodes) {
+        const parentNode = pn.node.parent;
+        if (!parentNode || parentNode === this.model.root) continue;
+        const cv = this.visuals.get(pn.node.topic);
+        const pv = this.visuals.get(parentNode.topic);
+        if (cv && pv) this.edges.push([pv, cv]);
+      }
     }
 
-    // structural change: force a full (slow-tick + edge rebuild) pass on the
-    // very next frame regardless of the 6-frame cadence, and refresh the
-    // minimap immediately rather than waiting out its throttle window
-    this.forceSlowTick = true;
-    this.edgesDirty = true;
-    this.lastMinimapDrawMs = 0;
+    // force a full (slow-tick + edge rebuild) pass on the very next frame
+    // regardless of the 6-frame cadence, and refresh the minimap immediately
+    // rather than waiting out its throttle window — but only when something a
+    // viewer could actually perceive changed. A relayout that reproduced the
+    // exact same topology and positions (e.g. a re-sort tick that didn't
+    // reorder anything) is a genuine no-op down here.
+    if (topologyChanged || anyPositionChanged) {
+      this.forceSlowTick = true;
+      this.edgesDirty = true;
+      this.lastMinimapDrawMs = 0;
+    }
   }
 
   // Ease the viewport so `node` and its currently-visible descendants fill the
@@ -500,6 +563,7 @@ export class TopicGraphRenderer {
     }
     const target = path[path.length - 1];
     for (let i = 0; i < path.length - 1; i++) path[i].expanded = true;
+    this.model.markExpansionChanged();
     this.relayout();
     this.zoomToSubtree(target);
   }
@@ -518,6 +582,7 @@ export class TopicGraphRenderer {
       // view; an expanded (or leaf) node toggles selection
       if (node.children.size > 0 && !node.expanded) {
         node.expanded = true;
+        this.model.markExpansionChanged();
         this.cb.onToggle?.(node);
         this.relayout();
         this.zoomToSubtree(node);
@@ -665,6 +730,7 @@ export class TopicGraphRenderer {
       caret.on("pointertap", () => {
         if (this.dragMoved) return;
         v.node.expanded = !v.node.expanded;
+        this.model.markExpansionChanged();
         this.cb.onToggle?.(v.node);
         this.relayout();
         if (v.node.expanded) this.zoomToSubtree(v.node);
@@ -903,12 +969,15 @@ export class TopicGraphRenderer {
       this.ripples = stillLive;
     }
 
-    // thin outline ring marks collapsed aggregates ("this circle sums a subtree")
+    // thin outline ring marks collapsed aggregates ("this circle sums a subtree").
+    // aggRingCandidates already narrows to the (collapsed, has-descendants)
+    // structural condition — only v.culled is re-checked here, since culling
+    // is per-frame viewport state that isn't tracked in the set.
     if (runSlowTick) {
       this.aggRingLayer.clear();
       if (lodDetail) {
-        for (const v of this.visuals.values()) {
-          if (v.culled || v.expanded || v.node.descendantCount === 0) continue;
+        for (const v of this.aggRingCandidates) {
+          if (v.culled) continue;
           const r = v.r;
           this.aggRingLayer
             .circle(v.container.x, v.container.y, r + 2.5)
@@ -958,7 +1027,14 @@ export class TopicGraphRenderer {
     }
 
     if (this.minimapVisible) {
-      const dueMinimap = nowMs - this.lastMinimapDrawMs >= this.MINIMAP_INTERVAL_MS;
+      // huge trees stretch the throttle window further — the minimap is a
+      // rough overview, not a precise instrument, and redrawing (+ subsampling)
+      // it at full 4Hz over 10k+ visuals is wasted work on every busy tick
+      const interval =
+        this.visuals.size > this.MINIMAP_SUBSAMPLE_THRESHOLD
+          ? this.MINIMAP_INTERVAL_MS_LARGE
+          : this.MINIMAP_INTERVAL_MS;
+      const dueMinimap = nowMs - this.lastMinimapDrawMs >= interval;
       if (dueMinimap) {
         this.lastMinimapDrawMs = nowMs;
         this.drawMinimap(nowMs);
@@ -1011,8 +1087,25 @@ export class TopicGraphRenderer {
     const ch = Math.max(1, this.contentH + this.rMax * 2);
     const s = Math.min(innerW / cw, innerH / ch);
 
+    // subsample huge trees: drawing every visual's dot + colorForAge every
+    // interval doesn't scale past a few thousand nodes, and the minimap is an
+    // overview, not a precise instrument — every Nth node (stride computed so
+    // the drawn count stays near MINIMAP_SUBSAMPLE_TARGET) still conveys the
+    // overall shape/density of the tree.
+    const total = this.visuals.size;
+    const stride =
+      total > this.MINIMAP_SUBSAMPLE_THRESHOLD
+        ? Math.ceil(total / this.MINIMAP_SUBSAMPLE_TARGET)
+        : 1;
+
     this.minimapDots.clear();
+    let i = 0;
     for (const v of this.visuals.values()) {
+      if (stride > 1 && i % stride !== 0) {
+        i++;
+        continue;
+      }
+      i++;
       const x = pad + v.tx * s;
       const y = pad + v.ty * s;
       const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
@@ -1046,5 +1139,6 @@ export class TopicGraphRenderer {
     this.badgePool = [];
     this.app.destroy(true, { children: true });
     this.visuals.clear();
+    this.aggRingCandidates.clear();
   }
 }
