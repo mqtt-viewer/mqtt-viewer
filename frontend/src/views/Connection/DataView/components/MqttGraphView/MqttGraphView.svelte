@@ -60,6 +60,13 @@
   let sortKey: SortKey = "rate";
   let paused = false;
   let allExpanded = false;
+  // anchors the "Sorting paused" note under the pause button (the header
+  // clips overflow, so the note lives in the canvas overlay instead)
+  let pauseWrapEl: HTMLDivElement | undefined;
+  $: pausedNoteLeft =
+    paused && pauseWrapEl
+      ? Math.max(8, Math.min(pauseWrapEl.offsetLeft, containerW - 110))
+      : 8;
 
   const SORT_LABELS: Record<SortKey, string> = {
     rate: "Busiest first",
@@ -474,22 +481,24 @@
         </DropdownMenu>
         <span slot="tooltip-content">Sort sibling topics</span>
       </Tooltip>
+      <div bind:this={pauseWrapEl}>
+        <Tooltip placement="bottom">
+          <Button
+            class={paused ? "text-primary" : ""}
+            on:click={togglePause}
+          >
+            <Icon type={paused ? "connect" : "pause"} width={20} height={20} />
+          </Button>
+          <span slot="tooltip-content"
+            >{paused ? "Resume live re-sorting" : "Pause live re-sorting"}</span
+          >
+        </Tooltip>
+      </div>
       <Tooltip placement="bottom">
         <Button on:click={toggleExpandAll}>
           <Icon type={allExpanded ? "collapse" : "expand"} width={20} height={20} />
         </Button>
         <span slot="tooltip-content">Expand/Collapse all topics</span>
-      </Tooltip>
-      <Tooltip placement="bottom">
-        <Button
-          class={paused ? "text-primary" : ""}
-          on:click={togglePause}
-        >
-          <Icon type={paused ? "connect" : "pause"} width={20} height={20} />
-        </Button>
-        <span slot="tooltip-content"
-          >{paused ? "Resume live re-sorting" : "Pause live re-sorting"}</span
-        >
       </Tooltip>
       <Tooltip placement="bottom">
         <Button on:click={() => renderer?.fitView()}>
@@ -571,6 +580,14 @@
     class="relative min-h-0 w-full grow bg-elevation-0"
   >
     <canvas bind:this={canvasEl} class="block h-full w-full"></canvas>
+    {#if paused}
+      <div
+        class="pointer-events-none absolute top-1 rounded border border-outline bg-elevation-1 px-1.5 py-0.5 text-xs text-secondary-text"
+        style:left={`${pausedNoteLeft}px`}
+      >
+        Sorting paused
+      </div>
+    {/if}
     {#if hover}
       <div
         class="pointer-events-none absolute z-20 max-w-[290px] rounded bg-elevation-2 px-2.5 py-1.5 text-xs shadow"
