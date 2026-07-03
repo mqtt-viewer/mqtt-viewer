@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-03T00:40:23.300Z",
+  "generatedAt": "2026-07-03T01:13:39.404Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3087,7 +3087,7 @@
         "DropdownMenu",
         "DropdownMenuItem"
       ],
-      "notes": "Figma page: Topic Graph — Exploration (Direction D). Canvas renderer; story mounts the real Pixi canvas on live mock traffic. Hover inspector shows msg/s + last-message age; legend explains recency ramp and sizing.",
+      "notes": "Figma page: Topic Graph - Exploration (Direction D). Canvas renderer; story mounts the real Pixi canvas on live mock traffic. Hover inspector shows msg/s + last-message age; legend explains recency ramp and sizing. Click model: clicking a collapsed parent expands it and zooms the view to the revealed subtree (a further click then selects it); clicking an expanded parent or a leaf selects it, and clicking the selected node again deselects it. Selecting a topic from the sidebar (outside the graph) zooms the graph to that topic, expanding its ancestors as needed. Message arrivals draw a brief expanding ring pulse on the node.",
       "sourcePath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.stories.svelte",

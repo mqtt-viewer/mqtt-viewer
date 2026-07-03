@@ -5,7 +5,15 @@
 // recency (cooldown). Tint/scale update every frame (cheap on the GPU); layout
 // recomputes only on structural change. Pan = drag, zoom = wheel.
 
-import { Application, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
+import {
+  Application,
+  Circle,
+  Container,
+  Graphics,
+  Sprite,
+  Text,
+  Texture,
+} from "pixi.js";
 import {
   COLD_ENDPOINT_DARK,
   radiusForScore,
@@ -18,7 +26,8 @@ import { TopicModel, TopicNode } from "./topic-model";
 const TEX_R = 64; // circle texture radius; sprites scale down from this
 
 export interface GraphCallbacks {
-  onSelect?: (topic: string) => void;
+  /** topic selected, or null when the user clicks the selected node again */
+  onSelect?: (topic: string | null) => void;
   onToggle?: (node: TopicNode) => void;
   /** hover enters/moves over a node (screen coords), or leaves (topic = null) */
   onHover?: (topic: string | null, x: number, y: number) => void;
@@ -30,6 +39,7 @@ export interface ThemeUi {
   minimapBg: number;
   minimapBgAlpha: number;
   minimapBorder: number;
+  pulse: number; // message-arrival ripple stroke colour
 }
 
 export interface GraphOptions {
@@ -46,11 +56,18 @@ interface NodeVisual {
   circle: Sprite;
   label: Text;
   caret: Graphics | null;
+  caretHover: boolean;
   badge: Text | null;
   node: TopicNode;
   expanded: boolean;
   tx: number; // target x (animated toward)
   ty: number; // target y
+  lastRippleMsg: number; // last-rendered message timestamp (for ripple spawn edge-detect)
+}
+
+interface Ripple {
+  visual: NodeVisual;
+  startMs: number;
 }
 
 export class TopicGraphRenderer {
@@ -58,6 +75,7 @@ export class TopicGraphRenderer {
   private model: TopicModel;
   private world = new Container();
   private edgeLayer = new Graphics();
+  private pulseLayer = new Graphics();
   private nodeLayer = new Container();
   private selectionRing = new Graphics();
   private aggRingLayer = new Graphics(); // outline rings marking collapsed subtree aggregates
@@ -81,6 +99,7 @@ export class TopicGraphRenderer {
   private minimapBgColor = 0x000000;
   private minimapBgAlpha = 0.32;
   private minimapBorderColor = 0x8a8a8a;
+  private pulseColor = 0xffffff;
   private sortKey: SortKey = "rate";
   private filter = "";
   private selected: string | null = null;
@@ -89,6 +108,10 @@ export class TopicGraphRenderer {
   private followTarget: string | null = null;
 
   private edges: Array<[NodeVisual, NodeVisual]> = [];
+  private ripples: Ripple[] = [];
+  // tree-view flash reference duration (MqttTopicRow.FLASH_DURATION_MS); the
+  // canvas ripple runs on the same clock so both views "feel" the same
+  private readonly RIPPLE_DURATION_MS = 1200;
   private minimap = new Container();
   private minimapBg = new Graphics();
   private minimapDots = new Graphics();
@@ -100,8 +123,9 @@ export class TopicGraphRenderer {
   private dragging = false;
   private dragMoved = false;
   private lastPointer = { x: 0, y: 0 };
-  private lastTapTopic: string | null = null;
-  private lastTapMs = 0;
+  // eased viewport animation target (zoom-to-subtree / focus); cancelled by
+  // any manual pan or zoom
+  private viewAnim: { x: number; y: number; scale: number } | null = null;
   private relayoutQueued = false;
   private lastTopicCount = -1;
   private contentW = 0;
@@ -129,6 +153,7 @@ export class TopicGraphRenderer {
     g.destroy();
 
     this.world.addChild(this.edgeLayer);
+    this.world.addChild(this.pulseLayer);
     this.world.addChild(this.selectionRing);
     this.world.addChild(this.aggRingLayer);
     this.world.addChild(this.nodeLayer);
@@ -167,6 +192,7 @@ export class TopicGraphRenderer {
     this.minimapBgColor = ui.minimapBg;
     this.minimapBgAlpha = ui.minimapBgAlpha;
     this.minimapBorderColor = ui.minimapBorder;
+    this.pulseColor = ui.pulse;
   }
   setSort(key: SortKey): void {
     this.sortKey = key;
@@ -192,6 +218,9 @@ export class TopicGraphRenderer {
   setMinimapVisible(on: boolean): void {
     this.minimapVisible = on;
     this.minimap.visible = on;
+  }
+  setMaxNodeSize(rMax: number): void {
+    this.rMax = rMax;
   }
 
   expandToDepth(depth: number): void {
@@ -225,6 +254,7 @@ export class TopicGraphRenderer {
       "wheel",
       (e: WheelEvent) => {
         e.preventDefault();
+        this.viewAnim = null;
         const rect = canvas.getBoundingClientRect();
         const px = e.clientX - rect.left;
         const py = e.clientY - rect.top;
@@ -258,7 +288,10 @@ export class TopicGraphRenderer {
       if (!this.dragging) return;
       const dx = e.global.x - this.lastPointer.x;
       const dy = e.global.y - this.lastPointer.y;
-      if (Math.abs(dx) + Math.abs(dy) > 2) this.dragMoved = true;
+      if (Math.abs(dx) + Math.abs(dy) > 2) {
+        this.dragMoved = true;
+        this.viewAnim = null;
+      }
       this.world.position.x += dx;
       this.world.position.y += dy;
       this.lastPointer = { x: e.global.x, y: e.global.y };
@@ -319,6 +352,7 @@ export class TopicGraphRenderer {
       if (!seen.has(topic)) {
         v.container.destroy({ children: true });
         this.visuals.delete(topic);
+        this.ripples = this.ripples.filter((rp) => rp.visual !== v);
       }
     }
 
@@ -333,6 +367,69 @@ export class TopicGraphRenderer {
     }
   }
 
+  // Ease the viewport so `node` and its currently-visible descendants fill the
+  // screen. Used for the "expand and bring into view" click behaviour and for
+  // sidebar-driven selection focus.
+  zoomToSubtree(node: TopicNode): void {
+    const vw = this.app.screen.width;
+    const vh = this.app.screen.height;
+    if (vw <= 0 || vh <= 0) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const visit = (n: TopicNode) => {
+      const v = this.visuals.get(n.topic);
+      if (!v) return;
+      if (v.tx < minX) minX = v.tx;
+      if (v.ty < minY) minY = v.ty;
+      if (v.tx > maxX) maxX = v.tx;
+      if (v.ty > maxY) maxY = v.ty;
+      for (const child of n.children.values()) visit(child);
+    };
+    visit(node);
+
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
+
+    const marginLeft = 40;
+    const marginRight = this.colW;
+    const marginTop = this.rowH;
+    const marginBottom = this.rowH;
+
+    const boundsW = Math.max(1, maxX - minX + marginLeft + marginRight);
+    const boundsH = Math.max(1, maxY - minY + marginTop + marginBottom);
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    const scale = Math.max(0.12, Math.min(1.2, Math.min(vw / boundsW, vh / boundsH)));
+
+    this.viewAnim = {
+      x: vw / 2 - centerX * scale,
+      y: vh / 2 - centerY * scale,
+      scale,
+    };
+  }
+
+  // Sidebar-driven selection: expand every ancestor of `topic` (not the topic
+  // itself), relayout, then zoom the subtree into view. No-op if the topic
+  // isn't in the model (e.g. it hasn't arrived yet).
+  focusTopic(topic: string): void {
+    const segs = topic.split("/");
+    let n = this.model.root;
+    const path: TopicNode[] = [];
+    for (const seg of segs) {
+      const child = n.children.get(seg);
+      if (!child) return;
+      path.push(child);
+      n = child;
+    }
+    const target = path[path.length - 1];
+    for (let i = 0; i < path.length - 1; i++) path[i].expanded = true;
+    this.relayout();
+    this.zoomToSubtree(target);
+  }
+
   private createVisual(node: TopicNode): NodeVisual {
     const container = new Container();
     container.eventMode = "static";
@@ -341,24 +438,18 @@ export class TopicGraphRenderer {
     circle.anchor.set(0.5);
     circle.eventMode = "static";
     circle.cursor = "pointer";
-    circle.on("pointertap", (e: any) => {
+    circle.on("pointertap", () => {
       if (this.dragMoved) return;
-      // double-tap on a parent toggles expand/collapse; single tap selects
-      const now = performance.now();
-      if (
-        node.children.size > 0 &&
-        this.lastTapTopic === node.topic &&
-        now - this.lastTapMs < 350
-      ) {
-        node.expanded = !node.expanded;
+      // collapsed parent: first click expands and brings the subtree into
+      // view; an expanded (or leaf) node toggles selection
+      if (node.children.size > 0 && !node.expanded) {
+        node.expanded = true;
         this.cb.onToggle?.(node);
         this.relayout();
-        this.lastTapMs = 0;
+        this.zoomToSubtree(node);
         return;
       }
-      this.lastTapTopic = node.topic;
-      this.lastTapMs = now;
-      this.cb.onSelect?.(node.topic);
+      this.cb.onSelect?.(this.selected === node.topic ? null : node.topic);
     });
     circle.on("pointerover", (e: any) => {
       this.cb.onHover?.(node.topic, e.global.x, e.global.y);
@@ -383,10 +474,36 @@ export class TopicGraphRenderer {
     label.anchor.set(0, 0.5);
     container.addChild(label);
 
-    const v: NodeVisual = { container, circle, label, caret: null, badge: null, node, expanded: node.expanded, tx: 0, ty: 0 };
+    const v: NodeVisual = {
+      container,
+      circle,
+      label,
+      caret: null,
+      caretHover: false,
+      badge: null,
+      node,
+      expanded: node.expanded,
+      tx: 0,
+      ty: 0,
+      lastRippleMsg: node.expanded ? node.ownLastMsg : node.aggLastMsg,
+    };
     this.nodeLayer.addChild(container);
     this.visuals.set(node.topic, v);
     return v;
+  }
+
+  // caret geometry is centred on (0,0); frame() slides it left of the node
+  // edge so large nodes never cover it
+  private drawCaret(v: NodeVisual): void {
+    if (!v.caret) return;
+    v.caret.clear();
+    if (v.caretHover) {
+      v.caret.circle(0, 0, 10).fill({ color: 0x8a8a8a, alpha: 0.28 });
+    }
+    const a = v.caretHover ? 1 : 0.85;
+    if (v.expanded) v.caret.poly([-5.5, -4, 5.5, -4, 0, 4.5]);
+    else v.caret.poly([-4, -5.5, -4, 5.5, 4.5, 0]);
+    v.caret.fill({ color: v.caretHover ? 0xbdbdbd : 0x8a8a8a, alpha: a });
   }
 
   private updateCaretAndBadge(v: NodeVisual): void {
@@ -396,24 +513,27 @@ export class TopicGraphRenderer {
       const caret = new Graphics();
       caret.eventMode = "static";
       caret.cursor = "pointer";
+      // generous hit circle: the triangle alone is a frustrating target
+      caret.hitArea = new Circle(0, 0, 11);
       caret.on("pointertap", () => {
         if (this.dragMoved) return;
         v.node.expanded = !v.node.expanded;
         this.cb.onToggle?.(v.node);
         this.relayout();
+        if (v.node.expanded) this.zoomToSubtree(v.node);
+      });
+      caret.on("pointerover", () => {
+        v.caretHover = true;
+        this.drawCaret(v);
+      });
+      caret.on("pointerout", () => {
+        v.caretHover = false;
+        this.drawCaret(v);
       });
       v.caret = caret;
       v.container.addChildAt(caret, 0);
     }
-    if (v.caret) {
-      v.caret.clear();
-      const open = v.expanded;
-      // small triangle pointing right (collapsed) / down (open), left of the node
-      const cx = -16;
-      if (open) v.caret.poly([cx - 4, -3, cx + 4, -3, cx, 3]);
-      else v.caret.poly([cx - 3, -4, cx - 3, 4, cx + 3, 0]);
-      v.caret.fill({ color: 0x8a8a8a, alpha: 0.8 });
-    }
+    if (v.caret) this.drawCaret(v);
 
     // +N badge for collapsed nodes with descendants
     const showBadge = !v.expanded && v.node.descendantCount > 0;
@@ -476,9 +596,23 @@ export class TopicGraphRenderer {
         v.badge.visible = showLabels;
       }
 
+      // keep the caret clear of the node edge, however large the node grows
+      if (v.caret) v.caret.position.x = -(r + 10);
+
       if (lastMsg > hottestMs) {
         hottestMs = lastMsg;
         hottestTopic = v.node.topic;
+      }
+
+      // message-arrival pulse: spawn a ripple when the rendered last-message
+      // time advances, unless this node already rippled very recently (avoid
+      // overdraw on hot topics ticking many times a second)
+      if (lastMsg > v.lastRippleMsg) {
+        v.lastRippleMsg = lastMsg;
+        const recent = this.ripples.find(
+          (rp) => rp.visual === v && nowMs - rp.startMs < 150
+        );
+        if (!recent) this.ripples.push({ visual: v, startMs: nowMs });
       }
     }
 
@@ -494,6 +628,26 @@ export class TopicGraphRenderer {
     }
     this.edgeLayer.stroke({ width: 1.25, color: 0x8a8a8a, alpha: 0.28 });
 
+    // message-arrival pulse ripples: expanding ring, eased out, fading
+    this.pulseLayer.clear();
+    if (this.ripples.length > 0) {
+      const stillLive: Ripple[] = [];
+      for (const rp of this.ripples) {
+        const elapsed = nowMs - rp.startMs;
+        if (elapsed >= this.RIPPLE_DURATION_MS) continue;
+        const t = elapsed / this.RIPPLE_DURATION_MS;
+        const eased = 1 - (1 - t) * (1 - t);
+        const r = rp.visual.circle.width / 2;
+        const radius = r + eased * 16;
+        const alpha = 0.85 * (1 - t);
+        this.pulseLayer
+          .circle(rp.visual.container.x, rp.visual.container.y, radius)
+          .stroke({ width: 1.5, color: this.pulseColor, alpha });
+        stillLive.push(rp);
+      }
+      this.ripples = stillLive;
+    }
+
     // thin outline ring marks collapsed aggregates ("this circle sums a subtree")
     this.aggRingLayer.clear();
     for (const v of this.visuals.values()) {
@@ -504,8 +658,24 @@ export class TopicGraphRenderer {
         .stroke({ width: 1, color: v.circle.tint as number, alpha: 0.55 });
     }
 
+    // eased viewport animation (zoom-to-subtree / focus-from-sidebar)
+    if (this.viewAnim) {
+      const t = this.viewAnim;
+      this.world.position.x += (t.x - this.world.position.x) * 0.16;
+      this.world.position.y += (t.y - this.world.position.y) * 0.16;
+      const ns = this.world.scale.x + (t.scale - this.world.scale.x) * 0.16;
+      this.world.scale.set(ns);
+      if (
+        Math.abs(t.x - this.world.position.x) < 0.5 &&
+        Math.abs(t.y - this.world.position.y) < 0.5 &&
+        Math.abs(t.scale - this.world.scale.x) < 0.002
+      ) {
+        this.viewAnim = null;
+      }
+    }
+
     // follow-hottest: ease the viewport so the most-recent topic stays centred
-    if (this.followHottest && hottestTopic) {
+    if (!this.viewAnim && this.followHottest && hottestTopic) {
       if (hottestMs > 0) this.followTarget = hottestTopic;
       const v = this.followTarget ? this.visuals.get(this.followTarget) : undefined;
       if (v) {

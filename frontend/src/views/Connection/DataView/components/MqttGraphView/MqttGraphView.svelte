@@ -78,22 +78,34 @@
   let legendOn = true;
   let cooldownMs = 60000;
   let tauMs = 14000; // EWMA half-life ~10s by default
+  let maxNodeR = 20;
   const COOLDOWNS: Array<[string, number]> = [
     ["30 seconds", 30000],
     ["1 minute", 60000],
     ["5 minutes", 300000],
+    ["15 minutes", 900000],
     ["1 hour", 3600000],
+    ["6 hours", 21600000],
+    ["24 hours", 86400000],
   ];
   const COOLDOWN_SHORT: Record<number, string> = {
     30000: "30s",
     60000: "1m",
     300000: "5m",
+    900000: "15m",
     3600000: "1h",
+    21600000: "6h",
+    86400000: "24h",
   };
   const SMOOTHING: Array<[string, number]> = [
     ["Responsive (5s)", 5000],
     ["Balanced (14s)", 14000],
     ["Smooth (40s)", 40000],
+  ];
+  const MAX_NODE_SIZES: Array<[string, number]> = [
+    ["Compact", 14],
+    ["Standard", 20],
+    ["Large", 28],
   ];
 
   const loadSettings = () => {
@@ -107,6 +119,7 @@
       if (typeof s.legendOn === "boolean") legendOn = s.legendOn;
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
+      if (typeof s.maxNodeR === "number") maxNodeR = s.maxNodeR;
     } catch (e) {
       console.error("topic-graph settings load failed", e);
     }
@@ -122,6 +135,7 @@
           legendOn,
           cooldownMs,
           tauMs,
+          maxNodeR,
         })
       );
     } catch (e) {
@@ -134,6 +148,7 @@
     renderer.setFollowHottest(followHottest);
     renderer.setCvdSafe(cvdSafe);
     renderer.setCooldownMs(cooldownMs);
+    renderer.setMaxNodeSize(maxNodeR);
     model.tauMs = tauMs;
   };
 
@@ -162,6 +177,7 @@
             minimapBg: 0xffffff,
             minimapBgAlpha: 0.7,
             minimapBorder: 0xb8b8c0,
+            pulse: 0x2a2a33,
           }
         : {
             text: 0xbdb7b0,
@@ -169,11 +185,26 @@
             minimapBg: 0x000000,
             minimapBgAlpha: 0.32,
             minimapBorder: 0x8a8a8a,
+            pulse: 0xffffff,
           }
     );
   };
   $: applyTheme($theme);
-  $: if (renderer) renderer.setSelected($selectedTopicStore.selectedTopic);
+
+  // Selection can originate from either side: clicking a node in the graph, or
+  // clicking the topic heading in the sidebar. Graph clicks record the topic in
+  // lastSyncedTopic up front, so when the store update lands back here it is a
+  // no-op. A store value we have NOT seen yet is sidebar-originated: reflect it
+  // on the canvas and zoom the graph to the newly-selected topic.
+  let lastSyncedTopic: string | null | undefined = undefined;
+  const syncExternalSelection = (topic: string | null) => {
+    if (!renderer) return;
+    if (topic === lastSyncedTopic) return;
+    lastSyncedTopic = topic;
+    renderer.setSelected(topic);
+    if (topic !== null) renderer.focusTopic(topic);
+  };
+  $: syncExternalSelection($selectedTopicStore.selectedTopic);
 
   // ---- hover inspector ----
   interface HoverInfo {
@@ -270,7 +301,10 @@
     renderer = new TopicGraphRenderer(model, {
       onSelect: (topic) => {
         renderer?.setSelected(topic);
-        if ($selectedTopicStore.selectedTopic !== topic) {
+        lastSyncedTopic = topic;
+        if (topic === null) {
+          selectedTopicStore.deselectTopic();
+        } else if ($selectedTopicStore.selectedTopic !== topic) {
           selectedTopicStore.selectTopic(topic);
         }
       },
@@ -284,6 +318,9 @@
     seed(initialData);
     renderer.expandToDepth(1);
     renderer.setSelected($selectedTopicStore.selectedTopic);
+    // seed the "already synced" state so the reactive sync below doesn't treat
+    // this initial mount value as an external change and zoom on load
+    lastSyncedTopic = $selectedTopicStore.selectedTopic;
     renderer.fitView();
 
     unsubSource = (messageSource ?? wailsSource).subscribe(
@@ -383,6 +420,11 @@
     model.tauMs = ms;
     saveSettings();
   };
+  const setMaxNodeSize = (r: number) => {
+    maxNodeR = r;
+    renderer?.setMaxNodeSize(r);
+    saveSettings();
+  };
   const toggleFullscreen = () => {
     const el = containerEl?.parentElement ?? containerEl;
     if (!document.fullscreenElement) el?.requestFullscreen?.();
@@ -476,6 +518,15 @@
             <DropdownMenuItem
               isSelected={tauMs === ms}
               onClick={() => setSmoothing(ms)}>{lbl}</DropdownMenuItem
+            >
+          {/each}
+          <span class="px-2 pb-0.5 pt-2 text-xs text-secondary-text"
+            >Max node size</span
+          >
+          {#each MAX_NODE_SIZES as [lbl, r]}
+            <DropdownMenuItem
+              isSelected={maxNodeR === r}
+              onClick={() => setMaxNodeSize(r)}>{lbl}</DropdownMenuItem
             >
           {/each}
           <span class="px-2 pb-0.5 pt-2 text-xs text-secondary-text">Display</span>
