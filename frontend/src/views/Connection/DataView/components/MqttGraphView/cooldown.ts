@@ -62,6 +62,16 @@ export function colorForAge(
   return endpoint;
 }
 
+// The ramp as CSS gradient stops (hot -> cold), for HTML legend overlays.
+export function rampCssGradient(endpoint: RGB, cvdSafe = false): string {
+  const stops: Array<[number, RGB]> = [...(cvdSafe ? CVD_STOPS : STOPS), [1.0, endpoint]];
+  const parts = stops.map(
+    ([p, c]) =>
+      `rgb(${Math.round(c.r)} ${Math.round(c.g)} ${Math.round(c.b)}) ${Math.round(p * 100)}%`
+  );
+  return `linear-gradient(to right, ${parts.join(", ")})`;
+}
+
 // Pack an RGB (0-255 components) into a 0xRRGGBB int for Pixi tint.
 export function packRGB(c: RGB): number {
   const r = Math.round(c.r) & 0xff;
@@ -101,6 +111,23 @@ export function decayScore(s: DecayScore, nowMs: number, tauMs: number): number 
 export function bumpScore(s: DecayScore, nowMs: number, tauMs: number): void {
   decayScore(s, nowMs, tauMs);
   s.score += 1;
+}
+
+// Convert a decayed score to an approximate message rate in msg/s. At steady
+// state the accumulator converges to rate x tau, so score / tau recovers the
+// real unit — comparable across smoothing (tau) settings, unlike the raw score.
+export function rateFromScore(score: number, tauMs: number): number {
+  if (tauMs <= 0) return 0;
+  return score / (tauMs / 1000);
+}
+
+// Human-friendly msg/s label for tooltips/legends.
+export function formatRate(msgPerSec: number): string {
+  if (msgPerSec >= 10) return `${Math.round(msgPerSec)} msg/s`;
+  if (msgPerSec >= 1) return `${msgPerSec.toFixed(1)} msg/s`;
+  if (msgPerSec >= 0.05) return `${msgPerSec.toFixed(2)} msg/s`;
+  if (msgPerSec > 0) return "<0.05 msg/s";
+  return "idle";
 }
 
 // Map a decayed score to a node radius. area ∝ score (sqrt of score for radius).

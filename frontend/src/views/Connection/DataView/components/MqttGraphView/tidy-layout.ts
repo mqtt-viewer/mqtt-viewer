@@ -5,7 +5,7 @@
 import { hierarchy, tree, type HierarchyPointNode } from "d3-hierarchy";
 import { TopicModel, TopicNode } from "./topic-model";
 
-export type SortKey = "rate" | "recency" | "alpha" | "count";
+export type SortKey = "rate" | "recency" | "stale" | "alpha" | "count";
 
 export interface LayoutOptions {
   rowH: number;
@@ -65,6 +65,10 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
         return -model.aggScore(n, nowMs);
       case "recency":
         return -n.aggLastMsg;
+      case "stale":
+        // silent-first: oldest last-message floats to the top ("did my device
+        // stop publishing?"); never-seen (0) sorts first of all
+        return n.aggLastMsg;
       case "count":
         return -(n.descendantCount + n.ownCount);
       case "alpha":

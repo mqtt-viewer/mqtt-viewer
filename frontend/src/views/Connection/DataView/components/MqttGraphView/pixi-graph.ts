@@ -20,6 +20,16 @@ const TEX_R = 64; // circle texture radius; sprites scale down from this
 export interface GraphCallbacks {
   onSelect?: (topic: string) => void;
   onToggle?: (node: TopicNode) => void;
+  /** hover enters/moves over a node (screen coords), or leaves (topic = null) */
+  onHover?: (topic: string | null, x: number, y: number) => void;
+}
+
+export interface ThemeUi {
+  text: number;
+  accent: number; // selection ring + minimap viewport
+  minimapBg: number;
+  minimapBgAlpha: number;
+  minimapBorder: number;
 }
 
 export interface GraphOptions {
@@ -50,6 +60,7 @@ export class TopicGraphRenderer {
   private edgeLayer = new Graphics();
   private nodeLayer = new Container();
   private selectionRing = new Graphics();
+  private aggRingLayer = new Graphics(); // outline rings marking collapsed subtree aggregates
   private circleTex!: Texture;
   private visuals = new Map<string, NodeVisual>();
   private cb: GraphCallbacks;
@@ -66,6 +77,10 @@ export class TopicGraphRenderer {
 
   private endpoint: RGB = COLD_ENDPOINT_DARK;
   private textColor = 0xbdb7b0;
+  private accentColor = 0x7c8cff; // brand primary (dark theme default)
+  private minimapBgColor = 0x000000;
+  private minimapBgAlpha = 0.32;
+  private minimapBorderColor = 0x8a8a8a;
   private sortKey: SortKey = "rate";
   private filter = "";
   private selected: string | null = null;
@@ -85,6 +100,8 @@ export class TopicGraphRenderer {
   private dragging = false;
   private dragMoved = false;
   private lastPointer = { x: 0, y: 0 };
+  private lastTapTopic: string | null = null;
+  private lastTapMs = 0;
   private relayoutQueued = false;
   private lastTopicCount = -1;
   private contentW = 0;
@@ -113,6 +130,7 @@ export class TopicGraphRenderer {
 
     this.world.addChild(this.edgeLayer);
     this.world.addChild(this.selectionRing);
+    this.world.addChild(this.aggRingLayer);
     this.world.addChild(this.nodeLayer);
     this.app.stage.addChild(this.world);
     this.world.position.set(60, height / 2);
@@ -142,6 +160,13 @@ export class TopicGraphRenderer {
       v.label.style.fill = hex;
       if (v.badge) v.badge.style.fill = hex;
     }
+  }
+  setThemeUi(ui: ThemeUi): void {
+    this.setTextColor(ui.text);
+    this.accentColor = ui.accent;
+    this.minimapBgColor = ui.minimapBg;
+    this.minimapBgAlpha = ui.minimapBgAlpha;
+    this.minimapBorderColor = ui.minimapBorder;
   }
   setSort(key: SortKey): void {
     this.sortKey = key;
@@ -316,9 +341,34 @@ export class TopicGraphRenderer {
     circle.anchor.set(0.5);
     circle.eventMode = "static";
     circle.cursor = "pointer";
-    circle.on("pointertap", () => {
+    circle.on("pointertap", (e: any) => {
       if (this.dragMoved) return;
+      // double-tap on a parent toggles expand/collapse; single tap selects
+      const now = performance.now();
+      if (
+        node.children.size > 0 &&
+        this.lastTapTopic === node.topic &&
+        now - this.lastTapMs < 350
+      ) {
+        node.expanded = !node.expanded;
+        this.cb.onToggle?.(node);
+        this.relayout();
+        this.lastTapMs = 0;
+        return;
+      }
+      this.lastTapTopic = node.topic;
+      this.lastTapMs = now;
       this.cb.onSelect?.(node.topic);
+    });
+    circle.on("pointerover", (e: any) => {
+      this.cb.onHover?.(node.topic, e.global.x, e.global.y);
+    });
+    circle.on("pointermove", (e: any) => {
+      if (this.dragging) return;
+      this.cb.onHover?.(node.topic, e.global.x, e.global.y);
+    });
+    circle.on("pointerout", () => {
+      this.cb.onHover?.(null, 0, 0);
     });
     container.addChild(circle);
 
@@ -327,7 +377,7 @@ export class TopicGraphRenderer {
       style: {
         fill: this.textColor,
         fontSize: 12,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "Mona Sans, system-ui, sans-serif",
       },
     });
     label.anchor.set(0, 0.5);
@@ -370,7 +420,7 @@ export class TopicGraphRenderer {
     if (showBadge && !v.badge) {
       v.badge = new Text({
         text: "",
-        style: { fill: this.textColor, fontSize: 10, fontFamily: "Inter, system-ui, sans-serif" },
+        style: { fill: this.textColor, fontSize: 10, fontFamily: "Mona Sans, system-ui, sans-serif" },
       });
       v.badge.anchor.set(0, 0.5);
       v.container.addChild(v.badge);
@@ -408,7 +458,18 @@ export class TopicGraphRenderer {
       const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
       v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe);
 
-      v.label.x = r + 7;
+      // expanded parents have an outgoing edge to the right — lift their label
+      // above the line so it isn't struck through; leaves/collapsed stay centred
+      const hasVisibleKids = v.expanded && v.node.children.size > 0;
+      if (hasVisibleKids) {
+        v.label.anchor.y = 1;
+        v.label.y = -4;
+        v.label.x = r + 4;
+      } else {
+        v.label.anchor.y = 0.5;
+        v.label.y = 0;
+        v.label.x = r + 7;
+      }
       v.label.visible = showLabels;
       if (v.badge && v.badge.visible) {
         v.badge.x = r + 9 + v.label.width + 8;
@@ -433,6 +494,16 @@ export class TopicGraphRenderer {
     }
     this.edgeLayer.stroke({ width: 1.25, color: 0x8a8a8a, alpha: 0.28 });
 
+    // thin outline ring marks collapsed aggregates ("this circle sums a subtree")
+    this.aggRingLayer.clear();
+    for (const v of this.visuals.values()) {
+      if (v.expanded || v.node.descendantCount === 0) continue;
+      const r = v.circle.width / 2;
+      this.aggRingLayer
+        .circle(v.container.x, v.container.y, r + 2.5)
+        .stroke({ width: 1, color: v.circle.tint as number, alpha: 0.55 });
+    }
+
     // follow-hottest: ease the viewport so the most-recent topic stays centred
     if (this.followHottest && hottestTopic) {
       if (hottestMs > 0) this.followTarget = hottestTopic;
@@ -453,7 +524,7 @@ export class TopicGraphRenderer {
       if (v) {
         const r = v.circle.width / 2;
         this.selectionRing.circle(v.container.x, v.container.y, r + 5);
-        this.selectionRing.stroke({ width: 2, color: 0xece9e7, alpha: 0.9 });
+        this.selectionRing.stroke({ width: 2, color: this.accentColor, alpha: 0.9 });
       }
     }
 
@@ -466,8 +537,12 @@ export class TopicGraphRenderer {
     const innerH = this.minimapH - pad * 2;
     // background
     this.minimapBg.clear();
-    this.minimapBg.roundRect(0, 0, this.minimapW, this.minimapH, 8).fill({ color: 0x000000, alpha: 0.32 });
-    this.minimapBg.roundRect(0, 0, this.minimapW, this.minimapH, 8).stroke({ width: 1, color: 0x8a8a8a, alpha: 0.3 });
+    this.minimapBg
+      .roundRect(0, 0, this.minimapW, this.minimapH, 8)
+      .fill({ color: this.minimapBgColor, alpha: this.minimapBgAlpha });
+    this.minimapBg
+      .roundRect(0, 0, this.minimapW, this.minimapH, 8)
+      .stroke({ width: 1, color: this.minimapBorderColor, alpha: 0.4 });
 
     const cw = Math.max(1, this.contentW + this.colW);
     const ch = Math.max(1, this.contentH + this.rMax * 2);
@@ -497,7 +572,7 @@ export class TopicGraphRenderer {
         Math.min(innerW, vw),
         Math.min(innerH, vh)
       )
-      .stroke({ width: 1.5, color: 0xe8833a, alpha: 0.9 });
+      .stroke({ width: 1.5, color: this.accentColor, alpha: 0.9 });
   }
 
   destroy(): void {

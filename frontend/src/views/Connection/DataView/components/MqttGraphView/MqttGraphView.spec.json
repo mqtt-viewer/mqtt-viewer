@@ -32,12 +32,32 @@
       "type": "number",
       "required": false,
       "default": "0"
+    },
+    {
+      "name": "messageSource",
+      "type": "object",
+      "required": false
     }
   ],
   "tokens": [
     "secondary-text",
-    "outline"
+    "outline",
+    "elevation-0",
+    "elevation-1",
+    "elevation-2",
+    "emphasis",
+    "white-text",
+    "primary",
+    "hovered"
   ],
-  "dependencies": [],
-  "notes": "Figma page: Topic Graph — Exploration (Direction D). Canvas renderer; story exercises mount + toolbar."
+  "dependencies": [
+    "PanelHeader",
+    "BaseInput",
+    "Button",
+    "Icon",
+    "Tooltip",
+    "DropdownMenu",
+    "DropdownMenuItem"
+  ],
+  "notes": "Figma page: Topic Graph — Exploration (Direction D). Canvas renderer; story mounts the real Pixi canvas on live mock traffic. Hover inspector shows msg/s + last-message age; legend explains recency ramp and sizing."
 }

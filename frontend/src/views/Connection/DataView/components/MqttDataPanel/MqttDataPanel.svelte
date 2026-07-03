@@ -3,6 +3,7 @@
   import SearchActionBar from "./components/SearchActionBar/SearchActionBar.svelte";
   import MqttTopicTree from "./components/MqttTopicTree/MqttTopicTree.svelte";
   import MqttGraphView from "../MqttGraphView/MqttGraphView.svelte";
+  import ViewToggle from "./components/ViewToggle/ViewToggle.svelte";
 
   import { createMqttDataStore } from "./stores/mqtt-data";
   import { createExpandedTopicsStore } from "./stores/expanded-topics";
@@ -45,28 +46,15 @@
 </script>
 
 <div class={twMerge("bg-elevation-0 h-full w-full min-w-0 flex flex-col")}>
-  <div class="flex items-center px-2 pt-2">
-    <div
-      class="inline-flex overflow-hidden rounded-md border border-outline text-xs text-secondary-text"
-    >
-      <button
-        class={twMerge("px-2.5 py-1", view === "list" && "bg-elevation-2 text-white-text")}
-        on:click={() => (view = "list")}>List</button
-      >
-      <button
-        class={twMerge("px-2.5 py-1", view === "graph" && "bg-elevation-2 text-white-text")}
-        on:click={() => (view = "graph")}>Graph</button
-      >
-    </div>
-  </div>
-
   {#if view === "list"}
     <SearchActionBar
       getAllTopics={mqttDataStore.getAllTopics}
       {searchStore}
       {expandedTopicsStore}
       {sortStore}
-    />
+    >
+      <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
+    </SearchActionBar>
     <div
       class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
     >
@@ -95,7 +83,9 @@
         {selectedTopicStore}
         {width}
         initialData={$mqttDataStore}
-      />
+      >
+        <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
+      </MqttGraphView>
     </div>
   {/if}
 </div>

@@ -52,11 +52,16 @@ export interface MockHandle {
   topicCount: number;
 }
 
-export function startMockTraffic(model: TopicModel, scale = 1): MockHandle {
+// Message-callback variant: emits (topic, timeMs) pairs instead of writing into
+// a model — lets the real MqttGraphView component run on synthetic traffic
+// (storybook / browser dev) via its messageSource prop.
+export function startMockMessages(
+  emit: (topic: string, timeMs: number) => void,
+  scale = 1
+): MockHandle {
   const topics = buildTopics(scale);
-  // seed retained/config topics once
   const now = Date.now();
-  for (const t of topics) if (t.rate === 0) model.ingest(t.topic, now);
+  for (const t of topics) if (t.rate === 0) emit(t.topic, now);
 
   let anomaly = false;
   let anomalyUntil = 0;
@@ -75,10 +80,13 @@ export function startMockTraffic(model: TopicModel, scale = 1): MockHandle {
       if (top.rate <= 0) continue;
       let rate = top.rate;
       if (anomaly && top.topic === "backyard/sensors/34/temperature") rate = 15;
-      // probability of a message in this 100ms tick
-      if (Math.random() < rate * 0.1) model.ingest(top.topic, t);
+      if (Math.random() < rate * 0.1) emit(top.topic, t);
     }
   };
   const id = window.setInterval(tick, 100);
   return { stop: () => window.clearInterval(id), topicCount: topics.length };
+}
+
+export function startMockTraffic(model: TopicModel, scale = 1): MockHandle {
+  return startMockMessages((topic, t) => model.ingest(topic, t), scale);
 }

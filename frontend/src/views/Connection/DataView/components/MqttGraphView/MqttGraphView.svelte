@@ -1,14 +1,40 @@
+<script lang="ts" context="module">
+  /** Feed of MQTT message arrivals; defaults to the Wails event stream.
+   *  Injectable so storybook / browser harnesses can drive synthetic traffic. */
+  export interface GraphMessageSource {
+    subscribe: (
+      onMessages: (msgs: Array<{ topic: string; timeMs?: number }>) => void,
+      onClear: () => void
+    ) => () => void;
+  }
+</script>
+
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { Events } from "@wailsio/runtime";
+  import _ from "lodash";
   import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { MqttData } from "../MqttDataPanel/stores/mqtt-data";
   import theme from "@/stores/theme";
-  import { TopicModel } from "./topic-model";
+  import PanelHeader from "@/components/PanelHeader/PanelHeader.svelte";
+  import BaseInput from "@/components/InputFields/BaseInput.svelte";
+  import Button from "@/components/Button/Button.svelte";
+  import Icon from "@/components/Icon/Icon.svelte";
+  import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
+  import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
+  import { untypedColors } from "@/util/resolvedTailwindConfig";
+  import { TopicModel, type TopicNode } from "./topic-model";
   import { TopicGraphRenderer } from "./pixi-graph";
-  import { COLD_ENDPOINT_DARK, COLD_ENDPOINT_LIGHT } from "./cooldown";
+  import {
+    COLD_ENDPOINT_DARK,
+    COLD_ENDPOINT_LIGHT,
+    formatRate,
+    rampCssGradient,
+    rateFromScore,
+  } from "./cooldown";
   import type { SortKey } from "./tidy-layout";
 
   export let connection: Connection;
@@ -16,21 +42,32 @@
   /** snapshot used once on mount to seed the tree so it isn't empty */
   export let initialData: MqttData = {};
   export let width = 0;
+  /** override the live message feed (storybook / dev harnesses) */
+  export let messageSource: GraphMessageSource | undefined = undefined;
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
+  let containerW = 0;
+  let containerH = 0;
   const model = new TopicModel();
   let renderer: TopicGraphRenderer | null = null;
-  let unsubMsgs: (() => void) | null = null;
-  let unsubClear: (() => void) | null = null;
+  let unsubSource: (() => void) | null = null;
   let ro: ResizeObserver | null = null;
   let liveTimer: number | null = null;
   let everSized = false;
 
-  let filter = "";
+  let filterText = "";
   let sortKey: SortKey = "rate";
   let paused = false;
-  let depth = 1;
+  let allExpanded = false;
+
+  const SORT_LABELS: Record<SortKey, string> = {
+    rate: "Busiest first",
+    recency: "Recent first",
+    stale: "Silent first",
+    alpha: "Name",
+    count: "Topic count",
+  };
 
   // persisted view preferences (scoped per connection)
   const settingsKey = () =>
@@ -38,18 +75,25 @@
   let minimapOn = true;
   let followHottest = false;
   let cvdSafe = false;
+  let legendOn = true;
   let cooldownMs = 60000;
   let tauMs = 14000; // EWMA half-life ~10s by default
   const COOLDOWNS: Array<[string, number]> = [
-    ["30s", 30000],
-    ["1m", 60000],
-    ["5m", 300000],
-    ["1h", 3600000],
+    ["30 seconds", 30000],
+    ["1 minute", 60000],
+    ["5 minutes", 300000],
+    ["1 hour", 3600000],
   ];
+  const COOLDOWN_SHORT: Record<number, string> = {
+    30000: "30s",
+    60000: "1m",
+    300000: "5m",
+    3600000: "1h",
+  };
   const SMOOTHING: Array<[string, number]> = [
-    ["responsive", 5000],
-    ["balanced", 14000],
-    ["smooth", 40000],
+    ["Responsive (5s)", 5000],
+    ["Balanced (14s)", 14000],
+    ["Smooth (40s)", 40000],
   ];
 
   const loadSettings = () => {
@@ -60,6 +104,7 @@
       if (typeof s.minimapOn === "boolean") minimapOn = s.minimapOn;
       if (typeof s.followHottest === "boolean") followHottest = s.followHottest;
       if (typeof s.cvdSafe === "boolean") cvdSafe = s.cvdSafe;
+      if (typeof s.legendOn === "boolean") legendOn = s.legendOn;
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
     } catch (e) {
@@ -70,7 +115,14 @@
     try {
       localStorage.setItem(
         settingsKey(),
-        JSON.stringify({ minimapOn, followHottest, cvdSafe, cooldownMs, tauMs })
+        JSON.stringify({
+          minimapOn,
+          followHottest,
+          cvdSafe,
+          legendOn,
+          cooldownMs,
+          tauMs,
+        })
       );
     } catch (e) {
       console.error("topic-graph settings save failed", e);
@@ -102,10 +154,114 @@
   const applyTheme = (t: "dark" | "light") => {
     if (!renderer) return;
     renderer.setEndpoint(t === "light" ? COLD_ENDPOINT_LIGHT : COLD_ENDPOINT_DARK);
-    renderer.setTextColor(t === "light" ? 0x4a4641 : 0xbdb7b0);
+    renderer.setThemeUi(
+      t === "light"
+        ? {
+            text: 0x4a4641,
+            accent: 0x5e6ce0,
+            minimapBg: 0xffffff,
+            minimapBgAlpha: 0.7,
+            minimapBorder: 0xb8b8c0,
+          }
+        : {
+            text: 0xbdb7b0,
+            accent: 0x7c8cff,
+            minimapBg: 0x000000,
+            minimapBgAlpha: 0.32,
+            minimapBorder: 0x8a8a8a,
+          }
+    );
   };
   $: applyTheme($theme);
   $: if (renderer) renderer.setSelected($selectedTopicStore.selectedTopic);
+
+  // ---- hover inspector ----
+  interface HoverInfo {
+    topic: string;
+    scope: string;
+    rate: string;
+    age: string;
+    count: number;
+    x: number;
+    y: number;
+  }
+  let hover: HoverInfo | null = null;
+
+  const findNode = (topic: string): TopicNode | null => {
+    let n = model.root;
+    for (const seg of topic.split("/")) {
+      const c = n.children.get(seg);
+      if (!c) return null;
+      n = c;
+    }
+    return n;
+  };
+
+  const formatAge = (lastMs: number, nowMs: number): string => {
+    if (!lastMs) return "no messages yet";
+    const d = Math.max(0, nowMs - lastMs);
+    if (d < 1500) return "just now";
+    const s = Math.floor(d / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s ago`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m ago`;
+  };
+
+  const buildHover = (topic: string, x: number, y: number): HoverInfo | null => {
+    const node = findNode(topic);
+    if (!node) return null;
+    const nowMs = Date.now();
+    // mirror the renderer: collapsed parents display the subtree aggregate
+    const isAgg = !node.expanded && node.descendantCount > 0;
+    const score = isAgg ? model.aggScore(node, nowMs) : model.ownScore(node, nowMs);
+    const lastMs = isAgg ? node.aggLastMsg : node.ownLastMsg;
+    return {
+      topic,
+      scope: isAgg
+        ? `subtree total · ${node.descendantCount} topics`
+        : node.descendantCount > 0
+          ? "this topic only"
+          : "topic",
+      rate: formatRate(rateFromScore(score, model.tauMs)),
+      age: formatAge(lastMs, nowMs),
+      count: isAgg ? node.aggCount : node.ownCount,
+      x,
+      y,
+    };
+  };
+
+  $: tipLeft = hover ? Math.min(hover.x + 14, Math.max(8, containerW - 300)) : 0;
+  $: tipTop = hover
+    ? hover.y > containerH - 100
+      ? hover.y - 88
+      : hover.y + 18
+    : 0;
+
+  // ---- legend ----
+  $: legendGradient = rampCssGradient(
+    $theme === "light" ? COLD_ENDPOINT_LIGHT : COLD_ENDPOINT_DARK,
+    cvdSafe
+  );
+  $: cooldownShort = COOLDOWN_SHORT[cooldownMs] ?? `${Math.round(cooldownMs / 1000)}s`;
+
+  // ---- message source (Wails by default; injectable for storybook/dev) ----
+  const wailsSource: GraphMessageSource = {
+    subscribe: (onMessages, onClear) => {
+      const unMsgs = Events.On(connection.eventSet.mqttMessages, (e) => {
+        const messages: mqtt.MqttMessage[] = e.data;
+        onMessages(messages);
+      });
+      const unClear = Events.On(connection.eventSet.mqttClearHistory, () =>
+        onClear()
+      );
+      return () => {
+        unMsgs();
+        unClear();
+      };
+    },
+  };
 
   onMount(async () => {
     loadSettings();
@@ -118,23 +274,27 @@
           selectedTopicStore.selectTopic(topic);
         }
       },
+      onHover: (topic, x, y) => {
+        hover = topic ? buildHover(topic, x, y) : null;
+      },
     });
     await renderer.init(canvasEl, w, h);
     applyTheme($theme);
     applySettings();
     seed(initialData);
-    renderer.expandToDepth(depth);
+    renderer.expandToDepth(1);
     renderer.setSelected($selectedTopicStore.selectedTopic);
     renderer.fitView();
 
-    unsubMsgs = Events.On(connection.eventSet.mqttMessages, (e) => {
-      const messages: mqtt.MqttMessage[] = e.data;
-      for (const m of messages) model.ingest(m.topic, m.timeMs || Date.now());
-    });
-    unsubClear = Events.On(connection.eventSet.mqttClearHistory, () => {
-      model.clear();
-      renderer?.relayout();
-    });
+    unsubSource = (messageSource ?? wailsSource).subscribe(
+      (msgs) => {
+        for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
+      },
+      () => {
+        model.clear();
+        renderer?.relayout();
+      }
+    );
 
     liveTimer = window.setInterval(() => {
       if (!renderer) return;
@@ -142,6 +302,8 @@
       if (!paused && (sortKey === "rate" || sortKey === "recency")) {
         renderer.relayout();
       }
+      // keep the hover inspector's numbers live while the pointer rests
+      if (hover) hover = buildHover(hover.topic, hover.x, hover.y);
     }, 1200);
 
     ro = new ResizeObserver(() => {
@@ -159,26 +321,35 @@
   });
 
   onDestroy(() => {
-    unsubMsgs?.();
-    unsubClear?.();
+    unsubSource?.();
     ro?.disconnect();
     document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (liveTimer) clearInterval(liveTimer);
     renderer?.destroy();
   });
 
-  const onFilter = (e: Event) => {
-    filter = (e.target as HTMLInputElement).value;
-    renderer?.setFilter(filter);
-  };
-  const onSort = (e: Event) => {
-    sortKey = (e.target as HTMLSelectElement).value as SortKey;
-    renderer?.setSort(sortKey);
+  // debounced filter (matches the list view's search behaviour)
+  const applyFilter = _.debounce((t: string) => renderer?.setFilter(t), 150);
+  $: {
+    if (filterText === "") {
+      applyFilter.cancel();
+      renderer?.setFilter("");
+    } else {
+      applyFilter(filterText);
+    }
+  }
+
+  const setSort = (key: SortKey) => {
+    sortKey = key;
+    renderer?.setSort(key);
   };
   const setDepth = (d: number) => {
-    depth = d;
     renderer?.expandToDepth(d);
     renderer?.fitView();
+  };
+  const toggleExpandAll = () => {
+    allExpanded = !allExpanded;
+    setDepth(allExpanded ? 99 : 1);
   };
   const togglePause = () => {
     paused = !paused;
@@ -198,14 +369,18 @@
     renderer?.setCvdSafe(cvdSafe);
     saveSettings();
   };
-  const onCooldown = (e: Event) => {
-    cooldownMs = Number((e.target as HTMLSelectElement).value);
-    renderer?.setCooldownMs(cooldownMs);
+  const toggleLegend = () => {
+    legendOn = !legendOn;
     saveSettings();
   };
-  const onSmoothing = (e: Event) => {
-    tauMs = Number((e.target as HTMLSelectElement).value);
-    model.tauMs = tauMs;
+  const setCooldown = (ms: number) => {
+    cooldownMs = ms;
+    renderer?.setCooldownMs(ms);
+    saveSettings();
+  };
+  const setSmoothing = (ms: number) => {
+    tauMs = ms;
+    model.tauMs = ms;
     saveSettings();
   };
   const toggleFullscreen = () => {
@@ -224,65 +399,163 @@
       }
     });
   };
+
+  const filterFieldColor = untypedColors["outline"]["DEFAULT"];
 </script>
 
 <div class="flex h-full w-full min-w-0 flex-col bg-elevation-0">
+  <PanelHeader class="bg-elevation-0 shrink-0">
+    <div
+      class="flex h-full flex-row items-center gap-2 overflow-hidden px-2 text-emphasis"
+    >
+      <slot name="leading" />
+      <div class="max-w-[280px] flex-grow">
+        <BaseInput
+          name={`topic-graph-filter-${connection.connectionDetails.id}`}
+          icon="search"
+          placeholder="Filter topics"
+          bgColor={filterFieldColor}
+          bgHoverColor="var(--color-hovered)"
+          bind:value={filterText}
+        />
+      </div>
+      <Tooltip placement="bottom">
+        <DropdownMenu triggerText={SORT_LABELS[sortKey]} triggerClass="w-[125px]">
+          <div class="flex flex-col" slot="menu-content">
+            {#each Object.entries(SORT_LABELS) as [key, label]}
+              <DropdownMenuItem
+                isSelected={sortKey === key}
+                onClick={() => setSort(key as SortKey)}>{label}</DropdownMenuItem
+              >
+            {/each}
+          </div>
+        </DropdownMenu>
+        <span slot="tooltip-content">Sort sibling topics</span>
+      </Tooltip>
+      <Tooltip placement="bottom">
+        <Button on:click={toggleExpandAll}>
+          <Icon type={allExpanded ? "collapse" : "expand"} width={20} height={20} />
+        </Button>
+        <span slot="tooltip-content">Expand/Collapse all topics</span>
+      </Tooltip>
+      <Tooltip placement="bottom">
+        <Button
+          class={paused ? "text-primary" : ""}
+          on:click={togglePause}
+        >
+          <Icon type={paused ? "connect" : "pause"} width={20} height={20} />
+        </Button>
+        <span slot="tooltip-content"
+          >{paused ? "Resume live re-sorting" : "Pause live re-sorting"}</span
+        >
+      </Tooltip>
+      <Tooltip placement="bottom">
+        <Button on:click={() => renderer?.fitView()}>
+          <Icon type="fit" width={20} height={20} />
+        </Button>
+        <span slot="tooltip-content">Fit graph to view</span>
+      </Tooltip>
+      <DropdownMenu>
+        <span slot="trigger">
+          <Button variant="secondary" iconType="settings" iconSize={16}></Button>
+        </span>
+        <div class="flex w-[200px] flex-col" slot="menu-content">
+          <span class="px-2 pb-0.5 pt-1 text-xs text-secondary-text"
+            >Recency window</span
+          >
+          {#each COOLDOWNS as [lbl, ms]}
+            <DropdownMenuItem
+              isSelected={cooldownMs === ms}
+              onClick={() => setCooldown(ms)}>{lbl}</DropdownMenuItem
+            >
+          {/each}
+          <span class="px-2 pb-0.5 pt-2 text-xs text-secondary-text"
+            >Rate smoothing</span
+          >
+          {#each SMOOTHING as [lbl, ms]}
+            <DropdownMenuItem
+              isSelected={tauMs === ms}
+              onClick={() => setSmoothing(ms)}>{lbl}</DropdownMenuItem
+            >
+          {/each}
+          <span class="px-2 pb-0.5 pt-2 text-xs text-secondary-text">Display</span>
+          <DropdownMenuItem onClick={toggleMinimap}>
+            <span class="flex items-center gap-2">
+              <Icon type={minimapOn ? "ticked" : "unticked"} size={14} />Minimap
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={toggleLegend}>
+            <span class="flex items-center gap-2">
+              <Icon type={legendOn ? "ticked" : "unticked"} size={14} />Legend
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={toggleFollow}>
+            <span class="flex items-center gap-2">
+              <Icon type={followHottest ? "ticked" : "unticked"} size={14} />Follow
+              hottest topic
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={toggleCvd}>
+            <span class="flex items-center gap-2">
+              <Icon type={cvdSafe ? "ticked" : "unticked"} size={14} />Colour-blind
+              safe palette
+            </span>
+          </DropdownMenuItem>
+        </div>
+      </DropdownMenu>
+      <div class="ml-auto">
+        <Tooltip placement="bottom">
+          <Button on:click={toggleFullscreen}>
+            <Icon type="fullscreen" width={20} height={20} />
+          </Button>
+          <span slot="tooltip-content">Fullscreen</span>
+        </Tooltip>
+      </div>
+    </div>
+  </PanelHeader>
   <div
-    class="flex items-center gap-2 border-b border-outline px-3 py-2 text-xs text-secondary-text"
+    bind:this={containerEl}
+    bind:clientWidth={containerW}
+    bind:clientHeight={containerH}
+    class="relative min-h-0 w-full grow bg-elevation-0"
   >
-    <input
-      class="w-48 rounded-md border border-outline bg-elevation-1 px-2 py-1 text-white-text outline-none"
-      placeholder="filter topics…"
-      value={filter}
-      on:input={onFilter}
-    />
-    <select
-      class="rounded-md border border-outline bg-elevation-1 px-2 py-1 text-white-text outline-none"
-      value={sortKey}
-      on:change={onSort}
-    >
-      <option value="rate">sort: rate</option>
-      <option value="recency">sort: recency</option>
-      <option value="alpha">sort: name</option>
-      <option value="count">sort: topics</option>
-    </select>
-    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" on:click={() => setDepth(1)}>collapse</button>
-    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" on:click={() => setDepth(99)}>expand all</button>
-    <button
-      class="rounded-md border border-outline px-2 py-1 hover:text-white-text"
-      class:text-primary={paused}
-      on:click={togglePause}
-      title="pause/lock live re-sorting"
-    >
-      {paused ? "paused" : "live"}
-    </button>
-    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" on:click={() => renderer?.fitView()}>fit</button>
-    <select
-      class="rounded-md border border-outline bg-elevation-1 px-2 py-1 text-white-text outline-none"
-      value={cooldownMs}
-      on:change={onCooldown}
-      title="recency cooldown duration"
-    >
-      {#each COOLDOWNS as [lbl, ms]}
-        <option value={ms}>cool: {lbl}</option>
-      {/each}
-    </select>
-    <select
-      class="rounded-md border border-outline bg-elevation-1 px-2 py-1 text-white-text outline-none"
-      value={tauMs}
-      on:change={onSmoothing}
-      title="rate smoothing (EWMA window)"
-    >
-      {#each SMOOTHING as [lbl, ms]}
-        <option value={ms}>rate: {lbl}</option>
-      {/each}
-    </select>
-    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={followHottest} on:click={toggleFollow} title="auto-pan to the hottest topic">follow</button>
-    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={minimapOn} on:click={toggleMinimap} title="toggle minimap">minimap</button>
-    <button class="rounded-md border border-outline px-2 py-1 hover:text-white-text" class:text-primary={cvdSafe} on:click={toggleCvd} title="colour-vision-safe palette">cvd</button>
-    <button class="ml-auto rounded-md border border-outline px-2 py-1 hover:text-white-text" on:click={toggleFullscreen}>fullscreen</button>
-  </div>
-  <div bind:this={containerEl} class="relative min-h-0 w-full grow">
     <canvas bind:this={canvasEl} class="block h-full w-full"></canvas>
+    {#if hover}
+      <div
+        class="pointer-events-none absolute z-20 max-w-[290px] rounded bg-elevation-2 px-2.5 py-1.5 text-xs shadow"
+        style:left={`${tipLeft}px`}
+        style:top={`${tipTop}px`}
+      >
+        <div class="break-all font-medium text-emphasis">{hover.topic}</div>
+        <div class="text-secondary-text">{hover.scope}</div>
+        <div class="flex gap-3 text-white-text">
+          <span>{hover.rate}</span>
+          <span>{hover.age}</span>
+          <span>{hover.count.toLocaleString()} msgs</span>
+        </div>
+      </div>
+    {/if}
+    {#if legendOn}
+      <div
+        class="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1.5 rounded border border-outline bg-elevation-1 bg-opacity-85 px-2.5 py-2 text-xs text-secondary-text"
+      >
+        <div class="flex items-center gap-2">
+          <span>now</span>
+          <div
+            class="h-1.5 w-24 rounded-full"
+            style:background={legendGradient}
+          ></div>
+          <span>idle {cooldownShort}+</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1">
+            <div class="size-1.5 rounded-full bg-secondary-text"></div>
+            <div class="size-2.5 rounded-full bg-secondary-text"></div>
+            <div class="size-3.5 rounded-full bg-secondary-text"></div>
+          </div>
+          <span>size = msg rate · ring = collapsed subtree</span>
+        </div>
+      </div>
+    {/if}
   </div>
 </div>

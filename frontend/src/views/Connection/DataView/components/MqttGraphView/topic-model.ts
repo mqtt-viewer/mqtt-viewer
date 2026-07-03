@@ -24,6 +24,7 @@ export class TopicNode {
   // subtree aggregate (this node + all descendants)
   agg: DecayScore = { score: 0, lastMs: 0 };
   aggLastMsg = 0;
+  aggCount = 0; // total messages seen in the subtree
 
   descendantCount = 0; // number of topic nodes strictly below this one
 
@@ -80,6 +81,7 @@ export class TopicModel {
       // each node on the path accumulates the subtree aggregate
       bumpScore(node.agg, tMs, this.tauMs);
       node.aggLastMsg = tMs;
+      node.aggCount++;
     }
     // the exact topic node accumulates its own traffic
     bumpScore(node.own, tMs, this.tauMs);
