@@ -1,11 +1,10 @@
 // The in-app changelog. One entry per released version; the newest entry for
 // the running version is shown once in the "What's new" dialog (tracked via
 // app_settings.lastSeenChangelogVersion), and it stays reachable from
-// Settings. Keep the writing warm and plain — these notes are read by people
-// mid-task, not by a release pipeline.
+// Settings. Keep the writing warm and plain: these notes are read by people
+// mid-task, not by a release pipeline. Follow docs/WRITING_STYLE.md. No emoji.
 
 export interface ChangelogSection {
-  emoji: string;
   title: string;
   body: string;
 }
@@ -29,38 +28,32 @@ export const CHANGELOG: ChangelogEntry[] = [
       "After years of betas, MQTT Viewer is officially 1.0. Thanks for sticking with it. Here's what's new.",
     sections: [
       {
-        emoji: "📈",
-        title: "Live charting",
-        body: "Tick any numeric field in a payload to chart it over time. Charts can pop out into their own window.",
+        title: "Chart your data, live",
+        body: "Tick any numeric field in a payload and watch it plot over time. Charts pop out into their own window.",
       },
       {
-        emoji: "🗂️",
-        title: "Saved message collections",
-        body: "Save messages into collections — per connection or global — and publish them again with a click. Publish history and search are in the sidebar too.",
+        title: "A message library",
+        body: "Save the messages you publish often into collections, per connection or global, and reuse them with a click. Search collections and publish history from the sidebar.",
       },
       {
-        emoji: "🧠",
-        title: "Bounded memory",
-        body: "Message history stays within a memory budget you set, so the app won't eat your RAM if you leave it open. Turn on recording if you want history to survive restarts.",
+        title: "History that stays in budget",
+        body: "Message history keeps to a memory limit you set, so the app won't eat your RAM if you leave it running. Turn on recording and history survives restarts.",
       },
       {
-        emoji: "🖼️",
-        title: "Image previews",
-        body: "PNG, JPEG, GIF, WebP and BMP payloads now show as actual images, with the raw bytes one click away.",
+        title: "Images, decoded",
+        body: "PNG, JPEG, GIF, WebP and BMP payloads render as actual images, with the raw bytes one click away.",
       },
       {
-        emoji: "📝",
-        title: "Release notes",
+        title: "What's-new notes",
         body: "After each update you'll see a short summary of what changed, like this one. You can reopen it any time from Settings.",
       },
       {
-        emoji: "🐧",
         title: "Linux fixes and auto-updates",
         body: "There are proper rpm and deb packages now, so Fedora no longer crashes at startup. AppImages render correctly again, and the app can update itself.",
       },
     ],
     outro:
-      "Found a bug or a rough edge? Use the Feedback button — I really want to know.",
+      "Found a bug or a rough edge? The Feedback button comes straight to me.",
   },
   {
     version: "0.7.0",
@@ -70,22 +63,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       "A big one: charting, collections, bounded memory, image previews, and a new engine under the hood.",
     sections: [
       {
-        emoji: "📈",
         title: "Topic charting",
         body: "Chart numeric payload fields over time, live, with a pop-out window.",
       },
       {
-        emoji: "🗂️",
         title: "Message library",
-        body: "Collections of saved messages, publish history, and search — all in the new sidebar.",
+        body: "Collections of saved messages, publish history and search, all in the new sidebar.",
       },
       {
-        emoji: "🧠",
-        title: "Bounded memory + durable history",
+        title: "Bounded memory and durable history",
         body: "History stays within a configurable memory budget, with opt-in recording to disk.",
       },
       {
-        emoji: "🖼️",
         title: "Image payload previews",
         body: "Image payloads render as images, not noise.",
       },
