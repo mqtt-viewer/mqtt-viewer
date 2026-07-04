@@ -65,6 +65,7 @@
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
+| Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
 | Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
@@ -134,7 +135,7 @@
 
 ## Summary
 
-- Components scanned: 108
-- Story present: 108
+- Components scanned: 109
+- Story present: 109
 - Figma-linked: 0
 - Missing specs: 0

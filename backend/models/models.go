@@ -14,7 +14,9 @@ type Global struct {
 // always-on leak guard); RecordingEnabled + DiskBudgetBytes control opt-in
 // durable history on disk; HasSeenHistoryPrompt gates the first-run popup.
 // LastSeenChangelogVersion records which version's "What's new" dialog the
-// user has dismissed, so it shows once per version.
+// user has dismissed, so it shows once per version. LaunchCount counts app
+// starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
+// the GitHub star prompt as shown so it only ever appears once.
 type AppSettings struct {
 	ID                       uint   `json:"id" gorm:"primaryKey"`
 	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
@@ -22,6 +24,8 @@ type AppSettings struct {
 	DiskBudgetBytes          int64  `json:"diskBudgetBytes"`
 	HasSeenHistoryPrompt     bool   `json:"hasSeenHistoryPrompt"`
 	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion"`
+	LaunchCount              int64  `json:"launchCount"`
+	HasSeenStarPrompt        bool   `json:"hasSeenStarPrompt"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,

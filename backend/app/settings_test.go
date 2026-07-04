@@ -23,6 +23,49 @@ func TestAppSettingsSeededDefaults(t *testing.T) {
 	if settings.HasSeenHistoryPrompt {
 		t.Error("expected history prompt unseen by default")
 	}
+	if settings.LaunchCount != 0 {
+		t.Errorf("expected launch count 0 in test mode, got %d", settings.LaunchCount)
+	}
+	if settings.HasSeenStarPrompt {
+		t.Error("expected star prompt unseen by default")
+	}
+}
+
+func TestRecordAppLaunchIncrementsCount(t *testing.T) {
+	app := getTestApp(t)
+
+	for i := 1; i <= 3; i++ {
+		if err := app.recordAppLaunch(); err != nil {
+			t.Fatalf("recording launch: %v", err)
+		}
+		settings, err := app.GetAppSettings()
+		if err != nil {
+			t.Fatalf("reading settings: %v", err)
+		}
+		if settings.LaunchCount != int64(i) {
+			t.Errorf("expected launch count %d, got %d", i, settings.LaunchCount)
+		}
+	}
+}
+
+func TestAcknowledgeStarPromptPersists(t *testing.T) {
+	app := getTestApp(t)
+
+	updated, err := app.AcknowledgeStarPrompt()
+	if err != nil {
+		t.Fatalf("acknowledging star prompt: %v", err)
+	}
+	if !updated.HasSeenStarPrompt {
+		t.Error("expected star prompt marked seen")
+	}
+
+	reloaded, err := app.GetAppSettings()
+	if err != nil {
+		t.Fatalf("reloading settings: %v", err)
+	}
+	if !reloaded.HasSeenStarPrompt {
+		t.Error("expected star prompt seen flag to persist")
+	}
 }
 
 func TestUpdateAppSettingsPersistsAndAppliesBudget(t *testing.T) {
