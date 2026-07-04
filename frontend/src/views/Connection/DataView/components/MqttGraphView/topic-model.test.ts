@@ -55,7 +55,11 @@ test("expanding a previously-collapsed node whose subtree already exists marks d
 test("ingest after ancestor expands marks visibleDirty again", () => {
   const model = new TopicModel();
   model.ingest("a/b/c", 1000);
-  const b = model.root.children.get("a")!.children.get("b")!;
+  // the graph now starts fully collapsed (autoExpandDepth 0), so the whole
+  // ancestor chain must be expanded explicitly for a new arrival to be visible
+  const a = model.root.children.get("a")!;
+  const b = a.children.get("b")!;
+  a.expanded = true;
   b.expanded = true;
   model.visibleDirty = false;
 

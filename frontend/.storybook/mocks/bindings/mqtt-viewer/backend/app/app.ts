@@ -372,6 +372,56 @@ export async function GetReceivedMessageCount(
   return mockMqttMessages.length;
 }
 
+// Lightweight stubs (id/timeMs/qos/retain, no payload) mirroring the real
+// GetMessageTimeline/GetReceivedTimelineWindow bindings used by the
+// selection timeline. Computed lazily (not a module-level const) to avoid
+// depending on fixtures.ts's own initialization order.
+const mockMqttMessageStubs = () =>
+  mockMqttMessages.map((m) => ({
+    id: m.id,
+    timeMs: m.timeMs,
+    qos: m.qos,
+    retain: m.retain,
+  }));
+
+export async function GetMessageTimeline(
+  _connectionId: number,
+  _topic: string,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetReceivedTimelineWindow(
+  _connectionId: number,
+  _topic: string,
+  _beforeID: number,
+  _afterID: number,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetMessageById(
+  _connectionId: number,
+  topic: string,
+  id: string
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === id);
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetReceivedMessageById(
+  _connectionId: number,
+  topic: string,
+  id: number
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === String(id));
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
 export async function GetMqttStats(): Promise<app.MqttStats> {
   return new app.MqttStats({
     totalMessagesReceived: 128,

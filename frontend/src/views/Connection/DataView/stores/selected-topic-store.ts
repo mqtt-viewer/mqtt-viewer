@@ -1,8 +1,12 @@
 import { get, writable } from "svelte/store";
 import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 import {
+  GetMessageTimeline,
+  GetMessageById,
   GetMessageHistory,
+  GetReceivedTimelineWindow,
   GetReceivedMessageWindow,
+  GetReceivedMessageById,
   GetReceivedMessageCount,
   GetAppSettings,
 } from "bindings/mqtt-viewer/backend/app/app";
@@ -22,19 +26,35 @@ export const HISTORY_WINDOW_SIZE = 5000;
 // while the user pans through a busy topic's history.
 export const MAX_LOADED_MESSAGES = 20000;
 
+// Selecting a topic (and paging its window) only ever fetches lightweight
+// stubs: id, arrival time, and small flags. Payloads are fetched individually
+// on demand via ensurePayload, so a busy topic's 5,000-message window never
+// serializes tens of MB of payload across the webview bridge in one go.
+//
+// payload/payloadB64 are null until fetched. payloadState tracks why:
+//   - "unfetched": never requested (most history items, most of the time).
+//   - "loading": a fetch is in flight (ensurePayload was called).
+//   - "loaded": payload/payloadB64 are populated.
+//   - "aged-out": the backend reported the message no longer exists (evicted
+//     from the RAM budget, or pruned from disk); payload will never load.
+export type PayloadState = "unfetched" | "loading" | "loaded" | "aged-out";
+
 export type MqttHistoryMessage = Omit<
   mqtt.MqttMessage,
   "payload" | "convertValues"
 > & {
-  payload: string;
+  payload: string | null;
   // The original base64 payload, kept alongside the utf8-decoded text so
   // binary payloads (e.g. images) can be rendered from their real bytes.
-  payloadB64: string;
+  payloadB64: string | null;
+  payloadState: PayloadState;
 };
 
 // A delta describing how `history` just changed, so consumers (the vis
 // timeline) can apply the same change incrementally instead of rebuilding
-// wholesale.
+// wholesale. Payload-only changes (ensurePayload landing) are NOT deltas: the
+// timeline only cares about id/time/flags, all of which are already present
+// on stub arrival.
 export type HistoryDelta =
   | { kind: "append"; messages: MqttHistoryMessage[] } // live messages or loadNewer results
   | { kind: "prepend"; messages: MqttHistoryMessage[] } // loadOlder results
@@ -74,6 +94,17 @@ interface SelectedTopicData {
   // In-flight indicator for an incremental older/newer load; also doubles as
   // the single-flight guard for loadOlderWindow/loadNewerWindow.
   isLoadingWindow: "older" | "newer" | null;
+  // Full-payload history for the Chart tab only. `history` itself never
+  // carries every payload (that's the whole point of the stub windows), but
+  // the chart draws a numeric series across the *entire* loaded window, which
+  // genuinely needs every payload. Rather than fetch that on every topic
+  // selection, it stays null until the user actually opens the Chart tab (or
+  // already has fields picked), at which point ensureChartHistory fetches the
+  // full window once via the pre-existing full-message binding. Bounded by
+  // the same HISTORY_WINDOW_SIZE as everything else, so it is a bump in
+  // bridge bytes only when the user opts into charting, never on selection.
+  chartHistory: MqttHistoryMessage[] | null;
+  isLoadingChartHistory: boolean;
   options: {
     autoSelect: boolean;
     compare: boolean;
@@ -85,19 +116,41 @@ interface SelectedTopicData {
 
 export type SelectedTopicStore = ReturnType<typeof createSelectedTopicStore>;
 
+// Builds a stub-shaped history entry (payload not yet fetched) from a
+// MqttMessageStub returned by GetMessageTimeline/GetReceivedTimelineWindow.
+const stubToHistoryMessage = (s: {
+  id: string;
+  timeMs: number;
+  qos: number;
+  retain: boolean;
+}): MqttHistoryMessage =>
+  ({
+    id: s.id,
+    topic: "",
+    timeMs: s.timeMs,
+    qos: s.qos,
+    retain: s.retain,
+    payload: null,
+    payloadB64: null,
+    payloadState: "unfetched",
+  }) as MqttHistoryMessage;
+
+// Decodes a full message (with payload) into the history shape, marking it
+// loaded. Used for live appends and single-message fetches (ensurePayload),
+// never for stub windows, which have no payload to decode.
 const decode = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
   ...m,
   payload: base64ToUtf8(m.payload as unknown as string),
   payloadB64: m.payload as unknown as string,
+  payloadState: "loaded",
 });
 
 const yieldToEventLoop = () => new Promise<void>((r) => setTimeout(r, 0));
 
 // Decodes a large message batch without blocking the main thread: decoding
-// (base64 -> utf8) is CPU-bound and a busy topic can have up to
-// HISTORY_WINDOW_SIZE messages in a single window, so we slice the work into
-// chunks and yield to the event loop between them, letting the panel/loading
-// state and the rest of the UI keep rendering while it runs.
+// (base64 -> utf8) is CPU-bound. Only ever used for live-append batches now
+// (stub windows have nothing to decode), but kept chunked since a burst of
+// live messages draining at once could still be sizeable.
 const decodeChunked = async (
   messages: mqtt.MqttMessage[],
   chunk = 400
@@ -124,11 +177,11 @@ export const createSelectedTopicStore = (
 ) => {
   // Monotonically increasing token identifying the "current" selection/fetch.
   // Every async load (selectTopic, loadOlderWindow, loadNewerWindow,
-  // jumpToLatest) captures the token at call time and, before applying its
-  // result, checks it's still the current token and the selected topic
-  // hasn't changed. This guards against a slow fetch for a topic the user
-  // has since clicked away from (or a superseded window navigation) landing
-  // late and clobbering newer state.
+  // jumpToLatest, ensurePayload) captures the token at call time and, before
+  // applying its result, checks it's still the current token and the
+  // selected topic hasn't changed. This guards against a slow fetch for a
+  // topic the user has since clicked away from (or a superseded window
+  // navigation/payload fetch) landing late and clobbering newer state.
   let requestToken = 0;
   const isStale = (token: number, topic: string) => {
     const store = get({ subscribe });
@@ -147,6 +200,8 @@ export const createSelectedTopicStore = (
       isLoadingHistory: false,
       historyRevision: 0,
       isLoadingWindow: null,
+      chartHistory: null,
+      isLoadingChartHistory: false,
       onHistoryDelta: null,
       options: {
         autoSelect: true,
@@ -204,6 +259,11 @@ export const createSelectedTopicStore = (
         return {
           ...s,
           history: [...s.history, ...decoded],
+          // Keep the chart's full-payload cache current if it's loaded, same
+          // as the stub history above, so an open Chart tab keeps streaming
+          // live points instead of needing a re-fetch.
+          chartHistory:
+            s.chartHistory === null ? null : [...s.chartHistory, ...decoded],
           totalCount: s.totalCount + decoded.length,
           window,
         };
@@ -229,6 +289,8 @@ export const createSelectedTopicStore = (
         isLoadingHistory: false,
         historyRevision: s.historyRevision + 1,
         isLoadingWindow: null,
+        chartHistory: null,
+        isLoadingChartHistory: false,
       }));
     });
     activeTeardown = () => {
@@ -321,7 +383,7 @@ export const createSelectedTopicStore = (
     // Open the panel and show a loading state immediately, synchronously,
     // before any await below — the panel's visibility is driven by
     // `selectedTopic !== null`, so this is what makes selecting a topic feel
-    // instant even when the fetch/decode below takes a while.
+    // instant even when the fetch below takes a while.
     update((store) => ({
       ...store,
       selectedTopic: topic,
@@ -331,6 +393,8 @@ export const createSelectedTopicStore = (
       isLoadingHistory: true,
       historyRevision: store.historyRevision + 1,
       isLoadingWindow: null,
+      chartHistory: null,
+      isLoadingChartHistory: false,
       options: { ...store.options, autoSelect: true },
       onHistoryDelta: onHistoryDelta ?? null,
     }));
@@ -339,48 +403,136 @@ export const createSelectedTopicStore = (
     if (isStale(token, topic)) return;
 
     if (recording) {
-      const [count, windowMessages] = await Promise.all([
+      const [count, stubs] = await Promise.all([
         GetReceivedMessageCount(connectionId, topic),
-        GetReceivedMessageWindow(connectionId, topic, 0, 0, HISTORY_WINDOW_SIZE),
+        GetReceivedTimelineWindow(connectionId, topic, 0, 0, HISTORY_WINDOW_SIZE),
       ]);
       if (isStale(token, topic)) return;
-      const decoded = await decodeChunked(windowMessages);
-      if (isStale(token, topic)) return;
+      const history = stubs.map((s) =>
+        stubToHistoryMessageForTopic(s, topic)
+      );
       update((store) => ({
         ...store,
-        history: decoded,
+        history,
         historySource: "disk",
-        window: windowFromMessages(decoded, true),
+        window: windowFromMessages(history, true),
         totalCount: count,
         isLoadingHistory: false,
         historyRevision: store.historyRevision + 1,
         isLoadingWindow: null,
       }));
+      // Fetch exactly one payload (the newest stub) so the auto-selected
+      // message renders immediately. Token-guarded inside ensurePayload.
+      const newest = history[history.length - 1];
+      if (newest) ensurePayload(newest.id);
       return;
     }
 
     // Memory mode: the in-RAM history is already bounded by the memory budget,
     // but we still cap what we pull across the bridge to HISTORY_WINDOW_SIZE
     // so a busy topic's full RAM history doesn't serialize as one unbounded
-    // blob.
-    const history = await GetMessageHistory(
+    // blob. Only stubs are fetched, no payloads, so even a 150k-message
+    // topic's window is a few hundred KB, not tens of MB.
+    const stubs = await GetMessageTimeline(
       connectionId,
       topic,
       HISTORY_WINDOW_SIZE
     );
     if (isStale(token, topic)) return;
-    const decoded = await decodeChunked(history);
-    if (isStale(token, topic)) return;
+    const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     update((store) => ({
       ...store,
-      history: decoded,
+      history,
       historySource: "memory",
       window: null,
-      totalCount: decoded.length,
+      totalCount: history.length,
       isLoadingHistory: false,
       historyRevision: store.historyRevision + 1,
       isLoadingWindow: null,
     }));
+    const newest = history[history.length - 1];
+    if (newest) ensurePayload(newest.id);
+  };
+
+  // stubToHistoryMessage doesn't know the topic (the backend stub type omits
+  // it: every stub in a window is for the same topic by construction), but
+  // MqttHistoryMessage's shape mirrors MqttMessage which does carry topic, so
+  // fill it in here for consumers (compare mode, chart) that read it.
+  const stubToHistoryMessageForTopic = (
+    s: { id: string; timeMs: number; qos: number; retain: boolean },
+    topic: string
+  ): MqttHistoryMessage => ({ ...stubToHistoryMessage(s), topic });
+
+  // Fetches and decodes a single message's payload by id, patching it into
+  // `history` in place once it lands. No-ops (returns immediately) if the
+  // stub isn't found, already loaded, or already loading. Does NOT fire a
+  // history delta: the timeline only cares about id/time/flags, which don't
+  // change here. Token-guarded so a stale fetch (user selected another topic
+  // meanwhile) never clobbers newer state.
+  const ensurePayload = async (id: string): Promise<void> => {
+    const store = get({ subscribe });
+    const topic = store.selectedTopic;
+    if (topic === null) return;
+    const index = store.history.findIndex((m) => m.id === id);
+    if (index === -1) return;
+    const target = store.history[index];
+    if (target.payloadState === "loaded" || target.payloadState === "loading") {
+      return;
+    }
+
+    const token = requestToken;
+    update((s) => {
+      const history = s.history.slice();
+      const i = history.findIndex((m) => m.id === id);
+      if (i === -1) return s;
+      history[i] = { ...history[i], payloadState: "loading" };
+      return { ...s, history };
+    });
+
+    try {
+      let found: boolean;
+      let full: mqtt.MqttMessage | null = null;
+      if (store.historySource === "disk") {
+        const numeric = numericId(id);
+        const [msg, isFound] = await GetReceivedMessageById(
+          store.connectionId,
+          topic,
+          numeric
+        );
+        found = isFound;
+        full = msg;
+      } else {
+        const [msg, isFound] = await GetMessageById(
+          store.connectionId,
+          topic,
+          id
+        );
+        found = isFound;
+        full = msg;
+      }
+      if (isStale(token, topic)) return;
+
+      update((s) => {
+        const history = s.history.slice();
+        const i = history.findIndex((m) => m.id === id);
+        if (i === -1) return s;
+        if (!found || full === null) {
+          history[i] = { ...history[i], payloadState: "aged-out" };
+        } else {
+          history[i] = decode(full);
+        }
+        return { ...s, history };
+      });
+    } catch {
+      if (isStale(token, topic)) return;
+      update((s) => {
+        const history = s.history.slice();
+        const i = history.findIndex((m) => m.id === id);
+        if (i === -1) return s;
+        history[i] = { ...history[i], payloadState: "aged-out" };
+        return { ...s, history };
+      });
+    }
   };
 
   const windowFromMessages = (
@@ -409,7 +561,7 @@ export const createSelectedTopicStore = (
     const topic = store.selectedTopic;
     const token = requestToken;
     update((s) => ({ ...s, isLoadingWindow: "older" }));
-    const older = await GetReceivedMessageWindow(
+    const olderStubs = await GetReceivedTimelineWindow(
       store.connectionId,
       topic,
       store.window.oldestId,
@@ -417,28 +569,34 @@ export const createSelectedTopicStore = (
       HISTORY_WINDOW_SIZE
     );
     if (isStale(token, topic)) return;
-    const decoded = await decodeChunked(older);
-    if (isStale(token, topic)) return;
+    const older = olderStubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     update((s) => {
-      const history = [...decoded, ...s.history];
+      const history = [...older, ...s.history];
       const window =
         s.window === null
           ? null
           : {
               ...s.window,
               oldestId:
-                decoded.length > 0
-                  ? numericId(decoded[0].id)
-                  : s.window.oldestId,
-              atOldest: decoded.length < HISTORY_WINDOW_SIZE,
+                older.length > 0 ? numericId(older[0].id) : s.window.oldestId,
+              atOldest: older.length < HISTORY_WINDOW_SIZE,
             };
-      return { ...s, history, window, isLoadingWindow: null };
+      // `history` grew with stub-only entries the chart cache doesn't have;
+      // drop the cache so ensureChartHistory re-fetches fresh next render
+      // rather than risk it silently diverging from `history`.
+      return {
+        ...s,
+        history,
+        window,
+        isLoadingWindow: null,
+        chartHistory: older.length > 0 ? null : s.chartHistory,
+      };
     });
     // Re-read the callback: it may have been re-registered while the fetch
-    // and decode above were awaiting (e.g. the timeline rebuilt).
+    // above was awaiting (e.g. the timeline rebuilt).
     const onHistoryDelta = get({ subscribe }).onHistoryDelta;
     if (onHistoryDelta !== null) {
-      onHistoryDelta({ kind: "prepend", messages: decoded });
+      onHistoryDelta({ kind: "prepend", messages: older });
     }
     enforceCap("prepend");
   };
@@ -455,7 +613,7 @@ export const createSelectedTopicStore = (
     const topic = store.selectedTopic;
     const token = requestToken;
     update((s) => ({ ...s, isLoadingWindow: "newer" }));
-    const newer = await GetReceivedMessageWindow(
+    const newerStubs = await GetReceivedTimelineWindow(
       store.connectionId,
       topic,
       0,
@@ -463,7 +621,7 @@ export const createSelectedTopicStore = (
       HISTORY_WINDOW_SIZE
     );
     if (isStale(token, topic)) return;
-    if (newer.length === 0) {
+    if (newerStubs.length === 0) {
       // Already at the latest, just mark the current window live.
       update((s) => ({
         ...s,
@@ -472,26 +630,27 @@ export const createSelectedTopicStore = (
       }));
       return;
     }
-    const decoded = await decodeChunked(newer);
-    if (isStale(token, topic)) return;
+    const newer = newerStubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     const reachedLatest = newer.length < HISTORY_WINDOW_SIZE;
     update((s) => {
-      const history = [...s.history, ...decoded];
+      const history = [...s.history, ...newer];
       const window =
         s.window === null
           ? null
           : {
               ...s.window,
-              newestId: numericId(decoded[decoded.length - 1].id),
+              newestId: numericId(newer[newer.length - 1].id),
               isNewest: reachedLatest,
             };
-      return { ...s, history, window, isLoadingWindow: null };
+      // Same reasoning as loadOlderWindow: stub-only growth the chart cache
+      // doesn't reflect, so drop it and let ensureChartHistory refetch.
+      return { ...s, history, window, isLoadingWindow: null, chartHistory: null };
     });
     // Re-read the callback: it may have been re-registered while the fetch
-    // and decode above were awaiting (e.g. the timeline rebuilt).
+    // above was awaiting (e.g. the timeline rebuilt).
     const onHistoryDelta = get({ subscribe }).onHistoryDelta;
     if (onHistoryDelta !== null) {
-      onHistoryDelta({ kind: "append", messages: decoded });
+      onHistoryDelta({ kind: "append", messages: newer });
     }
     enforceCap("append");
   };
@@ -505,7 +664,7 @@ export const createSelectedTopicStore = (
     // invalidate any in-flight older/newer load: with accumulation, a stale
     // prepend landing after the jump would corrupt the fresh window.
     const token = ++requestToken;
-    const windowMessages = await GetReceivedMessageWindow(
+    const stubs = await GetReceivedTimelineWindow(
       store.connectionId,
       topic,
       0,
@@ -513,15 +672,19 @@ export const createSelectedTopicStore = (
       HISTORY_WINDOW_SIZE
     );
     if (isStale(token, topic)) return;
-    const decoded = await decodeChunked(windowMessages);
-    if (isStale(token, topic)) return;
+    const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     update((s) => ({
       ...s,
-      history: decoded,
-      window: windowFromMessages(decoded, true),
+      history,
+      window: windowFromMessages(history, true),
       historyRevision: s.historyRevision + 1,
       isLoadingWindow: null,
+      // Wholesale replacement: the chart cache no longer matches `history`.
+      chartHistory: null,
+      isLoadingChartHistory: false,
     }));
+    const newest = history[history.length - 1];
+    if (newest) ensurePayload(newest.id);
   };
 
   const deselectTopic = () => {
@@ -535,6 +698,8 @@ export const createSelectedTopicStore = (
       isLoadingHistory: false,
       historyRevision: store.historyRevision + 1,
       isLoadingWindow: null,
+      chartHistory: null,
+      isLoadingChartHistory: false,
       onHistoryDelta: null,
     }));
   };
@@ -559,6 +724,51 @@ export const createSelectedTopicStore = (
     }));
   };
 
+  // Fetches the full-payload window for the CURRENT selection (via the
+  // pre-existing full-message bindings) so the Chart tab can draw a numeric
+  // series across the whole loaded window. This is the one place a busy
+  // topic's payloads are fetched in bulk again, deliberately gated behind
+  // the user opening the Chart tab (or already having chart fields picked),
+  // never behind selecting a topic. No-ops if already loaded or loading, or
+  // if nothing is selected. Token-guarded like every other async load here.
+  const ensureChartHistory = async () => {
+    const store = get({ subscribe });
+    const topic = store.selectedTopic;
+    if (topic === null) return;
+    if (store.chartHistory !== null || store.isLoadingChartHistory) return;
+
+    const token = requestToken;
+    update((s) => ({ ...s, isLoadingChartHistory: true }));
+
+    try {
+      let decoded: MqttHistoryMessage[];
+      if (store.historySource === "disk") {
+        const full = await GetReceivedMessageWindow(
+          store.connectionId,
+          topic,
+          0,
+          0,
+          HISTORY_WINDOW_SIZE
+        );
+        if (isStale(token, topic)) return;
+        decoded = await decodeChunked(full);
+      } else {
+        const full = await GetMessageHistory(
+          store.connectionId,
+          topic,
+          HISTORY_WINDOW_SIZE
+        );
+        if (isStale(token, topic)) return;
+        decoded = await decodeChunked(full);
+      }
+      if (isStale(token, topic)) return;
+      update((s) => ({ ...s, chartHistory: decoded, isLoadingChartHistory: false }));
+    } catch {
+      if (isStale(token, topic)) return;
+      update((s) => ({ ...s, isLoadingChartHistory: false }));
+    }
+  };
+
   return {
     set,
     subscribe,
@@ -571,5 +781,7 @@ export const createSelectedTopicStore = (
     loadOlderWindow,
     loadNewerWindow,
     jumpToLatest,
+    ensurePayload,
+    ensureChartHistory,
   };
 };

@@ -119,3 +119,141 @@ func TestDeleteConnectionCascadesReceivedMessages(t *testing.T) {
 func deleteReceivedForConnTest(app *App, connID uint) error {
 	return app.Db.Where("connection_id = ?", connID).Delete(&models.ReceivedMessage{}).Error
 }
+
+func TestReceivedTimelineWindowPagesStubsNewestFirstInArrivalOrder(t *testing.T) {
+	app := getTestApp(t)
+	conn, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	enableRecording(t, app)
+
+	batch := make([]mqtt.MqttMessage, 0, 25)
+	for i := 0; i < 25; i++ {
+		batch = append(batch, mqtt.MqttMessage{Topic: "seq", Payload: []byte(fmt.Sprintf("%d", i))})
+	}
+	app.recordReceivedMessages(conn.ConnectionDetails.ID, batch)
+
+	win1, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "seq", 0, 0, 10)
+	if err != nil {
+		t.Fatalf("window 1: %v", err)
+	}
+	if len(win1) != 10 {
+		t.Fatalf("expected 10 stubs in newest window, got %d", len(win1))
+	}
+	// Stubs carry no payload; verify ids are ascending arrival order 15..24.
+	var firstID, lastID uint
+	fmt.Sscanf(win1[0].Id, "%d", &firstID)
+	fmt.Sscanf(win1[9].Id, "%d", &lastID)
+	if lastID != firstID+9 {
+		t.Errorf("expected 10 contiguous ascending ids, got %s..%s", win1[0].Id, win1[9].Id)
+	}
+
+	smallestID := win1[0].Id
+	var beforeID uint
+	fmt.Sscanf(smallestID, "%d", &beforeID)
+	win2, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "seq", beforeID, 0, 10)
+	if err != nil {
+		t.Fatalf("window 2: %v", err)
+	}
+	if len(win2) != 10 {
+		t.Fatalf("expected 10 stubs in older window, got %d", len(win2))
+	}
+}
+
+func TestReceivedTimelineWindowCarriesQosAndRetainNoPayload(t *testing.T) {
+	app := getTestApp(t)
+	conn, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	enableRecording(t, app)
+
+	m := mqtt.MqttMessage{Topic: "flags", Payload: []byte("some-payload"), QoS: 2, Retain: true}
+	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
+
+	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "flags", 0, 0, 10)
+	if err != nil || len(win) != 1 {
+		t.Fatalf("window: %v len=%d", err, len(win))
+	}
+	if win[0].QoS != 2 || !win[0].Retain {
+		t.Errorf("expected qos=2 retain=true, got %+v", win[0])
+	}
+}
+
+func TestGetReceivedMessageByIdReturnsFullPayload(t *testing.T) {
+	app := getTestApp(t)
+	conn, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	enableRecording(t, app)
+
+	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
+		{Topic: "p", Payload: []byte("hello world")},
+	})
+
+	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)
+	if err != nil || len(win) != 1 {
+		t.Fatalf("window: %v len=%d", err, len(win))
+	}
+	var id uint
+	fmt.Sscanf(win[0].Id, "%d", &id)
+
+	msg, found, err := app.GetReceivedMessageById(conn.ConnectionDetails.ID, "p", id)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Fatal("expected message to be found")
+	}
+	if string(msg.Payload) != "hello world" {
+		t.Errorf("expected payload %q, got %q", "hello world", msg.Payload)
+	}
+}
+
+func TestGetReceivedMessageByIdNotFoundForMissingRow(t *testing.T) {
+	app := getTestApp(t)
+	conn, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	enableRecording(t, app)
+
+	_, found, err := app.GetReceivedMessageById(conn.ConnectionDetails.ID, "p", 99999)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found {
+		t.Error("expected not found for missing row")
+	}
+}
+
+func TestGetReceivedMessageByIdScopedToTopic(t *testing.T) {
+	app := getTestApp(t)
+	conn, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	enableRecording(t, app)
+
+	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
+		{Topic: "p", Payload: []byte("hello")},
+	})
+	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)
+	if err != nil || len(win) != 1 {
+		t.Fatalf("window: %v len=%d", err, len(win))
+	}
+	var id uint
+	fmt.Sscanf(win[0].Id, "%d", &id)
+
+	// Same id, wrong topic: must report not found rather than leaking a
+	// cross-topic row.
+	_, found, err := app.GetReceivedMessageById(conn.ConnectionDetails.ID, "other-topic", id)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found {
+		t.Error("expected not found when topic does not match")
+	}
+}

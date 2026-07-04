@@ -25,6 +25,13 @@
   export let isComparing: boolean;
   export let payload: string;
   export let payloadLeftForCompare: string | null = null;
+  // True while the previous message's payload is still being fetched
+  // (ensurePayload in flight): distinguishes "loading" from "genuinely no
+  // previous message" (both otherwise look like payloadLeftForCompare===null).
+  export let payloadLeftLoading = false;
+  // True when the previous message existed but its payload aged out of the
+  // backend's retention window before it could be fetched.
+  export let payloadLeftAgedOut = false;
   // Raw base64 payload; when its bytes are an image, a preview is rendered.
   export let payloadB64: string | null = null;
   export let codec: SupportedCodeEditorCodec;
@@ -167,7 +174,13 @@
       {:else if payloadLeftForCompare == null}
         <div class="w-full flex">
           <div class="w-1/2 flex justify-center pt-4 text-secondary-text">
-            No message
+            {#if payloadLeftLoading}
+              Loading message...
+            {:else if payloadLeftAgedOut}
+              Message no longer available
+            {:else}
+              No message
+            {/if}
           </div>
           <div class="w-1/2">
             <CodeEditor text={processedPayload} {format} readOnly />

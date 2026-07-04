@@ -92,6 +92,29 @@ func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.Mq
 	return messageHistory, nil
 }
 
+// GetMessageTimeline returns up to `limit` of the newest retained messages
+// for a topic as lightweight stubs (id, timeMs, qos, retain, no payload).
+// This is the memory-mode counterpart to GetReceivedTimelineWindow: selecting
+// a topic fetches stubs to draw the timeline, then fetches individual
+// payloads on demand via GetMessageById.
+func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.MqttMessageStub, error) {
+	appConnection := a.AppConnections[connId]
+	stubs, err := appConnection.MqttManager.MessageHistory.GetTopicTimelineWindow(topic, limit)
+	if err != nil {
+		return nil, err
+	}
+	return stubs, nil
+}
+
+// GetMessageById fetches a single full message (with its payload) by id from
+// a topic's in-RAM history. found=false (no error) means the message has
+// aged out of the RAM window (evicted by the memory budget), so the frontend
+// can render a graceful "no longer available" state instead of an error.
+func (a *App) GetMessageById(connId uint, topic string, id string) (msg mqtt.MqttMessage, found bool) {
+	appConnection := a.AppConnections[connId]
+	return appConnection.MqttManager.MessageHistory.GetMessageById(topic, id)
+}
+
 func (a *App) ClearConnectionHistory(connId uint) error {
 	appConnection := a.AppConnections[connId]
 	appConnection.MqttManager.ClearConnectionHistory()

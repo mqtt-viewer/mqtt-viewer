@@ -20,6 +20,30 @@ type MqttMessage struct {
 	Time                 time.Time
 }
 
+// MqttMessageStub is the lightweight projection of MqttMessage used to
+// populate the selection timeline: everything the timeline needs to render a
+// dot (id, arrival time, qos/retain flags) but never the payload. Selecting a
+// busy topic (potentially 150k+ stored messages) fetches a bounded window of
+// these instead of full messages, so the bridge never has to serialize tens
+// of MB of payload just to draw dots on a timeline. Payloads are fetched
+// individually, on demand, via GetMessageById/GetMessageTimeline callers.
+type MqttMessageStub struct {
+	Id     string `json:"id"`
+	TimeMs int64  `json:"timeMs"`
+	QoS    byte   `json:"qos"`
+	Retain bool   `json:"retain"`
+}
+
+// Stub projects a full message down to its timeline stub.
+func (m *MqttMessage) Stub() MqttMessageStub {
+	return MqttMessageStub{
+		Id:     m.Id,
+		TimeMs: m.TimeMs,
+		QoS:    m.QoS,
+		Retain: m.Retain,
+	}
+}
+
 // estimatedBytes approximates the heap cost of retaining this message, used to
 // keep the in-memory history under its byte budget. It need not be exact —
 // just proportional and dominated by the variable parts (payload, topic,

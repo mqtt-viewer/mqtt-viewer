@@ -130,6 +130,55 @@ func (m *MessageHistory) GetTopicHistoryWindow(topic string, limit int) ([]MqttM
 	return result, nil
 }
 
+// GetTopicTimelineWindow returns up to `limit` of the NEWEST retained
+// messages for a topic as lightweight stubs (no payload), in arrival order
+// (limit <= 0 means no limit). Mirrors GetTopicHistoryWindow's backwards scan
+// so the timeline can render a busy topic's dots without paying to
+// serialize its payloads across the bridge.
+func (m *MessageHistory) GetTopicTimelineWindow(topic string, limit int) ([]MqttMessageStub, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	result := make([]MqttMessageStub, 0, 16)
+	for i := len(m.recent) - 1; i >= m.head; i-- {
+		if m.recent[i].Topic == topic {
+			result = append(result, m.recent[i].Stub())
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+	}
+	// collected newest-first; flip to arrival order
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
+	}
+	if len(result) == 0 {
+		if latest, ok := m.latest[topic]; ok {
+			return []MqttMessageStub{latest.Stub()}, nil
+		}
+		return nil, fmt.Errorf("topic not found in message history")
+	}
+	return result, nil
+}
+
+// GetMessageById looks up a single message by id within a topic's retained
+// RAM window. Linear scan is fine here: this only runs at click time for one
+// message, never for the whole history. Returns found=false (no error) when
+// the id has aged out of the recent window rather than treating it as a
+// failure, so the frontend can render a graceful "no longer available" state.
+func (m *MessageHistory) GetMessageById(topic string, id string) (msg MqttMessage, found bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	for i := len(m.recent) - 1; i >= m.head; i-- {
+		if m.recent[i].Topic == topic && m.recent[i].Id == id {
+			return *m.recent[i], true
+		}
+	}
+	if latest, ok := m.latest[topic]; ok && latest.Id == id {
+		return *latest, true
+	}
+	return MqttMessage{}, false
+}
+
 // GetAllHistory returns a per-topic copy of the retained window, including the
 // latest value of any topic whose messages have fully aged out.
 func (m *MessageHistory) GetAllHistory() map[string][]MqttMessage {

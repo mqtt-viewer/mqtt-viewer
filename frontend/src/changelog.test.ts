@@ -49,9 +49,17 @@ describe("released / unreleased split", () => {
       expect(e.released).toBe(true);
       expect(e.version).toMatch(/^\d+\.\d+\.\d+$/);
     }
-    // 1.0.0 comes before 0.7.0 in the list.
+    // Newest first: each entry's semver is >= the one after it. (Previously
+    // asserted 1.0.0 sits before 0.7.0 specifically, which broke when the
+    // 0.7.0 entry was removed from the changelog.)
+    const toParts = (v: string) => v.split(".").map(Number);
     const versions = released.map((e) => e.version);
-    expect(versions.indexOf("1.0.0")).toBeLessThan(versions.indexOf("0.7.0"));
+    for (let i = 0; i < versions.length - 1; i++) {
+      const [a, b] = [toParts(versions[i]), toParts(versions[i + 1])];
+      const cmp =
+        a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+      expect(cmp).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it("has at most one unreleased staging entry, flagged not-released", () => {

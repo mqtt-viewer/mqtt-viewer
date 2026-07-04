@@ -72,9 +72,17 @@
           selectedMessageIndex
         ] as MqttHistoryMessage)
       : null;
-  $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
+  $: selectedMessagePayloadState = selectedMessage?.payloadState ?? null;
+  $: selectedMessagePayload = selectedMessage?.payload ?? null;
   $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
+
+  // history[] only carries stubs until fetched. Ensure the selected
+  // message's payload as soon as it's picked (timeline click or
+  // auto-select-latest). Cheap/no-op if already loaded or in flight.
+  $: if (selectedMessageId !== null) {
+    selectedTopicStore.ensurePayload(selectedMessageId);
+  }
 
   $: selectedMessagePayload,
     (() => {
@@ -105,7 +113,22 @@
       ? $selectedTopicStore.history[previousMessageIndex]
       : null;
   $: prevMessageRetained = previousMessage?.retain ?? false;
-  $: previousMessagePayload = previousMessage?.payload.toString() ?? null;
+  $: previousMessagePayloadState = previousMessage?.payloadState ?? null;
+  $: previousMessagePayload = previousMessage?.payload ?? null;
+  // Distinguishes "previous message exists but its payload hasn't landed
+  // yet" from "there genuinely is no previous message" for PayloadTab's
+  // compare view (both otherwise present as payload === null).
+  $: previousMessageLoading =
+    previousMessage !== null &&
+    previousMessagePayloadState !== "loaded" &&
+    previousMessagePayloadState !== "aged-out";
+  $: previousMessageAgedOut = previousMessagePayloadState === "aged-out";
+
+  // Compare mode needs the previous message's payload too, still only ever
+  // 1-2 messages fetched, never the whole history.
+  $: if (isComparing && previousMessage !== null) {
+    selectedTopicStore.ensurePayload(previousMessage.id);
+  }
 
   // Windowed durable history (recording on): older/newer/latest navigation.
   $: isDiskHistory = $selectedTopicStore.historySource === "disk";
@@ -254,7 +277,11 @@
         tabs={[{ title: "Payload" }, { title: "Chart" }]}
       >
         <div slot="tab-1" class="size-full pt-2">
-          {#if selectedMessagePayload !== null}
+          {#if selectedMessagePayloadState === "aged-out"}
+            <div class="mt-12 flex justify-center text-secondary-text">
+              Message no longer available
+            </div>
+          {:else if selectedMessagePayload !== null}
             <PayloadTab
               bind:codec={$selectedTopicStore.options.decoding}
               bind:format={$selectedTopicStore.options.format}
@@ -263,9 +290,15 @@
               payload={selectedMessagePayload}
               payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
+              payloadLeftLoading={previousMessageLoading}
+              payloadLeftAgedOut={previousMessageAgedOut}
               {chartSeriesStore}
               onViewChart={viewChart}
             />
+          {:else}
+            <div class="mt-12 flex justify-center text-secondary-text">
+              Loading message...
+            </div>
           {/if}
         </div>
         <div slot="tab-2" class="size-full pt-2">
@@ -275,6 +308,7 @@
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
+            isActive={isChartTabActive}
           />
         </div>
       </Tabs>
@@ -291,7 +325,11 @@
         ]}
       >
         <div slot="tab-1" class="size-full pt-2">
-          {#if selectedMessagePayload !== null}
+          {#if selectedMessagePayloadState === "aged-out"}
+            <div class="mt-12 flex justify-center text-secondary-text">
+              Message no longer available
+            </div>
+          {:else if selectedMessagePayload !== null}
             <PayloadTab
               bind:codec={$selectedTopicStore.options.decoding}
               bind:format={$selectedTopicStore.options.format}
@@ -300,9 +338,15 @@
               payload={selectedMessagePayload}
               payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
+              payloadLeftLoading={previousMessageLoading}
+              payloadLeftAgedOut={previousMessageAgedOut}
               {chartSeriesStore}
               onViewChart={viewChart}
             />
+          {:else}
+            <div class="mt-12 flex justify-center text-secondary-text">
+              Loading message...
+            </div>
           {/if}
         </div>
         <div slot="tab-2" class="size-full pt-2">
@@ -331,6 +375,7 @@
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
+            isActive={isChartTabActive}
           />
         </div>
       </Tabs>

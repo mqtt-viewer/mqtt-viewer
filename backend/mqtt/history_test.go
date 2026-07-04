@@ -197,3 +197,133 @@ func TestTopicHistoryWindowZeroLimitReturnsAll(t *testing.T) {
 		t.Errorf("expected all 25 messages, got %d", len(got))
 	}
 }
+
+func TestTopicTimelineWindowReturnsStubsNewestInOrder(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	for i := 0; i < 30; i++ {
+		m := msg("w/t", 10)
+		m.TimeMs = int64(i)
+		h.addMessageToHistory(m)
+		// interleave other-topic traffic so the backward scan must skip
+		h.addMessageToHistory(msg("other", 10))
+	}
+
+	got, err := h.GetTopicTimelineWindow("w/t", 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 10 {
+		t.Fatalf("expected 10 stubs, got %d", len(got))
+	}
+	// newest 10 (TimeMs 20..29) in arrival order
+	for i, m := range got {
+		if m.TimeMs != int64(20+i) {
+			t.Errorf("index %d: expected TimeMs %d, got %d", i, 20+i, m.TimeMs)
+		}
+	}
+}
+
+func TestTopicTimelineWindowFallsBackToLatestWhenAgedOut(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	h.SetBudgetBytes(int64(perMsg * 3))
+
+	h.addMessageToHistory(msg("low/traffic", 1024))
+	for i := 0; i < 20; i++ {
+		h.addMessageToHistory(msg("busy/topic", 1024))
+	}
+
+	got, err := h.GetTopicTimelineWindow("low/traffic", 10)
+	if err != nil {
+		t.Fatalf("expected latest-per-topic fallback, got error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("expected 1 latest stub for low/traffic, got %+v", got)
+	}
+}
+
+func TestTopicTimelineWindowUnknownTopic(t *testing.T) {
+	h := newMessageHistory()
+	if _, err := h.GetTopicTimelineWindow("nope", 10); err == nil {
+		t.Error("expected error for unknown topic")
+	}
+}
+
+func TestGetMessageByIdFindsMessageInWindow(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	m := msg("find/me", 10)
+	m.Id = "target-id"
+	h.addMessageToHistory(m)
+	for i := 0; i < 5; i++ {
+		h.addMessageToHistory(msg("other", 10))
+	}
+
+	got, found := h.GetMessageById("find/me", "target-id")
+	if !found {
+		t.Fatal("expected message to be found")
+	}
+	if got.Id != "target-id" || got.Topic != "find/me" {
+		t.Errorf("unexpected message returned: %+v", got)
+	}
+}
+
+func TestGetMessageByIdFindsAgedOutMessageViaLatestFallback(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	h.SetBudgetBytes(int64(perMsg * 3))
+
+	m := msg("low/traffic", 1024)
+	m.Id = "aged-out-id"
+	h.addMessageToHistory(m)
+	for i := 0; i < 20; i++ {
+		h.addMessageToHistory(msg("busy/topic", 1024))
+	}
+
+	// The message's content aged out of the recent ring, but it's still the
+	// latest value recorded for its topic, so it must still be found.
+	got, found := h.GetMessageById("low/traffic", "aged-out-id")
+	if !found {
+		t.Fatal("expected aged-out message to be found via latest fallback")
+	}
+	if got.Id != "aged-out-id" {
+		t.Errorf("unexpected message returned: %+v", got)
+	}
+}
+
+func TestGetMessageByIdReportsNotFoundWhenSupersededAndAgedOut(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	h.SetBudgetBytes(int64(perMsg * 3))
+
+	m := msg("low/traffic", 1024)
+	m.Id = "superseded-id"
+	h.addMessageToHistory(m)
+	// A newer message on the same topic replaces the latest pointer, and
+	// enough other traffic follows to push both out of the recent ring.
+	newer := msg("low/traffic", 1024)
+	newer.Id = "current-id"
+	h.addMessageToHistory(newer)
+	for i := 0; i < 20; i++ {
+		h.addMessageToHistory(msg("busy/topic", 1024))
+	}
+
+	_, found := h.GetMessageById("low/traffic", "superseded-id")
+	if found {
+		t.Error("expected superseded, aged-out message to not be found")
+	}
+}
+
+func TestGetMessageByIdUnknownTopicOrId(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.addMessageToHistory(msg("a/b", 10))
+
+	if _, found := h.GetMessageById("a/b", "no-such-id"); found {
+		t.Error("expected not found for unknown id")
+	}
+	if _, found := h.GetMessageById("nope", "no-such-id"); found {
+		t.Error("expected not found for unknown topic")
+	}
+}

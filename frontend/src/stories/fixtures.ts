@@ -237,6 +237,7 @@ export const createMockSelectedTopicStore = () => {
           ? '{"temp":21.4,"unit":"C"}'
           : '{"humidity":42.8}',
       payloadB64: message.payload,
+      payloadState: "loaded",
     })) as any,
     historySource: "memory",
     window: null,
@@ -244,6 +245,8 @@ export const createMockSelectedTopicStore = () => {
     isLoadingHistory: false,
     historyRevision: 0,
     isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
     options: {
       autoSelect: true,
       compare: true,
@@ -269,6 +272,7 @@ const buildBusyHistory = (count: number, spanMs: number, endMs: number) => {
       topic: "factory/line/temperature",
       payload,
       payloadB64: btoa(payload),
+      payloadState: "loaded",
       qos: 0,
       retain: false,
       properties: undefined,
@@ -316,6 +320,8 @@ export const createBusyMockSelectedTopicStore = (
     isLoadingHistory: false,
     historyRevision: 0,
     isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
     options: {
       autoSelect: true,
       compare: true,
@@ -341,6 +347,7 @@ export const createBusyMockSelectedTopicStore = (
           topic: "factory/line/temperature",
           payload,
           payloadB64: btoa(payload),
+          payloadState: "loaded",
           qos: 0,
           retain: false,
           properties: undefined,

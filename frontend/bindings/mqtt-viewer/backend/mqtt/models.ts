@@ -158,6 +158,48 @@ export class MqttMessage {
     }
 }
 
+/**
+ * MqttMessageStub is the lightweight projection of MqttMessage used to
+ * populate the selection timeline: everything the timeline needs to render a
+ * dot (id, arrival time, qos/retain flags) but never the payload. Selecting a
+ * busy topic (potentially 150k+ stored messages) fetches a bounded window of
+ * these instead of full messages, so the bridge never has to serialize tens
+ * of MB of payload just to draw dots on a timeline. Payloads are fetched
+ * individually, on demand, via GetMessageById/GetMessageTimeline callers.
+ */
+export class MqttMessageStub {
+    "id": string;
+    "timeMs": number;
+    "qos": number;
+    "retain": boolean;
+
+    /** Creates a new MqttMessageStub instance. */
+    constructor($$source: Partial<MqttMessageStub> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("timeMs" in $$source)) {
+            this["timeMs"] = 0;
+        }
+        if (!("qos" in $$source)) {
+            this["qos"] = 0;
+        }
+        if (!("retain" in $$source)) {
+            this["retain"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MqttMessageStub instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MqttMessageStub {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MqttMessageStub($$parsedSource as Partial<MqttMessageStub>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Map($Create.Any, $Create.Any);
 const $$createType1 = MessageProperties.createFrom;

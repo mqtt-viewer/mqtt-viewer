@@ -248,6 +248,22 @@ export function GetMatchingSubscriptionForTopic(connId: number, topic: string): 
 }
 
 /**
+ * GetMessageById fetches a single full message (with its payload) by id from
+ * a topic's in-RAM history. found=false (no error) means the message has
+ * aged out of the RAM window (evicted by the memory budget), so the frontend
+ * can render a graceful "no longer available" state instead of an error.
+ */
+export function GetMessageById(connId: number, topic: string, id: string): Promise<[mqtt$0.MqttMessage, boolean]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2592571623, connId, topic, id) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        $result[0] = $$createType14($result[0]);
+        return $result;
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
  * GetMessageHistory returns up to `limit` of the newest retained messages for
  * a topic (limit <= 0 returns everything). The UI passes its window size:
  * returning a busy topic's entire RAM history serializes an unbounded JSON
@@ -263,10 +279,26 @@ export function GetMessageHistory(connId: number, topic: string, limit: number):
     return $typingPromise;
 }
 
+/**
+ * GetMessageTimeline returns up to `limit` of the newest retained messages
+ * for a topic as lightweight stubs (id, timeMs, qos, retain, no payload).
+ * This is the memory-mode counterpart to GetReceivedTimelineWindow: selecting
+ * a topic fetches stubs to draw the timeline, then fetches individual
+ * payloads on demand via GetMessageById.
+ */
+export function GetMessageTimeline(connId: number, topic: string, limit: number): Promise<mqtt$0.MqttMessageStub[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3329510004, connId, topic, limit) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType17($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function GetMqttStats(): Promise<$models.MqttStats> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2888945465) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType16($result);
+        return $$createType18($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -275,7 +307,7 @@ export function GetMqttStats(): Promise<$models.MqttStats> & { cancel(): void } 
 export function GetPanelSizes(): Promise<models$0.PanelSize[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3836927596) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType18($result);
+        return $$createType20($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -284,7 +316,24 @@ export function GetPanelSizes(): Promise<models$0.PanelSize[]> & { cancel(): voi
 export function GetPublishHistoriesForConnection(connectionID: number): Promise<models$0.PublishHistory[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3102818020, connectionID) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType20($result);
+        return $$createType22($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * GetReceivedMessageById fetches a single durable message (with its full
+ * payload) by numeric row id, scoped to the connection/topic. Used for the
+ * on-demand payload fetch when a timeline stub is selected or clicked.
+ * found=false (no error) means the row no longer exists (e.g. pruned), so the
+ * frontend can render a graceful "no longer available" state.
+ */
+export function GetReceivedMessageById(connectionID: number, topic: string, id: number): Promise<[mqtt$0.MqttMessage, boolean]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2888436030, connectionID, topic, id) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        $result[0] = $$createType14($result[0]);
+        return $result;
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -319,10 +368,27 @@ export function GetReceivedMessageWindow(connectionID: number, topic: string, be
     return $typingPromise;
 }
 
+/**
+ * GetReceivedTimelineWindow mirrors GetReceivedMessageWindow's keyset paging
+ * (same beforeID/afterID/limit semantics) but selects only the stub columns
+ * (id, timeMs, qos, retain), never the payload. This is what the timeline
+ * pages through when browsing a busy topic's durable history: a window of
+ * 5000 stubs is a few hundred KB at most, versus potentially tens of MB if
+ * every row's payload were included.
+ */
+export function GetReceivedTimelineWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): Promise<mqtt$0.MqttMessageStub[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3455009092, connectionID, topic, beforeID, afterID, limit) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType17($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function GetSortStates(): Promise<models$0.SortState[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2748919454) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType22($result);
+        return $$createType24($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -331,7 +397,7 @@ export function GetSortStates(): Promise<models$0.SortState[]> & { cancel(): voi
 export function LoadOpenTabs(): Promise<models$0.Tab[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2526018972) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType24($result);
+        return $$createType26($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -349,7 +415,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): P
 export function NewConnection(): Promise<$models.Connection | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3098702478) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType26($result);
+        return $$createType28($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -409,7 +475,7 @@ export function SaveFilterHistoryEntry(connectionId: number, text: string): Prom
 export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): Promise<models$0.PublishHistory> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3794014424, params) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType19($result);
+        return $$createType21($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -488,14 +554,16 @@ const $$createType12 = models$0.FilterHistory.createFrom;
 const $$createType13 = $Create.Array($$createType12);
 const $$createType14 = mqtt$0.MqttMessage.createFrom;
 const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = $models.MqttStats.createFrom;
-const $$createType17 = models$0.PanelSize.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = models$0.PublishHistory.createFrom;
+const $$createType16 = mqtt$0.MqttMessageStub.createFrom;
+const $$createType17 = $Create.Array($$createType16);
+const $$createType18 = $models.MqttStats.createFrom;
+const $$createType19 = models$0.PanelSize.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = models$0.SortState.createFrom;
+const $$createType21 = models$0.PublishHistory.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = models$0.Tab.createFrom;
+const $$createType23 = models$0.SortState.createFrom;
 const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = $models.Connection.createFrom;
-const $$createType26 = $Create.Nullable($$createType25);
+const $$createType25 = models$0.Tab.createFrom;
+const $$createType26 = $Create.Array($$createType25);
+const $$createType27 = $models.Connection.createFrom;
+const $$createType28 = $Create.Nullable($$createType27);

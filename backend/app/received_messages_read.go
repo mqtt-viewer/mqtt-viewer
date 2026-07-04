@@ -2,9 +2,12 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
 	"strconv"
+
+	"gorm.io/gorm"
 )
 
 // DefaultReceivedMessageWindow is the page size for timeline windowing.
@@ -63,9 +66,76 @@ func (a *App) GetReceivedMessageCount(connectionID uint, topic string) (int64, e
 	return count, err
 }
 
+// GetReceivedTimelineWindow mirrors GetReceivedMessageWindow's keyset paging
+// (same beforeID/afterID/limit semantics) but selects only the stub columns
+// (id, timeMs, qos, retain), never the payload. This is what the timeline
+// pages through when browsing a busy topic's durable history: a window of
+// 5000 stubs is a few hundred KB at most, versus potentially tens of MB if
+// every row's payload were included.
+func (a *App) GetReceivedTimelineWindow(connectionID uint, topic string, beforeID uint, afterID uint, limit int) ([]mqtt.MqttMessageStub, error) {
+	if limit <= 0 {
+		limit = DefaultReceivedMessageWindow
+	}
+	query := a.Db.Model(&models.ReceivedMessage{}).
+		Select("id", "qo_s", "retain", "received_at").
+		Where("connection_id = ? AND topic = ?", connectionID, topic)
+
+	if afterID > 0 {
+		var rows []models.ReceivedMessage
+		if err := query.Where("id > ?", afterID).Order("id asc").Limit(limit).Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		out := make([]mqtt.MqttMessageStub, len(rows))
+		for i := range rows {
+			out[i] = stubFromReceived(&rows[i])
+		}
+		return out, nil
+	}
+
+	if beforeID > 0 {
+		query = query.Where("id < ?", beforeID)
+	}
+	var rows []models.ReceivedMessage
+	if err := query.Order("id desc").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	// Newest-first from the query; reverse to arrival order for the timeline.
+	out := make([]mqtt.MqttMessageStub, len(rows))
+	for i := range rows {
+		out[len(rows)-1-i] = stubFromReceived(&rows[i])
+	}
+	return out, nil
+}
+
+// GetReceivedMessageById fetches a single durable message (with its full
+// payload) by numeric row id, scoped to the connection/topic. Used for the
+// on-demand payload fetch when a timeline stub is selected or clicked.
+// found=false (no error) means the row no longer exists (e.g. pruned), so the
+// frontend can render a graceful "no longer available" state.
+func (a *App) GetReceivedMessageById(connectionID uint, topic string, id uint) (msg mqtt.MqttMessage, found bool, err error) {
+	var row models.ReceivedMessage
+	dbErr := a.Db.Where("connection_id = ? AND topic = ? AND id = ?", connectionID, topic, id).First(&row).Error
+	if dbErr != nil {
+		if errors.Is(dbErr, gorm.ErrRecordNotFound) {
+			return mqtt.MqttMessage{}, false, nil
+		}
+		return mqtt.MqttMessage{}, false, dbErr
+	}
+	return mqttMessageFromReceived(&row), true, nil
+}
+
 // GetDatabaseSizeBytes reports the live database size (for the settings readout).
 func (a *App) GetDatabaseSizeBytes() (int64, error) {
 	return a.usedBytes()
+}
+
+func stubFromReceived(row *models.ReceivedMessage) mqtt.MqttMessageStub {
+	return mqtt.MqttMessageStub{
+		Id:     strconv.FormatUint(uint64(row.ID), 10),
+		TimeMs: row.ReceivedAt.UnixMilli(),
+		QoS:    byte(row.QoS),
+		Retain: row.Retain,
+	}
 }
 
 func mqttMessageFromReceived(row *models.ReceivedMessage) mqtt.MqttMessage {

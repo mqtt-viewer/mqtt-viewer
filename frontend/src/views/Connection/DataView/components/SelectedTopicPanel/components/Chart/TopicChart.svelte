@@ -15,6 +15,12 @@
   export let showPoints = true;
   // 0 = all history; otherwise show only the last N minutes.
   export let windowMinutes = 0;
+  // True once the Chart tab is genuinely the visible tab. This component is
+  // always mounted (Tabs.svelte renders every panel, hiding inactive ones),
+  // so this is the actual gate on fetching every payload. Defaults to true
+  // so callers that don't pass it (e.g. existing stories/fixtures) keep their
+  // previous always-render behaviour.
+  export let isActive = true;
 
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
@@ -27,6 +33,7 @@
   const seriesData = (history: MqttHistoryMessage[], path: string) => {
     const points: [number, number][] = [];
     for (const m of history) {
+      if (m.payload === null) continue;
       const value = valueAtPath(m.payload, path);
       if (value !== null) points.push([m.timeMs, value]);
     }
@@ -86,23 +93,42 @@
     };
   };
 
+  // The chart needs every message's payload to plot a series across time,
+  // unlike the rest of the panel which only ever needs one or two messages'
+  // payloads. `history` itself only carries stubs (see selected-topic-store),
+  // so this reads the store's separate full-payload chartHistory cache
+  // instead, populated on demand by ensureChartHistory below. Falls back to
+  // `history` when chartHistory hasn't been requested yet. This also keeps
+  // Storybook fixtures (which set `history` directly with payloads already
+  // present, and never populate chartHistory) working unchanged.
+  $: chartData = $selectedTopicStore.chartHistory ?? $selectedTopicStore.history;
+
   const render = () => {
     if (!chart || paused) return;
     chart.setOption(
-      buildOption($selectedTopicStore.history, $chartSeriesStore),
+      buildOption(chartData, $chartSeriesStore),
       { replaceMerge: ["series"] }
     );
   };
 
   // Re-render on new history, series add/remove/visibility, or option change,
   // unless paused.
-  $: $selectedTopicStore.history,
+  $: chartData,
     $chartSeriesStore,
     style,
     showPoints,
     windowMinutes,
     paused,
     render();
+
+  // This component is always mounted, even behind an inactive tab (Tabs.svelte
+  // renders every panel), so it must not fetch every payload just because it
+  // exists. Only once the Chart tab is genuinely visible does the full
+  // window actually get read. ensureChartHistory itself no-ops once loaded
+  // or already loading, so this is cheap to re-evaluate.
+  $: if (isActive) {
+    selectedTopicStore.ensureChartHistory();
+  }
 
   // Keep the ticker running only while a finite, unpaused window is shown.
   const syncWindowTick = () => {
