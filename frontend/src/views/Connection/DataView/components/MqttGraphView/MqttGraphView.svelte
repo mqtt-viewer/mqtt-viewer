@@ -328,7 +328,10 @@
     // seed the "already synced" state so the reactive sync below doesn't treat
     // this initial mount value as an external change and zoom on load
     lastSyncedTopic = $selectedTopicStore.selectedTopic;
-    renderer.fitView();
+    // skip the whole-tree fit if the seed was already big enough to trigger
+    // the one-shot initial view (top rows of sort order) — fitView() here
+    // would otherwise immediately zoom back out to the illegible whole tree
+    if (!renderer.hasAppliedInitialView()) renderer.fitView();
 
     unsubSource = (messageSource ?? wailsSource).subscribe(
       (msgs) => {
@@ -373,7 +376,7 @@
         renderer.endResize(cw, ch);
         if (!everSized) {
           everSized = true;
-          renderer.fitView();
+          if (!renderer.hasAppliedInitialView()) renderer.fitView();
         }
       }, 150);
     });

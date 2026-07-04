@@ -90,17 +90,36 @@ func (m *MessageHistory) evictLocked() {
 	}
 }
 
-// GetTopicHistory returns the retained messages for a topic in arrival order.
-// If the topic's messages have all aged out of the recent window, its latest
-// value is still returned so a tree-click is never empty.
+// GetTopicHistory returns every retained message for a topic in arrival
+// order. Unbounded: only for paths that genuinely need the full window (e.g.
+// export). UI paths must use GetTopicHistoryWindow — copying a busy topic's
+// entire history while holding the mutex stalls every concurrent receive.
 func (m *MessageHistory) GetTopicHistory(topic string) ([]MqttMessage, error) {
+	return m.GetTopicHistoryWindow(topic, 0)
+}
+
+// GetTopicHistoryWindow returns up to `limit` of the NEWEST retained messages
+// for a topic, in arrival order (limit <= 0 means no limit). The scan runs
+// backwards from the newest message and short-circuits once `limit` matches
+// are found, so for a busy topic it touches only the tail of the window
+// instead of every retained message. If the topic's messages have all aged
+// out of the recent window, its latest value is still returned so a
+// tree-click is never empty.
+func (m *MessageHistory) GetTopicHistoryWindow(topic string, limit int) ([]MqttMessage, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	result := make([]MqttMessage, 0, 16)
-	for i := m.head; i < len(m.recent); i++ {
+	for i := len(m.recent) - 1; i >= m.head; i-- {
 		if m.recent[i].Topic == topic {
 			result = append(result, *m.recent[i])
+			if limit > 0 && len(result) >= limit {
+				break
+			}
 		}
+	}
+	// collected newest-first; flip to arrival order
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
 	}
 	if len(result) == 0 {
 		if latest, ok := m.latest[topic]; ok {

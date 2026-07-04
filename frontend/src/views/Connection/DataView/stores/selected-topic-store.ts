@@ -211,11 +211,12 @@ export const createSelectedTopicStore = (
       if (store.onHistoryDelta !== null) {
         store.onHistoryDelta({ kind: "append", messages: decoded });
       }
-      // Memory mode's RAM history is already bounded by the backend budget;
-      // only disk mode needs the frontend cap enforced here.
-      if (store.historySource === "disk") {
-        enforceCap("append");
-      }
+      // The backend RAM budget bounds the backend's own history, but the
+      // frontend's loaded `history` array still grows without bound for a
+      // long-open panel on a busy topic in either mode, so enforce the cap
+      // here for both. enforceCap already handles window === null (memory
+      // mode) correctly.
+      enforceCap("append");
     });
     const offClear = Events.On(connectionEventSet.mqttClearHistory, () => {
       requestToken++;
@@ -358,8 +359,15 @@ export const createSelectedTopicStore = (
       return;
     }
 
-    // Memory mode: the in-RAM history is already bounded by the memory budget.
-    const history = await GetMessageHistory(connectionId, topic);
+    // Memory mode: the in-RAM history is already bounded by the memory budget,
+    // but we still cap what we pull across the bridge to HISTORY_WINDOW_SIZE
+    // so a busy topic's full RAM history doesn't serialize as one unbounded
+    // blob.
+    const history = await GetMessageHistory(
+      connectionId,
+      topic,
+      HISTORY_WINDOW_SIZE
+    );
     if (isStale(token, topic)) return;
     const decoded = await decodeChunked(history);
     if (isStale(token, topic)) return;

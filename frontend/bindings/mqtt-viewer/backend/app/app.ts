@@ -234,8 +234,15 @@ export function GetMatchingSubscriptionForTopic(connId: number, topic: string): 
     return $typingPromise;
 }
 
-export function GetMessageHistory(connId: number, topic: string): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3700437937, connId, topic) as any;
+/**
+ * GetMessageHistory returns up to `limit` of the newest retained messages for
+ * a topic (limit <= 0 returns everything). The UI passes its window size:
+ * returning a busy topic's entire RAM history serializes an unbounded JSON
+ * blob across the webview bridge, which crashed the app on huge
+ * public-broker topics.
+ */
+export function GetMessageHistory(connId: number, topic: string, limit: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3700437937, connId, topic, limit) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType15($result);
     }) as any;

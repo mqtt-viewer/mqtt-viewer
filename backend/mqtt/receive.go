@@ -2,11 +2,12 @@ package mqtt
 
 import (
 	"fmt"
-	"log/slog"
 )
 
+// receiveMessage runs on every incoming message; keep it log-free. A debug
+// line here means thousands of formatted log writes per second on a busy
+// broker, which alone lags the app in dev mode.
 func (mm *MqttManager) receiveMessage(m *MqttMessage) error {
-	slog.DebugContext(mm.ctx, "received message", slog.String("topic", m.Topic))
 	err := handleReceiveMiddleware(m, mm.middleware.BeforeAddToHistory)
 	if err != nil {
 		return fmt.Errorf("before add to history: %w", err)

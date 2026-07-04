@@ -20,7 +20,7 @@ import {
   tintForAge,
   type RGB,
 } from "./cooldown";
-import { layoutTopicTree, type SortKey } from "./tidy-layout";
+import { layoutTopicTree, type LayoutResult, type SortKey } from "./tidy-layout";
 import { TopicModel, TopicNode } from "./topic-model";
 
 const TEX_R = 64; // circle texture radius; sprites scale down from this
@@ -182,6 +182,17 @@ export class TopicGraphRenderer {
   private lastTopologySig = "";
   private contentW = 0;
   private contentH = 0;
+  // One-shot "initial fit" — see applyInitialView(). Set true either once the
+  // fit has actually run, or as soon as the user pans/zooms (so a slow broker
+  // that only crosses INITIAL_VIEW_MIN_NODES after the user already started
+  // interacting doesn't yank the viewport out from under them).
+  private initialViewApplied = false;
+  // rows of the laid-out tree to fit on first meaningful layout
+  private readonly INITIAL_VIEW_ROWS = 25;
+  // minimum node count before the initial fit is worth doing at all — below
+  // this the whole tree already fits legibly, so fitView()'s default framing
+  // (called from onMount) is fine and there's nothing to "cancel" here.
+  private readonly INITIAL_VIEW_MIN_NODES = 10;
 
   constructor(model: TopicModel, cb: GraphCallbacks = {}, opts: GraphOptions = {}) {
     this.model = model;
@@ -325,6 +336,7 @@ export class TopicGraphRenderer {
       (e: WheelEvent) => {
         e.preventDefault();
         this.viewAnim = null;
+        this.initialViewApplied = true; // user zoomed: never auto-fit again
         const rect = canvas.getBoundingClientRect();
         const px = e.clientX - rect.left;
         const py = e.clientY - rect.top;
@@ -361,6 +373,7 @@ export class TopicGraphRenderer {
       if (Math.abs(dx) + Math.abs(dy) > 2) {
         this.dragMoved = true;
         this.viewAnim = null;
+        this.initialViewApplied = true; // user panned: never auto-fit again
       }
       this.world.position.x += dx;
       this.world.position.y += dy;
@@ -390,6 +403,15 @@ export class TopicGraphRenderer {
   // Snapshot for the dev harness FPS overlay / perf instrumentation.
   getPerfCounts(): { placedNodes: number; visibleNodes: number } {
     return { placedNodes: this.visuals.size, visibleNodes: this.visibleNodeCount };
+  }
+
+  // True once the one-shot initial fit (top rows of sort order) has run, or
+  // once the user has panned/zoomed. Callers use this to skip a redundant
+  // automatic fitView() (whole-tree fit) that would otherwise immediately
+  // undo the initial fit right after mount — an explicit, user-invoked
+  // fitView() call (e.g. the toolbar button) should never consult this.
+  hasAppliedInitialView(): boolean {
+    return this.initialViewApplied;
   }
 
   // Fit the current content into the viewport, top-aligned below `topMargin`.
@@ -502,6 +524,59 @@ export class TopicGraphRenderer {
       this.edgesDirty = true;
       this.lastMinimapDrawMs = 0;
     }
+
+    this.applyInitialView(res);
+  }
+
+  // One-shot: on the first relayout where the tree has grown past a trivial
+  // size, frame the viewport on the top INITIAL_VIEW_ROWS rows of the current
+  // sort order (rather than fitView()'s whole-tree fit, which on a big broker
+  // is a useless, illegibly-zoomed-out vertical line). "Top of sort order" is
+  // the smallest-y rows of the laid-out tree — the layout is a vertical tidy
+  // tree, so y is breadth position and lower y is literally higher on screen,
+  // regardless of depth. No-ops once run, or once the user has interacted
+  // (see initialViewApplied writes in installPanZoom).
+  private applyInitialView(res: LayoutResult): void {
+    if (this.initialViewApplied) return;
+    if (res.nodes.length < this.INITIAL_VIEW_MIN_NODES) return;
+
+    const vw = this.app.screen.width;
+    const vh = this.app.screen.height;
+    if (vw <= 0 || vh <= 0) return;
+
+    const topRows = [...res.nodes].sort((a, b) => a.y - b.y).slice(0, this.INITIAL_VIEW_ROWS);
+    if (topRows.length === 0) return;
+    this.initialViewApplied = true;
+
+    let minX = 0; // always include the root/first-level column
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const pn of topRows) {
+      if (pn.x < minX) minX = pn.x;
+      if (pn.y < minY) minY = pn.y;
+      if (pn.x > maxX) maxX = pn.x;
+      if (pn.y > maxY) maxY = pn.y;
+    }
+
+    const marginLeft = 40;
+    const marginRight = this.colW; // room for the last column's label
+    const marginTop = this.rowH;
+    const marginBottom = this.rowH;
+
+    const boundsW = Math.max(1, maxX - minX + marginLeft + marginRight);
+    const boundsH = Math.max(1, maxY - minY + marginTop + marginBottom);
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // clamp to at least the label threshold: a readable initial view is the
+    // whole point, so never let a huge bounding box zoom out past legibility
+    // (the bottom clamp still allows zooming in further on a very short list).
+    const fitScale = Math.min(vw / boundsW, vh / boundsH);
+    const scale = Math.max(this.LABEL_ZOOM_THRESHOLD, Math.min(1.2, fitScale));
+
+    this.world.scale.set(scale);
+    this.world.position.set(vw / 2 - centerX * scale, vh / 2 - centerY * scale);
   }
 
   // Ease the viewport so `node` and its currently-visible descendants fill the

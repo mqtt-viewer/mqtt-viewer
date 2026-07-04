@@ -28,6 +28,19 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
 
+  // Upper bound on how many items the vis-timeline DataSet holds at once.
+  // The store's `history` array (and the payload/chart features that read
+  // it) keeps up to MAX_LOADED_MESSAGES messages, but rendering that many
+  // as vis-timeline DOM items is what saturates the main thread on a busy
+  // topic; the visual timeline only ever needs to show a recent slice, so
+  // it is bounded far tighter than the data itself. Only the newest
+  // TIMELINE_MAX_ITEMS are kept in timelineDataSet; older ones are trimmed
+  // as appends arrive (see trimTimelineDataSetToMax below). Keyboard
+  // next/previous and selection still derive from the full store history,
+  // so navigating past the trimmed edge still works — it just can't
+  // visually pan the timeline to an item that isn't loaded into it.
+  const TIMELINE_MAX_ITEMS = 2000;
+
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
   export let firstConnectedAtMs: number;
@@ -78,6 +91,37 @@
       });
     });
     return timelineData;
+  };
+
+  // Builds the initial/rebuilt DataSet contents: only the newest
+  // TIMELINE_MAX_ITEMS of `messages` (history is already time-ordered
+  // oldest-first), so a 5,000+ item history never creates that many
+  // vis-timeline DOM items in one go.
+  const getBoundedTimelineData = (messages: MqttHistoryMessage[]) => {
+    const bounded =
+      messages.length > TIMELINE_MAX_ITEMS
+        ? messages.slice(messages.length - TIMELINE_MAX_ITEMS)
+        : messages;
+    return getTimelineData(bounded);
+  };
+
+  // Enforces TIMELINE_MAX_ITEMS on the DataSet after new items are added,
+  // evicting the oldest currently-loaded visual items (NOT from the store's
+  // `history` — only the vis-timeline DataSet is bounded). Cheap relative to
+  // rendering: DataSet.remove on ids that are already off-screen doesn't
+  // trigger the same per-item DOM work as the initial add.
+  const trimTimelineDataSetToMax = () => {
+    const excess = timelineDataSet.length - TIMELINE_MAX_ITEMS;
+    if (excess <= 0) return;
+    // DataSet iteration order isn't guaranteed to be insertion/time order,
+    // so sort by start time to find the oldest `excess` ids to evict.
+    const items = timelineDataSet.get({ fields: ["id", "start"] }) as {
+      id: IdType;
+      start: Date;
+    }[];
+    items.sort((a, b) => a.start.getTime() - b.start.getTime());
+    const idsToRemove = items.slice(0, excess).map((item) => item.id);
+    timelineDataSet.remove(idsToRemove);
   };
 
   // Recomputes currentMin: normally session start minus a minute, but when
@@ -134,6 +178,7 @@
   const handleHistoryDelta = (delta: HistoryDelta) => {
     if (delta.kind === "append") {
       timelineDataSet.add(getTimelineData(delta.messages));
+      trimTimelineDataSetToMax();
       return;
     }
     if (delta.kind === "prepend") {
@@ -182,7 +227,7 @@
       `timeline timeline-${connectionId}`
     )![0] as HTMLElement;
     timelineDataSet = new DataSet<DataItem, "id">();
-    const timelineData = getTimelineData($selectedTopicStore.history);
+    const timelineData = getBoundedTimelineData($selectedTopicStore.history);
     timelineDataSet.add(timelineData);
     selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
     recomputeMin();
@@ -244,9 +289,15 @@
       9 * 60 * 1000
     );
     // If eg. a laptop is closed, we don't want the timeline to not show the current time
-    // once the app resumes
+    // once the app resumes. Only extend (and only then call setOptions, which
+    // fully re-renders every item) once "now" gets within a minute of the
+    // current max — comparing .getTime() (ms since epoch), not
+    // .getMilliseconds() (0-999 sub-second component), which previously made
+    // this condition true unconditionally and re-rendered the whole timeline
+    // every second regardless of busyness.
     timelineEnsureNowVisibleInterval = setInterval(() => {
-      if (maxTimelineTime.getMilliseconds() < new Date().getTime()) {
+      const nowMs = new Date().getTime();
+      if (nowMs > maxTimelineTime.getTime() - 60 * 1000) {
         maxTimelineTime = moment().add(10, "minutes").toDate();
         applyTimelineOptions();
       }
@@ -283,6 +334,13 @@
     timelineDataSet.off("add", selectMostRecentData);
   };
 
+  // True when `time` already falls inside the timeline's current visible
+  // window, so a moveTo would be a no-op pan anyway.
+  const isWithinVisibleWindow = (time: Date) => {
+    const range = timeline.getWindow();
+    return time >= range.start && time <= range.end;
+  };
+
   const selectMostRecentData = (
     event: "add",
     properties: { items: IdType[] },
@@ -299,8 +357,13 @@
     timeline.setSelection([lastMessageId]);
     onMessageSelect(lastMessageId.toString());
     const lastMessage = timelineDataSet.get(lastMessageId);
-    if (lastMessage) {
-      timeline.moveTo(lastMessage.start, { animation: true });
+    // While auto-following live appends (every ~300ms on a busy topic), skip
+    // the viewport move entirely when the new item is already visible, and
+    // never animate: an animated moveTo on every drain compounds with the
+    // add frequency into a continuously-tweening viewport that a 5,000+ item
+    // timeline can't keep up with.
+    if (lastMessage && !isWithinVisibleWindow(lastMessage.start as Date)) {
+      timeline.moveTo(lastMessage.start, { animation: false });
     }
   };
 
@@ -323,7 +386,7 @@
 
   const rebuildTimelineFromHistory = () => {
     timelineDataSet = new DataSet<DataItem, "id">();
-    timelineDataSet.add(getTimelineData($selectedTopicStore.history));
+    timelineDataSet.add(getBoundedTimelineData($selectedTopicStore.history));
     selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
     timeline.setItems(timelineDataSet);
     recomputeMin();

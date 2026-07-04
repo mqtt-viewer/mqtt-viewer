@@ -9,6 +9,7 @@
     MqttHistoryMessage,
     SelectedTopicStore,
   } from "../../stores/selected-topic-store";
+  import { HISTORY_WINDOW_SIZE } from "../../stores/selected-topic-store";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import SelectedMessageArrivalDetails from "./components/SelectedMessageArrivalDetails.svelte";
@@ -223,6 +224,11 @@
         Showing {shownHistoryCount.toLocaleString()} of {totalHistoryCount.toLocaleString()}
         {atLatestWindow ? "(latest)" : ""}
       </span>
+    </div>
+  {:else if !isLoadingHistory && !isDiskHistory && shownHistoryCount >= HISTORY_WINDOW_SIZE}
+    <div class="text-sm text-secondary-text mt-1 mb-1">
+      Showing the latest {HISTORY_WINDOW_SIZE.toLocaleString()} messages. Enable
+      recording in settings to browse older history.
     </div>
   {/if}
   {#if isLoadingHistory}

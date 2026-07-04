@@ -138,6 +138,67 @@ describe("selectTopic (disk mode)", () => {
   });
 });
 
+describe("selectTopic (memory mode)", () => {
+  it("loads history via GetMessageHistory with the window-size limit", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const msgs = makeMessages(1, 10);
+    GetMessageHistory.mockResolvedValue(msgs);
+
+    await store.selectTopic("a/b");
+
+    expect(GetMessageHistory).toHaveBeenCalledWith(
+      CONNECTION_ID,
+      "a/b",
+      HISTORY_WINDOW_SIZE
+    );
+
+    const s = get(store);
+    expect(s.historySource).toBe("memory");
+    expect(s.history).toHaveLength(10);
+    expect(s.window).toBeNull();
+
+    unsub();
+  });
+
+  it("caps live appends at MAX_LOADED_MESSAGES and emits a trim delta", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageHistory.mockResolvedValue(makeMessages(1, MAX_LOADED_MESSAGES));
+    await store.selectTopic("a/b");
+
+    expect(get(store).history).toHaveLength(MAX_LOADED_MESSAGES);
+
+    const deltas: HistoryDelta[] = [];
+    store.setOnHistoryDelta((d) => deltas.push(d));
+
+    fireLiveMessage({
+      id: "live-1",
+      topic: "a/b",
+      payload: btoa("payload-live"),
+      timeMs: 999999,
+      retain: false,
+    });
+
+    const s = get(store);
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
+    expect(s.history[s.history.length - 1].id).toBe("live-1");
+    expect(s.history[0].id).toBe("2");
+
+    expect(deltas.some((d) => d.kind === "trim")).toBe(true);
+    const trim = deltas.find((d) => d.kind === "trim");
+    if (trim?.kind === "trim") {
+      expect(trim.ids).toEqual(["1"]);
+    }
+
+    unsub();
+  });
+});
+
 describe("loadOlderWindow", () => {
   it("prepends the next older window, keeping ascending order", async () => {
     const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);

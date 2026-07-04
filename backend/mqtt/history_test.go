@@ -156,3 +156,44 @@ func TestHistoryMultiTopicOrdering(t *testing.T) {
 		t.Errorf("expected 5 topics, got %d", len(all))
 	}
 }
+
+func TestTopicHistoryWindowReturnsNewestInOrder(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	for i := 0; i < 30; i++ {
+		m := msg("w/t", 10)
+		m.TimeMs = int64(i)
+		h.addMessageToHistory(m)
+		// interleave other-topic traffic so the backward scan must skip
+		h.addMessageToHistory(msg("other", 10))
+	}
+
+	got, err := h.GetTopicHistoryWindow("w/t", 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 10 {
+		t.Fatalf("expected 10 messages, got %d", len(got))
+	}
+	// newest 10 (TimeMs 20..29) in arrival order
+	for i, m := range got {
+		if m.TimeMs != int64(20+i) {
+			t.Errorf("index %d: expected TimeMs %d, got %d", i, 20+i, m.TimeMs)
+		}
+	}
+}
+
+func TestTopicHistoryWindowZeroLimitReturnsAll(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	for i := 0; i < 25; i++ {
+		h.addMessageToHistory(msg("all/t", 10))
+	}
+	got, err := h.GetTopicHistoryWindow("all/t", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 25 {
+		t.Errorf("expected all 25 messages, got %d", len(got))
+	}
+}
