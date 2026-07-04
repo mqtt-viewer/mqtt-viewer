@@ -55,31 +55,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     outro:
       "Found a bug or a rough edge? The Feedback button comes straight to me.",
   },
-  {
-    version: "0.7.0",
-    date: "July 2026",
-    headline: "What's new in 0.7.0",
-    intro:
-      "A big one: charting, collections, bounded memory, image previews, and a new engine under the hood.",
-    sections: [
-      {
-        title: "Topic charting",
-        body: "Chart numeric payload fields over time, live, with a pop-out window.",
-      },
-      {
-        title: "Message library",
-        body: "Collections of saved messages, publish history and search, all in the new sidebar.",
-      },
-      {
-        title: "Bounded memory and durable history",
-        body: "History stays within a configurable memory budget, with opt-in recording to disk.",
-      },
-      {
-        title: "Image payload previews",
-        body: "Image payloads render as images, not noise.",
-      },
-    ],
-  },
 ];
 
 const normalise = (version: string): string =>
