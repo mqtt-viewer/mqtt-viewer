@@ -371,7 +371,7 @@
     applyTheme($theme);
     applySettings();
     seed(initialData);
-    renderer.expandToDepth(1);
+    renderer.expandToDepth(0);
     renderer.setSelected($selectedTopicStore.selectedTopic);
     // seed the "already synced" state so the reactive sync below doesn't treat
     // this initial mount value as an external change and zoom on load
@@ -463,7 +463,8 @@
   };
   const toggleExpandAll = () => {
     allExpanded = !allExpanded;
-    setDepth(allExpanded ? 99 : 1);
+    // collapse returns to the fully-collapsed initial state (roots only)
+    setDepth(allExpanded ? 99 : 0);
   };
   const togglePause = () => {
     paused = !paused;

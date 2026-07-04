@@ -135,7 +135,7 @@ async function main() {
   setTimeout(() => {
     const s = sizeOf();
     renderer.resize(s.w, s.h);
-    renderer.expandToDepth(1);
+    renderer.expandToDepth(0); // match the app: start fully collapsed
     renderer.fitView();
   }, 600);
 

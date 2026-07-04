@@ -44,8 +44,11 @@ export class TopicModel {
   // synthetic root; its children are the top-level topics (no broker hub is drawn)
   root = new TopicNode("", "", -1, null);
   tauMs: number;
-  // nodes shallower than this auto-expand when first discovered
-  autoExpandDepth = 1;
+  // nodes shallower than this auto-expand when first discovered. 0 = start
+  // fully collapsed: only top-level topics visible, each showing its subtree
+  // aggregate. A busy broker has far too many second-level nodes for
+  // depth 1 to be a sane default; the user drills in from the roots.
+  autoExpandDepth = 0;
   private nodeCount = 0;
 
   // Set whenever a change could alter the LAID-OUT (visible) tree: a new node
