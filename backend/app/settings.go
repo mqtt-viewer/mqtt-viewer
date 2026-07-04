@@ -3,6 +3,8 @@ package app
 import (
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+
+	"gorm.io/gorm"
 )
 
 // GetAppSettings returns the singleton settings row (seeded by migration).
@@ -53,6 +55,27 @@ func (a *App) AcknowledgeChangelog(version string) (models.AppSettings, error) {
 		return models.AppSettings{}, err
 	}
 	return settings, nil
+}
+
+// AcknowledgeStarPrompt records that the user has seen the "star us on GitHub"
+// prompt, so it never shows again (whether they starred or dismissed it).
+func (a *App) AcknowledgeStarPrompt() (models.AppSettings, error) {
+	var settings models.AppSettings
+	if err := a.Db.First(&settings, 1).Error; err != nil {
+		return models.AppSettings{}, err
+	}
+	settings.HasSeenStarPrompt = true
+	if err := a.Db.Save(&settings).Error; err != nil {
+		return models.AppSettings{}, err
+	}
+	return settings, nil
+}
+
+// recordAppLaunch bumps the persisted launch counter. It gates one-time nudges
+// (like the GitHub star prompt) so they never hit a fresh install on first run.
+func (a *App) recordAppLaunch() error {
+	return a.Db.Model(&models.AppSettings{}).Where("id = ?", 1).
+		UpdateColumn("launch_count", gorm.Expr("launch_count + 1")).Error
 }
 
 // memoryBudgetBytes returns the configured in-RAM budget, falling back to the

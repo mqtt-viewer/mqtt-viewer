@@ -8,6 +8,11 @@
   // never needed, or the user dismissed it). Keeps the two dialogs from
   // stacking on a fresh install.
   export const firstRunGateCleared = writable(false);
+
+  // Set true once the auto-open decision has been made, whether or not the
+  // dialog opened. Later nudges (the GitHub star prompt) wait on this so they
+  // never land on top of the "What's new" notes.
+  export const whatsNewResolved = writable(false);
 </script>
 
 <script lang="ts">
@@ -49,6 +54,8 @@
         }
       } catch (e) {
         console.error("Failed to check changelog state", e);
+      } finally {
+        whatsNewResolved.set(true);
       }
     })();
   }
