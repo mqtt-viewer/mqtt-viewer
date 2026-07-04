@@ -66,15 +66,21 @@ tasks:
       - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true -ts
 
   generate:icons:
-    summary: Generates Windows `.ico` and Mac `.icns` from `build/appicon.png`
+    summary: Generates Windows `.ico` from `appicon.png` and Mac `.icns` from `appicon-mac.png`
     dir: build
     sources:
       - "appicon.png"
+      - "appicon-mac.png"
     generates:
       - "darwin/icons.icns"
       - "windows/icon.ico"
     cmds:
-      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
+      # macOS expects a transparent safe-area margin so the icon matches sibling dock
+      # icons; appicon-mac.png has that padding, appicon.png is full-bleed for Windows.
+      - wails3 generate icons -input appicon-mac.png -macfilename darwin/icons.icns
+      - wails3 generate icons -input appicon.png -windowsfilename windows/icon.ico
+      # Each invocation also emits the other platform's default file in this dir; drop them.
+      - rm -f icon.ico icons.icns
 
   dev:frontend:
     summary: Runs the frontend in development mode
