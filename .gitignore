@@ -5,6 +5,7 @@ frontend/dist
 frontend/storybook-static
 *.db
 _dev_resources
+/backend/app/_test/
 /mqtt-viewer
 secrets.json*
 .env
