@@ -36,7 +36,8 @@
     "ds:registry": "node .storybook/build-registry.mjs",
     "ds:validate": "node .storybook/validate-registry.mjs",
     "ds:tokens": "node .storybook/extract-tokens.mjs",
-    "ds:make-spec": "node .storybook/make-spec.mjs"
+    "ds:make-spec": "node .storybook/make-spec.mjs",
+    "perf:graph": "node scripts/perf-graph.mjs"
   },
   "devDependencies": {
     "@melt-ui/pp": "^0.3.2",

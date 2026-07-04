@@ -227,3 +227,43 @@ Still open (need the real app / product call):
 ## 16. References
 - Figma exploration page `6467:24` (Direction D) — visual source of truth for v1.
 - Directions A (radial), B (force), C (augmented list) on the same page — explored alternatives.
+
+---
+
+## 17. Performance monitoring
+
+Long-term instrumentation so a future regression is caught rather than discovered on a customer's broker.
+
+### In-app HUD
+
+The gear menu's **Display** section has a **Performance stats** toggle (`statsOn`, persisted per connection like the other Display toggles, default off). When on, a small overlay appears top-right of the canvas (below the toolbar, `pointer-events-none`, same visual language as the Legend overlay) showing, refreshed every second:
+
+- `<fps> fps (cap <maxFps>)`: rendered frames/sec over the last second, and the renderer's current adaptive frame-rate cap (60 or 30; see §"adaptive frame rate" in `pixi-graph.ts`).
+- `avg frame <ms> ms`: the renderer's `frameMsEma`, an EMA of per-frame WORK time (the `frame()` body only, excluding idle wait imposed by the display rate or the fps cap; the same value drives the adaptive cap). Work time is what regresses when rendering code gets slower, whereas inter-frame time just flattens to the cap.
+- `nodes <visible>/<placed> visible`: `visibleNodeCount` vs total placed visuals.
+- `ingest <n> msg/s`: messages received through the component's message-source callback over the last second (counted in `MqttGraphView.svelte`, not the renderer, since the renderer only sees `model.ingest()` calls, not raw message batches).
+
+Backing API: `TopicGraphRenderer.getPerfStats()` returns `{ fps, avgFrameMs, maxFps, placedNodes, visibleNodes, movingNodes, liveRipples }`. `getPerfCounts()` (placedNodes/visibleNodes only) remains for existing callers (dev harness FPS meter).
+
+### Dev harness
+
+`frontend/dev/topic-graph.html` (open via `pnpm dev` at `/dev/topic-graph.html`) mounts the renderer against synthetic traffic and exposes `window.__perf` (fps/avgFrameMs/worstFrameMs/placedNodes/visibleNodes, refreshed every second) plus `window.__r` (the renderer instance) and `window.__m` (the model) for console poking. Query params:
+
+- `?scale=N`: synthetic tree size multiplier (`scale=30` ≈ 2400 placed nodes once fully expanded; this is the perf-baseline reference size).
+- `?broker=<ws url>`: connect to a real broker instead of synthetic traffic (e.g. `wss://test.mosquitto.org:8081/mqtt` for a firehose stress test).
+
+Toolbar buttons `d1`/`d2`/`d9` expand to depth 1/2/all.
+
+### Regression script
+
+`frontend/scripts/perf-graph.mjs`, run via `pnpm perf:graph` (from `frontend/`). It starts a throwaway Vite dev server (a free port, or `PERF_PORT` if set; never assumes a fixed port is free), opens the harness at `?scale=30`, clicks "expand all", waits for the tree to settle, samples `window.__perf` five times, and prints a JSON report (`{ fps, avgFrameMs, worstFrameMs, placedNodes, visibleNodes, samples }`).
+
+The report's `avgFrameMs` is compared against `frontend/perf-baseline.json`. **Headed vs headless matters**: headless Chromium renders via software GL and its absolute frame times are not comparable to a headed/real-browser run, so the script tries to launch headed first and only falls back to headless (with a printed warning) if that fails, e.g. a CI runner with no display server. `PERF_HEADLESS=1` forces headless, for calibrating that baseline field locally. Note the compared `avgFrameMs` is renderer work time, which is far less backend-sensitive than paint throughput, so the two baseline fields sit close together. Whichever mode actually ran, the script compares only against the matching baseline field (`headedAvgFrameMs` or `headlessAvgFrameMs`). Exit codes:
+
+- `0` and a plain PASS line: within baseline.
+- `0` and a WARN line: regressed vs baseline but within the (generous, GPU-variance-tolerant) 3x hard threshold.
+- `1`: hard regression, `avgFrameMs` exceeds 3x the matching baseline field.
+
+**Updating the baseline:** run `node scripts/perf-graph.mjs` on a quiescent machine, copy the reported `avgFrameMs` into the matching field (`headedAvgFrameMs` if it ran headed, `headlessAvgFrameMs` if it fell back), and re-run once to confirm a PASS. Update both fields if you have access to run it both ways (e.g. once locally headed, once with `xvfb-run` or in CI for the headless number).
+
+**CI:** `.github/workflows/design-system.yml` has a separate `perf-graph` job (`continue-on-error: true`, so a slow/flaky CI runner never blocks a merge) that runs `pnpm perf:graph` and uploads the JSON report as a build artifact.

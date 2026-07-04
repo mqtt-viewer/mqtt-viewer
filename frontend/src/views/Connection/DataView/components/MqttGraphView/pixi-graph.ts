@@ -66,6 +66,11 @@ interface NodeVisual {
   culled: boolean; // outside the viewport (+ margin) — skips all per-frame work
   moving: boolean; // still easing toward (tx, ty)
   r: number; // last-computed radius (cached so culled nodes keep a sane value)
+  // set by the cull-recompute pass when this visual just transitioned
+  // culled -> visible on a frame that wasn't itself a slow tick; the detail
+  // pass (radius/tint/label) picks it up and clears it so a reveal never
+  // renders stale for up to SLOW_TICK_EVERY frames
+  justRevealed: boolean;
 }
 
 interface Ripple {
@@ -148,6 +153,22 @@ export class TopicGraphRenderer {
   private visibleNodeCount = 0;
   private edgesDirty = true;
 
+  // ---- moving-set fast path ----
+  // Per-frame easing cost scales with the number of visuals still travelling
+  // toward a target position, not the total placed count. relayout() adds any
+  // visual whose target moved to this set; the easing step below removes a
+  // visual once it settles. A busy broker with a mostly-static layout (only a
+  // handful of nodes re-sorting per tick) then costs O(moving), not O(placed).
+  private movingVisuals = new Set<NodeVisual>();
+
+  // Set true by anything that can change what's on/off screen: pan, zoom,
+  // resize, a running viewport animation (viewAnim/follow-hottest), or a slow
+  // tick (nodes may have moved/appeared since the last cull pass). frame()
+  // only walks the full visuals map to recompute culling when this is set or
+  // a slow tick is due. Otherwise culling from the previous frame still
+  // holds, bounded in staleness by the slow tick's ~10Hz cadence.
+  private viewportDirty = true;
+
   // ---- label/badge pooling (lazy creation is the biggest win at scale) ----
   private labelPool: Text[] = [];
   private badgePool: Text[] = [];
@@ -160,6 +181,15 @@ export class TopicGraphRenderer {
   private slowFrameStreak = 0;
   private fastFrameStreak = 0;
   private currentMaxFps = 60;
+
+  // ---- perf HUD counters (see getPerfStats()) ----
+  // Rendered-frames-per-second, counted directly in the ticker callback over
+  // rolling ~1s windows, independent of frameMsEma, which is an EMA used to
+  // drive the adaptive fps cap, not a literal frame count.
+  private fpsWindowStart = 0;
+  private fpsWindowFrames = 0;
+  private lastFps = 0;
+
   private visibilityHandler = () => {
     if (document.hidden) this.app.ticker.stop();
     else this.app.ticker.start();
@@ -230,6 +260,10 @@ export class TopicGraphRenderer {
 
     this.installPanZoom(canvas);
     this.app.ticker.add(() => this.frame());
+    // apply the default cap up front: Pixi's ticker is otherwise uncapped
+    // (maxFPS 0), which ran the graph at display rate (e.g. 120Hz) while the
+    // HUD and adaptive logic assumed a 60fps ceiling
+    this.app.ticker.maxFPS = this.currentMaxFps;
 
     document.addEventListener("visibilitychange", this.visibilityHandler);
   }
@@ -349,6 +383,7 @@ export class TopicGraphRenderer {
         const after = this.world.toLocal({ x: px, y: py });
         this.world.position.x += (after.x - before.x) * this.world.scale.x;
         this.world.position.y += (after.y - before.y) * this.world.scale.y;
+        this.viewportDirty = true;
       },
       { passive: false }
     );
@@ -378,6 +413,7 @@ export class TopicGraphRenderer {
       this.world.position.x += dx;
       this.world.position.y += dy;
       this.lastPointer = { x: e.global.x, y: e.global.y };
+      this.viewportDirty = true;
     });
   }
 
@@ -385,6 +421,7 @@ export class TopicGraphRenderer {
     this.app.renderer.resize(width, height);
     this.app.stage.hitArea = this.app.screen;
     this.positionMinimap();
+    this.viewportDirty = true;
   }
 
   // Panel-drag resize support: pause the ticker for the duration of a drag
@@ -403,6 +440,28 @@ export class TopicGraphRenderer {
   // Snapshot for the dev harness FPS overlay / perf instrumentation.
   getPerfCounts(): { placedNodes: number; visibleNodes: number } {
     return { placedNodes: this.visuals.size, visibleNodes: this.visibleNodeCount };
+  }
+
+  // Fuller snapshot backing the in-app performance HUD (see MqttGraphView's
+  // "Performance stats" toggle) and the perf-graph.mjs regression script.
+  getPerfStats(): {
+    fps: number;
+    avgFrameMs: number;
+    maxFps: number;
+    placedNodes: number;
+    visibleNodes: number;
+    movingNodes: number;
+    liveRipples: number;
+  } {
+    return {
+      fps: this.lastFps,
+      avgFrameMs: Math.round(this.frameMsEma * 100) / 100,
+      maxFps: this.currentMaxFps,
+      placedNodes: this.visuals.size,
+      visibleNodes: this.visibleNodeCount,
+      movingNodes: this.movingVisuals.size,
+      liveRipples: this.ripples.length,
+    };
   }
 
   // True once the one-shot initial fit (top rows of sort order) has run, or
@@ -424,6 +483,7 @@ export class TopicGraphRenderer {
     const scale = Math.max(0.12, Math.min(1.4, Math.min((vw - 80) / cw, (vh - topMargin - 40) / ch)));
     this.world.scale.set(scale);
     this.world.position.set(40, topMargin + this.rMax * scale);
+    this.viewportDirty = true;
   }
 
   relayout(): void {
@@ -467,6 +527,10 @@ export class TopicGraphRenderer {
           : undefined;
         if (parent) v.container.position.set(parent.container.x, parent.container.y);
         else v.container.position.set(pn.x, pn.y);
+        // createVisual() always starts a node as moving = true (it may need to
+        // ease in from its parent's position even when pn.x/pn.y already match
+        // the spawn point, e.g. the no-parent case above), so keep it in the set
+        this.movingVisuals.add(v);
       }
       v.expanded = pn.expanded;
       if (v.tx !== pn.x || v.ty !== pn.y) anyPositionChanged = true;
@@ -474,8 +538,12 @@ export class TopicGraphRenderer {
       v.ty = pn.y;
       // re-arm easing: settled nodes drop out of the fast-path position loop
       // (moving = false), so any relayout that changes a node's target must
-      // mark it moving again or it would freeze at its old position
-      if (v.container.x !== pn.x || v.container.y !== pn.y) v.moving = true;
+      // mark it moving again, and back into movingVisuals, or it would
+      // freeze at its old position
+      if (v.container.x !== pn.x || v.container.y !== pn.y) {
+        v.moving = true;
+        this.movingVisuals.add(v);
+      }
       this.updateCaretAndBadge(v);
       // aggregate-ring eligibility (collapsed + has descendants) is structural
       // and only changes here, at relayout time — recompute membership so the
@@ -493,6 +561,7 @@ export class TopicGraphRenderer {
         this.visuals.delete(topic);
         this.ripples = this.ripples.filter((rp) => rp.visual !== v);
         this.aggRingCandidates.delete(v);
+        this.movingVisuals.delete(v);
         anyPositionChanged = true; // a removal always changes what's drawn
       }
     }
@@ -577,6 +646,7 @@ export class TopicGraphRenderer {
 
     this.world.scale.set(scale);
     this.world.position.set(vw / 2 - centerX * scale, vh / 2 - centerY * scale);
+    this.viewportDirty = true;
   }
 
   // Ease the viewport so `node` and its currently-visible descendants fill the
@@ -697,6 +767,7 @@ export class TopicGraphRenderer {
       culled: false,
       moving: true,
       r: this.rMin,
+      justRevealed: false,
     };
     this.nodeLayer.addChild(container);
     this.visuals.set(node.topic, v);
@@ -824,6 +895,105 @@ export class TopicGraphRenderer {
     if (v.caret) this.drawCaret(v);
   }
 
+  // Recompute a visible visual's radius/tint/label/badge/caret, and (when
+  // spawnRipple) detect a message-arrival edge and spawn a pulse ring. Shared
+  // by the slow tick (every visual, ~10Hz) and the just-revealed fast path (a
+  // single visual, the frame it comes back on screen). Returns the resolved
+  // lastMsg so callers can fold it into hottest-topic tracking without
+  // re-deriving expanded/own-vs-agg themselves. Caller must have already
+  // confirmed the visual isn't culled.
+  private refreshVisualDetail(
+    v: NodeVisual,
+    nowMs: number,
+    showLabels: boolean,
+    lodDetail: boolean,
+    spawnRipple: boolean
+  ): number {
+    const score = v.expanded
+      ? this.model.ownScore(v.node, nowMs)
+      : this.model.aggScore(v.node, nowMs);
+    const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
+    const r = radiusForScore(score, this.rMin, this.rMax, this.k);
+    v.r = r;
+    v.circle.scale.set(r / TEX_R);
+    const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
+    v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe);
+
+    // labels/badges: acquire lazily when visible + zoomed in enough, release otherwise
+    if (showLabels) {
+      const label = this.acquireLabel(v);
+      // leaf label bug fix: always render just this node's own segment name,
+      // never the full topic path — an empty segment (topic with a trailing
+      // slash) renders as "/" rather than falling back to node.topic
+      label.text = v.node.name === "" ? "/" : v.node.name;
+      if (this.textColorDirty) label.style.fill = this.textColor;
+
+      // expanded parents have an outgoing edge to the right — lift their
+      // label above the line so it isn't struck through; leaves/collapsed
+      // stay centred
+      const hasVisibleKids = v.expanded && v.node.children.size > 0;
+      if (hasVisibleKids) {
+        label.anchor.y = 1;
+        label.y = -4;
+        label.x = r + 4;
+      } else {
+        label.anchor.y = 0.5;
+        label.y = 0;
+        label.x = r + 7;
+      }
+      label.visible = true;
+
+      const showBadge = !v.expanded && v.node.descendantCount > 0;
+      if (showBadge) {
+        const badge = this.acquireBadge(v);
+        if (this.textColorDirty) badge.style.fill = this.textColor;
+        badge.text = `+${v.node.descendantCount}`;
+        badge.x = r + 9 + label.width + 8;
+        badge.visible = true;
+      } else if (v.badge) {
+        this.releaseBadge(v);
+      }
+    } else {
+      if (v.label) this.releaseLabel(v);
+      if (v.badge) this.releaseBadge(v);
+    }
+
+    // keep the caret clear of the node edge, however large the node grows;
+    // below the label zoom threshold carets are untargetable at that scale
+    // (and just visual noise), so hide the Graphics entirely
+    if (v.caret) {
+      v.caret.visible = lodDetail;
+      if (lodDetail) v.caret.position.x = -(r + 10);
+    }
+
+    if (!spawnRipple) {
+      v.lastRippleMsg = lastMsg;
+      return lastMsg;
+    }
+
+    // message-arrival pulse: spawn a ripple when the rendered last-message
+    // time advances, unless this node already rippled very recently (avoid
+    // overdraw on hot topics ticking many times a second). No ripples at all
+    // when zoomed out past the LOD threshold — they're imperceptible and
+    // just cost draw calls.
+    if (lodDetail && lastMsg > v.lastRippleMsg) {
+      v.lastRippleMsg = lastMsg;
+      const recent = this.ripples.find(
+        (rp) => rp.visual === v && nowMs - rp.startMs < 150
+      );
+      if (!recent) {
+        if (this.ripples.length >= this.RIPPLE_CAP) this.ripples.shift();
+        this.ripples.push({ visual: v, startMs: nowMs });
+      }
+    } else if (lastMsg > v.lastRippleMsg) {
+      // still track the edge even while suppressed, so a zoom-in afterwards
+      // doesn't replay a backlog of "new" messages as ripples
+      v.lastRippleMsg = lastMsg;
+    }
+
+    return lastMsg;
+  }
+
   // World-space visible rect (screen corners projected into world space),
   // expanded by CULL_MARGIN so nodes just off-screen don't pop in/out.
   private computeVisibleRect(): { minX: number; minY: number; maxX: number; maxY: number } {
@@ -840,26 +1010,32 @@ export class TopicGraphRenderer {
 
   private frame(): void {
     const nowMs = Date.now();
-    this.updateAdaptiveFps();
+    const workStart = performance.now();
+    this.updateFpsCounter(nowMs);
 
     const showLabels = this.world.scale.x >= this.LABEL_ZOOM_THRESHOLD;
     const lodDetail = this.world.scale.x >= this.LABEL_ZOOM_THRESHOLD;
-    let hottestTopic: string | null = null;
-    let hottestMs = -1;
 
     this.frameCount++;
     const runSlowTick = this.forceSlowTick || this.frameCount % this.SLOW_TICK_EVERY === 0;
     this.forceSlowTick = false;
 
-    const rect = this.computeVisibleRect();
-    let anyMoved = false;
-    this.visibleNodeCount = 0;
+    // an in-flight viewport animation (zoom-to-subtree / follow-hottest) moves
+    // the camera every frame it's active, so culling must be re-checked every
+    // such frame too. Set here (before the cull pass below reads it) rather
+    // than at the end where the actual position update happens.
+    if (this.viewAnim || (this.followHottest && this.followTarget)) {
+      this.viewportDirty = true;
+    }
 
-    for (const v of this.visuals.values()) {
-      // ease position toward target (animated reflow on sort/expand/filter) —
-      // always runs (fast path) but is a no-op once a node has settled, so
-      // this loop body is cheap for the (common) majority of stationary nodes
-      if (v.moving) {
+    // ---- moving-set fast path ----
+    // Ease only the visuals still travelling toward a target; this loop's
+    // cost is O(moving), not O(placed). A settled node is dropped from the
+    // set so a busy-but-static tree (most nodes stationary between re-sorts)
+    // doesn't pay for a full-visuals walk here every frame.
+    let anyMoved = false;
+    if (this.movingVisuals.size > 0) {
+      for (const v of this.movingVisuals) {
         const dx = v.tx - v.container.x;
         const dy = v.ty - v.container.y;
         if (Math.abs(dx) + Math.abs(dy) > 0.4) {
@@ -870,137 +1046,98 @@ export class TopicGraphRenderer {
           v.container.x = v.tx;
           v.container.y = v.ty;
           v.moving = false;
-        }
-      }
-
-      // viewport culling: skip ALL further per-frame work for offscreen nodes
-      const wasCulled = v.culled;
-      const culled =
-        v.container.x < rect.minX ||
-        v.container.x > rect.maxX ||
-        v.container.y < rect.minY ||
-        v.container.y > rect.maxY;
-      v.culled = culled;
-      if (culled) {
-        if (v.container.visible) {
-          v.container.visible = false;
-          // release pooled resources on the cull transition so labels/badges
-          // from panned-away regions are reusable elsewhere instead of
-          // accumulating on invisible containers
-          if (v.label) this.releaseLabel(v);
-          if (v.badge) this.releaseBadge(v);
-        }
-        // follow-hottest must still consider offscreen nodes: panning the
-        // viewport to them is the whole point of the mode
-        if (this.followHottest) {
-          const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
-          if (lastMsg > hottestMs) {
-            hottestMs = lastMsg;
-            hottestTopic = v.node.topic;
-          }
-        }
-        continue;
-      }
-      if (!v.container.visible) v.container.visible = true;
-      this.visibleNodeCount++;
-      // a node transitioning culled -> visible needs its slow-tick state
-      // (radius/tint/label) refreshed immediately rather than waiting for the
-      // next 10Hz tick, or it'll render with stale (or default) values for a beat
-      const justRevealed = wasCulled && !culled;
-
-      if (runSlowTick || justRevealed) {
-        const score = v.expanded
-          ? this.model.ownScore(v.node, nowMs)
-          : this.model.aggScore(v.node, nowMs);
-        const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
-        const r = radiusForScore(score, this.rMin, this.rMax, this.k);
-        v.r = r;
-        v.circle.scale.set(r / TEX_R);
-        const age = lastMsg === 0 ? this.cooldownMs * 2 : nowMs - lastMsg;
-        v.circle.tint = tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe);
-
-        // labels/badges: acquire lazily when visible + zoomed in enough, release otherwise
-        if (showLabels) {
-          const label = this.acquireLabel(v);
-          // leaf label bug fix: always render just this node's own segment name,
-          // never the full topic path — an empty segment (topic with a trailing
-          // slash) renders as "/" rather than falling back to node.topic
-          label.text = v.node.name === "" ? "/" : v.node.name;
-          if (this.textColorDirty) label.style.fill = this.textColor;
-
-          // expanded parents have an outgoing edge to the right — lift their
-          // label above the line so it isn't struck through; leaves/collapsed
-          // stay centred
-          const hasVisibleKids = v.expanded && v.node.children.size > 0;
-          if (hasVisibleKids) {
-            label.anchor.y = 1;
-            label.y = -4;
-            label.x = r + 4;
-          } else {
-            label.anchor.y = 0.5;
-            label.y = 0;
-            label.x = r + 7;
-          }
-          label.visible = true;
-
-          const showBadge = !v.expanded && v.node.descendantCount > 0;
-          if (showBadge) {
-            const badge = this.acquireBadge(v);
-            if (this.textColorDirty) badge.style.fill = this.textColor;
-            badge.text = `+${v.node.descendantCount}`;
-            badge.x = r + 9 + label.width + 8;
-            badge.visible = true;
-          } else if (v.badge) {
-            this.releaseBadge(v);
-          }
-        } else {
-          if (v.label) this.releaseLabel(v);
-          if (v.badge) this.releaseBadge(v);
-        }
-
-        // keep the caret clear of the node edge, however large the node grows;
-        // below the label zoom threshold carets are untargetable at that scale
-        // (and just visual noise), so hide the Graphics entirely
-        if (v.caret) {
-          v.caret.visible = lodDetail;
-          if (lodDetail) v.caret.position.x = -(r + 10);
-        }
-
-        if (lastMsg > hottestMs) {
-          hottestMs = lastMsg;
-          hottestTopic = v.node.topic;
-        }
-
-        // message-arrival pulse: spawn a ripple when the rendered last-message
-        // time advances, unless this node already rippled very recently (avoid
-        // overdraw on hot topics ticking many times a second). No ripples at all
-        // when zoomed out past the LOD threshold — they're imperceptible and
-        // just cost draw calls.
-        if (lodDetail && lastMsg > v.lastRippleMsg) {
-          v.lastRippleMsg = lastMsg;
-          const recent = this.ripples.find(
-            (rp) => rp.visual === v && nowMs - rp.startMs < 150
-          );
-          if (!recent) {
-            if (this.ripples.length >= this.RIPPLE_CAP) this.ripples.shift();
-            this.ripples.push({ visual: v, startMs: nowMs });
-          }
-        } else if (lastMsg > v.lastRippleMsg) {
-          // still track the edge even while suppressed, so a zoom-in afterwards
-          // doesn't replay a backlog of "new" messages as ripples
-          v.lastRippleMsg = lastMsg;
-        }
-      } else {
-        // fast path, non-slow-tick frame: still need an up to date hottest-topic
-        // candidate for follow-hottest, using the last-known lastMsg cheaply
-        const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
-        if (lastMsg > hottestMs) {
-          hottestMs = lastMsg;
-          hottestTopic = v.node.topic;
+          this.movingVisuals.delete(v);
         }
       }
     }
-    if (runSlowTick) this.textColorDirty = false;
+
+    // ---- culling (viewport-dirty gated) ----
+    // Recompute cull state for every visual only when the viewport actually
+    // changed (pan/zoom/resize/viewport-animation) or the slow tick is due
+    // (nodes may have moved/appeared since the last cull pass ran). The slow
+    // tick's ~10Hz cadence is the upper bound on how stale culling can get.
+    // Otherwise last frame's cull state (and visibleNodeCount) still holds,
+    // so an unchanged viewport with no slow tick due skips this walk entirely.
+    const recomputeCull = this.viewportDirty || runSlowTick;
+    if (recomputeCull) {
+      const rect = this.computeVisibleRect();
+      this.visibleNodeCount = 0;
+      for (const v of this.visuals.values()) {
+        const wasCulled = v.culled;
+        const culled =
+          v.container.x < rect.minX ||
+          v.container.x > rect.maxX ||
+          v.container.y < rect.minY ||
+          v.container.y > rect.maxY;
+        v.culled = culled;
+        if (culled) {
+          if (v.container.visible) {
+            v.container.visible = false;
+            // release pooled resources on the cull transition so labels/badges
+            // from panned-away regions are reusable elsewhere instead of
+            // accumulating on invisible containers
+            if (v.label) this.releaseLabel(v);
+            if (v.badge) this.releaseBadge(v);
+          }
+          continue;
+        }
+        if (!v.container.visible) v.container.visible = true;
+        this.visibleNodeCount++;
+        // a node transitioning culled -> visible needs its slow-tick state
+        // (radius/tint/label) refreshed immediately rather than waiting for
+        // the next 10Hz tick, or it'll render with stale/default values for a
+        // beat. Mark it here so the detail pass below picks it up even on a
+        // frame where runSlowTick is false but the viewport just moved.
+        if (wasCulled) v.justRevealed = true;
+      }
+      this.viewportDirty = false;
+    }
+
+    // ---- slow tick: hottest-topic tracking, radius/tint/labels/ripples ----
+    // Runs the O(placed) detail pass at ~10Hz rather than every frame. Culled
+    // nodes are skipped except for follow-hottest, which must still consider
+    // them (panning the viewport to an offscreen hot topic is the point).
+    let hottestTopic: string | null = null;
+    let hottestMs = -1;
+    if (runSlowTick) {
+      for (const v of this.visuals.values()) {
+        if (v.culled) {
+          if (this.followHottest) {
+            const lastMsg = v.expanded ? v.node.ownLastMsg : v.node.aggLastMsg;
+            if (lastMsg > hottestMs) {
+              hottestMs = lastMsg;
+              hottestTopic = v.node.topic;
+            }
+          }
+          continue;
+        }
+
+        const lastMsg = this.refreshVisualDetail(v, nowMs, showLabels, lodDetail, true);
+        v.justRevealed = false;
+
+        if (lastMsg > hottestMs) {
+          hottestMs = lastMsg;
+          hottestTopic = v.node.topic;
+        }
+      }
+      this.textColorDirty = false;
+    } else if (recomputeCull) {
+      // Not a slow-tick frame, but the cull pass above still ran (viewport
+      // changed), so a node revealed this frame needs its detail refreshed
+      // immediately rather than rendering stale for up to SLOW_TICK_EVERY
+      // frames. Ripple edge-detection is intentionally skipped for these
+      // (see refreshVisualDetail's spawnRipple param): a just-revealed node's
+      // backlog of "new" messages while offscreen/stale shouldn't replay as
+      // ripples. The next slow tick picks up its cadence cleanly.
+      for (const v of this.visuals.values()) {
+        if (!v.justRevealed) continue;
+        v.justRevealed = false;
+        this.refreshVisualDetail(v, nowMs, showLabels, lodDetail, false);
+      }
+    }
+    // follow-hottest still needs a candidate on non-slow-tick frames; rather
+    // than re-scanning all visuals every frame, the easing below rides on
+    // whatever followTarget the last slow tick established.
 
     // edges: rebuild the Graphics only when something actually changed this
     // frame (a node moved, a relayout happened, or the slow tick ran — radii
@@ -1077,10 +1214,16 @@ export class TopicGraphRenderer {
       }
     }
 
-    // follow-hottest: ease the viewport so the most-recent topic stays centred
-    if (!this.viewAnim && this.followHottest && hottestTopic) {
-      if (hottestMs > 0) this.followTarget = hottestTopic;
-      const v = this.followTarget ? this.visuals.get(this.followTarget) : undefined;
+    // follow-hottest: ease the viewport so the most-recent topic stays centred.
+    // The candidate search (hottestTopic/hottestMs) only runs on slow-tick
+    // frames now, but the easing itself must run every frame toward whatever
+    // followTarget was last set to, or the camera would visibly step at 10Hz
+    // instead of easing smoothly.
+    if (runSlowTick && this.followHottest && hottestTopic && hottestMs > 0) {
+      this.followTarget = hottestTopic;
+    }
+    if (!this.viewAnim && this.followHottest && this.followTarget) {
+      const v = this.visuals.get(this.followTarget);
       if (v) {
         const s = this.world.scale.x;
         const targetX = this.app.screen.width / 2 - v.container.x * s;
@@ -1115,15 +1258,22 @@ export class TopicGraphRenderer {
         this.drawMinimap(nowMs);
       }
     }
+
+    this.updateAdaptiveFps(performance.now() - workStart);
   }
 
-  // EMA of ticker.deltaMS drives an adaptive frame-rate cap: sustained slow
-  // frames (busy tree, big relayout, etc.) drop the cap to 30fps to keep
-  // interactions responsive; sustained fast frames restore 60fps. Hysteresis
-  // (60-frame streaks in each direction) prevents flapping at the boundary.
-  private updateAdaptiveFps(): void {
-    const ms = this.app.ticker.elapsedMS;
-    this.frameMsEma = this.frameMsEma + this.EMA_ALPHA * (ms - this.frameMsEma);
+  // EMA of per-frame WORK time (measured around the frame() body) drives an
+  // adaptive frame-rate cap: sustained slow frames (busy tree, big relayout,
+  // etc.) drop the cap to 30fps to keep interactions responsive; sustained
+  // fast frames restore 60fps. Hysteresis (60-frame streaks in each
+  // direction) prevents flapping at the boundary.
+  //
+  // Work time, NOT ticker.elapsedMS: elapsed time between ticks includes the
+  // idle wait imposed by the display rate and the cap itself, so on a plain
+  // 60Hz display it reads ~16.7ms regardless of load — permanently past the
+  // 14ms threshold, which would wrongly degrade every 60Hz user to 30fps.
+  private updateAdaptiveFps(workMs: number): void {
+    this.frameMsEma = this.frameMsEma + this.EMA_ALPHA * (workMs - this.frameMsEma);
 
     if (this.frameMsEma > 14) {
       this.slowFrameStreak++;
@@ -1142,6 +1292,20 @@ export class TopicGraphRenderer {
     } else if (this.currentMaxFps !== 60 && this.fastFrameStreak > 60) {
       this.currentMaxFps = 60;
       this.app.ticker.maxFPS = 60;
+    }
+  }
+
+  // Counts actual rendered frames per rolling ~1s window: the literal fps
+  // the HUD/perf script report, as distinct from frameMsEma (a smoothed
+  // per-frame cost used only to drive the adaptive cap above).
+  private updateFpsCounter(nowMs: number): void {
+    if (this.fpsWindowStart === 0) this.fpsWindowStart = nowMs;
+    this.fpsWindowFrames++;
+    const elapsed = nowMs - this.fpsWindowStart;
+    if (elapsed >= 1000) {
+      this.lastFps = Math.round((this.fpsWindowFrames * 1000) / elapsed);
+      this.fpsWindowFrames = 0;
+      this.fpsWindowStart = nowMs;
     }
   }
 
@@ -1215,5 +1379,6 @@ export class TopicGraphRenderer {
     this.app.destroy(true, { children: true });
     this.visuals.clear();
     this.aggRingCandidates.clear();
+    this.movingVisuals.clear();
   }
 }

@@ -83,6 +83,7 @@
   let followHottest = false;
   let cvdSafe = false;
   let legendOn = true;
+  let statsOn = false;
   let cooldownMs = 60000;
   let tauMs = 14000; // EWMA half-life ~10s by default
   let maxNodeR = 20;
@@ -124,6 +125,7 @@
       if (typeof s.followHottest === "boolean") followHottest = s.followHottest;
       if (typeof s.cvdSafe === "boolean") cvdSafe = s.cvdSafe;
       if (typeof s.legendOn === "boolean") legendOn = s.legendOn;
+      if (typeof s.statsOn === "boolean") statsOn = s.statsOn;
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
       if (typeof s.maxNodeR === "number") maxNodeR = s.maxNodeR;
@@ -140,6 +142,7 @@
           followHottest,
           cvdSafe,
           legendOn,
+          statsOn,
           cooldownMs,
           tauMs,
           maxNodeR,
@@ -284,6 +287,51 @@
   );
   $: cooldownShort = COOLDOWN_SHORT[cooldownMs] ?? `${Math.round(cooldownMs / 1000)}s`;
 
+  // ---- performance stats HUD ----
+  // Ingest rate is counted here (in the message-source callback below) rather
+  // than in the renderer, since the renderer never sees raw message counts,
+  // only model.ingest() calls. A 1s interval reads both that counter and the
+  // renderer's getPerfStats() and formats them into readable words for the
+  // overlay; cleaned up on destroy like the other intervals in this component.
+  interface StatsInfo {
+    fps: number;
+    maxFps: number;
+    avgFrameMs: number;
+    visibleNodes: number;
+    placedNodes: number;
+    ingestPerSec: number;
+  }
+  let stats: StatsInfo | null = null;
+  let statsTimer: number | null = null;
+  let ingestCounter = 0;
+
+  const startStatsTimer = () => {
+    if (statsTimer !== null) return;
+    statsTimer = window.setInterval(() => {
+      if (!renderer) return;
+      const p = renderer.getPerfStats();
+      stats = {
+        fps: p.fps,
+        maxFps: p.maxFps,
+        avgFrameMs: p.avgFrameMs,
+        visibleNodes: p.visibleNodes,
+        placedNodes: p.placedNodes,
+        ingestPerSec: ingestCounter,
+      };
+      ingestCounter = 0;
+    }, 1000);
+  };
+  const stopStatsTimer = () => {
+    if (statsTimer !== null) {
+      window.clearInterval(statsTimer);
+      statsTimer = null;
+    }
+    stats = null;
+    ingestCounter = 0;
+  };
+  $: if (statsOn) startStatsTimer();
+  else stopStatsTimer();
+
   // ---- message source (Wails by default; injectable for storybook/dev) ----
   const wailsSource: GraphMessageSource = {
     subscribe: (onMessages, onClear) => {
@@ -335,6 +383,7 @@
 
     unsubSource = (messageSource ?? wailsSource).subscribe(
       (msgs) => {
+        ingestCounter += msgs.length;
         for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
       },
       () => {
@@ -389,6 +438,7 @@
     ro?.disconnect();
     document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (liveTimer) clearInterval(liveTimer);
+    stopStatsTimer();
     renderer?.destroy();
   });
 
@@ -435,6 +485,10 @@
   };
   const toggleLegend = () => {
     legendOn = !legendOn;
+    saveSettings();
+  };
+  const toggleStats = () => {
+    statsOn = !statsOn;
     saveSettings();
   };
   const setCooldown = (ms: number) => {
@@ -569,6 +623,12 @@
               <Icon type={legendOn ? "ticked" : "unticked"} size={14} />Legend
             </span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={toggleStats}>
+            <span class="flex items-center gap-2">
+              <Icon type={statsOn ? "ticked" : "unticked"} size={14} />Performance
+              stats
+            </span>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={toggleFollow}>
             <span class="flex items-center gap-2">
               <Icon type={followHottest ? "ticked" : "unticked"} size={14} />Follow
@@ -643,6 +703,19 @@
           </div>
           <span>size = msg rate · ring = collapsed subtree</span>
         </div>
+      </div>
+    {/if}
+    {#if statsOn && stats}
+      <div
+        class="pointer-events-none absolute right-3 top-3 flex flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
+      >
+        <div>{stats.fps} fps (cap {stats.maxFps})</div>
+        <div>avg frame {stats.avgFrameMs} ms</div>
+        <div>
+          nodes {stats.visibleNodes.toLocaleString()}/{stats.placedNodes.toLocaleString()}
+          visible
+        </div>
+        <div>ingest {stats.ingestPerSec.toLocaleString()} msg/s</div>
       </div>
     {/if}
   </div>

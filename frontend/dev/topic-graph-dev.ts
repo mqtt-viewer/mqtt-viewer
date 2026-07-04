@@ -53,7 +53,6 @@ function installPerfMeter(r: TopicGraphRenderer): void {
   let frames = 0;
   let windowStart = performance.now();
   let worstMs = 0;
-  let sumMs = 0;
   let lastFrameTime = performance.now();
 
   r.app.ticker.add(() => {
@@ -61,23 +60,25 @@ function installPerfMeter(r: TopicGraphRenderer): void {
     const dt = now - lastFrameTime;
     lastFrameTime = now;
     frames++;
-    sumMs += dt;
     if (dt > worstMs) worstMs = dt;
 
     const elapsed = now - windowStart;
     if (elapsed >= 1000) {
       const fps = (frames * 1000) / elapsed;
-      const avgFrameMs = sumMs / frames;
       const counts = r.getPerfCounts();
+      // avgFrameMs is the renderer's WORK-time EMA, not inter-frame time:
+      // with the ticker capped at 60fps, inter-frame time flattens to the
+      // cap (~16.7ms) regardless of load, which would blind the perf-graph
+      // regression check. worstFrameMs stays inter-frame so jank spikes and
+      // stalls remain visible.
       window.__perf = {
         fps: Math.round(fps * 10) / 10,
-        avgFrameMs: Math.round(avgFrameMs * 100) / 100,
+        avgFrameMs: r.getPerfStats().avgFrameMs,
         worstFrameMs: Math.round(worstMs * 100) / 100,
         placedNodes: counts.placedNodes,
         visibleNodes: counts.visibleNodes,
       };
       frames = 0;
-      sumMs = 0;
       worstMs = 0;
       windowStart = now;
       updateStatus();
