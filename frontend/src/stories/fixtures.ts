@@ -476,7 +476,7 @@ export const createMockChartSeriesStore = () =>
   ]);
 
 export const mockPayloadTree = payloadTree(
-  '{"temp":24.6,"humidity":61,"sensor":{"rssi":-72},"status":"ok"}'
+  '{"temp":24.6,"humidity":61,"pressure":"1013.2","sensor":{"rssi":-72},"status":"ok"}'
 );
 
 export const createMockCollectionsStore = () => {

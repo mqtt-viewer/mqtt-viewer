@@ -104,8 +104,16 @@ React-only in preview — don't use it here. The MCP needs Storybook **served or
 built first** (`pnpm storybook`, or `pnpm build-storybook`). It complements the
 specs (it knows rendered reality; the specs know Figma drift + the dep graph).
 
+## Writing copy (UI text, changelog, docs)
+
+Anything a user reads (dialog copy, empty states, tooltips, the "What's new"
+changelog, README) follows `docs/WRITING_STYLE.md`: warm, first person, British
+spelling, concise, and no em dashes. The changelog lives in
+`frontend/src/changelog.ts`; use the `/changelog` skill to update it.
+
 ## Skills
 
 - `/ds-add-component` — scaffold or formalize a component (spec + story + tier).
 - `/ds-figma-handover` — diff Figma library vs this code, emit a handover doc.
 - `/ds-implement-handover` — apply a handover doc to code + specs + stories.
+- `/changelog` — add to the "What's new" changelog, or promote it at release.

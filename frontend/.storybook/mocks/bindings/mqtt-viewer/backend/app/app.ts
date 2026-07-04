@@ -55,6 +55,8 @@ let mockAppSettings = new models.AppSettings({
   diskBudgetBytes: 1 * 1024 * 1024 * 1024,
   hasSeenHistoryPrompt: false,
   lastSeenChangelogVersion: "",
+  launchCount: 0,
+  hasSeenStarPrompt: false,
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
 
@@ -78,6 +80,14 @@ export async function AcknowledgeChangelog(
   mockAppSettings = new models.AppSettings({
     ...mockAppSettings,
     lastSeenChangelogVersion: version,
+  });
+  return mockAppSettings;
+}
+
+export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    hasSeenStarPrompt: true,
   });
   return mockAppSettings;
 }

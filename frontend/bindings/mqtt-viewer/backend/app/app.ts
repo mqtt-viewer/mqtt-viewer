@@ -35,6 +35,19 @@ export function AcknowledgeChangelog(version: string): Promise<models$0.AppSetti
     return $typingPromise;
 }
 
+/**
+ * AcknowledgeStarPrompt records that the user has seen the "star us on GitHub"
+ * prompt, so it never shows again (whether they starred or dismissed it).
+ */
+export function AcknowledgeStarPrompt(): Promise<models$0.AppSettings> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2492238430) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType0($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function AddSubscription(connectionId: number): Promise<models$0.Subscription | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1707702138, connectionId) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {

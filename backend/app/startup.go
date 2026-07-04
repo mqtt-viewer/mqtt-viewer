@@ -99,6 +99,15 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	// the message-buffer drain hot path.
 	a.loadRetentionSettings()
 
+	// Count this launch so one-time nudges (e.g. the GitHub star prompt) only
+	// fire once the app has clearly been used, never on a first-run install.
+	// Skipped in test mode to keep seeded-settings fixtures deterministic.
+	if a.Mode != AppModes.Test {
+		if err := a.recordAppLaunch(); err != nil {
+			slog.Error(fmt.Sprintf("error recording app launch: %v", err))
+		}
+	}
+
 	go func() {
 		err := protobuf.WriteSparkplugProtoFiles(a.Paths.ResourcePath)
 		if err != nil {

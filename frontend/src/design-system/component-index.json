@@ -2125,6 +2125,30 @@
       "specMissing": false
     },
     {
+      "name": "StarPromptDialog",
+      "tier": "component",
+      "description": "One-time nudge asking a repeat user to star the project on GitHub.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
+      "sourcePath": "src/components/StarPromptDialog/StarPromptDialog.svelte",
+      "specPath": "src/components/StarPromptDialog/StarPromptDialog.spec.json",
+      "storyPath": "src/components/StarPromptDialog/StarPromptDialog.stories.svelte",
+      "storyId": "Components/StarPromptDialog",
+      "specMissing": false
+    },
+    {
       "name": "Tabs",
       "tier": "primitive",
       "description": "Storybook coverage for Tabs.",
@@ -2295,9 +2319,14 @@
       },
       "props": [
         {
-          "name": "entry",
-          "type": "object",
+          "name": "entries",
+          "type": "array",
           "required": true
+        },
+        {
+          "name": "initialVersion",
+          "type": "string",
+          "required": false
         },
         {
           "name": "onClose",
@@ -2306,7 +2335,11 @@
         }
       ],
       "tokens": [
-        "secondary-text"
+        "secondary-text",
+        "emphasis",
+        "white-text",
+        "outline",
+        "primary"
       ],
       "dependencies": [
         "Button"

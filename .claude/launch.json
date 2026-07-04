@@ -4,19 +4,36 @@
     {
       "name": "storybook",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "frontend", "exec", "storybook", "dev", "-p", "6006", "--no-open"],
+      "runtimeArgs": [
+        "--dir",
+        "frontend",
+        "exec",
+        "storybook",
+        "dev",
+        "-p",
+        "6006",
+        "--no-open"
+      ],
       "port": 6006
     },
     {
       "name": "wails",
-      "runtimeExecutable": "wails",
-      "runtimeArgs": ["dev", "-noreload", "-skipbindings"],
-      "port": 34115
+      "runtimeExecutable": "wails3",
+      "runtimeArgs": ["dev", "-config", "./build/config.yml", "-port", "9245"],
+      "port": 9245
     },
     {
       "name": "frontend-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "frontend", "exec", "vite", "--port", "5180", "--strictPort"],
+      "runtimeArgs": [
+        "--dir",
+        "frontend",
+        "exec",
+        "vite",
+        "--port",
+        "5180",
+        "--strictPort"
+      ],
       "port": 5180,
       "autoPort": false
     }

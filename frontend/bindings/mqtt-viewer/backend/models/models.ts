@@ -15,7 +15,9 @@ import * as time$0 from "../../../time/models.js";
  * always-on leak guard); RecordingEnabled + DiskBudgetBytes control opt-in
  * durable history on disk; HasSeenHistoryPrompt gates the first-run popup.
  * LastSeenChangelogVersion records which version's "What's new" dialog the
- * user has dismissed, so it shows once per version.
+ * user has dismissed, so it shows once per version. LaunchCount counts app
+ * starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
+ * the GitHub star prompt as shown so it only ever appears once.
  */
 export class AppSettings {
     "id": number;
@@ -24,6 +26,8 @@ export class AppSettings {
     "diskBudgetBytes": number;
     "hasSeenHistoryPrompt": boolean;
     "lastSeenChangelogVersion": string;
+    "launchCount": number;
+    "hasSeenStarPrompt": boolean;
 
     /** Creates a new AppSettings instance. */
     constructor($$source: Partial<AppSettings> = {}) {
@@ -44,6 +48,12 @@ export class AppSettings {
         }
         if (!("lastSeenChangelogVersion" in $$source)) {
             this["lastSeenChangelogVersion"] = "";
+        }
+        if (!("launchCount" in $$source)) {
+            this["launchCount"] = 0;
+        }
+        if (!("hasSeenStarPrompt" in $$source)) {
+            this["hasSeenStarPrompt"] = false;
         }
 
         Object.assign(this, $$source);

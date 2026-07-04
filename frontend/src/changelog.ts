@@ -10,8 +10,10 @@ export interface ChangelogSection {
 }
 
 export interface ChangelogEntry {
-  // Bare semver, no leading v.
+  // Bare semver (no leading v) once released; "unreleased" while in development.
   version: string;
+  // false for the staging entry that gathers changes for the next release.
+  released: boolean;
   date: string;
   headline: string;
   intro: string;
@@ -21,7 +23,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "unreleased",
+    released: false,
+    date: "In development",
+    headline: "In the next update",
+    intro:
+      "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
+    sections: [
+      {
+        title: "Chart values that arrive as text",
+        body: 'Numeric readings often turn up wrapped in quotes, like "24.6". You can now chart those too, so a quoted number plots just like a plain one. Values that aren\'t really numbers stay out of the way.',
+      },
+      {
+        title: "Adding a value to a chart is clearer",
+        body: 'Choosing "Add value from payload" now opens the picker straight on the value, so it\'s obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.',
+      },
+    ],
+  },
+  {
     version: "1.0.0",
+    released: true,
     date: "July 2026",
     headline: "MQTT Viewer 1.0 is here",
     intro:
@@ -60,10 +81,18 @@ export const CHANGELOG: ChangelogEntry[] = [
 const normalise = (version: string): string =>
   version.trim().replace(/^v/i, "");
 
-// Returns the changelog entry for an exact app version, or null. Dev builds
-// ("v0.0.0-dev" etc.) and versions without notes get nothing.
+/** Released entries only, newest first. */
+export const releasedEntries = (): ChangelogEntry[] =>
+  CHANGELOG.filter((e) => e.released);
+
+/** The staging entry for the next release, or null if there isn't one. */
+export const unreleasedEntry = (): ChangelogEntry | null =>
+  CHANGELOG.find((e) => !e.released) ?? null;
+
+// Returns the released changelog entry for an exact app version, or null. Dev
+// builds ("v0.0.0-dev" etc.) and versions without notes get nothing.
 export const entryForVersion = (version: string): ChangelogEntry | null =>
-  CHANGELOG.find((e) => e.version === normalise(version)) ?? null;
+  releasedEntries().find((e) => e.version === normalise(version)) ?? null;
 
 export const shouldShowChangelog = (
   appVersion: string,
@@ -72,4 +101,20 @@ export const shouldShowChangelog = (
   const entry = entryForVersion(appVersion);
   if (!entry) return false;
   return normalise(lastSeenVersion) !== normalise(appVersion);
+};
+
+/**
+ * The entries to show in the dialog for a given running version, newest first.
+ * Released entries are always included. The unreleased staging entry is shown
+ * only on builds whose version has no released entry (i.e. dev builds), so it
+ * can be previewed without ever reaching users on a shipped release.
+ */
+export const changelogForDisplay = (version: string): ChangelogEntry[] => {
+  const released = releasedEntries();
+  const unreleased = unreleasedEntry();
+  const showUnreleased =
+    unreleased !== null &&
+    unreleased.sections.length > 0 &&
+    entryForVersion(version) === null;
+  return showUnreleased ? [unreleased, ...released] : released;
 };

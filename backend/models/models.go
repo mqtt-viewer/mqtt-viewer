@@ -14,25 +14,31 @@ type Global struct {
 // always-on leak guard); RecordingEnabled + DiskBudgetBytes control opt-in
 // durable history on disk; HasSeenHistoryPrompt gates the first-run popup.
 // LastSeenChangelogVersion records which version's "What's new" dialog the
-// user has dismissed, so it shows once per version.
+// user has dismissed, so it shows once per version. LaunchCount counts app
+// starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
+// the GitHub star prompt as shown so it only ever appears once.
 type AppSettings struct {
 	ID                       uint   `json:"id" gorm:"primaryKey"`
 	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
 	RecordingEnabled         bool   `json:"recordingEnabled"`
 	DiskBudgetBytes          int64  `json:"diskBudgetBytes"`
 	HasSeenHistoryPrompt     bool   `json:"hasSeenHistoryPrompt"`
-	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion"`
+	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion" gorm:"not null;default:''"`
+	LaunchCount              int64  `json:"launchCount" gorm:"not null;default:0"`
+	HasSeenStarPrompt        bool   `json:"hasSeenStarPrompt" gorm:"not null;default:0"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,
 // written in batches only when recording is enabled. Mirrors the message shape
 // of PublishHistory; payload is a blob to avoid UTF-8 inflation of raw bytes.
 // id is autoincrement, so it doubles as a stable arrival-order cursor for
-// keyset-paginated window lookups. Indexes are defined in the SQL migration.
+// keyset-paginated window lookups. The composite index serves per-topic paged
+// lookups (connection_id, topic, id) and its leftmost prefix serves the
+// per-connection cascade deletes.
 type ReceivedMessage struct {
-	ID           uint   `json:"id" gorm:"primaryKey"`
-	ConnectionID uint   `json:"connectionId"`
-	Topic        string `json:"topic"`
+	ID           uint   `json:"id" gorm:"primaryKey;index:received_messages_conn_topic_id,priority:3"`
+	ConnectionID uint   `json:"connectionId" gorm:"index:received_messages_conn_topic_id,priority:1"`
+	Topic        string `json:"topic" gorm:"index:received_messages_conn_topic_id,priority:2"`
 	QoS          uint   `json:"qos"`
 	Retain       bool   `json:"retain"`
 	Payload      []byte `json:"payload"`
@@ -75,6 +81,11 @@ type Connection struct {
 	CustomIconSeed       *string          `json:"customIconSeed"`
 	FilterHistories      []FilterHistory  `json:"filterHistories"`
 	PublishHistories     []PublishHistory `json:"publishHistories"`
+	// Declared only so the schema keeps the foreign keys added during the DB
+	// hardening review. Never preloaded (received history can be huge) and kept
+	// out of JSON/bindings; ConnectionID on the child is the source of truth.
+	Collections      []Collection      `json:"-"`
+	ReceivedMessages []ReceivedMessage `json:"-"`
 }
 
 type FilterHistory struct {

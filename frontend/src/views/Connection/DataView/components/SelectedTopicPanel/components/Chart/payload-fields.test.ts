@@ -34,10 +34,28 @@ describe("numericFields", () => {
     expect(numericFields("42.5")).toEqual([{ path: "", value: 42.5 }]);
   });
 
-  it("excludes strings, booleans, and null", () => {
+  it("excludes non-numeric strings, booleans, and null", () => {
     expect(numericFields('{"a":1,"b":"x","c":true,"d":null}')).toEqual([
       { path: "a", value: 1 },
     ]);
+  });
+
+  it("casts quoted numerics to numbers", () => {
+    expect(numericFields('{"temp":"24.6","rssi":"-72","load":"1e3"}')).toEqual([
+      { path: "temp", value: 24.6 },
+      { path: "rssi", value: -72 },
+      { path: "load", value: 1000 },
+    ]);
+  });
+
+  it("charts a bare quoted numeric payload with empty path", () => {
+    expect(numericFields('"42.5"')).toEqual([{ path: "", value: 42.5 }]);
+  });
+
+  it("excludes strings that are not purely numeric", () => {
+    expect(
+      numericFields('{"a":"24C","b":"","c":"0x1f","d":"1,000","e":"NaN"}')
+    ).toEqual([]);
   });
 
   it("returns [] for non-JSON payloads", () => {
@@ -58,6 +76,10 @@ describe("valueAtPath", () => {
   it("reads a bare numeric payload at empty path", () => {
     expect(valueAtPath("42.5", "")).toBe(42.5);
   });
+  it("reads quoted numeric values as numbers", () => {
+    expect(valueAtPath('{"temp":"24.6"}', "temp")).toBe(24.6);
+    expect(valueAtPath('"42.5"', "")).toBe(42.5);
+  });
   it("returns null when path is missing or non-numeric", () => {
     expect(valueAtPath('{"a":1}', "b")).toBeNull();
     expect(valueAtPath('{"a":"x"}', "a")).toBeNull();
@@ -77,6 +99,21 @@ describe("payloadTree", () => {
     expect(sensor?.children?.[0].path).toBe("sensor.rssi");
     const name = tree?.children?.find((c) => c.key === "name");
     expect(name?.type).toBe("string");
+    expect(name?.chartable).toBeUndefined();
+  });
+  it("marks numeric-string leaves as chartable but keeps string type", () => {
+    const tree = payloadTree('{"temp":"24.6","name":"kitchen"}');
+    const temp = tree?.children?.find((c) => c.key === "temp");
+    expect(temp?.type).toBe("string");
+    expect(temp?.value).toBe("24.6");
+    expect(temp?.chartable).toBe(true);
+    const name = tree?.children?.find((c) => c.key === "name");
+    expect(name?.chartable).toBeUndefined();
+  });
+  it("marks numeric leaves as chartable", () => {
+    const tree = payloadTree('{"temp":24.6}');
+    const temp = tree?.children?.find((c) => c.key === "temp");
+    expect(temp?.chartable).toBe(true);
   });
   it("returns null for non-JSON", () => {
     expect(payloadTree("nope")).toBeNull();
@@ -95,5 +132,6 @@ describe("hasNumericFields", () => {
     expect(hasNumericFields('{"a":"x"}')).toBe(false);
     expect(hasNumericFields("42")).toBe(true);
     expect(hasNumericFields("text")).toBe(false);
+    expect(hasNumericFields('{"a":"3.14"}')).toBe(true);
   });
 });

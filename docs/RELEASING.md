@@ -5,6 +5,10 @@ fires three workflows (mac / windows / linux) that build, sign, upload assets,
 and register the version with the portal. Nothing reaches users until you flip
 the `released` toggle in the portal admin.
 
+The `/release` skill drives this whole runbook (changelog promotion, release
+creation, workflow watching, and the go-live handoff). This doc is the
+reference it follows.
+
 ## TL;DR
 
 ```sh

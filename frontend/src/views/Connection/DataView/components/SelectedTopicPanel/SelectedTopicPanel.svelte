@@ -49,6 +49,13 @@
   $: chartTabIndex = mqttVersion === "3" ? 1 : 3;
   $: isChartTabActive = activeTabIndex === chartTabIndex;
   const viewChart = () => tabsRef?.setTab(chartTabIndex);
+  // Opens the payload field picker and switches to the Payload tab, so
+  // "Add value from payload" lands the user on a ready-to-pick control.
+  let showPayloadFieldPicker = false;
+  const addFromPayload = () => {
+    showPayloadFieldPicker = true;
+    tabsRef?.setTab(0);
+  };
   const popOut = () =>
     openChartWindow?.(
       $selectedTopicStore.selectedTopic ?? "",
@@ -251,6 +258,7 @@
             <PayloadTab
               bind:codec={$selectedTopicStore.options.decoding}
               bind:format={$selectedTopicStore.options.format}
+              bind:showFieldPicker={showPayloadFieldPicker}
               {isComparing}
               payload={selectedMessagePayload}
               payloadB64={selectedMessagePayloadB64}
@@ -265,7 +273,7 @@
             {selectedTopicStore}
             {chartSeriesStore}
             topic={selectedTopicString ?? ""}
-            onAddFromPayload={() => tabsRef?.setTab(0)}
+            onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
           />
         </div>
@@ -287,6 +295,7 @@
             <PayloadTab
               bind:codec={$selectedTopicStore.options.decoding}
               bind:format={$selectedTopicStore.options.format}
+              bind:showFieldPicker={showPayloadFieldPicker}
               {isComparing}
               payload={selectedMessagePayload}
               payloadB64={selectedMessagePayloadB64}
@@ -320,7 +329,7 @@
             {selectedTopicStore}
             {chartSeriesStore}
             topic={selectedTopicString ?? ""}
-            onAddFromPayload={() => tabsRef?.setTab(0)}
+            onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
           />
         </div>
