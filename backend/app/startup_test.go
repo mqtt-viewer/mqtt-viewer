@@ -41,6 +41,20 @@ func getTestApp(t *testing.T) *App {
 	return app
 }
 
+// restartTestApp starts a fresh App against the same on-disk resource
+// directory as an earlier getTestApp(t) call, without wiping it. Use this
+// to simulate an app restart against data seeded in a prior step.
+func restartTestApp(t *testing.T) *App {
+	app := NewApp(AppModes.Test, "0.0.0-test")
+	exPath := filepath.Join(appDir, "_test", t.Name())
+	app.Startup(context.Background(), &StartupOptions{
+		PathsOverride: &paths.Paths{
+			ResourcePath: exPath,
+		},
+	})
+	return app
+}
+
 func getSeededTestApp(t *testing.T) *App {
 	app := getTestApp(t)
 
@@ -79,7 +93,7 @@ func getSeededTestApp(t *testing.T) *App {
 	}
 	DB.Close()
 	// Use the newly seeded DB on start
-	app = getTestApp(t)
+	app = restartTestApp(t)
 
 	return app
 }
