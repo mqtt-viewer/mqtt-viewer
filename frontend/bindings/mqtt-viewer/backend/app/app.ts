@@ -358,6 +358,16 @@ export function OpenChartWindow(params: $models.OpenChartWindowParams): Promise<
     return $resultPromise;
 }
 
+/**
+ * OpenTopicWindow opens (or focuses) a separate window rendering the
+ * selected-topic panel for a connection, following topic selection in the
+ * main window like Chrome DevTools follows the page.
+ */
+export function OpenTopicWindow(params: $models.OpenTopicWindowParams): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(398361403, params) as any;
+    return $resultPromise;
+}
+
 export function PublishMqtt(connId: number, message: $models.PublishParams): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3575117605, connId, message) as any;
     return $resultPromise;
@@ -414,6 +424,22 @@ export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryP
 export function ServiceStartup(options: application$0.ServiceOptions): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1191179216, options) as any;
     return $resultPromise;
+}
+
+/**
+ * SetTopicPanelDock validates and persists the dockable selected-topic
+ * panel's global dock state, then emits TopicPanelDockChanged so every
+ * window converges. If the new mode is no longer "window", any open topic
+ * pop-out windows are closed (their own WindowClosing handler sees the mode
+ * has already left "window" and so does not revert it again).
+ */
+export function SetTopicPanelDock(mode: string, lastDockedSide: string): Promise<models$0.AppSettings> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(4192099940, mode, lastDockedSide) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType0($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 export function StartUpdate(): Promise<void> & { cancel(): void } {

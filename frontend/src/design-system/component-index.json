@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-04T05:21:19.313Z",
+  "generatedAt": "2026-07-04T08:59:47.200Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2041,12 +2041,19 @@
           "required": false,
           "options": [
             "left",
-            "right"
+            "right",
+            "top"
           ],
           "default": "right"
         },
         {
           "name": "width",
+          "type": "number",
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "height",
           "type": "number",
           "required": false,
           "default": 0
@@ -3178,6 +3185,35 @@
           "type": "function",
           "required": false,
           "default": "> Promise<void>"
+        },
+        {
+          "name": "openChartWindow",
+          "type": "function",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "dockMode",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "right",
+            "bottom",
+            "window"
+          ],
+          "default": "right"
+        },
+        {
+          "name": "onSetDockMode",
+          "type": "function",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "showCloseButton",
+          "type": "boolean",
+          "required": false,
+          "default": true
         }
       ],
       "tokens": [
@@ -4876,6 +4912,33 @@
       "specPath": "src/views/PleaseUpdate/PleaseUpdate.spec.json",
       "storyPath": "src/views/PleaseUpdate/PleaseUpdate.stories.svelte",
       "storyId": "Views/PleaseUpdate",
+      "specMissing": false
+    },
+    {
+      "name": "TopicWindow",
+      "tier": "view",
+      "description": "Storybook coverage for TopicWindow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/TopicWindow/TopicWindow.svelte",
+      "specPath": "src/views/TopicWindow/TopicWindow.spec.json",
+      "storyPath": "src/views/TopicWindow/TopicWindow.stories.svelte",
+      "storyId": "Views/TopicWindow",
       "specMissing": false
     }
   ]

@@ -19,6 +19,7 @@
   import Topic from "./components/Topic.svelte";
   import ChartView from "./components/Chart/ChartView.svelte";
   import { createChartSeriesStore } from "./components/Chart/chart-series-store";
+  import type { DockMode } from "@/stores/topic-panel-dock";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -30,6 +31,13 @@
   export let openChartWindow:
     | ((topic: string, fields: string[]) => void)
     | null = null;
+  // Dock-side control shown in the header menu. Optional so the panel keeps
+  // working anywhere it's used without wiring dock behaviour (e.g. tests).
+  export let dockMode: DockMode = "right";
+  export let onSetDockMode: ((mode: DockMode) => void) | null = null;
+  // Hidden in the popped-out window: the window's own close button is the
+  // way out there, rather than deselecting the topic.
+  export let showCloseButton = true;
 
   $: selectedTopicString = $selectedTopicStore.selectedTopic;
 
@@ -130,6 +138,43 @@
             </IconButton>
           </div>
           <div slot="menu-content" class="flex flex-col gap-5 p-2">
+            {#if onSetDockMode}
+              <div>
+                <div class="text-sm text-secondary-text mb-1">Dock side</div>
+                <div class="flex gap-1">
+                  <div
+                    class={`rounded ${dockMode === "right" ? "border-primary border-[1px]" : ""}`}
+                  >
+                    <IconButton
+                      tooltipText="Dock right"
+                      onClick={() => onSetDockMode?.("right")}
+                    >
+                      <Icon type="dockRight" size={18} />
+                    </IconButton>
+                  </div>
+                  <div
+                    class={`rounded ${dockMode === "bottom" ? "border-primary border-[1px]" : ""}`}
+                  >
+                    <IconButton
+                      tooltipText="Dock bottom"
+                      onClick={() => onSetDockMode?.("bottom")}
+                    >
+                      <Icon type="dockBottom" size={18} />
+                    </IconButton>
+                  </div>
+                  <div
+                    class={`rounded ${dockMode === "window" ? "border-primary border-[1px]" : ""}`}
+                  >
+                    <IconButton
+                      tooltipText="Open in window"
+                      onClick={() => onSetDockMode?.("window")}
+                    >
+                      <Icon type="popOut" size={18} />
+                    </IconButton>
+                  </div>
+                </div>
+              </div>
+            {/if}
             <Switch
               name="AutoSelectRecent"
               label="Auto-select most recent"
@@ -170,9 +215,11 @@
             </DropdownCloseOnClick>
           </div>
         </DropdownMenu>
-        <IconButton onClick={selectedTopicStore.deselectTopic}>
-          <Icon type="close" size={18} />
-        </IconButton>
+        {#if showCloseButton}
+          <IconButton onClick={selectedTopicStore.deselectTopic}>
+            <Icon type="close" size={18} />
+          </IconButton>
+        {/if}
       </div>
     </div></PanelHeader
   >

@@ -7,6 +7,9 @@ export enum GlobalEvent {
   $zero = "",
   ConnectionDeleted = "ConnectionDeleted",
   UpdateAvailable = "UpdateAvailable",
+  TopicWindowSelect = "TopicWindowSelect",
+  TopicWindowClosed = "TopicWindowClosed",
+  TopicPanelDockChanged = "TopicPanelDockChanged",
 }
 
 export class ConnectionEventsSet {

@@ -29,6 +29,12 @@ func TestAppSettingsSeededDefaults(t *testing.T) {
 	if settings.HasSeenStarPrompt {
 		t.Error("expected star prompt unseen by default")
 	}
+	if settings.TopicPanelDockMode != "right" {
+		t.Errorf("expected default dock mode 'right', got %q", settings.TopicPanelDockMode)
+	}
+	if settings.TopicPanelLastDockedSide != "right" {
+		t.Errorf("expected default last docked side 'right', got %q", settings.TopicPanelLastDockedSide)
+	}
 }
 
 func TestRecordAppLaunchIncrementsCount(t *testing.T) {
@@ -65,6 +71,36 @@ func TestAcknowledgeStarPromptPersists(t *testing.T) {
 	}
 	if !reloaded.HasSeenStarPrompt {
 		t.Error("expected star prompt seen flag to persist")
+	}
+}
+
+func TestSetTopicPanelDockPersists(t *testing.T) {
+	app := getTestApp(t)
+
+	updated, err := app.SetTopicPanelDock("bottom", "bottom")
+	if err != nil {
+		t.Fatalf("setting dock: %v", err)
+	}
+	if updated.TopicPanelDockMode != "bottom" || updated.TopicPanelLastDockedSide != "bottom" {
+		t.Errorf("unexpected updated settings: %+v", updated)
+	}
+
+	reloaded, err := app.GetAppSettings()
+	if err != nil {
+		t.Fatalf("reloading settings: %v", err)
+	}
+	if reloaded.TopicPanelDockMode != "bottom" {
+		t.Errorf("expected persisted dock mode 'bottom', got %q", reloaded.TopicPanelDockMode)
+	}
+}
+
+func TestSetTopicPanelDockValidatesMode(t *testing.T) {
+	app := getTestApp(t)
+	if _, err := app.SetTopicPanelDock("sideways", "right"); err == nil {
+		t.Error("expected error for invalid dock mode")
+	}
+	if _, err := app.SetTopicPanelDock("window", "window"); err == nil {
+		t.Error("expected error for invalid last docked side")
 	}
 }
 

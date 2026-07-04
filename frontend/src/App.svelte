@@ -19,6 +19,7 @@
   import PleaseUpdate from "./views/PleaseUpdate/PleaseUpdate.svelte";
   import UpdateDialog from "./components/UpdateDialog/UpdateDialog.svelte";
   import ChartWindow from "./views/ChartWindow/ChartWindow.svelte";
+  import TopicWindow from "./views/TopicWindow/TopicWindow.svelte";
   import HistoryRetentionPrompt from "./components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte";
   import WhatsNewDialog from "./components/WhatsNewDialog/WhatsNewDialog.svelte";
   import StarPromptDialog from "./components/StarPromptDialog/StarPromptDialog.svelte";
@@ -27,6 +28,10 @@
   // /?view=chart&...; render only the standalone chart, not the full app shell.
   const isChartWindow =
     new URLSearchParams(window.location.search).get("view") === "chart";
+  // Detached topic windows (opened by OpenTopicWindow) load the same assets at
+  // /?view=topic&...; render only the selected-topic panel, not the full app shell.
+  const isTopicWindow =
+    new URLSearchParams(window.location.search).get("view") === "topic";
 
   gsap.registerPlugin(Flip);
   gsap.registerPlugin(Draggable);
@@ -49,10 +54,17 @@
   });
 
   let appWidth: number;
+  let appHeight: number;
   $: appWidth,
     (() => {
       if (!!appWidth) {
         panelSizes.updateAppWidth(appWidth);
+      }
+    })();
+  $: appHeight,
+    (() => {
+      if (!!appHeight) {
+        panelSizes.updateAppHeight(appHeight);
       }
     })();
 
@@ -62,10 +74,13 @@
 
 {#if isChartWindow}
   <ChartWindow />
+{:else if isTopicWindow}
+  <TopicWindow />
 {:else}
   <main
     class="h-full w-full flex flex-col bg-elevation-0"
     bind:clientWidth={appWidth}
+    bind:clientHeight={appHeight}
   >
   <IconContext>
     {#await initialization.init()}

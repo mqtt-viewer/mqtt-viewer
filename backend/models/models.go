@@ -17,6 +17,10 @@ type Global struct {
 // user has dismissed, so it shows once per version. LaunchCount counts app
 // starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
 // the GitHub star prompt as shown so it only ever appears once.
+// TopicPanelDockMode and TopicPanelLastDockedSide hold the dockable
+// selected-topic panel's global dock state ("right" | "bottom" | "window",
+// and "right" | "bottom" for the side to return to when a pop-out window
+// closes).
 type AppSettings struct {
 	ID                       uint   `json:"id" gorm:"primaryKey"`
 	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
@@ -26,6 +30,8 @@ type AppSettings struct {
 	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion"`
 	LaunchCount              int64  `json:"launchCount"`
 	HasSeenStarPrompt        bool   `json:"hasSeenStarPrompt"`
+	TopicPanelDockMode       string `json:"topicPanelDockMode"`
+	TopicPanelLastDockedSide string `json:"topicPanelLastDockedSide"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,

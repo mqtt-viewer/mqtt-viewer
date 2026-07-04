@@ -47,6 +47,35 @@
       "type": "function",
       "required": false,
       "default": "> Promise<void>"
+    },
+    {
+      "name": "openChartWindow",
+      "type": "function",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "dockMode",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "right",
+        "bottom",
+        "window"
+      ],
+      "default": "right"
+    },
+    {
+      "name": "onSetDockMode",
+      "type": "function",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "showCloseButton",
+      "type": "boolean",
+      "required": false,
+      "default": true
     }
   ],
   "tokens": [

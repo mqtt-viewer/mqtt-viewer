@@ -435,6 +435,8 @@ const propDefaults: Record<string, () => unknown> = {
   onOpenMessage: () => noop,
   onSearch: () => noop,
   onSelect: () => noop,
+  onSetDockMode: () => noop,
+  openChartWindow: () => noop,
   scope: () => "global",
   connection: () => mockConnection,
   connectionId: () => 1,
@@ -455,6 +457,7 @@ const propDefaults: Record<string, () => unknown> = {
   defaultValueText: () => "mqtt",
   deleteRetainedMessage: () => asyncNoop,
   disabled: () => false,
+  dockMode: () => "right",
   errorMessage: () => "Field is required",
   expandedTopicsStore: () => {
     const store = createExpandedTopicsStore();
@@ -681,11 +684,12 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
   const enumOptions: Record<string, string[]> = {
     as: ["button", "a", "div"],
     codec: ["none", "base64", "hex"],
+    dockMode: ["right", "bottom", "window"],
     format: ["none", "json", "json-prettier", "xml"],
     iconPlacement: ["left", "right"],
     mqttVersion: ["3", "5"],
     placement: ["top", "right", "bottom", "left"],
-    resizeEdge: ["left", "right"],
+    resizeEdge: ["left", "right", "top"],
     size: ["small", "medium"],
     sortDir: ["asc", "desc"],
     sortKey: ["topic", "time"],

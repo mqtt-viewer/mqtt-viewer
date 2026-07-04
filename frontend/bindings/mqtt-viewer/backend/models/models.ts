@@ -18,6 +18,10 @@ import * as time$0 from "../../../time/models.js";
  * user has dismissed, so it shows once per version. LaunchCount counts app
  * starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
  * the GitHub star prompt as shown so it only ever appears once.
+ * TopicPanelDockMode and TopicPanelLastDockedSide hold the dockable
+ * selected-topic panel's global dock state ("right" | "bottom" | "window",
+ * and "right" | "bottom" for the side to return to when a pop-out window
+ * closes).
  */
 export class AppSettings {
     "id": number;
@@ -28,6 +32,8 @@ export class AppSettings {
     "lastSeenChangelogVersion": string;
     "launchCount": number;
     "hasSeenStarPrompt": boolean;
+    "topicPanelDockMode": string;
+    "topicPanelLastDockedSide": string;
 
     /** Creates a new AppSettings instance. */
     constructor($$source: Partial<AppSettings> = {}) {
@@ -54,6 +60,12 @@ export class AppSettings {
         }
         if (!("hasSeenStarPrompt" in $$source)) {
             this["hasSeenStarPrompt"] = false;
+        }
+        if (!("topicPanelDockMode" in $$source)) {
+            this["topicPanelDockMode"] = "";
+        }
+        if (!("topicPanelLastDockedSide" in $$source)) {
+            this["topicPanelLastDockedSide"] = "";
         }
 
         Object.assign(this, $$source);

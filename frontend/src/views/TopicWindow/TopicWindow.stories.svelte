@@ -1,16 +1,16 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import Component from "./ResizableContainer.svelte";
+  import Component from "./TopicWindow.svelte";
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
 
-  const componentName = "ResizableContainer";
-  const storyId = "Primitives/ResizableContainer";
-  const props: string[] = ["id","collapsed","minSize","maxSize","resizeEdge","width","height"];
+  const componentName = "TopicWindow";
+  const storyId = "Views/TopicWindow";
+  const props: string[] = [];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
-    title: "Primitives/ResizableContainer",
+    title: "Views/TopicWindow",
     component: Component,
     tags: ["autodocs"],
     argTypes: getStoryArgTypes(componentName, props) as any,
@@ -23,12 +23,3 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
-
-<!-- Vertical (bottom-dock) example: sizes height instead of width, drag
-     handle along the top edge. Mirrors the dockable topic panel's
-     resizeEdge="top" usage in DataView. -->
-<Story
-  name="Vertical"
-  args={{ ...storyArgs, id: "selected-topic-panel-bottom", resizeEdge: "top", minSize: 220, maxSize: 480, height: 280 }}
-  {template}
-/>

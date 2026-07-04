@@ -57,6 +57,8 @@ let mockAppSettings = new models.AppSettings({
   lastSeenChangelogVersion: "",
   launchCount: 0,
   hasSeenStarPrompt: false,
+  topicPanelDockMode: "right",
+  topicPanelLastDockedSide: "right",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
 
@@ -91,6 +93,23 @@ export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
   });
   return mockAppSettings;
 }
+
+export async function SetTopicPanelDock(
+  mode: string,
+  lastDockedSide: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    topicPanelDockMode: mode,
+    topicPanelLastDockedSide: lastDockedSide,
+  });
+  return mockAppSettings;
+}
+
+export async function OpenTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
+
 
 export async function GetDatabaseSizeBytes(): Promise<number> {
   return mockDatabaseSizeBytes;
