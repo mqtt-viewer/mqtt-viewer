@@ -1,6 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import Component from "./StarPromptDialog.svelte";
+  import Component, { starPromptOpen } from "./StarPromptDialog.svelte";
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
 
@@ -23,3 +23,12 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<Story
+  name="Open"
+  args={storyArgs}
+  {template}
+  play={async () => {
+    starPromptOpen.set(true);
+  }}
+/>

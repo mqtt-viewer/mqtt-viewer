@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-04T05:21:19.313Z",
+  "generatedAt": "2026-07-05T13:08:31.908Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2138,7 +2138,9 @@
       },
       "props": [],
       "tokens": [
-        "secondary-text"
+        "secondary-text",
+        "warning",
+        "highlight-background"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",

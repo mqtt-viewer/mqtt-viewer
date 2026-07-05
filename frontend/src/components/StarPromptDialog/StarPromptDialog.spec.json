@@ -13,7 +13,9 @@
   },
   "props": [],
   "tokens": [
-    "secondary-text"
+    "secondary-text",
+    "warning",
+    "highlight-background"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert."

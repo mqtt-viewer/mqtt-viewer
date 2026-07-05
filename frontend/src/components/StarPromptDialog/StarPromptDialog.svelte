@@ -8,6 +8,7 @@
 <script lang="ts">
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import Button from "@/components/Button/Button.svelte";
+  import Icon from "@/components/Icon/Icon.svelte";
   import { Browser } from "@wailsio/runtime";
   import {
     whatsNewResolved,
@@ -18,7 +19,7 @@
     AcknowledgeStarPrompt,
   } from "bindings/mqtt-viewer/backend/app/app";
 
-  const REPO_URL = "https://github.com/mqtt-viewer/mqtt-viewer";
+  const STARGAZERS_URL = "https://github.com/mqtt-viewer/mqtt-viewer/stargazers";
 
   // Only nudge once the app has clearly been used a few times, so a fresh
   // install never sees this on first run.
@@ -72,7 +73,7 @@
   };
 
   const onStar = () => {
-    Browser.OpenURL(REPO_URL);
+    Browser.OpenURL(STARGAZERS_URL);
     starPromptOpen.set(false);
   };
 
@@ -83,15 +84,27 @@
 
 <Dialog title="Like the app?" isOpen={starPromptOpen}>
   <div class="flex flex-col gap-5 mt-1 w-[400px]">
-    <p class="text-secondary-text">
-      Starring the project on GitHub is an easy way to help out. It helps more
-      people find MQTT Viewer, and it's a real boost for me to see. Thanks for
-      using it.
-    </p>
+    <div class="flex items-start gap-4">
+      <div class="shrink-0 rounded-full bg-highlight-background p-2.5 text-warning">
+        <Icon type="star" size={26} selected />
+      </div>
+      <p class="text-secondary-text">
+        Starring the project on GitHub is an easy way to help out. It helps more
+        people find MQTT Viewer, and it's a real boost for me to see. Thanks for
+        using it.
+      </p>
+    </div>
 
     <div class="flex gap-3 justify-end items-center">
       <Button variant="text" on:click={onLater}>Maybe later</Button>
-      <Button variant="primary" on:click={onStar}>Star on GitHub</Button>
+      <Button
+        variant="primary"
+        iconType="github"
+        iconSize={18}
+        on:click={onStar}
+      >
+        Star on GitHub
+      </Button>
     </div>
   </div>
 </Dialog>
