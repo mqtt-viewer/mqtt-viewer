@@ -16,23 +16,9 @@ import (
 var _, filename, _, _ = runtime.Caller(0)
 var appDir = path.Dir(filename)
 
-func getTestApp(t *testing.T) *App {
+func startTestAppAt(exPath string) *App {
 	app := NewApp(AppModes.Test, "0.0.0-test")
 	ctx := context.Background()
-	exPath := filepath.Join(appDir, "_test", t.Name())
-	// Create this path if it does not exist
-	if _, err := os.Stat(exPath); err == nil {
-		os.RemoveAll(exPath)
-		// Clean any old test dbs
-	}
-	if _, err := os.Stat(exPath); os.IsNotExist(err) {
-		os.MkdirAll(exPath, os.ModePerm)
-	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(exPath)
-	})
-
 	app.Startup(ctx, &StartupOptions{
 		PathsOverride: &paths.Paths{
 			ResourcePath: exPath,
@@ -41,18 +27,30 @@ func getTestApp(t *testing.T) *App {
 	return app
 }
 
-// restartTestApp starts a fresh App against the same on-disk resource
-// directory as an earlier getTestApp(t) call, without wiping it. Use this
-// to simulate an app restart against data seeded in a prior step.
-func restartTestApp(t *testing.T) *App {
-	app := NewApp(AppModes.Test, "0.0.0-test")
+func getTestApp(t *testing.T) *App {
 	exPath := filepath.Join(appDir, "_test", t.Name())
-	app.Startup(context.Background(), &StartupOptions{
-		PathsOverride: &paths.Paths{
-			ResourcePath: exPath,
-		},
+	// Clean any old test db left over from a previous run before starting fresh.
+	os.RemoveAll(exPath)
+	os.MkdirAll(exPath, os.ModePerm)
+
+	t.Cleanup(func() {
+		os.RemoveAll(exPath)
 	})
-	return app
+
+	return startTestAppAt(exPath)
+}
+
+// reopenTestApp closes the app's DB connection and starts a new App against
+// the same on-disk resource dir, simulating an app restart that reloads
+// whatever was persisted rather than wiping and recreating the DB.
+func reopenTestApp(t *testing.T, app *App) *App {
+	exPath := filepath.Join(appDir, "_test", t.Name())
+	DB, err := app.Db.DB.DB()
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	DB.Close()
+	return startTestAppAt(exPath)
 }
 
 func getSeededTestApp(t *testing.T) *App {
@@ -87,13 +85,8 @@ func getSeededTestApp(t *testing.T) *App {
 		}
 	}
 
-	DB, err := app.Db.DB.DB()
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-	DB.Close()
-	// Use the newly seeded DB on start
-	app = restartTestApp(t)
+	// Reopen against the same on-disk DB so the app loads the seeded data.
+	app = reopenTestApp(t, app)
 
 	return app
 }
