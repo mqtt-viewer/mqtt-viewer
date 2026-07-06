@@ -422,6 +422,28 @@ export async function GetReceivedMessageById(
   return [{ ...found, topic }, true];
 }
 
+export async function GetMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: string[],
+  _timesMs: number[]
+): Promise<any[]> {
+  return mockMqttMessages
+    .filter((m) => ids.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetReceivedMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: number[]
+): Promise<any[]> {
+  const wanted = ids.map(String);
+  return mockMqttMessages
+    .filter((m) => wanted.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
 export async function GetMqttStats(): Promise<app.MqttStats> {
   return new app.MqttStats({
     totalMessagesReceived: 128,

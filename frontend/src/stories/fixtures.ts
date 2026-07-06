@@ -247,6 +247,8 @@ export const createMockSelectedTopicStore = () => {
     isLoadingWindow: null,
     chartHistory: null,
     isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
     options: {
       autoSelect: true,
       compare: true,
@@ -322,6 +324,8 @@ export const createBusyMockSelectedTopicStore = (
     isLoadingWindow: null,
     chartHistory: null,
     isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
     options: {
       autoSelect: true,
       compare: true,

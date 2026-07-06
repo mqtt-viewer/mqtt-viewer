@@ -27,19 +27,48 @@
   } from "../../../stores/selected-topic-store";
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import { sampleEvenly } from "./timeline-sampling";
 
   // Upper bound on how many items the vis-timeline DataSet holds at once.
   // The store's `history` array (and the payload/chart features that read
   // it) keeps up to MAX_LOADED_MESSAGES messages, but rendering that many
   // as vis-timeline DOM items is what saturates the main thread on a busy
   // topic; the visual timeline only ever needs to show a recent slice, so
-  // it is bounded far tighter than the data itself. Only the newest
+  // it is bounded far tighter than the data itself. The initial rebuild on
+  // topic select creates this many DOM items synchronously, so it directly
+  // sets the select-time hitch: 1000 is visually indistinguishable from
+  // 2000 in a 100px strip and halves that cost. Only the newest
   // TIMELINE_MAX_ITEMS are kept in timelineDataSet; older ones are trimmed
   // as appends arrive (see trimTimelineDataSetToMax below). Keyboard
   // next/previous and selection still derive from the full store history,
   // so navigating past the trimmed edge still works — it just can't
   // visually pan the timeline to an item that isn't loaded into it.
-  const TIMELINE_MAX_ITEMS = 2000;
+  const TIMELINE_MAX_ITEMS = 1000;
+
+  // How much the DataSet may overshoot TIMELINE_MAX_ITEMS before
+  // trimTimelineDataSetToMax actually trims: its get+sort over the whole
+  // DataSet isn't free, so amortize it rather than pay it on every flush.
+  const TIMELINE_TRIM_SLACK = 500;
+
+  // Live append deltas arrive every ~300ms on a busy topic; adding to the
+  // DataSet (and re-selecting the newest item) per drain is too much main
+  // thread work, so appends are buffered and flushed at most this often.
+  const APPEND_FLUSH_MS = 500;
+
+  // Cap on how many DOM items a single append flush may create. At two
+  // flushes per second this bounds item creation to ~300/s no matter how
+  // fast the topic publishes; in a 100px strip more than about one dot
+  // per two horizontal pixels is indistinguishable anyway, so the dropped
+  // dots are invisible. Every message still lands in the store's history,
+  // so selection and keyboard navigation are unaffected — only the visual
+  // dot layer is sampled.
+  const FLUSH_MAX_ADDS = 150;
+
+  // Cap on how many DOM items a single prepend (a loaded older window) may
+  // create. A loaded older window spans a wide time range, so 500 evenly
+  // sampled dots is already denser than the strip can show; matches the
+  // rebuild's density philosophy instead of adding 5,000 items per window.
+  const PREPEND_MAX_ADDS = 500;
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -75,10 +104,11 @@
   let selectedMessageId: string | number | null = null;
   let selectedMessageIndex: number | null = null;
 
-  // Guards the auto-select-most-recent DataSet "add" listener while a
-  // prepend is being applied, since DataSet "add" events fire synchronously
-  // and we never want an older-history prepend to steal the selection.
-  let applyingPrepend = false;
+  // Live appends buffered between flushes (see APPEND_FLUSH_MS above) and
+  // the pending flush timer. Cleared on destroy and on a wholesale rebuild.
+  let pendingAppends: MqttHistoryMessage[] = [];
+  let appendFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  let destroyed = false;
 
   const getTimelineData = (messages: MqttHistoryMessage[]) => {
     const timelineData: DataItemCollectionType = [];
@@ -93,35 +123,95 @@
     return timelineData;
   };
 
-  // Builds the initial/rebuilt DataSet contents: only the newest
-  // TIMELINE_MAX_ITEMS of `messages` (history is already time-ordered
-  // oldest-first), so a 5,000+ item history never creates that many
-  // vis-timeline DOM items in one go.
+  // Builds the initial/rebuilt DataSet contents: at most
+  // TIMELINE_MAX_ITEMS items sampled evenly across the whole loaded
+  // history (already time-ordered oldest-first), so a 5,000+ item history
+  // never creates that many vis-timeline DOM items in one go. Sampling
+  // the whole loaded window rather than slicing the newest gives full-span
+  // dot coverage when zoomed out, at the same bounded item count.
   const getBoundedTimelineData = (messages: MqttHistoryMessage[]) => {
-    const bounded =
-      messages.length > TIMELINE_MAX_ITEMS
-        ? messages.slice(messages.length - TIMELINE_MAX_ITEMS)
-        : messages;
-    return getTimelineData(bounded);
+    return getTimelineData(sampleEvenly(messages, TIMELINE_MAX_ITEMS));
   };
 
   // Enforces TIMELINE_MAX_ITEMS on the DataSet after new items are added,
-  // evicting the oldest currently-loaded visual items (NOT from the store's
+  // evicting visual items from the requested end (NOT from the store's
   // `history` — only the vis-timeline DataSet is bounded). Cheap relative to
   // rendering: DataSet.remove on ids that are already off-screen doesn't
-  // trigger the same per-item DOM work as the initial add.
-  const trimTimelineDataSetToMax = () => {
+  // trigger the same per-item DOM work as the initial add. Amortized: only
+  // trims once the DataSet overshoots by TIMELINE_TRIM_SLACK, then trims
+  // back down to exactly TIMELINE_MAX_ITEMS.
+  const trimTimelineDataSetToMax = (evictEnd: "oldest" | "newest" = "oldest") => {
+    if (timelineDataSet.length <= TIMELINE_MAX_ITEMS + TIMELINE_TRIM_SLACK) {
+      return;
+    }
     const excess = timelineDataSet.length - TIMELINE_MAX_ITEMS;
-    if (excess <= 0) return;
     // DataSet iteration order isn't guaranteed to be insertion/time order,
-    // so sort by start time to find the oldest `excess` ids to evict.
+    // so sort by start time to find the `excess` ids to evict from the
+    // requested end.
     const items = timelineDataSet.get({ fields: ["id", "start"] }) as {
       id: IdType;
       start: Date;
     }[];
     items.sort((a, b) => a.start.getTime() - b.start.getTime());
-    const idsToRemove = items.slice(0, excess).map((item) => item.id);
-    timelineDataSet.remove(idsToRemove);
+    const toEvict =
+      evictEnd === "oldest"
+        ? items.slice(0, excess)
+        : items.slice(items.length - excess);
+    timelineDataSet.remove(toEvict.map((item) => item.id));
+  };
+
+  // Cancels the pending append flush and drops whatever it buffered. Used on
+  // destroy and before a wholesale rebuild: the rebuild reads the full
+  // current history, so flushing stale buffered appends afterwards would
+  // double-add items.
+  const cancelPendingAppends = () => {
+    if (appendFlushTimer !== null) {
+      clearTimeout(appendFlushTimer);
+      appendFlushTimer = null;
+    }
+    pendingAppends = [];
+  };
+
+  // Applies the buffered live appends in one go, then (while auto-following)
+  // moves the selection to the newest history message. Selection here reads
+  // history[length - 1] directly — live appends always land at the end, so
+  // there is no need for the findIndex over a 20k history the old
+  // per-DataSet-add listener paid on every drain.
+  const flushAppends = () => {
+    appendFlushTimer = null;
+    if (destroyed || pendingAppends.length === 0) return;
+    if (pendingAppends.length >= TIMELINE_MAX_ITEMS) {
+      // The buffer alone fills the visual cap: cheaper to rebuild the
+      // DataSet than to add everything and immediately trim most of it out.
+      // Sample across the whole buffer rather than slicing the newest so
+      // the dots cover the full flushed span evenly.
+      timelineDataSet.clear();
+      timelineDataSet.add(
+        getTimelineData(sampleEvenly(pendingAppends, TIMELINE_MAX_ITEMS))
+      );
+    } else {
+      timelineDataSet.add(
+        getTimelineData(sampleEvenly(pendingAppends, FLUSH_MAX_ADDS))
+      );
+      trimTimelineDataSetToMax();
+    }
+    pendingAppends = [];
+
+    if (!isAutoSelectingMostRecent) return;
+    const history = $selectedTopicStore.history;
+    if (history.length === 0) return;
+    const last = history[history.length - 1];
+    selectedMessageId = last.id;
+    selectedMessageIndex = history.length - 1;
+    timeline.setSelection([last.id]);
+    onMessageSelect(last.id.toString());
+    const item = timelineDataSet.get(last.id);
+    // Skip the viewport move when the new item is already visible, and never
+    // animate: an animated moveTo per flush compounds into a continuously
+    // tweening viewport the timeline can't keep up with.
+    if (item && !isWithinVisibleWindow(item.start as Date)) {
+      timeline.moveTo(item.start, { animation: false });
+    }
   };
 
   // Recomputes currentMin: normally session start minus a minute, but when
@@ -177,14 +267,22 @@
 
   const handleHistoryDelta = (delta: HistoryDelta) => {
     if (delta.kind === "append") {
-      timelineDataSet.add(getTimelineData(delta.messages));
-      trimTimelineDataSetToMax();
+      // Buffer rather than apply: see APPEND_FLUSH_MS. Appending to the
+      // buffer is O(batch); all the DataSet/DOM/selection cost is deferred
+      // to the throttled flush.
+      pendingAppends.push(...delta.messages);
+      if (appendFlushTimer === null) {
+        appendFlushTimer = setTimeout(flushAppends, APPEND_FLUSH_MS);
+      }
       return;
     }
     if (delta.kind === "prepend") {
-      applyingPrepend = true;
-      timelineDataSet.add(getTimelineData(delta.messages));
-      applyingPrepend = false;
+      timelineDataSet.add(
+        getTimelineData(sampleEvenly(delta.messages, PREPEND_MAX_ADDS))
+      );
+      // The user is panning into the past: evict from the newest end, the
+      // direction they are moving away from.
+      trimTimelineDataSetToMax("newest");
       recomputeMin();
       applyTimelineOptions();
       // The view may still extend past the new oldest point (or new/newer
@@ -198,6 +296,13 @@
     }
     // trim
     timelineDataSet.remove(delta.ids);
+    // Buffered appends may include ids the store just evicted; drop them so
+    // the next flush can't add items the store no longer holds. Trims are
+    // rare (amortized in the store) so the filter cost is negligible.
+    if (pendingAppends.length > 0) {
+      const trimmedIds = new Set(delta.ids);
+      pendingAppends = pendingAppends.filter((m) => !trimmedIds.has(m.id));
+    }
     if (selectedMessageId !== null && delta.ids.includes(selectedMessageId.toString())) {
       selectedMessageId = null;
       selectedMessageIndex = null;
@@ -208,7 +313,7 @@
   // Selects the last message in the store's (time-ordered) history — used
   // instead of reading timelineDataSet.get() insertion order, which breaks
   // once prepends are involved.
-  const selectLastHistoryMessage = () => {
+  const selectLastHistoryMessage = (animate = true) => {
     const history = $selectedTopicStore.history;
     if (history.length === 0) return;
     const lastMessage = history[history.length - 1];
@@ -218,7 +323,7 @@
     onMessageSelect(lastMessage.id.toString());
     const item = timelineDataSet.get(lastMessage.id);
     if (item) {
-      timeline.moveTo(item.start, { animation: true });
+      timeline.moveTo(item.start, { animation: animate });
     }
   };
 
@@ -234,7 +339,7 @@
     defaultTimelineOptions = { ...defaultTimelineOptions, min: currentMin };
     timeline = new Timeline(container, timelineDataSet, defaultTimelineOptions);
     if (timelineDataSet.length > 0) {
-      selectLastHistoryMessage();
+      selectLastHistoryMessage(false);
     }
 
     timeline.setWindow(currentMin, maxTimelineTime, {
@@ -305,6 +410,8 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
+    cancelPendingAppends();
     if (!!timeline) {
       timeline.destroy();
       timelineDataSet.clear();
@@ -318,22 +425,6 @@
     selectedTopicStore.setOnHistoryDelta(null);
   });
 
-  const turnAutoSelectMostRecentOn = (
-    timeline: Timeline,
-    timelineDataSet: DataSet<DataItem, "id">
-  ) => {
-    if (!timelineDataSet || !timeline) return;
-    selectLastHistoryMessage();
-    timelineDataSet.on("add", selectMostRecentData);
-  };
-
-  const turnAutoSelectMostRecentOff = (
-    timelineDataSet: DataSet<DataItem, "id">
-  ) => {
-    if (!timelineDataSet || !timeline) return;
-    timelineDataSet.off("add", selectMostRecentData);
-  };
-
   // True when `time` already falls inside the timeline's current visible
   // window, so a moveTo would be a no-op pan anyway.
   const isWithinVisibleWindow = (time: Date) => {
@@ -341,39 +432,14 @@
     return time >= range.start && time <= range.end;
   };
 
-  const selectMostRecentData = (
-    event: "add",
-    properties: { items: IdType[] },
-    senderId: string
-  ) => {
-    // Prepends fire "add" too, but must never steal the selection.
-    if (applyingPrepend) return;
-    if (properties.items.length === 0) return;
-    const lastMessageId = properties.items[properties.items.length - 1];
-    selectedMessageId = lastMessageId;
-    selectedMessageIndex = $selectedTopicStore.history.findIndex(
-      (message) => message.id === lastMessageId
-    );
-    timeline.setSelection([lastMessageId]);
-    onMessageSelect(lastMessageId.toString());
-    const lastMessage = timelineDataSet.get(lastMessageId);
-    // While auto-following live appends (every ~300ms on a busy topic), skip
-    // the viewport move entirely when the new item is already visible, and
-    // never animate: an animated moveTo on every drain compounds with the
-    // add frequency into a continuously-tweening viewport that a 5,000+ item
-    // timeline can't keep up with.
-    if (lastMessage && !isWithinVisibleWindow(lastMessage.start as Date)) {
-      timeline.moveTo(lastMessage.start, { animation: false });
-    }
-  };
-
+  // When following turns on, snap to the newest message once for immediate
+  // feedback; from then on each append flush keeps the selection following
+  // (see flushAppends), so no per-DataSet-add listener is needed.
   $: isAutoSelectingMostRecent,
     (() => {
       if (!timeline || !timelineDataSet) return;
-      if (!isAutoSelectingMostRecent) {
-        turnAutoSelectMostRecentOff(timelineDataSet);
-      } else {
-        turnAutoSelectMostRecentOn(timeline, timelineDataSet);
+      if (isAutoSelectingMostRecent) {
+        selectLastHistoryMessage();
       }
     })();
 
@@ -385,6 +451,9 @@
   let innerHistoryRevision = $selectedTopicStore.historyRevision;
 
   const rebuildTimelineFromHistory = () => {
+    // A rebuild replaces the dataset wholesale from the full current
+    // history; stale buffered appends would double-add items on flush.
+    cancelPendingAppends();
     timelineDataSet = new DataSet<DataItem, "id">();
     timelineDataSet.add(getBoundedTimelineData($selectedTopicStore.history));
     selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
@@ -393,7 +462,7 @@
     applyTimelineOptions();
     // Select the most recent message in the (re)loaded window by default.
     if (timelineDataSet.length > 0) {
-      selectLastHistoryMessage();
+      selectLastHistoryMessage(false);
     }
     timelineIsFocused = true;
     document.getElementById("timeline")?.focus();

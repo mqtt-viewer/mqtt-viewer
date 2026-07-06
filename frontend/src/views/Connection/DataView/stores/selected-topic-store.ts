@@ -3,10 +3,12 @@ import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 import {
   GetMessageTimeline,
   GetMessageById,
+  GetMessagesByIds,
   GetMessageHistory,
   GetReceivedTimelineWindow,
   GetReceivedMessageWindow,
   GetReceivedMessageById,
+  GetReceivedMessagesByIds,
   GetReceivedMessageCount,
   GetAppSettings,
 } from "bindings/mqtt-viewer/backend/app/app";
@@ -25,6 +27,12 @@ export const HISTORY_WINDOW_SIZE = 5000;
 // from the end away from the change so the timeline never grows unbounded
 // while the user pans through a busy topic's history.
 export const MAX_LOADED_MESSAGES = 20000;
+
+// Amortization slack for the cap above: trimming the moment history crosses
+// MAX_LOADED_MESSAGES would shift the whole array on every live drain of a
+// busy topic. Instead let it overshoot by up to this much, then trim back
+// down to exactly MAX_LOADED_MESSAGES in one go.
+export const TRIM_SLACK = 2000;
 
 // Selecting a topic (and paging its window) only ever fetches lightweight
 // stubs: id, arrival time, and small flags. Payloads are fetched individually
@@ -105,6 +113,12 @@ interface SelectedTopicData {
   // bridge bytes only when the user opts into charting, never on selection.
   chartHistory: MqttHistoryMessage[] | null;
   isLoadingChartHistory: boolean;
+  // Whether durable recording is enabled in app settings, captured at
+  // selection time. Drives the opt-in "Load recorded history" control.
+  recordingEnabled: boolean;
+  // Rows on disk for the selected topic; null until known. Fetched
+  // fire-and-forget on selection, used only to label the opt-in button.
+  recordedCount: number | null;
   options: {
     autoSelect: boolean;
     compare: boolean;
@@ -136,8 +150,8 @@ const stubToHistoryMessage = (s: {
   }) as MqttHistoryMessage;
 
 // Decodes a full message (with payload) into the history shape, marking it
-// loaded. Used for live appends and single-message fetches (ensurePayload),
-// never for stub windows, which have no payload to decode.
+// loaded. Used for single-message fetches (ensurePayload) and the chart's
+// bulk fetch, never for stub windows, which have no payload to decode.
 const decode = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
   ...m,
   payload: base64ToUtf8(m.payload as unknown as string),
@@ -145,12 +159,24 @@ const decode = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
   payloadState: "loaded",
 });
 
+// Wraps a live message into the history shape WITHOUT decoding its payload.
+// A busy topic drains ~600 messages per batched event; base64-decoding every
+// payload eagerly is what used to saturate the main thread on selection.
+// The raw bytes are kept on payloadB64 so ensurePayload can decode locally
+// (no backend round-trip) the moment a message is actually viewed.
+const toUndecoded = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
+  ...m,
+  payload: null,
+  payloadB64: m.payload as unknown as string,
+  payloadState: "unfetched",
+});
+
 const yieldToEventLoop = () => new Promise<void>((r) => setTimeout(r, 0));
 
 // Decodes a large message batch without blocking the main thread: decoding
-// (base64 -> utf8) is CPU-bound. Only ever used for live-append batches now
-// (stub windows have nothing to decode), but kept chunked since a burst of
-// live messages draining at once could still be sizeable.
+// (base64 -> utf8) is CPU-bound. Only ever used for the chart's bulk fetch
+// now (stub windows have nothing to decode, live appends stay undecoded),
+// where a full window of payloads arriving at once is genuinely sizeable.
 const decodeChunked = async (
   messages: mqtt.MqttMessage[],
   chunk = 400
@@ -170,6 +196,39 @@ const numericId = (id: string): number => {
   const n = parseInt(id, 10);
   return Number.isNaN(n) ? 0 : n;
 };
+
+// How many neighbours on each side of an ensured message get their payloads
+// prefetched in the same batch. Stepping through a topic's messages (arrow
+// keys / WASD in the timeline) then hits the local cache instead of paying a
+// bridge round-trip per message. 25 each side keeps the worst-case batch (51
+// payloads) well under the backend's batch cap.
+export const PREFETCH_RADIUS = 25;
+
+// A payload batch fetch that hasn't answered after this long is treated as
+// failed (and the stubs revert to unfetched) rather than leaving the viewer
+// stuck on a spinner indefinitely.
+export const PAYLOAD_FETCH_TIMEOUT_MS = 8000;
+
+// Delay before the single automatic retry after a failed payload fetch.
+export const PAYLOAD_RETRY_DELAY_MS = 1000;
+
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("payload fetch timed out")),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 
 export const createSelectedTopicStore = (
   connectionId: number,
@@ -202,6 +261,8 @@ export const createSelectedTopicStore = (
       isLoadingWindow: null,
       chartHistory: null,
       isLoadingChartHistory: false,
+      recordingEnabled: false,
+      recordedCount: null,
       onHistoryDelta: null,
       options: {
         autoSelect: true,
@@ -238,7 +299,12 @@ export const createSelectedTopicStore = (
 
       const forTopic = messages.filter((m) => m.topic === store.selectedTopic);
       if (forTopic.length === 0) return;
-      const decoded = forTopic.map(decode);
+      const entries = forTopic.map(toUndecoded);
+      // The Chart tab is the one consumer that genuinely needs every payload
+      // decoded (it draws a numeric series over the whole window), so decode
+      // for its cache only while it's loaded; skipped entirely otherwise.
+      const decodedForChart =
+        store.chartHistory !== null ? forTopic.map(decode) : null;
       update((s) => {
         // Live messages carry their receive-time UUID, while disk rows carry
         // numeric ids. We only ever page the keyset by disk id, so a live
@@ -253,23 +319,31 @@ export const createSelectedTopicStore = (
                 ...s.window,
                 newestId: Math.max(
                   s.window.newestId,
-                  numericId(decoded[decoded.length - 1].id)
+                  numericId(entries[entries.length - 1].id)
                 ),
               };
+        // Append in place: copying a 20k-element array on every 300ms drain
+        // is measurable at flood rates. Svelte writables notify subscribers
+        // on every update call regardless of reference equality, and no
+        // consumer relies on `history` identity (the timeline keys off
+        // historyRevision and deltas; the panel looks messages up by id).
+        s.history.push(...entries);
+        // Keep the chart's full-payload cache current if it's loaded, same
+        // as the stub history above, so an open Chart tab keeps streaming
+        // live points instead of needing a re-fetch.
+        if (s.chartHistory !== null && decodedForChart !== null) {
+          s.chartHistory.push(...decodedForChart);
+        }
         return {
           ...s,
-          history: [...s.history, ...decoded],
-          // Keep the chart's full-payload cache current if it's loaded, same
-          // as the stub history above, so an open Chart tab keeps streaming
-          // live points instead of needing a re-fetch.
-          chartHistory:
-            s.chartHistory === null ? null : [...s.chartHistory, ...decoded],
-          totalCount: s.totalCount + decoded.length,
+          history: s.history,
+          chartHistory: s.chartHistory,
+          totalCount: s.totalCount + entries.length,
           window,
         };
       });
       if (store.onHistoryDelta !== null) {
-        store.onHistoryDelta({ kind: "append", messages: decoded });
+        store.onHistoryDelta({ kind: "append", messages: entries });
       }
       // The backend RAM budget bounds the backend's own history, but the
       // frontend's loaded `history` array still grows without bound for a
@@ -291,6 +365,7 @@ export const createSelectedTopicStore = (
         isLoadingWindow: null,
         chartHistory: null,
         isLoadingChartHistory: false,
+        recordedCount: null,
       }));
     });
     activeTeardown = () => {
@@ -314,26 +389,26 @@ export const createSelectedTopicStore = (
 
   // Enforces MAX_LOADED_MESSAGES by evicting from the end AWAY from the
   // change that just happened: a prepend grew the oldest end, so we evict
-  // from the newest end (and vice versa for append/live append). Emits a
-  // trim delta with the evicted ids after state has been updated.
+  // from the newest end (and vice versa for append/live append). Only kicks
+  // in once history overshoots the cap by TRIM_SLACK (see its comment), then
+  // trims back down to exactly MAX_LOADED_MESSAGES with an in-place splice
+  // rather than two full-array copies. Emits a trim delta with the evicted
+  // ids after state has been updated.
   const enforceCap = (changeEnd: "prepend" | "append") => {
     const store = get({ subscribe });
+    if (store.history.length <= MAX_LOADED_MESSAGES + TRIM_SLACK) return;
     const excess = store.history.length - MAX_LOADED_MESSAGES;
-    if (excess <= 0) return;
 
-    let evicted: MqttHistoryMessage[];
-    let kept: MqttHistoryMessage[];
-    if (changeEnd === "prepend") {
-      // Grew at the oldest end: evict the newest `excess` messages.
-      kept = store.history.slice(0, store.history.length - excess);
-      evicted = store.history.slice(store.history.length - excess);
-    } else {
-      // Grew at the newest end: evict the oldest `excess` messages.
-      evicted = store.history.slice(0, excess);
-      kept = store.history.slice(excess);
-    }
-
+    let evicted: MqttHistoryMessage[] = [];
     update((s) => {
+      if (changeEnd === "prepend") {
+        // Grew at the oldest end: evict the newest `excess` messages.
+        evicted = s.history.splice(s.history.length - excess, excess);
+      } else {
+        // Grew at the newest end: evict the oldest `excess` messages.
+        evicted = s.history.splice(0, excess);
+      }
+      const kept = s.history;
       if (s.window === null) return { ...s, history: kept };
       let window = s.window;
       if (changeEnd === "prepend") {
@@ -395,44 +470,37 @@ export const createSelectedTopicStore = (
       isLoadingWindow: null,
       chartHistory: null,
       isLoadingChartHistory: false,
+      recordedCount: null,
       options: { ...store.options, autoSelect: true },
       onHistoryDelta: onHistoryDelta ?? null,
     }));
 
     const recording = await isRecordingEnabled();
     if (isStale(token, topic)) return;
+    update((store) => ({ ...store, recordingEnabled: recording }));
 
     if (recording) {
-      const [count, stubs] = await Promise.all([
-        GetReceivedMessageCount(connectionId, topic),
-        GetReceivedTimelineWindow(connectionId, topic, 0, 0, HISTORY_WINDOW_SIZE),
-      ]);
-      if (isStale(token, topic)) return;
-      const history = stubs.map((s) =>
-        stubToHistoryMessageForTopic(s, topic)
-      );
-      update((store) => ({
-        ...store,
-        history,
-        historySource: "disk",
-        window: windowFromMessages(history, true),
-        totalCount: count,
-        isLoadingHistory: false,
-        historyRevision: store.historyRevision + 1,
-        isLoadingWindow: null,
-      }));
-      // Fetch exactly one payload (the newest stub) so the auto-selected
-      // message renders immediately. Token-guarded inside ensurePayload.
-      const newest = history[history.length - 1];
-      if (newest) ensurePayload(newest.id);
-      return;
+      // Fire-and-forget: the disk row count only labels the opt-in "Load
+      // recorded history" button, so it must never delay the selection
+      // path or touch isLoadingHistory.
+      void (async () => {
+        try {
+          const count = await GetReceivedMessageCount(connectionId, topic);
+          if (isStale(token, topic)) return;
+          update((store) => ({ ...store, recordedCount: count }));
+        } catch {
+          // Leave recordedCount null: the opt-in button simply won't show.
+        }
+      })();
     }
 
-    // Memory mode: the in-RAM history is already bounded by the memory budget,
-    // but we still cap what we pull across the bridge to HISTORY_WINDOW_SIZE
-    // so a busy topic's full RAM history doesn't serialize as one unbounded
-    // blob. Only stubs are fetched, no payloads, so even a 150k-message
-    // topic's window is a few hundred KB, not tens of MB.
+    // Selection always shows the in-RAM session history: the RAM history is
+    // already bounded by the memory budget, and we still cap what we pull
+    // across the bridge to HISTORY_WINDOW_SIZE so a busy topic's full RAM
+    // history doesn't serialize as one unbounded blob. Only stubs are
+    // fetched, no payloads, so even a 150k-message topic's window is a few
+    // hundred KB, not tens of MB. Recorded (disk) history is opt-in via
+    // loadRecordedHistory below, never paid on selection.
     const stubs = await GetMessageTimeline(
       connectionId,
       topic,
@@ -463,13 +531,26 @@ export const createSelectedTopicStore = (
     topic: string
   ): MqttHistoryMessage => ({ ...stubToHistoryMessage(s), topic });
 
-  // Fetches and decodes a single message's payload by id, patching it into
-  // `history` in place once it lands. No-ops (returns immediately) if the
-  // stub isn't found, already loaded, or already loading. Does NOT fire a
-  // history delta: the timeline only cares about id/time/flags, which don't
-  // change here. Token-guarded so a stale fetch (user selected another topic
-  // meanwhile) never clobbers newer state.
-  const ensurePayload = async (id: string): Promise<void> => {
+  // Fetches and decodes a message's payload by id, patching it into
+  // `history` in place once it lands, and prefetches its neighbours within
+  // PREFETCH_RADIUS in the same single backend call so stepping through
+  // messages doesn't pay one bridge round-trip each. Live-appended messages
+  // resolve locally from their retained payloadB64 without touching the
+  // backend; only true stubs (window fetches) go across the bridge. No-ops
+  // (returns immediately) if the stub isn't found, already loaded, or
+  // already loading — the "loading" state doubles as the single-flight
+  // guard, so an overlapping ensurePayload never double-fetches an id. Does
+  // NOT fire a history delta: the timeline only cares about id/time/flags,
+  // which don't change here. Token-guarded so a stale fetch (user selected
+  // another topic meanwhile) never clobbers newer state.
+  //
+  // Reliability semantics: a backend "not found" is definitive and marks the
+  // stub "aged-out". A thrown error or a fetch still hanging after
+  // PAYLOAD_FETCH_TIMEOUT_MS is NOT definitive: every stub we marked
+  // "loading" reverts to "unfetched", and exactly one automatic retry for
+  // the target is scheduled (isRetry guards the retry itself from looping;
+  // after that, state stays "unfetched" so a manual re-click retries).
+  const ensurePayload = async (id: string, isRetry = false): Promise<void> => {
     const store = get({ subscribe });
     const topic = store.selectedTopic;
     if (topic === null) return;
@@ -480,58 +561,141 @@ export const createSelectedTopicStore = (
       return;
     }
 
+    // Live-appended messages already carry their raw bytes (payloadB64);
+    // only the utf8 decode was deferred (see toUndecoded). Decode locally,
+    // synchronously, instead of a pointless backend round-trip.
+    if (target.payloadB64 !== null) {
+      update((s) => {
+        const history = s.history.slice();
+        const i = history.findIndex((m) => m.id === id);
+        if (i === -1) return s;
+        const stub = history[i];
+        if (stub.payloadB64 === null) return s;
+        history[i] = {
+          ...stub,
+          payload: base64ToUtf8(stub.payloadB64),
+          payloadState: "loaded",
+        };
+        return { ...s, history };
+      });
+      return;
+    }
+
     const token = requestToken;
+
+    // Collect the target plus every true stub (unfetched, no local bytes)
+    // within PREFETCH_RADIUS on each side. The target itself passes the same
+    // filter: the early-outs above guarantee it is an unfetched stub.
+    const lo = Math.max(0, index - PREFETCH_RADIUS);
+    const hi = Math.min(store.history.length - 1, index + PREFETCH_RADIUS);
+    const batch: { id: string; timeMs: number }[] = [];
+    for (let i = lo; i <= hi; i++) {
+      const m = store.history[i];
+      if (m.payloadState === "unfetched" && m.payloadB64 === null) {
+        batch.push({ id: m.id, timeMs: m.timeMs });
+      }
+    }
+    const batchIds = new Set(batch.map((b) => b.id));
+
+    // Mark the whole batch loading in one store update; from here on other
+    // ensurePayload calls skip these ids.
     update((s) => {
       const history = s.history.slice();
-      const i = history.findIndex((m) => m.id === id);
-      if (i === -1) return s;
-      history[i] = { ...history[i], payloadState: "loading" };
+      for (let i = 0; i < history.length; i++) {
+        if (batchIds.has(history[i].id)) {
+          history[i] = { ...history[i], payloadState: "loading" };
+        }
+      }
       return { ...s, history };
     });
 
     try {
-      let found: boolean;
-      let full: mqtt.MqttMessage | null = null;
+      // One backend call for the whole batch; a batch of one uses the
+      // single-message binding (with the timeMs hint in memory mode, so the
+      // backend can binary-search its window instead of scanning it).
+      let results: mqtt.MqttMessage[];
       if (store.historySource === "disk") {
-        const numeric = numericId(id);
-        const [msg, isFound] = await GetReceivedMessageById(
-          store.connectionId,
-          topic,
-          numeric
-        );
-        found = isFound;
-        full = msg;
+        if (batch.length === 1) {
+          const [msg, isFound] = await withTimeout(
+            GetReceivedMessageById(store.connectionId, topic, numericId(id)),
+            PAYLOAD_FETCH_TIMEOUT_MS
+          );
+          results = isFound && msg !== null ? [msg] : [];
+        } else {
+          results =
+            (await withTimeout(
+              GetReceivedMessagesByIds(
+                store.connectionId,
+                topic,
+                batch.map((b) => numericId(b.id))
+              ),
+              PAYLOAD_FETCH_TIMEOUT_MS
+            )) ?? [];
+        }
       } else {
-        const [msg, isFound] = await GetMessageById(
-          store.connectionId,
-          topic,
-          id
-        );
-        found = isFound;
-        full = msg;
+        if (batch.length === 1) {
+          const [msg, isFound] = await withTimeout(
+            GetMessageById(store.connectionId, topic, id, target.timeMs),
+            PAYLOAD_FETCH_TIMEOUT_MS
+          );
+          results = isFound && msg !== null ? [msg] : [];
+        } else {
+          results =
+            (await withTimeout(
+              GetMessagesByIds(
+                store.connectionId,
+                topic,
+                batch.map((b) => b.id),
+                batch.map((b) => b.timeMs)
+              ),
+              PAYLOAD_FETCH_TIMEOUT_MS
+            )) ?? [];
+        }
       }
       if (isStale(token, topic)) return;
 
+      // Apply the whole batch in one update: returned messages decode in
+      // place; anything we marked that the backend did not return is
+      // definitively gone (evicted/pruned), so it becomes "aged-out".
+      const byId = new Map(results.map((m) => [m.id, m]));
       update((s) => {
         const history = s.history.slice();
-        const i = history.findIndex((m) => m.id === id);
-        if (i === -1) return s;
-        if (!found || full === null) {
-          history[i] = { ...history[i], payloadState: "aged-out" };
-        } else {
-          history[i] = decode(full);
+        for (let i = 0; i < history.length; i++) {
+          const m = history[i];
+          if (!batchIds.has(m.id)) continue;
+          const full = byId.get(m.id);
+          if (full !== undefined) {
+            history[i] = decode(full);
+          } else if (m.payloadState === "loading") {
+            history[i] = { ...m, payloadState: "aged-out" };
+          }
         }
         return { ...s, history };
       });
     } catch {
+      // Timeout or transport error: not a definitive not-found. Revert
+      // everything we marked (and that hasn't since loaded) back to
+      // "unfetched" so it can be retried, never to "aged-out".
       if (isStale(token, topic)) return;
       update((s) => {
         const history = s.history.slice();
-        const i = history.findIndex((m) => m.id === id);
-        if (i === -1) return s;
-        history[i] = { ...history[i], payloadState: "aged-out" };
+        for (let i = 0; i < history.length; i++) {
+          const m = history[i];
+          if (batchIds.has(m.id) && m.payloadState === "loading") {
+            history[i] = { ...m, payloadState: "unfetched" };
+          }
+        }
         return { ...s, history };
       });
+      // The panel's reactive trigger only fires on selection change, so
+      // without a retry the viewed message would sit unfetched until
+      // re-clicked. Schedule exactly one; the retry itself never loops.
+      if (!isRetry) {
+        setTimeout(() => {
+          if (isStale(token, topic)) return;
+          void ensurePayload(id, true);
+        }, PAYLOAD_RETRY_DELAY_MS);
+      }
     }
   };
 
@@ -687,6 +851,56 @@ export const createSelectedTopicStore = (
     if (newest) ensurePayload(newest.id);
   };
 
+  // Switches the current selection from the in-RAM session history to the
+  // recorded on-disk history. Opt-in: selecting a topic never pays the disk
+  // read; this runs only when the user clicks "Load recorded history".
+  const loadRecordedHistory = async () => {
+    const store = get({ subscribe });
+    if (store.selectedTopic === null) return;
+    if (store.historySource === "disk") return;
+    if (store.isLoadingHistory) return;
+    const topic = store.selectedTopic;
+    // Wholesale replacement of the loaded history, same rationale as
+    // jumpToLatest: bump the token so any in-flight fetch for the memory
+    // view lands stale instead of clobbering the disk window.
+    const token = ++requestToken;
+    update((s) => ({ ...s, isLoadingHistory: true }));
+    try {
+      const [count, stubs] = await Promise.all([
+        GetReceivedMessageCount(store.connectionId, topic),
+        GetReceivedTimelineWindow(
+          store.connectionId,
+          topic,
+          0,
+          0,
+          HISTORY_WINDOW_SIZE
+        ),
+      ]);
+      if (isStale(token, topic)) return;
+      const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+      update((s) => ({
+        ...s,
+        history,
+        historySource: "disk",
+        window: windowFromMessages(history, true),
+        totalCount: count,
+        recordedCount: count,
+        isLoadingHistory: false,
+        historyRevision: s.historyRevision + 1,
+        isLoadingWindow: null,
+        // Wholesale replacement: the chart cache no longer matches `history`.
+        chartHistory: null,
+      }));
+      // Fetch exactly one payload (the newest stub) so the auto-selected
+      // message renders immediately. Token-guarded inside ensurePayload.
+      const newest = history[history.length - 1];
+      if (newest) ensurePayload(newest.id);
+    } catch {
+      if (isStale(token, topic)) return;
+      update((s) => ({ ...s, isLoadingHistory: false }));
+    }
+  };
+
   const deselectTopic = () => {
     requestToken++;
     update((store) => ({
@@ -700,6 +914,7 @@ export const createSelectedTopicStore = (
       isLoadingWindow: null,
       chartHistory: null,
       isLoadingChartHistory: false,
+      recordedCount: null,
       onHistoryDelta: null,
     }));
   };
@@ -781,6 +996,7 @@ export const createSelectedTopicStore = (
     loadOlderWindow,
     loadNewerWindow,
     jumpToLatest,
+    loadRecordedHistory,
     ensurePayload,
     ensureChartHistory,
   };

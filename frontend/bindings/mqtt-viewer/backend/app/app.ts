@@ -249,12 +249,15 @@ export function GetMatchingSubscriptionForTopic(connId: number, topic: string): 
 
 /**
  * GetMessageById fetches a single full message (with its payload) by id from
- * a topic's in-RAM history. found=false (no error) means the message has
- * aged out of the RAM window (evicted by the memory budget), so the frontend
- * can render a graceful "no longer available" state instead of an error.
+ * a topic's in-RAM history. timeMs is the message's receive time from its
+ * stub; it lets the lookup binary-search the history window instead of
+ * scanning it (pass 0 when unknown). found=false (no error) means the message
+ * has aged out of the RAM window (evicted by the memory budget), so the
+ * frontend can render a graceful "no longer available" state instead of an
+ * error.
  */
-export function GetMessageById(connId: number, topic: string, id: string): Promise<[mqtt$0.MqttMessage, boolean]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(2592571623, connId, topic, id) as any;
+export function GetMessageById(connId: number, topic: string, id: string, timeMs: number): Promise<[mqtt$0.MqttMessage, boolean]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2592571623, connId, topic, id, timeMs) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
         $result[0] = $$createType14($result[0]);
         return $result;
@@ -290,6 +293,22 @@ export function GetMessageTimeline(connId: number, topic: string, limit: number)
     let $resultPromise = $Call.ByID(3329510004, connId, topic, limit) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType17($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * GetMessagesByIds fetches a batch of full messages (with payloads) by id
+ * from a topic's in-RAM history. ids and timesMs are parallel slices (the
+ * stubs' receive times drive the same fast lookup as GetMessageById). Only
+ * the messages still retained are returned; the frontend treats any omitted
+ * id as aged out.
+ */
+export function GetMessagesByIds(connId: number, topic: string, ids: string[], timesMs: number[]): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1309585445, connId, topic, ids, timesMs) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType15($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -361,6 +380,21 @@ export function GetReceivedMessageCount(connectionID: number, topic: string): Pr
  */
 export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType15($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * GetReceivedMessagesByIds fetches a batch of durable messages (with full
+ * payloads) by numeric row id, scoped to the connection/topic, in ascending
+ * id order. Ids with no matching row are simply omitted from the result, so
+ * the frontend can treat them as pruned ("aged out").
+ */
+export function GetReceivedMessagesByIds(connectionID: number, topic: string, ids: number[]): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(508166040, connectionID, topic, ids) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType15($result);
     }) as any;

@@ -107,12 +107,28 @@ func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.M
 }
 
 // GetMessageById fetches a single full message (with its payload) by id from
-// a topic's in-RAM history. found=false (no error) means the message has
-// aged out of the RAM window (evicted by the memory budget), so the frontend
-// can render a graceful "no longer available" state instead of an error.
-func (a *App) GetMessageById(connId uint, topic string, id string) (msg mqtt.MqttMessage, found bool) {
+// a topic's in-RAM history. timeMs is the message's receive time from its
+// stub; it lets the lookup binary-search the history window instead of
+// scanning it (pass 0 when unknown). found=false (no error) means the message
+// has aged out of the RAM window (evicted by the memory budget), so the
+// frontend can render a graceful "no longer available" state instead of an
+// error.
+func (a *App) GetMessageById(connId uint, topic string, id string, timeMs int64) (msg mqtt.MqttMessage, found bool) {
 	appConnection := a.AppConnections[connId]
-	return appConnection.MqttManager.MessageHistory.GetMessageById(topic, id)
+	return appConnection.MqttManager.MessageHistory.GetMessageById(topic, id, timeMs)
+}
+
+// GetMessagesByIds fetches a batch of full messages (with payloads) by id
+// from a topic's in-RAM history. ids and timesMs are parallel slices (the
+// stubs' receive times drive the same fast lookup as GetMessageById). Only
+// the messages still retained are returned; the frontend treats any omitted
+// id as aged out.
+func (a *App) GetMessagesByIds(connId uint, topic string, ids []string, timesMs []int64) ([]mqtt.MqttMessage, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection.MqttManager.MessageHistory.GetMessagesByIds(topic, ids, timesMs), nil
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-04T09:11:25.727Z",
+  "generatedAt": "2026-07-04T14:35:09.075Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2308,7 +2308,7 @@
     {
       "name": "WhatsNewContent",
       "tier": "component",
-      "description": "Layout for a changelog entry: intro, titled sections, optional outro, dismiss button.",
+      "description": "Tabbed changelog: a tab per release (newest left), each showing intro, titled sections, optional outro, and a dismiss button.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -3120,7 +3120,7 @@
         "DropdownMenu",
         "DropdownMenuItem"
       ],
-      "notes": "Figma page: Topic Graph - Exploration (Direction D). Canvas renderer; story mounts the real Pixi canvas on live mock traffic. Hover inspector shows msg/s + last-message age; legend explains recency ramp and sizing. Click model: clicking a collapsed parent expands it and zooms the view to the revealed subtree (a further click then selects it); clicking an expanded parent or a leaf selects it, and clicking the selected node again deselects it. Selecting a topic from the sidebar (outside the graph) zooms the graph to that topic, expanding its ancestors as needed. Message arrivals draw a brief expanding ring pulse on the node. Gear menu's Display section also has a 'Performance stats' toggle (statsOn, persisted per connection, default off) that renders a top-right HUD overlay (fps/cap, avg frame ms, visible/placed node counts, ingest msg/s) updated on a 1s interval; see docs/topic-graph-view-spec.md 'Performance monitoring' section.",
+      "notes": "Figma page: Topic Graph - Exploration (Direction D). Canvas renderer; story mounts the real Pixi canvas on live mock traffic. Hover inspector shows msg/s + last-message age; legend explains recency ramp and sizing. Click model: clicking a collapsed parent expands it and zooms the view to the revealed subtree (a further click then selects it); clicking an expanded parent or a leaf selects it, and clicking the selected node again deselects it. Selecting a topic from the sidebar (outside the graph) zooms the graph to that topic, expanding its ancestors as needed. Message arrivals draw a brief expanding ring pulse on the node. Minimap: clicking centres the viewport on the clicked point; holding and moving drags the viewport rectangle (continuous re-centring). Gear menu's Display section also has a 'Performance stats' toggle (statsOn, persisted per connection, default off) that renders a top-right HUD overlay (fps/cap, avg frame ms, visible/placed node counts, ingest msg/s) updated on a 1s interval; see docs/topic-graph-view-spec.md 'Performance monitoring' section.",
       "sourcePath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttGraphView/MqttGraphView.stories.svelte",

@@ -137,7 +137,7 @@
 
 ## Summary
 
-- Components scanned: 110
-- Story present: 110
+- Components scanned: 111
+- Story present: 111
 - Figma-linked: 0
 - Missing specs: 0

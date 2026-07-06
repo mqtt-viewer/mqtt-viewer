@@ -139,6 +139,8 @@
   $: atOldestWindow = historyWindow?.atOldest ?? true;
   $: isLoadingHistory = $selectedTopicStore.isLoadingHistory;
   $: isLoadingWindow = $selectedTopicStore.isLoadingWindow;
+  $: recordingEnabled = $selectedTopicStore.recordingEnabled;
+  $: recordedCount = $selectedTopicStore.recordedCount;
 </script>
 
 <div
@@ -255,7 +257,21 @@
         {atLatestWindow ? "(latest)" : ""}
       </span>
     </div>
-  {:else if !isLoadingHistory && !isDiskHistory && shownHistoryCount >= HISTORY_WINDOW_SIZE}
+  {:else if !isLoadingHistory && !isDiskHistory && recordingEnabled && (recordedCount ?? 0) > 0}
+    <div
+      class="flex items-center gap-2 text-sm text-secondary-text mt-1 mb-1 select-none"
+    >
+      <Button
+        variant="text"
+        on:click={() => selectedTopicStore.loadRecordedHistory()}
+        >Load recorded history</Button
+      >
+      <div class="grow"></div>
+      <span class="whitespace-nowrap">
+        {(recordedCount ?? 0).toLocaleString()} recorded messages on disk
+      </span>
+    </div>
+  {:else if !isLoadingHistory && !isDiskHistory && !recordingEnabled && shownHistoryCount >= HISTORY_WINDOW_SIZE}
     <div class="text-sm text-secondary-text mt-1 mb-1">
       Showing the latest {HISTORY_WINDOW_SIZE.toLocaleString()} messages. Enable
       recording in settings to browse older history.
@@ -278,8 +294,27 @@
       >
         <div slot="tab-1" class="size-full pt-2">
           {#if selectedMessagePayloadState === "aged-out"}
-            <div class="mt-12 flex justify-center text-secondary-text">
-              Message no longer available
+            <div
+              class="mt-12 flex flex-col items-center gap-2 px-4 text-center text-secondary-text"
+            >
+              {#if isDiskHistory}
+                <span>
+                  No longer on disk. Recorded history prunes the oldest
+                  messages to stay within its storage budget.
+                </span>
+              {:else if recordingEnabled}
+                <span>No longer in session memory.</span>
+                <Button
+                  variant="text"
+                  on:click={() => selectedTopicStore.loadRecordedHistory()}
+                  >Load recorded history</Button
+                >
+              {:else}
+                <span>
+                  No longer in session memory. Enable recording in settings to
+                  keep messages across restarts.
+                </span>
+              {/if}
             </div>
           {:else if selectedMessagePayload !== null}
             <PayloadTab
@@ -292,6 +327,10 @@
               payloadLeftForCompare={previousMessagePayload}
               payloadLeftLoading={previousMessageLoading}
               payloadLeftAgedOut={previousMessageAgedOut}
+              historySource={$selectedTopicStore.historySource}
+              {recordingEnabled}
+              onLoadRecordedHistory={() =>
+                selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
             />
@@ -326,8 +365,27 @@
       >
         <div slot="tab-1" class="size-full pt-2">
           {#if selectedMessagePayloadState === "aged-out"}
-            <div class="mt-12 flex justify-center text-secondary-text">
-              Message no longer available
+            <div
+              class="mt-12 flex flex-col items-center gap-2 px-4 text-center text-secondary-text"
+            >
+              {#if isDiskHistory}
+                <span>
+                  No longer on disk. Recorded history prunes the oldest
+                  messages to stay within its storage budget.
+                </span>
+              {:else if recordingEnabled}
+                <span>No longer in session memory.</span>
+                <Button
+                  variant="text"
+                  on:click={() => selectedTopicStore.loadRecordedHistory()}
+                  >Load recorded history</Button
+                >
+              {:else}
+                <span>
+                  No longer in session memory. Enable recording in settings to
+                  keep messages across restarts.
+                </span>
+              {/if}
             </div>
           {:else if selectedMessagePayload !== null}
             <PayloadTab
@@ -340,6 +398,10 @@
               payloadLeftForCompare={previousMessagePayload}
               payloadLeftLoading={previousMessageLoading}
               payloadLeftAgedOut={previousMessageAgedOut}
+              historySource={$selectedTopicStore.historySource}
+              {recordingEnabled}
+              onLoadRecordedHistory={() =>
+                selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
             />

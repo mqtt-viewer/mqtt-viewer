@@ -10,6 +10,7 @@ import {
   Circle,
   Container,
   Graphics,
+  Rectangle,
   Sprite,
   Text,
   Texture,
@@ -200,6 +201,9 @@ export class TopicGraphRenderer {
 
   private dragging = false;
   private dragMoved = false;
+  // pointer went down inside the minimap: moves re-centre the viewport on the
+  // minimap point instead of panning the world by pixel delta
+  private minimapDragging = false;
   private lastPointer = { x: 0, y: 0 };
   // eased viewport animation target (zoom-to-subtree / focus); cancelled by
   // any manual pan or zoom
@@ -257,6 +261,7 @@ export class TopicGraphRenderer {
     this.minimap.addChild(this.minimapBg, this.minimapDots, this.minimapView);
     this.app.stage.addChild(this.minimap);
     this.positionMinimap();
+    this.installMinimapNav();
 
     this.installPanZoom(canvas);
     this.app.ticker.add(() => this.frame());
@@ -273,6 +278,55 @@ export class TopicGraphRenderer {
       this.app.screen.width - this.minimapW - 14,
       this.app.screen.height - this.minimapH - 14
     );
+  }
+
+  // Click-to-navigate / drag-to-pan (spec §minimap: "draggable viewport
+  // rectangle"). Pointer-down centres the viewport on the clicked point;
+  // while the pointer stays down, moves keep re-centring, which reads as
+  // dragging the viewport rectangle. The move/up halves live on the stage
+  // handlers in installPanZoom so a drag that leaves the minimap keeps
+  // working until release.
+  private installMinimapNav(): void {
+    this.minimap.eventMode = "static";
+    this.minimap.cursor = "pointer";
+    this.minimap.hitArea = new Rectangle(0, 0, this.minimapW, this.minimapH);
+    this.minimap.on("pointerdown", (e: any) => {
+      e.stopPropagation(); // don't also start a world drag
+      this.minimapDragging = true;
+      this.viewAnim = null;
+      this.initialViewApplied = true; // user navigated: never auto-fit again
+      this.panToMinimapPoint(e.global.x, e.global.y);
+    });
+  }
+
+  // World-units-per-minimap-pixel mapping shared by drawMinimap and
+  // panToMinimapPoint — must stay identical in both or the viewport
+  // rectangle and the click target drift apart.
+  private minimapMapping(): { pad: number; innerW: number; innerH: number; s: number } {
+    const pad = 8;
+    const innerW = this.minimapW - pad * 2;
+    const innerH = this.minimapH - pad * 2;
+    const cw = Math.max(1, this.contentW + this.colW);
+    const ch = Math.max(1, this.contentH + this.rMax * 2);
+    return { pad, innerW, innerH, s: Math.min(innerW / cw, innerH / ch) };
+  }
+
+  private panToMinimapPoint(globalX: number, globalY: number): void {
+    const { pad, s } = this.minimapMapping();
+    if (s <= 0) return;
+    const local = this.minimap.toLocal({ x: globalX, y: globalY });
+    const wx = (local.x - pad) / s;
+    const wy = (local.y - pad) / s;
+    const scale = this.world.scale.x;
+    this.world.position.set(
+      this.app.screen.width / 2 - wx * scale,
+      this.app.screen.height / 2 - wy * scale
+    );
+    this.viewportDirty = true;
+    // move the viewport rectangle with the pointer instead of waiting out the
+    // minimap redraw throttle (up to 1s on huge trees) — the rect alone is
+    // cheap to redraw every frame, unlike the dots
+    this.drawMinimapViewRect();
   }
 
   setEndpoint(rgb: RGB): void {
@@ -397,11 +451,17 @@ export class TopicGraphRenderer {
     });
     this.app.stage.on("pointerup", () => {
       this.dragging = false;
+      this.minimapDragging = false;
     });
     this.app.stage.on("pointerupoutside", () => {
       this.dragging = false;
+      this.minimapDragging = false;
     });
     this.app.stage.on("pointermove", (e: any) => {
+      if (this.minimapDragging) {
+        this.panToMinimapPoint(e.global.x, e.global.y);
+        return;
+      }
       if (!this.dragging) return;
       const dx = e.global.x - this.lastPointer.x;
       const dy = e.global.y - this.lastPointer.y;
@@ -1310,9 +1370,7 @@ export class TopicGraphRenderer {
   }
 
   private drawMinimap(nowMs: number): void {
-    const pad = 8;
-    const innerW = this.minimapW - pad * 2;
-    const innerH = this.minimapH - pad * 2;
+    const { pad, s } = this.minimapMapping();
     // background
     this.minimapBg.clear();
     this.minimapBg
@@ -1321,10 +1379,6 @@ export class TopicGraphRenderer {
     this.minimapBg
       .roundRect(0, 0, this.minimapW, this.minimapH, 8)
       .stroke({ width: 1, color: this.minimapBorderColor, alpha: 0.4 });
-
-    const cw = Math.max(1, this.contentW + this.colW);
-    const ch = Math.max(1, this.contentH + this.rMax * 2);
-    const s = Math.min(innerW / cw, innerH / ch);
 
     // subsample huge trees: drawing every visual's dot + colorForAge every
     // interval doesn't scale past a few thousand nodes, and the minimap is an
@@ -1352,7 +1406,14 @@ export class TopicGraphRenderer {
       this.minimapDots.circle(x, y, 1.6).fill({ color: tintForAge(age, this.cooldownMs, this.endpoint, this.cvdSafe), alpha: 0.85 });
     }
 
-    // viewport rectangle (visible world region mapped into the minimap)
+    this.drawMinimapViewRect();
+  }
+
+  // viewport rectangle (visible world region mapped into the minimap) —
+  // separate from drawMinimap so a minimap drag can redraw just the rect
+  // every frame without paying for the dots
+  private drawMinimapViewRect(): void {
+    const { pad, innerW, innerH, s } = this.minimapMapping();
     const tl = this.world.toLocal({ x: 0, y: 0 });
     const br = this.world.toLocal({ x: this.app.screen.width, y: this.app.screen.height });
     const vx = pad + tl.x * s;

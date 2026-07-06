@@ -124,6 +124,38 @@ func (a *App) GetReceivedMessageById(connectionID uint, topic string, id uint) (
 	return mqttMessageFromReceived(&row), true, nil
 }
 
+// MaxReceivedMessagesByIds caps a single GetReceivedMessagesByIds batch. The
+// frontend's prefetch radius bounds real batches well under this; the cap is
+// a backstop so a pathological caller can't turn one bridge call into an
+// unbounded IN (...) query.
+const MaxReceivedMessagesByIds = 200
+
+// GetReceivedMessagesByIds fetches a batch of durable messages (with full
+// payloads) by numeric row id, scoped to the connection/topic, in ascending
+// id order. Ids with no matching row are simply omitted from the result, so
+// the frontend can treat them as pruned ("aged out").
+func (a *App) GetReceivedMessagesByIds(connectionID uint, topic string, ids []uint) ([]mqtt.MqttMessage, error) {
+	if len(ids) > MaxReceivedMessagesByIds {
+		ids = ids[:MaxReceivedMessagesByIds]
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var rows []models.ReceivedMessage
+	err := a.Db.
+		Where("connection_id = ? AND topic = ? AND id IN (?)", connectionID, topic, ids).
+		Order("id asc").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]mqtt.MqttMessage, len(rows))
+	for i := range rows {
+		out[i] = mqttMessageFromReceived(&rows[i])
+	}
+	return out, nil
+}
+
 // GetDatabaseSizeBytes reports the live database size (for the settings readout).
 func (a *App) GetDatabaseSizeBytes() (int64, error) {
 	return a.usedBytes()
