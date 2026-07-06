@@ -65,7 +65,7 @@
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
-| Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
+| Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
 | Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
