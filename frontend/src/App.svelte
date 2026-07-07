@@ -21,6 +21,7 @@
   import ChartWindow from "./views/ChartWindow/ChartWindow.svelte";
   import HistoryRetentionPrompt from "./components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte";
   import WhatsNewDialog from "./components/WhatsNewDialog/WhatsNewDialog.svelte";
+  import StarPromptDialog from "./components/StarPromptDialog/StarPromptDialog.svelte";
 
   // Detached chart windows (opened by OpenChartWindow) load the same assets at
   // /?view=chart&...; render only the standalone chart, not the full app shell.
@@ -92,6 +93,7 @@
       <UpdateDialog />
       <HistoryRetentionPrompt />
       <WhatsNewDialog />
+      <StarPromptDialog />
     {/await}
     <Toast />
   </IconContext>

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-02T03:36:11.225Z",
+  "generatedAt": "2026-07-04T05:21:19.313Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2125,6 +2125,30 @@
       "specMissing": false
     },
     {
+      "name": "StarPromptDialog",
+      "tier": "component",
+      "description": "One-time nudge asking a repeat user to star the project on GitHub.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
+      "sourcePath": "src/components/StarPromptDialog/StarPromptDialog.svelte",
+      "specPath": "src/components/StarPromptDialog/StarPromptDialog.spec.json",
+      "storyPath": "src/components/StarPromptDialog/StarPromptDialog.stories.svelte",
+      "storyId": "Components/StarPromptDialog",
+      "specMissing": false
+    },
+    {
       "name": "Tabs",
       "tier": "primitive",
       "description": "Storybook coverage for Tabs.",
@@ -2284,7 +2308,7 @@
     {
       "name": "WhatsNewContent",
       "tier": "component",
-      "description": "Layout for a changelog entry: intro, emoji-bulleted sections, optional outro, dismiss button.",
+      "description": "Tabbed changelog: a tab per release (newest left), each showing intro, titled sections, optional outro, and a dismiss button.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2295,9 +2319,14 @@
       },
       "props": [
         {
-          "name": "entry",
-          "type": "object",
+          "name": "entries",
+          "type": "array",
           "required": true
+        },
+        {
+          "name": "initialVersion",
+          "type": "string",
+          "required": false
         },
         {
           "name": "onClose",
@@ -2306,7 +2335,11 @@
         }
       ],
       "tokens": [
-        "secondary-text"
+        "secondary-text",
+        "emphasis",
+        "white-text",
+        "outline",
+        "primary"
       ],
       "dependencies": [
         "Button"

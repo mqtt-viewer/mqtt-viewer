@@ -9,6 +9,9 @@ export class AppSettings {
   recordingEnabled = false;
   diskBudgetBytes = 1 * 1024 * 1024 * 1024;
   hasSeenHistoryPrompt = false;
+  lastSeenChangelogVersion = "";
+  launchCount = 0;
+  hasSeenStarPrompt = false;
 
   static createFrom(source: any = {}) {
     return new AppSettings(source);

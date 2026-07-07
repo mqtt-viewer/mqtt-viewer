@@ -9,9 +9,9 @@
     },
     {
       "name": "wails",
-      "runtimeExecutable": "wails",
-      "runtimeArgs": ["dev", "-noreload", "-skipbindings"],
-      "port": 34115
+      "runtimeExecutable": "wails3",
+      "runtimeArgs": ["dev", "-config", "./build/config.yml", "-port", "9245"],
+      "port": 9245
     }
   ]
 }
