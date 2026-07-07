@@ -40,7 +40,11 @@
     const visible = series.filter((s) => s.visible);
     const axisColor = "#525252";
     const labelColor = "#aeaeae";
-    let xAxisExtra: Record<string, unknown> = {};
+    // Always emit min/max: echarts merges the xAxis on setOption, so when
+    // switching back to "All history" (windowMinutes 0) we must explicitly
+    // clear the previous window's bounds with null, else they persist and the
+    // axis stays clamped. null lets echarts auto-fit to the data extent.
+    let xAxisExtra: Record<string, unknown> = { min: null, max: null };
     if (windowMinutes > 0) {
       const now = Date.now();
       xAxisExtra = { min: now - windowMinutes * 60_000, max: now };
