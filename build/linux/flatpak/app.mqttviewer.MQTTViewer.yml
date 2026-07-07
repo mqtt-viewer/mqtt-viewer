@@ -1,0 +1,48 @@
+# Flatpak manifest for MQTT Viewer.
+#
+# This bundles a prebuilt binary rather than building from source: the
+# Go + Node + CGO/WebKit toolchain is already run by the Linux release
+# pipeline, and the resulting `mqtt-viewer` binary plus its assets are
+# staged next to this manifest before flatpak-builder runs (see
+# build/linux/Taskfile.yml, task `create:flatpak`).
+#
+# runtime-version MUST track a GNOME runtime that still ships
+# webkit2gtk-4.1 (the GTK3 WebKit the `-tags gtk3` build links against).
+# If a runtime bump drops it, the flatpak-check CI build fails loudly.
+app-id: app.mqttviewer.MQTTViewer
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: mqtt-viewer
+
+finish-args:
+  # MQTT broker connections
+  - --share=network
+  - --share=ipc
+  # Rendering
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Export/import: the usual user-writable locations. The GTK file chooser
+  # also routes through xdg-desktop-portal for anywhere else, so broad home
+  # access is not needed (and Flathub's linter rejects it).
+  - --filesystem=xdg-download
+  - --filesystem=xdg-documents
+
+modules:
+  - name: mqtt-viewer
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 mqtt-viewer /app/bin/mqtt-viewer
+      - install -Dm644 app.mqttviewer.MQTTViewer.desktop /app/share/applications/app.mqttviewer.MQTTViewer.desktop
+      - install -Dm644 app.mqttviewer.MQTTViewer.png /app/share/icons/hicolor/512x512/apps/app.mqttviewer.MQTTViewer.png
+      - install -Dm644 app.mqttviewer.MQTTViewer.metainfo.xml /app/share/metainfo/app.mqttviewer.MQTTViewer.metainfo.xml
+    sources:
+      - type: file
+        path: mqtt-viewer
+      - type: file
+        path: app.mqttviewer.MQTTViewer.desktop
+      - type: file
+        path: app.mqttviewer.MQTTViewer.png
+      - type: file
+        path: app.mqttviewer.MQTTViewer.metainfo.xml
