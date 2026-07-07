@@ -18,7 +18,7 @@ All contributions to this repository are made under the [MIT License](https://op
 
 Code inside your PR is automatically licensed under the permissive MIT license. This means that you are granting permission for your code to be used, modified, and distributed by anyone.
 
-As soon as your code is merged into the main branch, it becomes part of the project and is licensed under the same terms as the rest of the project (AGPLv3).
+As soon as your code is merged into the main branch, it becomes part of the project and is licensed under the same terms as the rest of the project (GPL-3.0-or-later).
 
 #### Why this is important
 
