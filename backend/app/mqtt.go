@@ -227,6 +227,7 @@ func getConnectionDetailsFromConnectionModel(connection *models.Connection) (*mq
 		Protocol:    connection.Protocol,
 		Host:        connection.Host,
 		Port:        connection.Port,
+		WebsocketPath: connection.WebsocketPath,
 	}
 
 	if connection.Username != nil {
