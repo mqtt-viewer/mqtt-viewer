@@ -1,12 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import * as echarts from "echarts";
-  import type {
-    MqttHistoryMessage,
-    SelectedTopicStore,
-  } from "../../../../stores/selected-topic-store";
+  import type { SelectedTopicStore } from "../../../../stores/selected-topic-store";
   import type { ChartSeriesStore } from "./chart-series-store";
-  import { valueAtPath } from "./payload-fields";
+  import { buildChartOption } from "./chart-option";
 
   export let selectedTopicStore: SelectedTopicStore;
   export let chartSeriesStore: ChartSeriesStore;
@@ -24,76 +21,17 @@
   // re-renders ~1s so the window keeps sliding even when no messages arrive.
   let windowTick: ReturnType<typeof setInterval> | null = null;
 
-  const seriesData = (history: MqttHistoryMessage[], path: string) => {
-    const points: [number, number][] = [];
-    for (const m of history) {
-      const value = valueAtPath(m.payload, path);
-      if (value !== null) points.push([m.timeMs, value]);
-    }
-    return points;
-  };
-
-  const buildOption = (
-    history: MqttHistoryMessage[],
-    series: { path: string; label: string; color: string; visible: boolean }[]
-  ): echarts.EChartsOption => {
-    const visible = series.filter((s) => s.visible);
-    const axisColor = "#525252";
-    const labelColor = "#aeaeae";
-    // Always emit min/max: echarts merges the xAxis on setOption, so when
-    // switching back to "All history" (windowMinutes 0) we must explicitly
-    // clear the previous window's bounds with null, else they persist and the
-    // axis stays clamped. null lets echarts auto-fit to the data extent.
-    let xAxisExtra: Record<string, unknown> = { min: null, max: null };
-    if (windowMinutes > 0) {
-      const now = Date.now();
-      xAxisExtra = { min: now - windowMinutes * 60_000, max: now };
-    }
-    return {
-      animation: false,
-      grid: { left: 48, right: 14, top: 14, bottom: 26 },
-      tooltip: {
-        trigger: "axis",
-        backgroundColor: "#1f1e1e",
-        borderColor: "#525252",
-        textStyle: { color: "#eee", fontSize: 12 },
-      },
-      xAxis: {
-        type: "time",
-        axisLine: { lineStyle: { color: axisColor } },
-        axisLabel: { color: labelColor, fontSize: 10, hideOverlap: true },
-        splitLine: { show: false },
-        ...xAxisExtra,
-      },
-      yAxis: {
-        type: "value",
-        scale: true,
-        axisLine: { show: false },
-        axisLabel: { color: labelColor, fontSize: 10 },
-        splitLine: { lineStyle: { color: "#2e2e2e" } },
-      },
-      series: visible.map((s) => ({
-        // id keys the series by its full payload path so replaceMerge and the
-        // tooltip stay stable even when two paths share a last segment (and
-        // thus the same display label, e.g. a.temp / b.temp -> "temp").
-        id: s.path,
-        name: s.label,
-        type: "line",
-        showSymbol: showPoints,
-        symbolSize: 5,
-        smooth: false,
-        lineStyle: { color: s.color, width: 2 },
-        itemStyle: { color: s.color },
-        areaStyle: style === "area" ? { color: s.color, opacity: 0.12 } : undefined,
-        data: seriesData(history, s.path),
-      })),
-    };
-  };
-
   const render = () => {
     if (!chart || paused) return;
     chart.setOption(
-      buildOption($selectedTopicStore.history, $chartSeriesStore),
+      buildChartOption({
+        history: $selectedTopicStore.history,
+        series: $chartSeriesStore,
+        windowMinutes,
+        showPoints,
+        style,
+        now: Date.now(),
+      }),
       { replaceMerge: ["series"] }
     );
   };
