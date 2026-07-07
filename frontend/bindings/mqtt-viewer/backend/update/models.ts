@@ -6,35 +6,42 @@
 import {Create as $Create} from "@wailsio/runtime";
 
 /**
- * UpdateResponse is what the frontend receives from a manual / periodic
- * update check. CanUpdate is false when the install cannot self-update
- * (e.g. AppImage, deb/rpm installs) or the license does not cover the
- * new version - in those cases NotificationUrl points the user at the
- * right place instead.
+ * UpdateResponse is what the frontend receives when an update is available.
+ * There is no licensing, so an update is always offered when a newer version
+ * exists. CanSelfUpdate decides whether the app updates itself through the
+ * built-in updater or the user follows install-type-specific instructions.
  */
 export class UpdateResponse {
     "latest_version": string;
-    "can_update": boolean;
     "release_notes": string;
-    "notification_text": string;
-    "notification_url": string;
+    "can_self_update": boolean;
+    "install_type": string;
+    "update_command": string;
+    "instructions": string;
+    "releases_url": string;
 
     /** Creates a new UpdateResponse instance. */
     constructor($$source: Partial<UpdateResponse> = {}) {
         if (!("latest_version" in $$source)) {
             this["latest_version"] = "";
         }
-        if (!("can_update" in $$source)) {
-            this["can_update"] = false;
-        }
         if (!("release_notes" in $$source)) {
             this["release_notes"] = "";
         }
-        if (!("notification_text" in $$source)) {
-            this["notification_text"] = "";
+        if (!("can_self_update" in $$source)) {
+            this["can_self_update"] = false;
         }
-        if (!("notification_url" in $$source)) {
-            this["notification_url"] = "";
+        if (!("install_type" in $$source)) {
+            this["install_type"] = "";
+        }
+        if (!("update_command" in $$source)) {
+            this["update_command"] = "";
+        }
+        if (!("instructions" in $$source)) {
+            this["instructions"] = "";
+        }
+        if (!("releases_url" in $$source)) {
+            this["releases_url"] = "";
         }
 
         Object.assign(this, $$source);
