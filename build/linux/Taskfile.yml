@@ -146,6 +146,37 @@ tasks:
       NFPM_VERSION: '{{trimPrefix "v" (.VERSION | default "0.0.0")}}'
       GOARCH: '{{.ARCH | default ARCH}}'
 
+  create:flatpak:
+    summary: Creates a Flatpak single-file bundle and a local signed repo
+    # Consumes the binary produced by `build`/`package` rather than rebuilding
+    # it, so the bundled binary keeps the exact production ldflags (version,
+    # baked-in secrets) from the preceding package step. Run `linux:build` or
+    # `linux:package` first.
+    preconditions:
+      - sh: test -f {{.ROOT_DIR}}/bin/{{.APP_NAME}}
+        msg: "bin/{{.APP_NAME}} not found. Run `wails3 task linux:build` (or linux:package) with the production LD_FLAGS first."
+    cmds:
+      # Stage the prebuilt binary and assets next to the manifest.
+      - rm -rf {{.STAGING}} && mkdir -p {{.STAGING}}
+      - cp {{.ROOT_DIR}}/bin/{{.APP_NAME}} {{.STAGING}}/mqtt-viewer
+      - cp {{.FLATPAK_DIR}}/{{.FLATPAK_ID}}.desktop {{.STAGING}}/{{.FLATPAK_ID}}.desktop
+      - cp {{.FLATPAK_DIR}}/{{.FLATPAK_ID}}.yml {{.STAGING}}/{{.FLATPAK_ID}}.yml
+      - cp {{.ROOT_DIR}}/build/appicon.png {{.STAGING}}/{{.FLATPAK_ID}}.png
+      # Inject the release version and build date into the metainfo.
+      - sed -e "s/__VERSION__/{{.CLEAN_VERSION}}/g" -e "s/__DATE__/{{.BUILD_DATE}}/g" {{.FLATPAK_DIR}}/{{.FLATPAK_ID}}.metainfo.xml > {{.STAGING}}/{{.FLATPAK_ID}}.metainfo.xml
+      # Build into a local OSTree repo (signed when GPG_KEY_ID is set).
+      - cd {{.STAGING}} && flatpak-builder --user --force-clean {{if .GPG_KEY_ID}}--gpg-sign={{.GPG_KEY_ID}} {{end}}--repo={{.REPO_DIR}} builddir {{.FLATPAK_ID}}.yml
+      # Produce the single-file bundle used as a release asset.
+      - flatpak build-bundle {{if .GPG_KEY_ID}}--gpg-sign={{.GPG_KEY_ID}} {{end}}{{.REPO_DIR}} {{.ROOT_DIR}}/bin/mqtt-viewer.flatpak {{.FLATPAK_ID}}
+    vars:
+      FLATPAK_ID: app.mqttviewer.MQTTViewer
+      FLATPAK_DIR: '{{.ROOT_DIR}}/build/linux/flatpak'
+      STAGING: '{{.ROOT_DIR}}/build/linux/flatpak/staging'
+      REPO_DIR: '{{.ROOT_DIR}}/build/linux/flatpak/repo'
+      CLEAN_VERSION: '{{trimPrefix "v" (.VERSION | default "0.0.0")}}'
+      BUILD_DATE:
+        sh: date -u +%Y-%m-%d
+
   generate:dotdesktop:
     summary: Generates a `.desktop` file
     dir: build
