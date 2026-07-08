@@ -8,10 +8,12 @@
 		<string>A fast and feature-rich MQTT visualization and debugging tool</string>
 		<key>CFBundleIconFile</key>
 		<string>icons</string>
+		<!-- Distinct dev bundle id so LaunchServices never resolves a dev build
+		     to the installed /Applications copy (or vice versa). -->
 		<key>CFBundleIdentifier</key>
-		<string>com.mqttviewer.MQTTViewer</string>
+		<string>com.mqttviewer.MQTTViewer.dev</string>
 		<key>CFBundleName</key>
-		<string>MQTT Viewer</string>
+		<string>MQTT Viewer (dev)</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

@@ -39,5 +39,7 @@ dev_mode:
       type: blocking
     - cmd: wails3 task common:dev:frontend
       type: background
-    - cmd: wails3 task run
+    # wait-for-vite gates the app launch on the dev server being up; without it
+    # the webview can race the Vite bind and stay blank.
+    - cmd: sh scripts/wait-for-vite.sh && wails3 task run
       type: primary

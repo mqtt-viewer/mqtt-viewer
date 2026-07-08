@@ -37,6 +37,11 @@ just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
 
+Dev-server ports are derived per checkout so parallel agent worktrees
+never collide. Once per checkout, run `scripts/dev-ports.sh write-launch`
+to generate `.claude/launch.json` (gitignored). See
+`docs/MULTI_AGENT_DEV.md`.
+
 Frontend (from `frontend/`, pnpm version pinned in package.json):
 
 ```sh
