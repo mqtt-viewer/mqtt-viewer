@@ -13,7 +13,9 @@ reference it follows.
 
 ```sh
 # 1. get develop green and merged
-git checkout main && git merge --ff-only origin/develop && git push
+#    (ALLOW_MAIN_PUSH=1 satisfies the .githooks/pre-push guard; a GitHub
+#    ruleset separately blocks force-pushes and deletion on main)
+git checkout main && git merge --ff-only origin/develop && ALLOW_MAIN_PUSH=1 git push
 
 # 2. dry-run with a prerelease (optional but recommended for risky changes)
 gh release create v0.X.Y-beta1 --target main --prerelease --generate-notes \

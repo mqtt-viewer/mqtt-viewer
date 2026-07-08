@@ -56,6 +56,13 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 - Branch model: feature branches PR into `develop`; `main` only moves by
   fast-forward from `develop` at release time (`/release` skill,
   `docs/RELEASING.md`).
+- Never push to any branch named `main`. A committed pre-push hook
+  enforces this; activate it once per clone with
+  `git config core.hooksPath .githooks`. Release pushes set
+  `ALLOW_MAIN_PUSH=1`. External PRs from forks often target `main` by
+  mistake; retarget with `gh pr edit <n> --base develop`. To push to a
+  fork's PR branch, check out with `gh pr checkout <n> -b pr-<n>` (fork
+  head branches named `main` otherwise collide with local `main`).
 - Commits: conventional prefixes with optional scope,
   `feat(topic-graph): ...`, `fix:`, `perf:`, `chore:`, `docs:`.
 - Svelte: the codebase runs Svelte 5 but components use legacy syntax
