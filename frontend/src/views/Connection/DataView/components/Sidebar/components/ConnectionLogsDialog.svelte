@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { afterUpdate } from "svelte";
+  import { afterUpdate, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import moment from "moment";
   import _ from "lodash";
@@ -30,10 +30,12 @@
   type Level = "debug" | "info" | "warn" | "error";
   const LEVELS: Level[] = ["debug", "info", "warn", "error"];
 
-  $: details = connection.connectionDetails;
+  $: details = connection?.connectionDetails;
 
   let entries: LogEntry[] = [];
-  let debugEnabled = details.debugLoggingEnabled ?? false;
+  // Read straight from the prop — the reactive `details` hasn't been assigned
+  // yet when this top-level initialiser runs.
+  let debugEnabled = connection?.connectionDetails?.debugLoggingEnabled ?? false;
 
   // Filters
   let filterText = "";
@@ -63,6 +65,7 @@
   }
 
   const onOpen = async () => {
+    if (!details) return;
     // Re-seed the toggle from the latest persisted value on each open.
     debugEnabled = details.debugLoggingEnabled ?? false;
     try {
@@ -72,7 +75,9 @@
     }
     autoScroll = true;
     off?.();
-    off = Events.On(connection.eventSet.mqttLogs, (e: any) => {
+    const logsEvent = connection?.eventSet?.mqttLogs;
+    if (!logsEvent) return;
+    off = Events.On(logsEvent, (e: any) => {
       const batch: LogEntry[] = e.data ?? [];
       if (!batch.length) return;
       const next = [...entries, ...batch];
@@ -84,6 +89,9 @@
     off?.();
     off = null;
   };
+
+  // Ensure the live subscription is dropped if the dialog unmounts while open.
+  onDestroy(() => off?.());
 
   // --- auto-scroll --------------------------------------------------------
   let scrollEl: HTMLDivElement | null = null;

@@ -47,6 +47,27 @@ export async function ClearConnectionHistory(
   _connectionId: number
 ): Promise<void> {}
 
+// Client-logs mocks. LogEntry is a flat {timestampMs, level, message} shape;
+// plain objects satisfy it structurally in stories.
+export async function GetConnectionLogs(_connId: number): Promise<any[]> {
+  const base = 1_710_000_000_000;
+  return [
+    { timestampMs: base, level: "info", message: "connection state changed from disconnected to connecting" },
+    { timestampMs: base + 500, level: "info", message: "connection state changed from connecting to connected" },
+    { timestampMs: base + 1200, level: "debug", message: "PINGREQ sent" },
+    { timestampMs: base + 1400, level: "debug", message: "PINGRESP received" },
+    { timestampMs: base + 2600, level: "warn", message: "reconnecting to broker" },
+    { timestampMs: base + 3000, level: "error", message: "connect failed: connection refused" },
+  ];
+}
+
+export async function ClearConnectionLogs(_connId: number): Promise<void> {}
+
+export async function SetConnectionDebugLogging(
+  _connId: number,
+  _enabled: boolean
+): Promise<void> {}
+
 // App settings / message retention mocks.
 let mockAppSettings = new models.AppSettings({
   id: 1,
