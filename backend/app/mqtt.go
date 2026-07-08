@@ -223,10 +223,10 @@ func makePublishProperties(properties *PublishProperties) (*mqtt.MessageProperti
 
 func getConnectionDetailsFromConnectionModel(connection *models.Connection) (*mqtt.MqttConnectionDetails, error) {
 	details := &mqtt.MqttConnectionDetails{
-		MqttVersion: connection.MqttVersion,
-		Protocol:    connection.Protocol,
-		Host:        connection.Host,
-		Port:        connection.Port,
+		MqttVersion:   connection.MqttVersion,
+		Protocol:      connection.Protocol,
+		Host:          connection.Host,
+		Port:          connection.Port,
 		WebsocketPath: connection.WebsocketPath,
 	}
 
