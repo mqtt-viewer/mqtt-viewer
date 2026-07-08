@@ -224,7 +224,7 @@
     <div
       bind:this={scrollEl}
       on:scroll={onScroll}
-      class="grow min-h-0 overflow-y-auto mx-4 mb-4 rounded bg-[#0c0c0c] border border-divider p-3 font-mono text-sm leading-relaxed"
+      class="grow min-h-0 overflow-y-auto mx-4 mb-4 rounded bg-elevation-0 border border-divider p-3 font-mono text-sm leading-relaxed"
     >
       {#if filtered.length === 0}
         <div class="h-full flex items-center justify-center text-secondary-text">

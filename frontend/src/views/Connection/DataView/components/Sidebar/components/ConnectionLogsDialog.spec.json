@@ -1,0 +1,39 @@
+{
+  "$schema": "../../../../../../design-system/component-spec.schema.json",
+  "name": "ConnectionLogsDialog",
+  "tier": "view",
+  "description": "Storybook coverage for ConnectionLogsDialog.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isOpen",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "connection",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "emphasis",
+    "secondary-text",
+    "divider",
+    "error",
+    "warning",
+    "elevation-0",
+    "elevation-2"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}
