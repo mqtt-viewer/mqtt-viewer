@@ -237,6 +237,7 @@ export class Connection {
     "subscriptions": Subscription[];
     "lastConnectedAt": time$0.Time | null;
     "customIconSeed": string | null;
+    "debugLoggingEnabled": boolean | null;
     "filterHistories": FilterHistory[];
     "publishHistories": PublishHistory[];
 
@@ -307,6 +308,9 @@ export class Connection {
         }
         if (!("customIconSeed" in $$source)) {
             this["customIconSeed"] = null;
+        }
+        if (!("debugLoggingEnabled" in $$source)) {
+            this["debugLoggingEnabled"] = null;
         }
         if (!("filterHistories" in $$source)) {
             this["filterHistories"] = [];

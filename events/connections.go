@@ -10,6 +10,7 @@ const MQTT_MESSAGES = "server:mqtt-messages"
 const MQTT_CLIENT_ERROR = "server:mqtt-client-error"
 const MQTT_CONNECTED_ROUNDTRIP_LATENCY = "server:mqtt-latency"
 const MQTT_CLEAR_HISTORY = "server:mqtt-clear-history"
+const MQTT_LOGS = "server:mqtt-logs"
 
 type ConnectionEvents struct {
 }
@@ -27,6 +28,7 @@ type ConnectionEventsSet struct {
 	MqttMessages     string `json:"mqttMessages"`
 	MqttLatency      string `json:"mqttLatency"`
 	MqttClearHistory string `json:"mqttClearHistory"`
+	MqttLogs         string `json:"mqttLogs"`
 }
 
 func (e *ConnectionEvents) GetConnectionEventsSet(connectionId uint) ConnectionEventsSet {
@@ -39,5 +41,6 @@ func (e *ConnectionEvents) GetConnectionEventsSet(connectionId uint) ConnectionE
 		MqttClientError:  MQTT_CLIENT_ERROR + ":" + fmt.Sprint(connectionId),
 		MqttLatency:      MQTT_CONNECTED_ROUNDTRIP_LATENCY + ":" + fmt.Sprint(connectionId),
 		MqttClearHistory: MQTT_CLEAR_HISTORY + ":" + fmt.Sprint(connectionId),
+		MqttLogs:         MQTT_LOGS + ":" + fmt.Sprint(connectionId),
 	}
 }

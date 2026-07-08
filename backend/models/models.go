@@ -79,6 +79,9 @@ type Connection struct {
 	Subscriptions        []Subscription   `json:"subscriptions"`
 	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
 	CustomIconSeed       *string          `json:"customIconSeed"`
+	// Opt-in verbose MQTT-library debug logging for this connection's client
+	// logs. nil/false = only always-on lifecycle/error lines are captured.
+	DebugLoggingEnabled *bool `json:"debugLoggingEnabled"`
 	FilterHistories      []FilterHistory  `json:"filterHistories"`
 	PublishHistories     []PublishHistory `json:"publishHistories"`
 	// Declared only so the schema keeps the foreign keys added during the DB

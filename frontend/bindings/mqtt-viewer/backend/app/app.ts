@@ -85,6 +85,38 @@ export function ClearConnectionHistory(connId: number): Promise<void> & { cancel
 }
 
 /**
+ * ClearConnectionLogs empties a connection's client-log ring and truncates its
+ * durable log file.
+ */
+export function ClearConnectionLogs(connId: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1243746974, connId) as any;
+    return $resultPromise;
+}
+
+/**
+ * GetConnectionLogs returns the buffered client-log lines for a connection
+ * (snapshot of the in-RAM ring that backs the logs dialog).
+ */
+export function GetConnectionLogs(connId: number): Promise<mqtt$0.LogEntry[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(226016115, connId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType28($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * SetConnectionDebugLogging persists and applies the per-connection verbose
+ * debug-logging toggle. Takes effect immediately for v5; for v3 it (de)registers
+ * the process-global debug dispatcher.
+ */
+export function SetConnectionDebugLogging(connId: number, enabled: boolean): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1317832316, connId, enabled) as any;
+    return $resultPromise;
+}
+
+/**
  * ClearReceivedMessages deletes all durable history (optionally for one
  * connection) and compacts the file.
  */
@@ -492,3 +524,5 @@ const $$createType23 = models$0.Tab.createFrom;
 const $$createType24 = $Create.Array($$createType23);
 const $$createType25 = $models.Connection.createFrom;
 const $$createType26 = $Create.Nullable($$createType25);
+const $$createType27 = mqtt$0.LogEntry.createFrom;
+const $$createType28 = $Create.Array($$createType27);

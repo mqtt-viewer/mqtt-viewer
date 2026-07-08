@@ -42,6 +42,38 @@ export class ConnectionStats {
     }
 }
 
+/**
+ * LogEntry is one client-log line, surfaced to the frontend as-is.
+ */
+export class LogEntry {
+    "timestampMs": number;
+    "level": string;
+    "message": string;
+
+    /** Creates a new LogEntry instance. */
+    constructor($$source: Partial<LogEntry> = {}) {
+        if (!("timestampMs" in $$source)) {
+            this["timestampMs"] = 0;
+        }
+        if (!("level" in $$source)) {
+            this["level"] = "";
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LogEntry instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LogEntry {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LogEntry($$parsedSource as Partial<LogEntry>);
+    }
+}
+
 export class MessageProperties {
     "correlationData": string;
     "contentType": string;
