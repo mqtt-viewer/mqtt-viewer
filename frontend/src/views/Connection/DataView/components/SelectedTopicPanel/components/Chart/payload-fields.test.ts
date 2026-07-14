@@ -53,9 +53,26 @@ describe("numericFields", () => {
   });
 
   it("excludes strings that are not purely numeric", () => {
+    // "1,000" is excluded on purpose: a 3-digit run after a comma is
+    // ambiguous with thousands grouping, so it is not guessed.
     expect(
       numericFields('{"a":"24C","b":"","c":"0x1f","d":"1,000","e":"NaN"}')
     ).toEqual([]);
+  });
+
+  it("casts EU-style decimal commas to numbers", () => {
+    expect(
+      numericFields('{"temp":"12,1","rssi":"-3,05","pi":"3,1416"}')
+    ).toEqual([
+      { path: "temp", value: 12.1 },
+      { path: "rssi", value: -3.05 },
+      { path: "pi", value: 3.1416 },
+    ]);
+  });
+
+  it("leaves ambiguous thousands-grouped commas unconverted", () => {
+    // 3-digit fractional run collides with thousands grouping.
+    expect(numericFields('{"a":"1,000","b":"12,345","c":"1,2,3"}')).toEqual([]);
   });
 
   it("returns [] for non-JSON payloads", () => {
@@ -79,6 +96,10 @@ describe("valueAtPath", () => {
   it("reads quoted numeric values as numbers", () => {
     expect(valueAtPath('{"temp":"24.6"}', "temp")).toBe(24.6);
     expect(valueAtPath('"42.5"', "")).toBe(42.5);
+  });
+  it("reads EU-style decimal commas as numbers", () => {
+    expect(valueAtPath('{"temp":"24,6"}', "temp")).toBe(24.6);
+    expect(valueAtPath('"42,5"', "")).toBe(42.5);
   });
   it("returns null when path is missing or non-numeric", () => {
     expect(valueAtPath('{"a":1}', "b")).toBeNull();

@@ -53,10 +53,15 @@ const isFiniteNumber = (v: unknown): v is number =>
 // empty/whitespace, hex ("0x1f"), Infinity/NaN, and unit-suffixed values ("24C").
 const NUMERIC_STRING = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
+// EU-style decimal comma: an integer part, a single comma, then the fractional
+// part ("12,1", "-3,05"). No period, no scientific notation, no digit grouping.
+const EU_DECIMAL_STRING = /^[+-]?\d+,(\d+)$/;
+
 /**
  * Coerces a leaf value to a finite number for charting. Numbers pass through;
- * quoted numerics (e.g. "24.6", "-72") are cast to float. Everything else
- * (non-numeric strings, booleans, null, objects) yields null.
+ * quoted numerics (e.g. "24.6", "-72") are cast to float, including EU-style
+ * decimal commas ("12,1" -> 12.1). Everything else (non-numeric strings,
+ * booleans, null, objects) yields null.
  */
 const coerceNumber = (v: unknown): number | null => {
   if (isFiniteNumber(v)) return v;
@@ -64,6 +69,15 @@ const coerceNumber = (v: unknown): number | null => {
     const trimmed = v.trim();
     if (NUMERIC_STRING.test(trimmed)) {
       const n = Number(trimmed);
+      if (Number.isFinite(n)) return n;
+    }
+    // Treat a comma as a decimal separator only when it is unambiguous. A
+    // 3-digit fractional run ("1,000") collides with thousands grouping, so it
+    // is left out rather than guessed; every other run length ("12,1", "1,05",
+    // "3,1416") can only be a decimal.
+    const eu = EU_DECIMAL_STRING.exec(trimmed);
+    if (eu && eu[1].length !== 3) {
+      const n = Number(trimmed.replace(",", "."));
       if (Number.isFinite(n)) return n;
     }
   }
