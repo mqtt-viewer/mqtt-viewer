@@ -53,15 +53,18 @@ const isFiniteNumber = (v: unknown): v is number =>
 // empty/whitespace, hex ("0x1f"), Infinity/NaN, and unit-suffixed values ("24C").
 const NUMERIC_STRING = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
-// EU-style decimal comma: an integer part, a single comma, then the fractional
-// part ("12,1", "-3,05"). No period, no scientific notation, no digit grouping.
-const EU_DECIMAL_STRING = /^[+-]?\d+,(\d+)$/;
+// Multiple comma-separated 3-digit groups: unambiguous thousands grouping
+// ("1,000,000", "12,345,678").
+const THOUSANDS_GROUPED = /^[+-]?\d{1,3}(?:,\d{3})+$/;
+// A single comma splitting an integer part from a trailing digit run.
+const SINGLE_COMMA = /^[+-]?\d+,(\d+)$/;
 
 /**
  * Coerces a leaf value to a finite number for charting. Numbers pass through;
- * quoted numerics (e.g. "24.6", "-72") are cast to float, including EU-style
- * decimal commas ("12,1" -> 12.1). Everything else (non-numeric strings,
- * booleans, null, objects) yields null.
+ * quoted numerics (e.g. "24.6", "-72") are cast to float. Comma numbers are
+ * read by the length of the run after the comma: a multiple of 3 ("1,000",
+ * "1,000000") is thousands grouping, any other length ("12,1", "3,1416") is an
+ * EU-style decimal separator. Everything else yields null.
  */
 const coerceNumber = (v: unknown): number | null => {
   if (isFiniteNumber(v)) return v;
@@ -71,14 +74,17 @@ const coerceNumber = (v: unknown): number | null => {
       const n = Number(trimmed);
       if (Number.isFinite(n)) return n;
     }
-    // Treat a comma as a decimal separator only when it is unambiguous. A
-    // 3-digit fractional run ("1,000") collides with thousands grouping, so it
-    // is left out rather than guessed; every other run length ("12,1", "1,05",
-    // "3,1416") can only be a decimal.
-    const eu = EU_DECIMAL_STRING.exec(trimmed);
-    if (eu && eu[1].length !== 3) {
-      const n = Number(trimmed.replace(",", "."));
-      if (Number.isFinite(n)) return n;
+    if (trimmed.includes(",")) {
+      const single = SINGLE_COMMA.exec(trimmed);
+      // 3/6/9-digit runs (and properly grouped forms) read the comma as a
+      // thousands separator; every other run length reads it as a decimal.
+      if (THOUSANDS_GROUPED.test(trimmed) || (single && single[1].length % 3 === 0)) {
+        const n = Number(trimmed.replace(/,/g, ""));
+        if (Number.isFinite(n)) return n;
+      } else if (single) {
+        const n = Number(trimmed.replace(",", "."));
+        if (Number.isFinite(n)) return n;
+      }
     }
   }
   return null;

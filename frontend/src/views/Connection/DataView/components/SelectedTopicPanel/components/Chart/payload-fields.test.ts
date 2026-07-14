@@ -53,14 +53,13 @@ describe("numericFields", () => {
   });
 
   it("excludes strings that are not purely numeric", () => {
-    // "1,000" is excluded on purpose: a 3-digit run after a comma is
-    // ambiguous with thousands grouping, so it is not guessed.
     expect(
-      numericFields('{"a":"24C","b":"","c":"0x1f","d":"1,000","e":"NaN"}')
+      numericFields('{"a":"24C","b":"","c":"0x1f","d":"1,2,3","e":"NaN"}')
     ).toEqual([]);
   });
 
   it("casts EU-style decimal commas to numbers", () => {
+    // Run lengths that are not a multiple of 3 read as a decimal separator.
     expect(
       numericFields('{"temp":"12,1","rssi":"-3,05","pi":"3,1416"}')
     ).toEqual([
@@ -70,9 +69,21 @@ describe("numericFields", () => {
     ]);
   });
 
-  it("leaves ambiguous thousands-grouped commas unconverted", () => {
-    // 3-digit fractional run collides with thousands grouping.
-    expect(numericFields('{"a":"1,000","b":"12,345","c":"1,2,3"}')).toEqual([]);
+  it("reads 3/6/9-digit comma runs as thousands grouping", () => {
+    expect(
+      numericFields(
+        '{"a":"1,000","b":"12,345","c":"1,000000","d":"12,345,678"}'
+      )
+    ).toEqual([
+      { path: "a", value: 1000 },
+      { path: "b", value: 12345 },
+      { path: "c", value: 1000000 },
+      { path: "d", value: 12345678 },
+    ]);
+  });
+
+  it("excludes malformed comma numbers", () => {
+    expect(numericFields('{"a":"1,2,3","b":"1,00,000"}')).toEqual([]);
   });
 
   it("returns [] for non-JSON payloads", () => {
