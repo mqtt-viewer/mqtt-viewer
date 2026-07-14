@@ -16,6 +16,18 @@ import type { SupportedCodeEditorFormat } from "@/components/CodeEditor/formatti
 
 export const HISTORY_WINDOW_SIZE = 5000;
 
+// Cap on the in-renderer `history` array. The backend memory budget bounds
+// backend RAM by bytes, but small payloads at high rates can still mean
+// millions of entries — the renderer keeps only the newest MAX_LOADED_MESSAGES.
+// TRIM_SLACK batches eviction so we don't reslice the array on every append.
+export const MAX_LOADED_MESSAGES = HISTORY_WINDOW_SIZE;
+export const TRIM_SLACK = 500;
+
+const trimHistory = (history: MqttHistoryMessage[]): MqttHistoryMessage[] =>
+  history.length > MAX_LOADED_MESSAGES + TRIM_SLACK
+    ? history.slice(-MAX_LOADED_MESSAGES)
+    : history;
+
 export type MqttHistoryMessage = Omit<
   mqtt.MqttMessage,
   "payload" | "convertValues"
@@ -130,7 +142,7 @@ export const createSelectedTopicStore = (
               };
         return {
           ...s,
-          history: [...s.history, ...decoded],
+          history: trimHistory([...s.history, ...decoded]),
           totalCount: s.totalCount + decoded.length,
           window,
         };
@@ -190,16 +202,18 @@ export const createSelectedTopicStore = (
       return;
     }
 
-    // Memory mode: the in-RAM history is already bounded by the memory budget.
+    // Memory mode: the backend budget bounds bytes, not entry count, so a
+    // busy topic with small payloads can still return far more entries than
+    // the renderer should hold — keep only the newest MAX_LOADED_MESSAGES.
     const history = await GetMessageHistory(connectionId, topic);
-    const decoded = history.map(decode);
+    const decoded = history.slice(-MAX_LOADED_MESSAGES).map(decode);
     update((store) => ({
       ...store,
       selectedTopic: topic,
       history: decoded,
       historySource: "memory",
       window: null,
-      totalCount: decoded.length,
+      totalCount: history.length,
       options: { ...store.options, autoSelect: true },
       onNewMessages: onNewMessages ?? null,
     }));
