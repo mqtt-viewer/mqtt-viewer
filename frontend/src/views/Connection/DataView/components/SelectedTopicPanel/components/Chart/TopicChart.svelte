@@ -13,13 +13,13 @@
   export let paused = false;
   export let style: "line" | "area" = "line";
   export let showPoints = true;
-  // 0 = all history; otherwise show only the last N minutes.
-  export let windowMinutes = 0;
+  // 0 = all history; otherwise show only the last N seconds.
+  export let windowSeconds = 0;
 
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
   let resizeObserver: ResizeObserver | null = null;
-  // Drives the sliding time-window: when windowMinutes>0 the x-axis min/max are
+  // Drives the sliding time-window: when windowSeconds>0 the x-axis min/max are
   // anchored to Date.now(), so without fresh data the view would freeze. Tick
   // re-renders ~1s so the window keeps sliding even when no messages arrive.
   let windowTick: ReturnType<typeof setInterval> | null = null;
@@ -41,9 +41,9 @@
     const axisColor = "#525252";
     const labelColor = "#aeaeae";
     let xAxisExtra: Record<string, unknown> = {};
-    if (windowMinutes > 0) {
+    if (windowSeconds > 0) {
       const now = Date.now();
-      xAxisExtra = { min: now - windowMinutes * 60_000, max: now };
+      xAxisExtra = { min: now - windowSeconds * 1000, max: now };
     }
     return {
       animation: false,
@@ -100,13 +100,13 @@
     $chartSeriesStore,
     style,
     showPoints,
-    windowMinutes,
+    windowSeconds,
     paused,
     render();
 
   // Keep the ticker running only while a finite, unpaused window is shown.
   const syncWindowTick = () => {
-    const wantTick = windowMinutes > 0 && !paused;
+    const wantTick = windowSeconds > 0 && !paused;
     if (wantTick && windowTick === null) {
       windowTick = setInterval(render, 1000);
     } else if (!wantTick && windowTick !== null) {
@@ -114,7 +114,7 @@
       windowTick = null;
     }
   };
-  $: windowMinutes, paused, syncWindowTick();
+  $: windowSeconds, paused, syncWindowTick();
 
   onMount(() => {
     chart = echarts.init(container, undefined, { renderer: "canvas" });

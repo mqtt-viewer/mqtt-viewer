@@ -1,4 +1,4 @@
-h1:cCnHejpxmzjdT9Upc6PAFPAjL3y6BALMEKpLMAWpJ+w=
+h1:zIJaFbhSrsmOJYxKJtjMpKhOigys8WOOkxFdqr7IAv4=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -12,3 +12,4 @@ h1:cCnHejpxmzjdT9Upc6PAFPAjL3y6BALMEKpLMAWpJ+w=
 20260613000000_add-received-messages-and-settings.sql h1:d1KzWMXKevL+GkkBxEWeTOpCAGPzSqV+i6AGnQIsgI8=
 20260702032219_add-changelog-version.sql h1:ELFjvpUawUhnM7QIlqDMU2pc7j2Lm5708LKEGTJoyvg=
 20260704051603_add-star-prompt-tracking.sql h1:zG2yaLTFTUlZiFeCC0KePn6TMzT2TOpf7rl97xZBIXQ=
+20260714053144_chart_window.sql h1:6/1Vv+19BbUNqFVG7ZrFSet9YLfGZWb9D017eryZ6mc=

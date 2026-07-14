@@ -6,4 +6,17 @@ export {
     App
 };
 
-export * from "./models.js";
+export {
+    Connection,
+    Connections,
+    CreateCollectionParams,
+    EnvInfo,
+    MqttStats,
+    OpenChartWindowParams,
+    PublishParams,
+    PublishProperties,
+    SaveCollectionMessageParams,
+    SavePublishHistoryEntryParams,
+    StartupOptions,
+    UpdateAppSettingsParams
+} from "./models.js";

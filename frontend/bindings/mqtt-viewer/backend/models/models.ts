@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Create as $Create} from "@wailsio/runtime";
+import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -65,6 +65,36 @@ export class AppSettings {
     static createFrom($$source: any = {}): AppSettings {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new AppSettings($$parsedSource as Partial<AppSettings>);
+    }
+}
+
+/**
+ * ChartWindow persists the chart time-window selection per connection. ID is
+ * the connection id (string). WindowSeconds is the selected window in seconds;
+ * 0 means "All history". A custom interval is stored as its resolved seconds.
+ */
+export class ChartWindow {
+    "id": string;
+    "windowSeconds": number;
+
+    /** Creates a new ChartWindow instance. */
+    constructor($$source: Partial<ChartWindow> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("windowSeconds" in $$source)) {
+            this["windowSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChartWindow instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChartWindow {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ChartWindow($$parsedSource as Partial<ChartWindow>);
     }
 }
 

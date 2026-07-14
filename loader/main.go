@@ -19,6 +19,7 @@ func main() {
 		&models.Tab{},
 		&models.Subscription{},
 		&models.SortState{},
+		&models.ChartWindow{},
 		&models.FilterHistory{},
 		&models.PanelSize{},
 		&models.PublishHistory{},
