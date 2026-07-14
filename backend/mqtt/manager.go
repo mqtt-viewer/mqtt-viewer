@@ -72,6 +72,13 @@ func (m *MqttManager) InitLogging(connId uint, filePath string, debugEnabled boo
 	installV3GlobalLoggers()
 }
 
+// CloseLogging tears down the log store when the connection is deleted:
+// deregister from the v3 dispatcher, stop the emit goroutine, close the file.
+func (m *MqttManager) CloseLogging() {
+	v3Registry.unregister(m.LogStore.connId)
+	m.LogStore.Close()
+}
+
 // SetDebugLoggingEnabled toggles verbose library debug capture for this
 // connection. For an active v3 connection it also (de)registers the global v3
 // dispatcher, since paho v3 loggers are process-global.

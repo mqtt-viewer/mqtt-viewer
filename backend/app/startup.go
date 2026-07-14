@@ -180,7 +180,7 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 
 	// Wire per-connection client logs: capture MQTT-library output into a
 	// bounded ring + rotating text file, and emit batches to the frontend.
-	debugLogging := conn.DebugLoggingEnabled != nil && *conn.DebugLoggingEnabled
+	debugLogging := conn.DebugLoggingEnabled
 	logPath := filepath.Join(a.Paths.ResourcePath, "logs", "connections", fmt.Sprintf("conn-%d.txt", conn.ID))
 	mqttManager.InitLogging(conn.ID, logPath, debugLogging, func(entries []mqtt.LogEntry) {
 		if a.Mode != AppModes.Test {

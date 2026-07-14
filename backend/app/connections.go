@@ -163,6 +163,11 @@ func (a *App) DeleteConnection(id uint) error {
 	if err != nil {
 		return err
 	}
+	// Stop the log store's emit goroutine and close its file before the
+	// connection is dropped from the map, else they leak for the process.
+	if appConnection, ok := a.AppConnections[id]; ok && appConnection.MqttManager != nil {
+		appConnection.MqttManager.CloseLogging()
+	}
 	delete(a.AppConnections, id)
 	a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
 	return nil

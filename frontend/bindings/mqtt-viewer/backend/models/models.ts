@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Create as $Create} from "@wailsio/runtime";
+import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -237,7 +237,13 @@ export class Connection {
     "subscriptions": Subscription[];
     "lastConnectedAt": time$0.Time | null;
     "customIconSeed": string | null;
-    "debugLoggingEnabled": boolean | null;
+
+    /**
+     * Opt-in verbose MQTT-library debug logging for this connection's client
+     * logs. false = only always-on lifecycle/error lines are captured.
+     * Non-pointer so GORM never inserts NULL into the NOT NULL column.
+     */
+    "debugLoggingEnabled": boolean;
     "filterHistories": FilterHistory[];
     "publishHistories": PublishHistory[];
 
@@ -310,7 +316,7 @@ export class Connection {
             this["customIconSeed"] = null;
         }
         if (!("debugLoggingEnabled" in $$source)) {
-            this["debugLoggingEnabled"] = null;
+            this["debugLoggingEnabled"] = false;
         }
         if (!("filterHistories" in $$source)) {
             this["filterHistories"] = [];
@@ -327,17 +333,17 @@ export class Connection {
      */
     static createFrom($$source: any = {}): Connection {
         const $$createField19_0 = $$createType3;
-        const $$createField22_0 = $$createType5;
-        const $$createField23_0 = $$createType7;
+        const $$createField23_0 = $$createType5;
+        const $$createField24_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("subscriptions" in $$parsedSource) {
             $$parsedSource["subscriptions"] = $$createField19_0($$parsedSource["subscriptions"]);
         }
         if ("filterHistories" in $$parsedSource) {
-            $$parsedSource["filterHistories"] = $$createField22_0($$parsedSource["filterHistories"]);
+            $$parsedSource["filterHistories"] = $$createField23_0($$parsedSource["filterHistories"]);
         }
         if ("publishHistories" in $$parsedSource) {
-            $$parsedSource["publishHistories"] = $$createField23_0($$parsedSource["publishHistories"]);
+            $$parsedSource["publishHistories"] = $$createField24_0($$parsedSource["publishHistories"]);
         }
         return new Connection($$parsedSource as Partial<Connection>);
     }

@@ -125,7 +125,9 @@ func (s *LogStore) StopEmitting() {
 		s.handleTicker = nil
 	}
 	if s.handleChan != nil {
-		s.handleChan <- true
+		// close rather than send: a send would block forever if the goroutine
+		// has already exited, and close is safe however many times Stop races.
+		close(s.handleChan)
 		s.handleChan = nil
 	}
 }
@@ -232,8 +234,8 @@ func (s *LogStore) removeBackups() error {
 	return nil
 }
 
-// Close stops emitting and closes the file. Called when the connection is torn
-// down (currently only exercised in tests; app connections live for the process).
+// Close stops emitting and closes the file. Called when the connection is
+// deleted (via MqttManager.CloseLogging) and on test teardown.
 func (s *LogStore) Close() {
 	s.StopEmitting()
 	s.fileMu.Lock()

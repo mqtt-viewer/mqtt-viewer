@@ -80,8 +80,9 @@ type Connection struct {
 	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
 	CustomIconSeed       *string          `json:"customIconSeed"`
 	// Opt-in verbose MQTT-library debug logging for this connection's client
-	// logs. nil/false = only always-on lifecycle/error lines are captured.
-	DebugLoggingEnabled *bool `json:"debugLoggingEnabled"`
+	// logs. false = only always-on lifecycle/error lines are captured.
+	// Non-pointer so GORM never inserts NULL into the NOT NULL column.
+	DebugLoggingEnabled bool `json:"debugLoggingEnabled" gorm:"not null;default:0"`
 	FilterHistories      []FilterHistory  `json:"filterHistories"`
 	PublishHistories     []PublishHistory `json:"publishHistories"`
 	// Declared only so the schema keeps the foreign keys added during the DB
