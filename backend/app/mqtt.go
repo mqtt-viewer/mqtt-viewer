@@ -84,7 +84,10 @@ func (a *App) DisconnectMqtt(connId uint) error {
 // blob across the webview bridge, which crashed the app on huge
 // public-broker topics.
 func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.MqttMessage, error) {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
 	messageHistory, err := appConnection.MqttManager.MessageHistory.GetTopicHistoryWindow(topic, limit)
 	if err != nil {
 		return nil, err
@@ -98,7 +101,10 @@ func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.Mq
 // a topic fetches stubs to draw the timeline, then fetches individual
 // payloads on demand via GetMessageById.
 func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.MqttMessageStub, error) {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
 	stubs, err := appConnection.MqttManager.MessageHistory.GetTopicTimelineWindow(topic, limit)
 	if err != nil {
 		return nil, err
@@ -114,7 +120,11 @@ func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.M
 // frontend can render a graceful "no longer available" state instead of an
 // error.
 func (a *App) GetMessageById(connId uint, topic string, id string, timeMs int64) (msg mqtt.MqttMessage, found bool) {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		// a call racing connection teardown: treat as aged out, not a panic
+		return mqtt.MqttMessage{}, false
+	}
 	return appConnection.MqttManager.MessageHistory.GetMessageById(topic, id, timeMs)
 }
 

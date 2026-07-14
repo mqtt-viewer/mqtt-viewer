@@ -501,11 +501,28 @@ export const createSelectedTopicStore = (
     // fetched, no payloads, so even a 150k-message topic's window is a few
     // hundred KB, not tens of MB. Recorded (disk) history is opt-in via
     // loadRecordedHistory below, never paid on selection.
-    const stubs = await GetMessageTimeline(
-      connectionId,
-      topic,
-      HISTORY_WINDOW_SIZE
-    );
+    let stubs: Awaited<ReturnType<typeof GetMessageTimeline>>;
+    try {
+      stubs = await GetMessageTimeline(connectionId, topic, HISTORY_WINDOW_SIZE);
+    } catch {
+      if (isStale(token, topic)) return;
+      // Structural topics (e.g. an expanded parent selected in the graph)
+      // have no own messages, so the backend rejects the timeline fetch.
+      // Show an empty history rather than a stuck loading state — the live
+      // listener ignores appends while isLoadingHistory is true, so nothing
+      // would ever clear it.
+      update((store) => ({
+        ...store,
+        history: [],
+        historySource: "memory",
+        window: null,
+        totalCount: 0,
+        isLoadingHistory: false,
+        historyRevision: store.historyRevision + 1,
+        isLoadingWindow: null,
+      }));
+      return;
+    }
     if (isStale(token, topic)) return;
     const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     update((store) => ({
@@ -725,13 +742,23 @@ export const createSelectedTopicStore = (
     const topic = store.selectedTopic;
     const token = requestToken;
     update((s) => ({ ...s, isLoadingWindow: "older" }));
-    const olderStubs = await GetReceivedTimelineWindow(
-      store.connectionId,
-      topic,
-      store.window.oldestId,
-      0,
-      HISTORY_WINDOW_SIZE
-    );
+    let olderStubs: Awaited<ReturnType<typeof GetReceivedTimelineWindow>>;
+    try {
+      olderStubs = await GetReceivedTimelineWindow(
+        store.connectionId,
+        topic,
+        store.window.oldestId,
+        0,
+        HISTORY_WINDOW_SIZE
+      );
+    } catch {
+      // Clear the single-flight guard or paging stays dead for this
+      // selection (both buttons disable while isLoadingWindow is set).
+      if (!isStale(token, topic)) {
+        update((s) => ({ ...s, isLoadingWindow: null }));
+      }
+      return;
+    }
     if (isStale(token, topic)) return;
     const older = olderStubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     update((s) => {
@@ -777,13 +804,22 @@ export const createSelectedTopicStore = (
     const topic = store.selectedTopic;
     const token = requestToken;
     update((s) => ({ ...s, isLoadingWindow: "newer" }));
-    const newerStubs = await GetReceivedTimelineWindow(
-      store.connectionId,
-      topic,
-      0,
-      store.window.newestId,
-      HISTORY_WINDOW_SIZE
-    );
+    let newerStubs: Awaited<ReturnType<typeof GetReceivedTimelineWindow>>;
+    try {
+      newerStubs = await GetReceivedTimelineWindow(
+        store.connectionId,
+        topic,
+        0,
+        store.window.newestId,
+        HISTORY_WINDOW_SIZE
+      );
+    } catch {
+      // Same as loadOlderWindow: never strand the single-flight guard.
+      if (!isStale(token, topic)) {
+        update((s) => ({ ...s, isLoadingWindow: null }));
+      }
+      return;
+    }
     if (isStale(token, topic)) return;
     if (newerStubs.length === 0) {
       // Already at the latest, just mark the current window live.

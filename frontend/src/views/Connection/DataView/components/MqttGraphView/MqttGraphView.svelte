@@ -166,10 +166,17 @@
     const walk = (d: MqttData) => {
       for (const key of Object.keys(d)) {
         const n = d[key];
-        const t = n.latestMessageTime
-          ? new Date(n.latestMessageTime).getTime()
-          : Date.now();
-        model.ingest(n.topic, t);
+        // Only nodes that actually published get ingested (same structural
+        // check as the list view). Parents carry latestMessageTime propagated
+        // from children, so ingesting them too would record a phantom own
+        // message on every ancestor. ingest() still creates the ancestor
+        // nodes from the leaf's path.
+        if (n.message !== undefined) {
+          const t = n.latestMessageTime
+            ? new Date(n.latestMessageTime).getTime()
+            : Date.now();
+          model.ingest(n.topic, t);
+        }
         walk(n.children);
       }
     };
@@ -439,6 +446,8 @@
     document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (liveTimer) clearInterval(liveTimer);
     stopStatsTimer();
+    // cancel the trailing 150ms filter call so it can't touch a destroyed renderer
+    applyFilter.cancel();
     renderer?.destroy();
   });
 

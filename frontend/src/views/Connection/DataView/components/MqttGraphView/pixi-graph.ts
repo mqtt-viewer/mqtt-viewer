@@ -209,6 +209,7 @@ export class TopicGraphRenderer {
   // any manual pan or zoom
   private viewAnim: { x: number; y: number; scale: number } | null = null;
   private relayoutQueued = false;
+  private relayoutTimer: ReturnType<typeof setTimeout> | null = null;
   private lastTopicCount = -1;
   // topology signature from the previous relayout (see relayout()); starts as
   // a value no real signature can equal so the very first relayout always
@@ -412,7 +413,8 @@ export class TopicGraphRenderer {
     // adaptive debounce: big trees relayout (a d3-hierarchy pass + full visual
     // reconciliation) far less often so a busy broker doesn't thrash the layout
     const delay = this.model.topicCount <= 2000 ? 250 : 1000;
-    setTimeout(() => {
+    this.relayoutTimer = setTimeout(() => {
+      this.relayoutTimer = null;
       this.relayoutQueued = false;
       this.relayout();
     }, delay);
@@ -1432,6 +1434,13 @@ export class TopicGraphRenderer {
   }
 
   destroy(): void {
+    // a pending relayout would otherwise fire (up to 1s later) against the
+    // destroyed Pixi app when the user toggles Graph -> List quickly
+    if (this.relayoutTimer !== null) {
+      clearTimeout(this.relayoutTimer);
+      this.relayoutTimer = null;
+      this.relayoutQueued = false;
+    }
     document.removeEventListener("visibilitychange", this.visibilityHandler);
     for (const t of this.labelPool) t.destroy();
     for (const t of this.badgePool) t.destroy();
