@@ -22,7 +22,16 @@
   <StoryRender component={Component} {args} {componentName} />
 {/snippet}
 
-<Story name="Default" args={storyArgs} {template} />
+<Story
+  name="Default"
+  args={storyArgs}
+  {template}
+  play={async () => {
+    // The store is module-level and shared with the Open story, so reset it
+    // in case that story ran first in an interactive session.
+    starPromptOpen.set(false);
+  }}
+/>
 
 <Story
   name="Open"
