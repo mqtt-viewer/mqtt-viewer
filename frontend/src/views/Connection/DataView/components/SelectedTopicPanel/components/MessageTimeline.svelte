@@ -25,6 +25,7 @@
   } from "../../../stores/selected-topic-store";
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import { evictOldestTimelineItems } from "./timeline-eviction";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -69,6 +70,28 @@
     return timelineData;
   };
 
+  // Live appends must not grow the DataSet without bound while a busy topic
+  // stays selected — evict oldest items past the cap, mirroring the store's
+  // history bound, and repair selection state if the eviction touched it.
+  const appendLiveMessages = (messages: MqttHistoryMessage[]) => {
+    timelineDataSet.add(getTimelineData(messages));
+    const removed = evictOldestTimelineItems(timelineDataSet);
+    if (removed.length === 0 || selectedMessageId === null) return;
+    if (removed.includes(selectedMessageId)) {
+      // The selected message aged out of the timeline (its payload also aged
+      // out of the store history) — clear the selection.
+      selectedMessageId = null;
+      selectedMessageIndex = null;
+      timeline?.setSelection([]);
+      onMessageSelect(null);
+    } else {
+      // Eviction shifted every index left; re-derive it from the id.
+      selectedMessageIndex = timelineDataSet
+        .get()
+        .findIndex((message) => message.id === selectedMessageId);
+    }
+  };
+
   onMount(() => {
     let container = document.getElementsByClassName(
       `timeline timeline-${connectionId}`
@@ -76,9 +99,7 @@
     timelineDataSet = new DataSet<DataItem, "id">();
     const timelineData = getTimelineData($selectedTopicStore.history);
     timelineDataSet.add(timelineData);
-    selectedTopicStore.setOnNewMessages((messages) => {
-      timelineDataSet.add(getTimelineData(messages));
-    });
+    selectedTopicStore.setOnNewMessages(appendLiveMessages);
     timeline = new Timeline(container, timelineDataSet, defaultTimelineOptions);
     if (timelineDataSet.length > 0) {
       const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
@@ -212,9 +233,7 @@
   const rebuildTimelineFromHistory = () => {
     timelineDataSet = new DataSet<DataItem, "id">();
     timelineDataSet.add(getTimelineData($selectedTopicStore.history));
-    selectedTopicStore.setOnNewMessages((messages) => {
-      timelineDataSet.add(getTimelineData(messages));
-    });
+    selectedTopicStore.setOnNewMessages(appendLiveMessages);
     timeline.setItems(timelineDataSet);
     // Select the most recent message in the (re)loaded window by default.
     if (timelineDataSet.length > 0) {
@@ -254,6 +273,7 @@
       nextMessageIndex = timelineDataSet.length - 1;
     }
     const nextMessage = timelineDataSet.get()[nextMessageIndex];
+    if (!nextMessage) return;
     selectedMessageId = nextMessage.id;
     selectedMessageIndex = nextMessageIndex;
     timeline.setSelection([nextMessage.id]);
