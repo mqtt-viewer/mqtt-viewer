@@ -47,7 +47,6 @@
 
   let publishPanelWidth: number;
   let selectedTopicPanelWidth: number;
-  let selectedTopicPanelHeight: number;
 
   let isPublishPanelOpen =
     $panelSizes.resizablePanelSizes["publish-panel"]?.isOpen ?? true;
@@ -137,12 +136,22 @@
       OpenTopicWindow({
         connectionId: connection.connectionDetails.id,
         topic: topic ?? "",
-      }).then(() => {
-        Events.Emit(events.GlobalEvent.TopicWindowSelect, {
-          connectionId: connection.connectionDetails.id,
-          topic: topic ?? "",
+      })
+        .then(() => {
+          Events.Emit(events.GlobalEvent.TopicWindowSelect, {
+            connectionId: connection.connectionDetails.id,
+            topic: topic ?? "",
+          });
+        })
+        .catch((e) => {
+          addToast({
+            data: {
+              title: "Failed to open topic window",
+              description: e as string,
+              type: "error",
+            },
+          });
         });
-      });
     }
   } else {
     // Reset so switching back to "window" mode (or back to this tab) re-sends
@@ -243,7 +252,6 @@
           resizeEdge="top"
           minSize={220}
           maxSize={(2 * $panelSizes.rootWindowHeight) / 3}
-          bind:height={selectedTopicPanelHeight}
         >
           <SelectedTopicDisplay
             connectionId={connection.connectionDetails.id}

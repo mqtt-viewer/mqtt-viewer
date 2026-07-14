@@ -227,6 +227,11 @@ func (a *App) revertTopicPanelDockIfStillWindowed() {
 	if err := a.Db.Save(&settings).Error; err != nil {
 		return
 	}
+	// The mode is no longer "window", so any other connection's pop-outs are
+	// now orphans: nothing follows selection into them and nothing else will
+	// close them. Their WindowClosing handlers re-enter the revert, which
+	// no-ops on the mode check above.
+	closeAllTopicWindows()
 	if a.EventRuntime != nil {
 		a.EventRuntime.EventsEmit(string(viewerEvents.TopicPanelDockChanged), TopicPanelDockChangedPayload{
 			Mode:           settings.TopicPanelDockMode,
