@@ -49,6 +49,14 @@ describe("buildChartOption xAxis bounds", () => {
     expect(cleared.min).toBeNull();
     expect(cleared.max).toBeNull();
   });
+
+  it("handles empty history without crashing", () => {
+    const opt = buildChartOption(params({ history: [] }));
+    const ax = opt.xAxis as { min?: unknown; max?: unknown };
+    expect(ax.min).toBeNull();
+    expect(ax.max).toBeNull();
+    expect((opt.series as { data: unknown[] }[])[0].data).toEqual([]);
+  });
 });
 
 describe("buildChartOption series", () => {

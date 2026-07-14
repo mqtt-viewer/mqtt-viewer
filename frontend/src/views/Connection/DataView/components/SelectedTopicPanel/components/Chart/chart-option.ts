@@ -78,6 +78,11 @@ export const buildChartOption = ({
       id: s.path,
       name: s.label,
       type: "line",
+      // All-history renders the full retained extent, so downsample with
+      // LTTB to keep redraws cheap on high-volume topics. echarts only
+      // applies sampling when points outnumber pixels, so sparse series
+      // render exactly as before.
+      sampling: "lttb",
       showSymbol: showPoints,
       symbolSize: 5,
       smooth: false,
