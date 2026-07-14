@@ -59,27 +59,30 @@ describe("numericFields", () => {
   });
 
   it("casts EU-style decimal commas to numbers", () => {
-    // Run lengths that are not a multiple of 3 read as a decimal separator.
+    // Any single-comma run other than exactly 3 digits reads as a decimal.
     expect(
-      numericFields('{"temp":"12,1","rssi":"-3,05","pi":"3,1416"}')
+      numericFields(
+        '{"temp":"12,1","rssi":"-3,05","pi":"3,1416","frac":"1,000000"}'
+      )
     ).toEqual([
       { path: "temp", value: 12.1 },
       { path: "rssi", value: -3.05 },
       { path: "pi", value: 3.1416 },
+      { path: "frac", value: 1 },
     ]);
   });
 
-  it("reads 3/6/9-digit comma runs as thousands grouping", () => {
-    expect(
-      numericFields(
-        '{"a":"1,000","b":"12,345","c":"1,000000","d":"12,345,678"}'
-      )
-    ).toEqual([
-      { path: "a", value: 1000 },
-      { path: "b", value: 12345 },
-      { path: "c", value: 1000000 },
-      { path: "d", value: 12345678 },
+  it("reads multi-group comma forms as thousands grouping", () => {
+    expect(numericFields('{"a":"1,000,000","b":"12,345,678"}')).toEqual([
+      { path: "a", value: 1000000 },
+      { path: "b", value: 12345678 },
     ]);
+  });
+
+  it("skips single-comma 3-digit runs as ambiguous", () => {
+    // "1,000" could be thousands grouping or an EU decimal; with no locale
+    // to resolve it, it stays unconverted (previous behaviour).
+    expect(numericFields('{"a":"1,000","b":"12,345"}')).toEqual([]);
   });
 
   it("excludes malformed comma numbers", () => {

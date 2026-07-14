@@ -53,18 +53,21 @@ const isFiniteNumber = (v: unknown): v is number =>
 // empty/whitespace, hex ("0x1f"), Infinity/NaN, and unit-suffixed values ("24C").
 const NUMERIC_STRING = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
-// Multiple comma-separated 3-digit groups: unambiguous thousands grouping
-// ("1,000,000", "12,345,678").
-const THOUSANDS_GROUPED = /^[+-]?\d{1,3}(?:,\d{3})+$/;
+// Two or more comma-separated 3-digit groups: unambiguous thousands grouping
+// ("1,000,000", "12,345,678") — an EU decimal can only carry one comma.
+const THOUSANDS_GROUPED = /^[+-]?\d{1,3}(?:,\d{3}){2,}$/;
 // A single comma splitting an integer part from a trailing digit run.
 const SINGLE_COMMA = /^[+-]?\d+,(\d+)$/;
 
 /**
  * Coerces a leaf value to a finite number for charting. Numbers pass through;
- * quoted numerics (e.g. "24.6", "-72") are cast to float. Comma numbers are
- * read by the length of the run after the comma: a multiple of 3 ("1,000",
- * "1,000000") is thousands grouping, any other length ("12,1", "3,1416") is an
- * EU-style decimal separator. Everything else yields null.
+ * quoted numerics (e.g. "24.6", "-72") are cast to float. Comma numbers:
+ * multi-group forms ("1,000,000") are unambiguous thousands grouping and are
+ * cast; a single comma followed by exactly 3 digits ("1,000", "12,345") is
+ * ambiguous between thousands grouping and an EU decimal, with no locale
+ * available to resolve it, so it is left unconverted; any other single-comma
+ * run ("12,1", "3,1416", "1,000000") can only be an EU-style decimal and is
+ * cast. Everything else yields null.
  */
 const coerceNumber = (v: unknown): number | null => {
   if (isFiniteNumber(v)) return v;
@@ -75,13 +78,14 @@ const coerceNumber = (v: unknown): number | null => {
       if (Number.isFinite(n)) return n;
     }
     if (trimmed.includes(",")) {
-      const single = SINGLE_COMMA.exec(trimmed);
-      // 3/6/9-digit runs (and properly grouped forms) read the comma as a
-      // thousands separator; every other run length reads it as a decimal.
-      if (THOUSANDS_GROUPED.test(trimmed) || (single && single[1].length % 3 === 0)) {
+      if (THOUSANDS_GROUPED.test(trimmed)) {
         const n = Number(trimmed.replace(/,/g, ""));
         if (Number.isFinite(n)) return n;
-      } else if (single) {
+      }
+      const single = SINGLE_COMMA.exec(trimmed);
+      // A 3-digit run ("1,000") is ambiguous between thousands grouping and
+      // an EU decimal — skip it; any other run length must be a decimal.
+      if (single && single[1].length !== 3) {
         const n = Number(trimmed.replace(",", "."));
         if (Number.isFinite(n)) return n;
       }
