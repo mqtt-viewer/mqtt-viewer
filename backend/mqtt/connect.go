@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,7 +105,7 @@ func (mm *MqttManager) Connect(connectionDetails MqttConnectionDetails, subscrip
 }
 
 func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConnectionDetails, subscriptions []SubscribeParams) (*autopaho.ConnectionManager, error) {
-	urlString := fmt.Sprintf("%s://%s:%d%s", connectionDetails.Protocol, connectionDetails.Host, connectionDetails.Port, connectionDetails.WebsocketPath)
+	urlString := buildBrokerURL(connectionDetails.Protocol, connectionDetails.Host, connectionDetails.Port, connectionDetails.WebsocketPath)
 	broker, err := url.Parse(urlString)
 	if err != nil {
 		return nil, err
@@ -204,9 +205,10 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 }
 
 func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConnectionDetails, subscriptions []SubscribeParams) (*mqttV3.Client, error) {
+	urlString := buildBrokerURL(connectionDetails.Protocol, connectionDetails.Host, connectionDetails.Port, connectionDetails.WebsocketPath)
 	opts := mqttV3.NewClientOptions()
 
-	opts.AddBroker(fmt.Sprintf("%s://%s:%d%s", connectionDetails.Protocol, connectionDetails.Host, connectionDetails.Port, connectionDetails.WebsocketPath))
+	opts.AddBroker(urlString)
 
 	opts.SetClientID(connectionDetails.ClientId)
 	if username := connectionDetails.Username; username != "" {
@@ -312,4 +314,12 @@ func validateSubs(subs []SubscribeParams) error {
 
 func newMqttConnectError(err error) error {
 	return fmt.Errorf("connect: %w", err)
+}
+
+func buildBrokerURL(protocol, host string, port int, wsPath string) string {
+	base := fmt.Sprintf("%s://%s:%d", protocol, host, port)
+	if wsPath == "" {
+		return base
+	}
+	return base + "/" + strings.TrimLeft(wsPath, "/")
 }

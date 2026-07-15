@@ -52,7 +52,15 @@
     selected,
     positioning: {
       placement: "bottom-start",
-      fitViewport: true,
+      // NB: `fitViewport` is deliberately omitted. It activates floating-ui's
+      // `size` middleware, which writes an inline `max-height`/`max-width` onto
+      // the menu computed from the available viewport space. On Windows WebView2
+      // that available space can be computed as ~0 (issue #108), producing an
+      // inline `max-height: 0px` that overrides the CSS `max-h-[300px]` cap and,
+      // combined with `overflow-y-auto`, collapses the menu to an invisible
+      // sliver — the dropdown "opens" (arrow toggles) but no list is shown.
+      // The CSS `max-h-[300px] overflow-y-auto` on the menu already caps height
+      // and scrolls long lists, so `fitViewport` is redundant here.
       sameWidth,
     },
     onSelectedChange: ({ curr, next }) => {

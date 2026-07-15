@@ -321,7 +321,11 @@ export default {
 };
 
 const getConnectionString = (connection: Connection["connectionDetails"]) => {
+  const isWs = connection.protocol === "ws" || connection.protocol === "wss";
+  const wsPath = isWs && connection.websocketPath
+    ? "/" + connection.websocketPath.replace(/^\/+/, "")
+    : "";
   return `${connection.protocol}://${
     !!connection.username ? connection.username + "@" : ""
-  }${connection.host}:${connection.port}`;
+  }${connection.host}:${connection.port}${wsPath}`;
 };

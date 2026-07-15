@@ -7,7 +7,7 @@ on:
       - "docs/design-system/**"
       - ".github/workflows/design-system.yml"
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - "frontend/**"
       - "docs/design-system/**"
