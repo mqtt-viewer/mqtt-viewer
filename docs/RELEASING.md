@@ -13,7 +13,9 @@ reference it follows.
 
 ```sh
 # 1. get develop green and merged
-git checkout main && git merge --ff-only origin/develop && git push
+#    (ALLOW_MAIN_PUSH=1 satisfies the .githooks/pre-push guard; a GitHub
+#    ruleset separately blocks force-pushes and deletion on main)
+git checkout main && git merge --ff-only origin/develop && ALLOW_MAIN_PUSH=1 git push
 
 # 2. dry-run with a prerelease (optional but recommended for risky changes)
 gh release create v0.X.Y-beta1 --target main --prerelease --generate-notes \
@@ -72,9 +74,67 @@ Shared foundations that have bitten before:
 
 - darwin: `MQTT_Viewer_<tag>_darwin_{arm64,amd64}.zip` (+ `.sha256`)
 - windows: `..._windows_amd64.zip` + `..._installer.exe` (+ `.sha256`)
-- linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm}` (+ `.sha256`)
+- linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm,flatpak}` (+ `.sha256`)
 
 Linux distro guidance: deb/rpm use the system WebKit and are the most
 compatible (Fedora needs the rpm — the AppImage bundles Ubuntu-built WebKit
 whose helper paths don't exist elsewhere). AppImage works on Debian/Ubuntu
 family with `libwebkit2gtk-4.1-0` installed.
+
+### Flatpak
+
+Each release also produces a single-file `.flatpak` bundle per architecture,
+uploaded as a release asset alongside the deb and rpm. Users can install it
+directly:
+
+```sh
+flatpak install ./MQTT_Viewer_<tag>_linux_amd64.flatpak
+```
+
+The Flatpak build cannot run on macOS. It is verified in CI by
+`.github/workflows/flatpak-check.yaml`, which builds the bundle and launches
+it headlessly on every pull request that touches `build/linux/flatpak/`,
+failing if the GNOME runtime no longer ships `webkit2gtk-4.1`.
+
+The bundled binary links `webkit2gtk-4.1` (the `-tags gtk3` stack), so the
+manifest pins `org.gnome.Platform` to a runtime that still ships it. Keep
+`RUNTIME_VERSION` (in the manifest and both Flatpak workflows) on the newest
+supported GNOME runtime; the CI smoke test catches a runtime that has dropped
+the GTK3 WebKit.
+
+#### Hosted repository (auto-updating installs)
+
+`.github/workflows/flatpak-publish.yaml` builds both architectures, merges
+them into one GPG-signed OSTree repository and deploys it to GitHub Pages, so
+that installs update through `flatpak update`. It runs on every published
+release, and can be triggered manually:
+
+```sh
+gh workflow run flatpak-publish.yaml --ref develop -f version=v0.0.0-test
+```
+
+Already configured: the `FLATPAK_GPG_PRIVATE_KEY` signing secret and GitHub
+Pages (source: GitHub Actions). The private key is held offline by the
+maintainer; losing it means clients must re-add the remote after a re-key.
+
+To serve from a custom subdomain instead of the default
+`https://mqtt-viewer.github.io/mqtt-viewer`:
+
+1. Add a DNS CNAME, e.g. `dl.mqttviewer.app` -> `mqtt-viewer.github.io`.
+2. Set the repository variables `FLATPAK_REPO_BASE_URL`
+   (e.g. `https://dl.mqttviewer.app`) and `FLATPAK_REPO_CUSTOM_DOMAIN`
+   (e.g. `dl.mqttviewer.app`), then re-run the publish workflow.
+
+Once live, users add the remote and install once:
+
+```sh
+flatpak remote-add --if-not-exists mqtt-viewer https://dl.mqttviewer.app/mqtt-viewer.flatpakrepo
+flatpak install mqtt-viewer app.mqttviewer.MQTTViewer
+```
+
+#### Flathub (future)
+
+The manifest and `metainfo.xml` are written to Flathub's requirements, so
+the same files can seed a Flathub submission (see
+`build/linux/flatpak/FLATHUB.md`). Flathub then hosts and auto-updates the
+app, which would make the self-hosted repository above redundant.

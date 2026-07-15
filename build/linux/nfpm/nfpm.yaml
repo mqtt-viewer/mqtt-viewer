@@ -10,7 +10,7 @@ maintainer: Sam Webster <sam@mqttviewer.app>
 description: "A fast and feature-rich MQTT visualization and debugging tool"
 vendor: "MQTT Viewer"
 homepage: "https://mqttviewer.app"
-license: "MIT"
+license: "GPL-3.0-or-later"
 release: "1"
 
 contents:

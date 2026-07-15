@@ -39,12 +39,6 @@ func (p *PortalProvider) Check(ctx context.Context, req updater.CheckRequest) (*
 	if info.UpToDate || sameVersion(info.LatestVersion, req.CurrentVersion) {
 		return nil, nil
 	}
-	// The portal marks updates the current license does not cover with
-	// can_update=false. They must never be installed; the notification flow
-	// (see Updater.CheckForUpdates) surfaces them to the user instead.
-	if !info.CanUpdate {
-		return nil, nil
-	}
 	if info.Artifact == nil || info.Artifact.Url == "" {
 		return nil, fmt.Errorf("portal: update available but no artifact provided")
 	}

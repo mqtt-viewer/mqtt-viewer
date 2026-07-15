@@ -17,6 +17,10 @@ func canSelfUpdate() bool {
 	if os.Getenv("APPIMAGE") != "" {
 		return false
 	}
+	if isFlatpak() {
+		// Flatpak's /app is read-only; updates come through `flatpak update`.
+		return false
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return false

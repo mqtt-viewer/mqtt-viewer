@@ -2,7 +2,16 @@ import { writable } from "svelte/store";
 import * as wailsupdate from "bindings/mqtt-viewer/backend/update/models";
 import { CheckForUpdates } from "bindings/mqtt-viewer/backend/app/app";
 import notificationStore, { type Notification } from "./notifications";
-import { Browser } from "@wailsio/runtime";
+
+const updateMessage = (u: wailsupdate.UpdateResponse): string => {
+  if (u.can_self_update) {
+    return "Click to download and install the update.";
+  }
+  if (u.update_command) {
+    return `${u.instructions} ${u.update_command}`;
+  }
+  return u.instructions;
+};
 
 interface UpdatesStore {
   isUpdateDialogOpen: boolean;
@@ -42,21 +51,12 @@ const getAvailableUpdate = async () => {
           const notification: Notification = {
             id: `available-update-${availableUpdate.latest_version}`,
             title: `${availableUpdate.latest_version} of MQTT Viewer is available`,
-            message: availableUpdate.notification_text,
+            message: updateMessage(availableUpdate),
             type: "info",
             icon: "download",
           };
-          if (availableUpdate.can_update) {
-            // Self-updatable install: confirm, then hand over to the
-            // built-in Wails updater window.
-            notification.onClick = openUpdateDialog;
-          } else if (availableUpdate.notification_url) {
-            // Managed installs (AppImage/deb/rpm) or unlicensed updates:
-            // send the user to the right place instead.
-            notification.onClick = () => {
-              Browser.OpenURL(availableUpdate.notification_url);
-            };
-          }
+          // The dialog handles both self-update and manual-instruction cases.
+          notification.onClick = openUpdateDialog;
           notificationStore.addNotification(notification);
         }
         return {
