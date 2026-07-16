@@ -3,7 +3,6 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"mqtt-viewer/backend/models"
 	"net/url"
 	"sync"
 
