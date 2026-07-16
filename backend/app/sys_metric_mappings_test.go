@@ -3,6 +3,7 @@ package app
 import (
 	"mqtt-viewer/backend/models"
 	"testing"
+	"time"
 )
 
 func TestAddAndGetSysMetricMappings(t *testing.T) {
@@ -97,6 +98,65 @@ func TestUpdateSysMetricMapping(t *testing.T) {
 	}
 }
 
+func TestUpdateSysMetricMappingPreservesCreatedAt(t *testing.T) {
+	app := getSeededTestApp(t)
+
+	added, err := app.AddSysMetricMapping(1, models.SysMetricMapping{Label: "Uptime"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	originalCreatedAt := added.CreatedAt
+	if originalCreatedAt.IsZero() {
+		t.Fatal("Expected a non-zero created_at on the added mapping")
+	}
+
+	// Simulate the binding sending a zero createdAt on edit: an edit must never
+	// overwrite the stored created_at.
+	added.CreatedAt = time.Time{}
+	added.Label = "Uptime (renamed)"
+	if _, err := app.UpdateSysMetricMapping(1, *added); err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	mappings, err := app.GetSysMetricMappingsByConnectionId(1)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(mappings) != 1 {
+		t.Fatalf("Expected 1 mapping, got %v", len(mappings))
+	}
+	if !mappings[0].CreatedAt.Equal(originalCreatedAt) {
+		t.Errorf("Expected created_at preserved (%v), got %v", originalCreatedAt, mappings[0].CreatedAt)
+	}
+	if mappings[0].Label != "Uptime (renamed)" {
+		t.Errorf("Expected updated label, got %v", mappings[0].Label)
+	}
+}
+
+func TestUpdateSysMetricMappingRejectsCrossConnection(t *testing.T) {
+	app := getSeededTestApp(t)
+
+	added, err := app.AddSysMetricMapping(1, models.SysMetricMapping{Label: "Owned by 1"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Connection 2 attempts to edit connection 1's mapping by id.
+	added.Label = "Hijacked"
+	if _, err := app.UpdateSysMetricMapping(2, *added); err == nil {
+		t.Fatal("Expected cross-connection update to be rejected, got nil error")
+	}
+
+	// The original row must be untouched.
+	mappings, err := app.GetSysMetricMappingsByConnectionId(1)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(mappings) != 1 || mappings[0].Label != "Owned by 1" {
+		t.Errorf("Expected connection 1's mapping unchanged, got %+v", mappings)
+	}
+}
+
 func TestDeleteSysMetricMapping(t *testing.T) {
 	app := getSeededTestApp(t)
 
@@ -114,6 +174,29 @@ func TestDeleteSysMetricMapping(t *testing.T) {
 	}
 	if len(mappings) != 0 {
 		t.Errorf("Expected 0 mappings after delete, got %v", len(mappings))
+	}
+}
+
+func TestDeleteSysMetricMappingRejectsCrossConnection(t *testing.T) {
+	app := getSeededTestApp(t)
+
+	added, err := app.AddSysMetricMapping(1, models.SysMetricMapping{Label: "Owned by 1"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Connection 2 attempts to delete connection 1's mapping by id: must not
+	// remove the row.
+	if err := app.DeleteSysMetricMapping(2, added.ID); err != nil {
+		t.Fatalf("Expected no error (delete is a no-op across connections), got %v", err)
+	}
+
+	mappings, err := app.GetSysMetricMappingsByConnectionId(1)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(mappings) != 1 {
+		t.Errorf("Expected connection 1's mapping to survive a cross-connection delete, got %v", len(mappings))
 	}
 }
 

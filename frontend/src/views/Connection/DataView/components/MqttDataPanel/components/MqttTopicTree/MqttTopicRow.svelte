@@ -156,9 +156,14 @@
           "ml-2 inline-flex items-center rounded p-[1px]",
           "text-secondary-text hover:text-white-text hover:bg-hovered",
           "opacity-0 pointer-events-none",
-          "group-hover:opacity-100 group-hover:pointer-events-auto"
+          "group-hover:opacity-100 group-hover:pointer-events-auto",
+          // Reveal it for keyboard users when it's focused, otherwise a
+          // Tab-focused button stays invisible.
+          "focus-visible:opacity-100 focus-visible:pointer-events-auto"
         )}
         on:click|stopPropagation={onOpenBrokerStatus}
+        on:keypress|stopPropagation
+        on:keydown|stopPropagation
       >
         <Icon type="pulse" size={14} />
       </button>

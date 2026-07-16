@@ -304,7 +304,7 @@ export const mockBrokerTilesPopulated = [
   }),
   ...observedTiles(),
   brokerTile({
-    key: "custom:0:factory/line/temp#",
+    key: "custom:factory/line/temp#",
     label: "Line temp",
     unit: "°C",
     value: 21.4,
@@ -376,7 +376,7 @@ export const createMockBrokerStatusStore = (
   return {
     subscribe,
     init: asyncNoop,
-    reloadMappings: asyncNoop,
+    reloadMappings: async () => [],
     destroy: noop,
     snapshot: () => state,
     connectionId,
@@ -940,6 +940,7 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
     codec: ["none", "base64", "hex"],
     format: ["none", "json", "json-prettier", "xml"],
     iconPlacement: ["left", "right"],
+    kind: ["number", "text"],
     mqttVersion: ["3", "5"],
     placement: ["top", "right", "bottom", "left"],
     resizeEdge: ["left", "right"],

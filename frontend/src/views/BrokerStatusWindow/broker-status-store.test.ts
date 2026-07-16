@@ -174,6 +174,46 @@ describe("createBrokerStatusStore — backfill", () => {
     expect(mocks.getHist).not.toHaveBeenCalled();
     store.destroy();
   });
+
+  it("treats a GetMessageHistory rejection as empty history (unpublished topic)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.getMappings.mockResolvedValue([
+      {
+        id: 1,
+        connectionId: CONN,
+        metricKey: "",
+        label: "Line temp",
+        topic: "factory/line0/temp",
+        payloadPath: "",
+        unit: "C",
+        sortOrder: 0,
+      },
+    ]);
+    // GetMessageHistory rejects for a topic that hasn't published yet.
+    mocks.getHist.mockRejectedValue(
+      new Error("topic not found in message history")
+    );
+
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await expect(store.init()).resolves.toBeUndefined();
+    const state = get(store);
+    // The custom tile exists but has no data; init still completed and the
+    // observed-rate ticker is running.
+    expect(customTile(state).valueKind).toBe("empty");
+    expect(vi.getTimerCount()).toBe(1);
+    store.destroy();
+    errSpy.mockRestore();
+  });
+
+  it("keeps init alive (and starts the ticker) when the $SYS backfill rejects", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.getSys.mockRejectedValue(new Error("backend boom"));
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await expect(store.init()).resolves.toBeUndefined();
+    expect(vi.getTimerCount()).toBe(1); // ticker started despite the rejection
+    store.destroy();
+    errSpy.mockRestore();
+  });
 });
 
 describe("createBrokerStatusStore — live batches", () => {
@@ -206,14 +246,18 @@ describe("createBrokerStatusStore — live batches", () => {
 });
 
 describe("createBrokerStatusStore — observed rates", () => {
-  it("computes msgs/s and bytes/s over the sliding window", async () => {
+  it("computes msgs/s and bytes/s over the full warmed window", async () => {
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
+
+    // Warm past the 60 s window so the divisor is the full window (not the
+    // warm-up elapsed time — see the dedicated warm-up test below).
+    vi.advanceTimersByTime(60_000);
 
     // 120 messages this second, payload "hello" → base64 "aGVsbG8=" (len 8)
     // → floor(8*3/4)=6 bytes each.
     const batch = Array.from({ length: 120 }, () =>
-      msg("factory/x", "hello", BASE_MS)
+      msg("factory/x", "hello", Date.now())
     );
     emit("msgs", batch);
 
@@ -221,6 +265,24 @@ describe("createBrokerStatusStore — observed rates", () => {
     const state = get(store);
     expect(tile(state, OBSERVED_MSG_KEY).value).toBeCloseTo(120 / 60, 6);
     expect(tile(state, OBSERVED_BYTE_KEY).value).toBeCloseTo((120 * 6) / 60, 6);
+    store.destroy();
+  });
+
+  it("warm-up: divides by elapsed time (not the full window) before 60 s", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // Steady 10 msgs/s for 5 s from open.
+    for (let i = 0; i < 5; i++) {
+      emit(
+        "msgs",
+        Array.from({ length: 10 }, () => msg("t", "hi", Date.now()))
+      );
+      vi.advanceTimersByTime(1000);
+    }
+
+    // 50 msgs collected over 5 s → 10/s, not the under-reported 50/60 ≈ 0.83.
+    expect(tile(get(store), OBSERVED_MSG_KEY).value).toBeCloseTo(10, 6);
     store.destroy();
   });
 
@@ -286,6 +348,24 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     expect(tile(get(store), "msg_rate_in").value).toBe(0);
     store.destroy();
   });
+
+  it("reseeds (no spike sample) when the winning cumulative topic switches", async () => {
+    const nodeB = "$SYS/brokers/emqxB@127.0.0.1/metrics/messages/received";
+    const nodeA = "$SYS/brokers/emqxA@127.0.0.1/metrics/messages/received";
+    mocks.getSys.mockResolvedValue([
+      msg(nodeB, "1000", BASE_MS - 3000),
+      msg(nodeB, "1100", BASE_MS - 2000), // +100 over 1 s → 100/s
+      // A lexicographically smaller node appears and becomes the winner. Its
+      // 9000 must NOT be diffed against nodeB's 1100 (a bogus ~7900/s spike).
+      msg(nodeA, "9000", BASE_MS - 1000),
+    ]);
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    const t = tile(get(store), "msg_rate_in");
+    expect(t.samples.map((s) => s.v)).toEqual([100]);
+    expect(t.value).toBeCloseTo(100, 6);
+    store.destroy();
+  });
 });
 
 describe("createBrokerStatusStore — reset & reload", () => {
@@ -302,6 +382,69 @@ describe("createBrokerStatusStore — reset & reload", () => {
     expect(tile(state, "clients_connected").valueKind).toBe("empty");
     expect(state.latestByTopic.size).toBe(0);
     expect(state.sysEverSeen).toBe(false);
+    store.destroy();
+  });
+
+  it("discards a history backfill whose clear-history landed mid-fetch", async () => {
+    // GetSysMessageHistory stays pending until we resolve it; `called` fires
+    // once init has invoked it (so the epoch is already captured).
+    let resolveHist!: (v: any) => void;
+    let signalCalled!: () => void;
+    const called = new Promise<void>((r) => (signalCalled = r));
+    mocks.getSys.mockImplementation(() => {
+      signalCalled();
+      return new Promise((res) => (resolveHist = res));
+    });
+
+    const store = createBrokerStatusStore(CONN, eventSet);
+    const initPromise = store.init();
+    await called; // $SYS fetch is in flight; epoch captured
+
+    emit("clear"); // history cleared while the fetch is pending → bumps epoch
+    resolveHist([msg("$SYS/broker/clients/connected", "42", BASE_MS)]);
+    await initPromise;
+
+    const state = get(store);
+    // The pre-clear history must not resurrect: tile stays empty, browser empty.
+    expect(tile(state, "clients_connected").valueKind).toBe("empty");
+    expect(state.latestByTopic.size).toBe(0);
+    expect(state.sysEverSeen).toBe(false);
+    store.destroy();
+  });
+
+  it("keeps a surviving custom tile's runtime when an earlier row is deleted", async () => {
+    const rowA = {
+      id: 10, connectionId: CONN, metricKey: "", label: "A",
+      topic: "app/a", payloadPath: "", unit: "", sortOrder: 1,
+    };
+    const rowB = {
+      id: 20, connectionId: CONN, metricKey: "", label: "B",
+      topic: "app/b", payloadPath: "", unit: "", sortOrder: 2,
+    };
+    mocks.getMappings.mockResolvedValue([rowA, rowB]);
+    mocks.getHist.mockImplementation((_c: number, topic: string) =>
+      Promise.resolve(
+        topic === "app/a"
+          ? [msg("app/a", "1", BASE_MS - 1000), msg("app/a", "2", BASE_MS)]
+          : topic === "app/b"
+            ? [msg("app/b", "10", BASE_MS - 1000), msg("app/b", "20", BASE_MS)]
+            : []
+      )
+    );
+
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    const tileB = () => tile(get(store), "custom:20");
+    const before = tileB().samples;
+    expect(before).toHaveLength(2);
+
+    // Delete row A: reload with only row B. Its runtime (sparkline) must survive
+    // because its stable id-based key doesn't shift when A is removed.
+    mocks.getMappings.mockResolvedValue([rowB]);
+    await store.reloadMappings();
+    const after = tileB().samples;
+    expect(after).toBe(before); // same runtime object, not reset to []
+    expect(after).toHaveLength(2);
     store.destroy();
   });
 

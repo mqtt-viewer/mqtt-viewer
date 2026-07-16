@@ -10,7 +10,14 @@
 
   const componentName = "StatTile";
   const storyId = "Views/BrokerStatusWindow/StatTile";
-  const props: string[] = ["label", "value", "unit", "points", "noData"];
+  const props: string[] = [
+    "label",
+    "value",
+    "unit",
+    "kind",
+    "points",
+    "noData",
+  ];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -58,6 +65,7 @@
     label: "Broker",
     value: "mosquitto 2.0.18",
     unit: undefined,
+    kind: "text",
     points: undefined,
   }}
   {template}
@@ -69,6 +77,7 @@
     label: "Broker version",
     value: "mosquitto version 2.0.18",
     unit: undefined,
+    kind: "text",
     points: undefined,
   }}
   {template}

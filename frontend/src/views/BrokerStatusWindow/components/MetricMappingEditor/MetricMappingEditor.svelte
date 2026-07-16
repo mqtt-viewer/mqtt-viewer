@@ -29,16 +29,11 @@
   /** When opening in add mode, seed the draft topic/label (pin-from-browser). */
   export let prefill: { topic?: string; label?: string } | null = null;
 
-  const NONE_LABEL = "None — custom tile";
-  // Sentinel option value for "no override". The Select treats an empty-string
-  // value as "nothing selected" and keeps its floating label at rest, which
-  // then overlaps the trigger text; a non-empty sentinel makes the label float
-  // up like every other field. Mapped back to "" (the stored metricKey) below.
-  const NONE_VALUE = "__none__";
-  const toMetricKey = (value: string): string =>
-    value === NONE_VALUE ? "" : value;
-  const toOptionValue = (metricKey: string): string =>
-    metricKey === "" ? NONE_VALUE : metricKey;
+  // The empty string is the stored metricKey for "no override" (a custom tile).
+  // Select now floats its label for any present selection, including "", so we
+  // bind the empty-string value directly — no sentinel round-trip needed.
+  const NONE_VALUE = "";
+  const NONE_LABEL = "None (custom tile)";
 
   // Overridable builtins only — the computed observed_* tiles have no topic to
   // redirect, so they are not offered as override targets.
@@ -48,7 +43,7 @@
     ...overrideTargets.map((m) => m.key),
   ];
   const labelFor = (value: string): string =>
-    value === NONE_VALUE || value === ""
+    value === ""
       ? NONE_LABEL
       : (overrideTargets.find((m) => m.key === value)?.label ?? value);
 
@@ -85,8 +80,10 @@
   const setDraft = (next: Draft) => {
     draft = next;
     topicError = undefined;
-    const optionValue = toOptionValue(next.metricKey);
-    overrideSelected.set({ value: optionValue, label: labelFor(optionValue) });
+    overrideSelected.set({
+      value: next.metricKey,
+      label: labelFor(next.metricKey),
+    });
   };
 
   const refresh = async () => {
@@ -97,7 +94,7 @@
     rows.reduce((max, r) => Math.max(max, r.sortOrder), -1) + 1;
 
   const onOverrideChange = (value: string | undefined) => {
-    draft.metricKey = toMetricKey(value ?? NONE_VALUE);
+    draft.metricKey = value ?? "";
   };
 
   const editRow = (row: models.SysMetricMapping) =>
@@ -135,8 +132,9 @@
       } else {
         await AddSysMetricMapping(connectionId, mapping);
       }
-      await refresh();
-      await store.reloadMappings();
+      // reloadMappings re-fetches and returns the rows; reuse them for the list
+      // instead of a second GetSysMetricMappingsByConnectionId round-trip.
+      rows = await store.reloadMappings();
       setDraft(blankDraft(null));
     } catch (e) {
       console.error("Failed to save metric mapping", e);
@@ -156,8 +154,7 @@
     try {
       await DeleteSysMetricMapping(connectionId, row.id);
       if (draft.id === row.id) setDraft(blankDraft(null));
-      await refresh();
-      await store.reloadMappings();
+      rows = await store.reloadMappings();
     } catch (e) {
       console.error("Failed to delete metric mapping", e);
       addToast({

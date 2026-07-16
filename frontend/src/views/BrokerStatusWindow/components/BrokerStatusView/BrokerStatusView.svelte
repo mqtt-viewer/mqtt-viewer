@@ -118,13 +118,19 @@
   let rawExpanded = false;
   let rawFilter = "";
 
-  $: rawEntries = Array.from($store.latestByTopic.entries())
-    .map(([topic, entry]) => ({
-      topic,
-      value: entry.value,
-      timeMs: entry.timeMs,
-    }))
-    .sort((a, b) => a.topic.localeCompare(b.topic));
+  // Only build and sort the entry list while the browser is expanded; when
+  // collapsed the header just needs the topic count, which the store's Map
+  // gives in O(1). Under a busy broker this skips a sort of every $SYS topic on
+  // every flush.
+  $: rawEntries = rawExpanded
+    ? Array.from($store.latestByTopic.entries())
+        .map(([topic, entry]) => ({
+          topic,
+          value: entry.value,
+          timeMs: entry.timeMs,
+        }))
+        .sort((a, b) => a.topic.localeCompare(b.topic))
+    : [];
 
   $: rawFilterLc = rawFilter.trim().toLowerCase();
   $: rawFiltered =
@@ -149,6 +155,7 @@
           <StatTile
             label={tile.label}
             value={tile.display}
+            kind={tile.valueKind === "text" ? "text" : "number"}
             points={tile.samples}
             noData={tile.valueKind === "empty"}
           />
@@ -157,6 +164,7 @@
         <StatTile
           label={tile.label}
           value={tile.display}
+          kind={tile.valueKind === "text" ? "text" : "number"}
           points={tile.samples}
           noData={tile.valueKind === "empty"}
         />
@@ -219,7 +227,7 @@
         <Icon type="right" size={16} />
       </span>
       <span>Raw $SYS topics</span>
-      <span class="text-sm opacity-70">({rawEntries.length})</span>
+      <span class="text-sm opacity-70">({$store.latestByTopic.size})</span>
     </button>
 
     {#if rawExpanded}
@@ -277,7 +285,7 @@
           </div>
           {#if rawHidden > 0}
             <span class="px-1 text-sm text-secondary-text opacity-70">
-              {rawHidden} more hidden — narrow the filter to see them.
+              {rawHidden} more hidden. Narrow the filter to see them.
             </span>
           {/if}
         {/if}

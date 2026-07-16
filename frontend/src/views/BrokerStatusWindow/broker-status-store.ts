@@ -18,7 +18,6 @@ import { get, writable } from "svelte/store";
 import { Events } from "@wailsio/runtime";
 import type * as events from "bindings/mqtt-viewer/events/models";
 import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
-import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import {
   GetSysMessageHistory,
   GetMessageHistory,
@@ -126,15 +125,6 @@ const emptyRuntime = (): TileRuntime => ({
   lastTopic: "",
 });
 
-const toRow = (m: models.SysMetricMapping): SysMetricMappingRow => ({
-  metricKey: m.metricKey,
-  label: m.label,
-  topic: m.topic,
-  payloadPath: m.payloadPath,
-  unit: m.unit,
-  sortOrder: m.sortOrder,
-});
-
 export const createBrokerStatusStore = (
   connectionId: number,
   eventSet: events.ConnectionEventsSet,
@@ -166,6 +156,12 @@ export const createBrokerStatusStore = (
   let connected = opts.connected ?? true;
   const windowOpenedAt = Date.now();
   let openedAt = windowOpenedAt;
+
+  // Bumped whenever the data is reset (history cleared). Async backfills capture
+  // it before their awaited fetch and discard the ingest if it changed while the
+  // fetch was in flight, so a clear that races a slow history fetch can't
+  // resurrect stale, just-cleared history.
+  let dataEpoch = 0;
 
   const buildTile = (tile: MetricTile): BrokerTileView => {
     const rt = runtime.get(tile.key) ?? emptyRuntime();
@@ -228,7 +224,13 @@ export const createBrokerStatusStore = (
       if (!sel) continue;
       const entry = latest.get(sel.topic);
       if (!entry) continue;
-      if (sel.topic === rt.lastTopic && entry.timeMs <= rt.lastTimeMs) continue;
+      const topicSwitched = sel.topic !== rt.lastTopic;
+      if (!topicSwitched && entry.timeMs <= rt.lastTimeMs) continue;
+      // When the winning candidate switches to a different topic, the previous
+      // cumulative baseline belongs to the old topic; keeping it would produce a
+      // bogus (often huge) delta on the first sample from the new topic. Drop it
+      // so the next sample seeds a fresh baseline instead.
+      if (topicSwitched) cumPrev.delete(tile.key);
       rt.lastTopic = sel.topic;
       rt.lastTimeMs = entry.timeMs;
 
@@ -331,8 +333,16 @@ export const createBrokerStatusStore = (
     const now = Date.now();
     const nowSec = Math.floor(now / 1000);
     const { count, bytes } = sumObserved(nowSec);
-    updateComputedTile(OBSERVED_MSG_KEY, count / OBSERVED_WINDOW_SEC, now);
-    updateComputedTile(OBSERVED_BYTE_KEY, bytes / OBSERVED_WINDOW_SEC, now);
+    // Warm-up: divide by however long the window has actually been collecting
+    // (since open or the last history clear), capped at the full window. Using
+    // the full 60 s divisor before 60 s have elapsed under-reports the rate — a
+    // burst 5 s after opening would read as 1/12th of its true per-second rate.
+    const elapsedSec = Math.max(
+      1,
+      Math.min(OBSERVED_WINDOW_SEC, (now - openedAt) / 1000)
+    );
+    updateComputedTile(OBSERVED_MSG_KEY, count / elapsedSec, now);
+    updateComputedTile(OBSERVED_BYTE_KEY, bytes / elapsedSec, now);
     flush(); // one coalesced set per tick
   };
 
@@ -365,6 +375,8 @@ export const createBrokerStatusStore = (
     sysEverSeen = false;
     // Restart the empty-state grace period from the clear.
     openedAt = Date.now();
+    // Invalidate any history backfill still in flight (see dataEpoch).
+    dataEpoch++;
   };
 
   const bindListeners = () => {
@@ -401,49 +413,78 @@ export const createBrokerStatusStore = (
     trackedTopics = new Set(rows.map((r) => r.topic).filter((t) => t !== ""));
   };
 
+  // Binding rows satisfy SysMetricMappingRow structurally (id + all fields), so
+  // they flow straight through mergeMappings/backfill without a re-map.
   const loadMappings = async () => {
     const rows = (await GetSysMetricMappingsByConnectionId(connectionId)) ?? [];
-    applyMappings(rows.map(toRow));
+    applyMappings(rows);
     return rows;
   };
 
+  // Backfills the retained $SYS history. Wrapped so a rejection (backend hiccup)
+  // can't abort init() before the ticker starts.
+  const backfillSys = async () => {
+    const epoch = dataEpoch;
+    try {
+      const sysHistory = (await GetSysMessageHistory(connectionId)) ?? [];
+      if (epoch !== dataEpoch) return; // history cleared mid-fetch → discard
+      ingest(sysHistory, { observed: false, perMessageRecompute: true });
+    } catch (e) {
+      console.error("broker-status: $SYS history backfill failed", e);
+    }
+  };
+
   // Backfills exact-topic history for mapped topics that live outside $SYS/
-  // (those are not covered by GetSysMessageHistory).
+  // (those are not covered by GetSysMessageHistory). Topics are fetched in
+  // parallel; each fetch is independent.
   const backfillCustomTopics = async (rows: SysMetricMappingRow[]) => {
     const seen = new Set<string>();
+    const topics: string[] = [];
     for (const r of rows) {
       const topic = r.topic;
       if (topic === "" || topic.startsWith("$SYS/")) continue;
       if (seen.has(topic) || latest.has(topic)) continue;
       seen.add(topic);
-      const hist = (await GetMessageHistory(connectionId, topic)) ?? [];
-      ingest(hist, { observed: false, perMessageRecompute: true });
+      topics.push(topic);
     }
+    await Promise.all(
+      topics.map(async (topic) => {
+        const epoch = dataEpoch;
+        let hist: mqtt.MqttMessage[];
+        try {
+          hist = (await GetMessageHistory(connectionId, topic)) ?? [];
+        } catch {
+          // GetMessageHistory rejects with "topic not found in message history"
+          // for a topic that hasn't published yet. A mapping for a not-yet-seen
+          // topic is the normal case, so treat it as empty rather than failing.
+          return;
+        }
+        if (epoch !== dataEpoch) return; // history cleared mid-fetch → discard
+        ingest(hist, { observed: false, perMessageRecompute: true });
+      })
+    );
   };
 
   // Opens the store: binds live listeners first (so nothing is missed during
   // the async backfill), loads mappings, then backfills $SYS + custom topics.
+  // The $SYS and custom backfills are independent, so run them together.
   const init = async () => {
     bindListeners();
     const rows = await loadMappings();
-    const mappingRows = rows.map(toRow);
-
-    const sysHistory = (await GetSysMessageHistory(connectionId)) ?? [];
-    ingest(sysHistory, { observed: false, perMessageRecompute: true });
-
-    await backfillCustomTopics(mappingRows);
-
+    await Promise.all([backfillSys(), backfillCustomTopics(rows)]);
     if (connected) startTicker();
     flush();
   };
 
   // Re-reads mappings after the editor CRUDs a row. Keeps existing samples for
-  // unchanged tiles and backfills any newly-added non-$SYS topic.
+  // unchanged tiles and backfills any newly-added non-$SYS topic. Returns the
+  // freshly-loaded rows so the editor can reuse them instead of re-fetching.
   const reloadMappings = async () => {
     const rows = await loadMappings();
-    await backfillCustomTopics(rows.map(toRow));
+    await backfillCustomTopics(rows);
     recomputeTiles();
     flush();
+    return rows;
   };
 
   const destroy = () => {

@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import connections from "@/stores/connections";
+  import subscriptions from "@/stores/subscriptions";
   import IconContext from "@/components/Icon/IconContext.svelte";
   import Toast from "@/components/Toast/Toast.svelte";
   import ConnectionStatusCircle from "@/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte";
@@ -30,7 +31,10 @@
   $: isDisconnected = connectionState === "disconnected";
 
   onMount(async () => {
-    await connections.init();
+    // Init subscriptions too so BrokerStatusView's hasSysSubscription reflects
+    // reality (otherwise it reads as always-false and the empty state offers a
+    // duplicate "$SYS/#" subscription the connection already has).
+    await Promise.all([connections.init(), subscriptions.init()]);
     const connection = get(connections).connections[connectionId];
     if (!connection) {
       error = "Connection not found";
@@ -63,7 +67,7 @@
     >
       <ConnectionStatusCircle state={connectionState} />
       <span class="text-lg text-emphasis truncate">{connectionName}</span>
-      <span class="text-secondary-text text-sm">— broker status</span>
+      <span class="text-secondary-text text-sm">broker status</span>
       {#if store}
         <div class="ml-auto">
           <IconButton
@@ -82,7 +86,7 @@
         class="px-4 py-1 text-sm text-warning border-y border-warning truncate"
         style="--wails-draggable:false"
       >
-        Disconnected — values frozen
+        Disconnected. Values frozen.
       </div>
     {/if}
 

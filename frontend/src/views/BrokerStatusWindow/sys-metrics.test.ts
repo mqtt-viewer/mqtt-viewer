@@ -122,6 +122,40 @@ describe("topicMatchesPattern", () => {
       topicMatchesPattern("$SYS/broker/uptime", "$SYS/broker/uptime/extra")
     ).toBe(false);
   });
+
+  it("# matches zero or more trailing levels", () => {
+    expect(
+      topicMatchesPattern(
+        "$SYS/broker/load/#",
+        "$SYS/broker/load/messages/received/1min"
+      )
+    ).toBe(true);
+    // Also matches the parent (zero remaining levels) and one level deep.
+    expect(topicMatchesPattern("a/#", "a")).toBe(true);
+    expect(topicMatchesPattern("a/#", "a/b")).toBe(true);
+    expect(topicMatchesPattern("a/#", "a/b/c")).toBe(true);
+  });
+
+  it("# alone matches everything", () => {
+    expect(topicMatchesPattern("#", "$SYS/broker/uptime")).toBe(true);
+    expect(topicMatchesPattern("#", "anything")).toBe(true);
+  });
+
+  it("# still requires the earlier levels to match", () => {
+    expect(topicMatchesPattern("a/#", "b/x")).toBe(false);
+  });
+
+  it("+ behavior is unchanged alongside # support", () => {
+    expect(
+      topicMatchesPattern(
+        "$SYS/brokers/+/stats/connections/count",
+        "$SYS/brokers/emqx@127.0.0.1/stats/connections/count"
+      )
+    ).toBe(true);
+    expect(
+      topicMatchesPattern("$SYS/+/uptime", "$SYS/brokers/node1/uptime")
+    ).toBe(false);
+  });
 });
 
 describe("selectCandidate", () => {
@@ -407,6 +441,26 @@ describe("mergeMappings", () => {
     ]);
     expect(tiles).toHaveLength(BUILTIN_METRICS.length + 1);
     expect(tiles.at(-1)?.label).toBe("X");
+  });
+
+  it("keys custom tiles by row id when present, stable across sibling deletes", () => {
+    const rows = [
+      mappingRow({ id: 10, topic: "t/1", label: "First", sortOrder: 1 }),
+      mappingRow({ id: 20, topic: "t/2", label: "Second", sortOrder: 2 }),
+    ];
+    const before = mergeMappings(rows).slice(BUILTIN_METRICS.length);
+    expect(before.map((t) => t.key)).toEqual(["custom:10", "custom:20"]);
+
+    // Deleting the first row must not renumber the survivor's key.
+    const after = mergeMappings([rows[1]]).slice(BUILTIN_METRICS.length);
+    expect(after.map((t) => t.key)).toEqual(["custom:20"]);
+  });
+
+  it("falls back to topic#path keys for id-less rows", () => {
+    const tiles = mergeMappings([
+      mappingRow({ topic: "plant/temp", payloadPath: "data.c" }),
+    ]);
+    expect(tiles.at(-1)?.key).toBe("custom:plant/temp#data.c");
   });
 });
 

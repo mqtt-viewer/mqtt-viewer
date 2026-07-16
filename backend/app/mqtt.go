@@ -9,7 +9,6 @@ import (
 	"mqtt-viewer/backend/security"
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -97,25 +96,20 @@ func (a *App) GetSysMessageHistory(connId uint) ([]mqtt.MqttMessage, error) {
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
-	allHistory := appConnection.MqttManager.MessageHistory.GetAllHistory()
-	return flattenSysHistory(allHistory), nil
+	// Prefix-filter inside the history lock so we only copy $SYS/* messages,
+	// rather than struct-copying the entire retained window under the ingest
+	// mutex (GetAllHistory).
+	messages := appConnection.MqttManager.MessageHistory.GetHistoryByTopicPrefix("$SYS/")
+	sortMessagesByTimeAsc(messages)
+	return messages, nil
 }
 
-// flattenSysHistory extracts $SYS/* messages from a per-topic history map
-// into a single time-ascending slice. Pure so it is testable without a
-// broker.
-func flattenSysHistory(allHistory map[string][]mqtt.MqttMessage) []mqtt.MqttMessage {
-	result := []mqtt.MqttMessage{}
-	for topic, messages := range allHistory {
-		if !strings.HasPrefix(topic, "$SYS/") {
-			continue
-		}
-		result = append(result, messages...)
-	}
-	sort.SliceStable(result, func(i, j int) bool {
-		return result[i].TimeMs < result[j].TimeMs
+// sortMessagesByTimeAsc orders messages by arrival time ascending, stably.
+// Pure so it is testable without a broker.
+func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
+	sort.SliceStable(messages, func(i, j int) bool {
+		return messages[i].TimeMs < messages[j].TimeMs
 	})
-	return result
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {

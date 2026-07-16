@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T08:28:41.407Z",
+  "generatedAt": "2026-07-16T09:48:15.466Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2582,6 +2582,13 @@
           "required": false,
           "default": null,
           "description": "Subdued suffix rendered after the value, e.g. '/s'."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "required": false,
+          "default": "number",
+          "description": "'number' renders big, tabular, one line; 'text' renders smaller and wraps to two lines. Fed from the tile's valueKind."
         },
         {
           "name": "points",

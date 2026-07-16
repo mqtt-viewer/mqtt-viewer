@@ -31,6 +31,13 @@
       "description": "Subdued suffix rendered after the value, e.g. '/s'."
     },
     {
+      "name": "kind",
+      "type": "string",
+      "required": false,
+      "default": "number",
+      "description": "'number' renders big, tabular, one line; 'text' renders smaller and wraps to two lines. Fed from the tile's valueKind."
+    },
+    {
       "name": "points",
       "type": "object",
       "required": false,

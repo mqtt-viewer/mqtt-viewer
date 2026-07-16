@@ -69,6 +69,12 @@ export interface MetricTile {
  * purpose — bindings may be regenerating while this module is worked on.
  */
 export interface SysMetricMappingRow {
+  /**
+   * Persistent row id from the binding. Optional because a locally-built row
+   * (tests, fixtures) may not have one; when present it gives custom tiles a
+   * stable key so deleting one row doesn't rename the survivors.
+   */
+  id?: number;
   metricKey: string; // builtin tile id to override, or "" = custom tile
   label: string;
   topic: string;
@@ -241,10 +247,18 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
 export function topicMatchesPattern(pattern: string, topic: string): boolean {
   const patternLevels = pattern.split("/");
   const topicLevels = topic.split("/");
-  if (patternLevels.length !== topicLevels.length) return false;
-  return patternLevels.every(
-    (level, i) => level === "+" || level === topicLevels[i]
-  );
+  for (let i = 0; i < patternLevels.length; i++) {
+    const level = patternLevels[i];
+    if (level === "#") {
+      // Multi-level wildcard: matches zero or more remaining levels. Only valid
+      // as the final level (mosquitto semantics; mirrors the topic tree's
+      // filter matcher). "a/#" therefore matches "a", "a/b", "a/b/c".
+      return i === patternLevels.length - 1;
+    }
+    if (i >= topicLevels.length) return false;
+    if (level !== "+" && level !== topicLevels[i]) return false;
+  }
+  return patternLevels.length === topicLevels.length;
 }
 
 export interface SelectedCandidate {
@@ -355,9 +369,12 @@ export function mergeMappings(
   customs
     .map((row, i) => ({ row, i }))
     .sort((a, b) => a.row.sortOrder - b.row.sortOrder || a.i - b.i)
-    .forEach(({ row, i }) => {
+    .forEach(({ row }) => {
       tiles.push({
-        key: `custom:${i}:${row.topic}#${row.payloadPath}`,
+        // Key on the row's persistent id when present so deleting one custom
+        // row doesn't renumber (and therefore reset the runtime of) the others.
+        // Fall back to topic#path for locally-built rows without an id.
+        key: `custom:${row.id ?? `${row.topic}#${row.payloadPath}`}`,
         label: row.label !== "" ? row.label : row.topic,
         unit: row.unit !== "" ? row.unit : undefined,
         candidates: [
