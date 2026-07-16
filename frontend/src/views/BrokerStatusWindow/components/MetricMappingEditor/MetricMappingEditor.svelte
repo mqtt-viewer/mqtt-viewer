@@ -30,15 +30,27 @@
   export let prefill: { topic?: string; label?: string } | null = null;
 
   const NONE_LABEL = "None — custom tile";
+  // Sentinel option value for "no override". The Select treats an empty-string
+  // value as "nothing selected" and keeps its floating label at rest, which
+  // then overlaps the trigger text; a non-empty sentinel makes the label float
+  // up like every other field. Mapped back to "" (the stored metricKey) below.
+  const NONE_VALUE = "__none__";
+  const toMetricKey = (value: string): string =>
+    value === NONE_VALUE ? "" : value;
+  const toOptionValue = (metricKey: string): string =>
+    metricKey === "" ? NONE_VALUE : metricKey;
 
   // Overridable builtins only — the computed observed_* tiles have no topic to
   // redirect, so they are not offered as override targets.
   const overrideTargets = BUILTIN_METRICS.filter((m) => !m.computed);
-  const overrideOptions: string[] = ["", ...overrideTargets.map((m) => m.key)];
-  const labelFor = (key: string): string =>
-    key === ""
+  const overrideOptions: string[] = [
+    NONE_VALUE,
+    ...overrideTargets.map((m) => m.key),
+  ];
+  const labelFor = (value: string): string =>
+    value === NONE_VALUE || value === ""
       ? NONE_LABEL
-      : (overrideTargets.find((m) => m.key === key)?.label ?? key);
+      : (overrideTargets.find((m) => m.key === value)?.label ?? value);
 
   interface Draft {
     id: number | null;
@@ -66,14 +78,15 @@
   let saving = false;
 
   const overrideSelected = writable<SelectOption<string | undefined>>({
-    value: "",
+    value: NONE_VALUE,
     label: NONE_LABEL,
   });
 
   const setDraft = (next: Draft) => {
     draft = next;
     topicError = undefined;
-    overrideSelected.set({ value: next.metricKey, label: labelFor(next.metricKey) });
+    const optionValue = toOptionValue(next.metricKey);
+    overrideSelected.set({ value: optionValue, label: labelFor(optionValue) });
   };
 
   const refresh = async () => {
@@ -84,7 +97,7 @@
     rows.reduce((max, r) => Math.max(max, r.sortOrder), -1) + 1;
 
   const onOverrideChange = (value: string | undefined) => {
-    draft.metricKey = value ?? "";
+    draft.metricKey = toMetricKey(value ?? NONE_VALUE);
   };
 
   const editRow = (row: models.SysMetricMapping) =>
@@ -182,6 +195,7 @@
         <BaseInput
           name="mapping-label"
           label="Label"
+          placeholder="Connected clients"
           bind:value={draft.label}
         />
         <Select
@@ -196,6 +210,7 @@
       <BaseInput
         name="mapping-topic"
         label="Topic"
+        placeholder="$SYS/broker/clients/connected"
         bind:value={draft.topic}
         errorMessage={topicError}
         onChange={() => (topicError = undefined)}
@@ -204,11 +219,13 @@
         <BaseInput
           name="mapping-path"
           label="JSON path (optional)"
+          placeholder="data.temp"
           bind:value={draft.payloadPath}
         />
         <BaseInput
           name="mapping-unit"
           label="Unit (optional)"
+          placeholder="°C"
           bind:value={draft.unit}
         />
       </div>

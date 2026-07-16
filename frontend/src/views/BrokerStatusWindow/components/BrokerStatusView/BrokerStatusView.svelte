@@ -68,6 +68,15 @@
 
   $: showEmptyState = !$store.sysEverSeen && $store.connected && graceElapsed;
 
+  // In the empty state (no $SYS ever seen, grace elapsed) the builtin tiles can
+  // never populate, so hide the ones with no data and show only tiles that
+  // actually carry a value (observed rates, any custom tiles with data) plus
+  // the always-present "+". During the grace window keep every tile visible so
+  // it can still fill in from retained $SYS as messages arrive.
+  $: visibleTiles = showEmptyState
+    ? $store.tiles.filter((tile) => tile.valueKind !== "empty")
+    : $store.tiles;
+
   // Whether this connection still has a $SYS/# subscription row — drives the
   // "Add $SYS/# subscription" CTA in the empty state.
   $: connSubs = $subscriptions.subscriptionsByConnectionId[connectionId] ?? [];
@@ -127,11 +136,14 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <!-- Tile grid: builtins + custom/override tiles, then the always-last +. -->
+  <!-- Tile grid: builtins + custom/override tiles, then the always-last +.
+       Dimmed while disconnected so the frozen values read as stale in the body,
+       not only in the shell's banner. -->
   <div
-    class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3"
+    class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3 transition-opacity"
+    class:opacity-70={!$store.connected}
   >
-    {#each $store.tiles as tile (tile.key)}
+    {#each visibleTiles as tile (tile.key)}
       {#if tile.tooltip}
         <Tooltip text={tile.tooltip} class="h-full">
           <StatTile
@@ -202,7 +214,7 @@
       aria-expanded={rawExpanded}
     >
       <span
-        class="transition-transform {rawExpanded ? 'rotate-90' : ''}"
+        class="inline-flex transition-transform {rawExpanded ? 'rotate-90' : ''}"
       >
         <Icon type="right" size={16} />
       </span>
@@ -243,7 +255,7 @@
                       {row.topic}
                     </td>
                     <td
-                      class="max-w-[180px] truncate py-1 pr-3 tabular-nums text-secondary-text"
+                      class="max-w-[180px] truncate py-1 pr-3 font-mono tabular-nums text-secondary-text"
                     >
                       {row.value}
                     </td>

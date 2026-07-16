@@ -154,11 +154,49 @@ export const mockSparklinePoints = Array.from({ length: 30 }, (_, i) => ({
 // no-op lifecycle/reload methods) so BrokerStatusView stories can render rich
 // states without a live broker.
 
-const brokerSparkline = (base: number, amp: number) =>
-  Array.from({ length: 30 }, (_, i) => ({
-    t: now - (29 - i) * 2000,
-    v: Math.max(0, base + Math.sin(i / 3) * amp + i * (amp / 40)),
-  }));
+// Deterministic pseudo-noise in [-1, 1] from an integer seed. Hash-of-sine so
+// every story render is identical (no Math.random at module scope) while each
+// tile gets its own texture.
+const pnoise = (n: number) => {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return (x - Math.floor(x)) * 2 - 1;
+};
+
+type SparkShape = "steady" | "ramp" | "bursty" | "wave";
+
+// Per-tile sample series with a distinct, realistic silhouette: `steady` sits
+// flat with light jitter (gauges like client counts), `ramp` trends upward
+// (message rates warming up), `bursty` spikes intermittently (byte throughput),
+// `wave` oscillates smoothly (observed rates). `seed` decorrelates tiles that
+// share a shape so no two sparklines look identical.
+const brokerSparkline = (
+  base: number,
+  amp: number,
+  shape: SparkShape = "wave",
+  seed = 0
+) =>
+  Array.from({ length: 30 }, (_, i) => {
+    const j = i + seed * 31;
+    let v: number;
+    switch (shape) {
+      case "steady":
+        v = base + pnoise(j) * amp * 0.35;
+        break;
+      case "ramp":
+        v = base + (i / 29) * amp * 1.6 + pnoise(j) * amp * 0.25;
+        break;
+      case "bursty": {
+        const spike = pnoise(j) > 0.55 ? Math.abs(pnoise(j * 5)) * amp * 2.2 : 0;
+        v = base + Math.abs(pnoise(j * 3)) * amp * 0.3 + spike;
+        break;
+      }
+      case "wave":
+      default:
+        v = base + Math.sin(i / 3 + seed) * amp + pnoise(j) * amp * 0.18;
+        break;
+    }
+    return { t: now - (29 - i) * 2000, v: Math.max(0, v) };
+  });
 
 type MockBrokerTile = {
   key: string;
@@ -196,7 +234,7 @@ const observedTiles = () => [
     tooltip: "Measured by this client across its subscriptions",
     value: 36.5,
     display: "36.5",
-    samples: brokerSparkline(30, 9),
+    samples: brokerSparkline(30, 9, "wave", 5),
   }),
   brokerTile({
     key: "observed_byte_rate",
@@ -205,7 +243,7 @@ const observedTiles = () => [
     tooltip: "Measured by this client across its subscriptions",
     value: 3400,
     display: "3.4k",
-    samples: brokerSparkline(3200, 700),
+    samples: brokerSparkline(3200, 700, "bursty", 6),
   }),
 ];
 
@@ -215,28 +253,28 @@ export const mockBrokerTilesPopulated = [
     label: "Connected clients",
     value: 17,
     display: "17",
-    samples: brokerSparkline(15, 3),
+    samples: brokerSparkline(15, 3, "steady", 1),
   }),
   brokerTile({
     key: "msg_rate_in",
     label: "Msgs/s in",
     value: 842,
     display: "842",
-    samples: brokerSparkline(820, 120),
+    samples: brokerSparkline(820, 120, "ramp", 2),
   }),
   brokerTile({
     key: "msg_rate_out",
     label: "Msgs/s out",
     value: 1180,
     display: "1.2k",
-    samples: brokerSparkline(1100, 160),
+    samples: brokerSparkline(1100, 160, "ramp", 3),
   }),
   brokerTile({
     key: "bytes_rate_in",
     label: "Bytes/s in",
     value: 48200,
     display: "48.2k",
-    samples: brokerSparkline(46000, 6000),
+    samples: brokerSparkline(46000, 6000, "bursty", 4),
   }),
   brokerTile({
     key: "subscriptions",
@@ -271,7 +309,7 @@ export const mockBrokerTilesPopulated = [
     unit: "°C",
     value: 21.4,
     display: "21.4 °C",
-    samples: brokerSparkline(21, 1.5),
+    samples: brokerSparkline(21, 1.5, "wave", 7),
   }),
 ];
 
