@@ -144,6 +144,11 @@ export const mockMqttMessages = [
   },
 ];
 
+export const mockSparklinePoints = Array.from({ length: 30 }, (_, i) => ({
+  t: now - (29 - i) * 2000,
+  v: 40 + i * 1.5 + Math.sin(i / 2) * 6,
+}));
+
 export const mockMqttData = {
   factory: {
     subtopicCount: 1,
@@ -656,6 +661,13 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   SavedMessageRow: { message: mockCollectionMessage },
   SearchMessagesModal: { isOpen: writable(true) },
   Sidebar: { isOpen: true, open: noop, close: noop },
+  Sparkline: { points: mockSparklinePoints, height: 28 },
+  StatTile: {
+    label: "Msgs/s in",
+    value: "1.2k",
+    unit: "/s",
+    points: mockSparklinePoints,
+  },
   Select: {
     options: ["mqtt", "mqtts", "ws", "wss"],
     defaultValue: "mqtt",

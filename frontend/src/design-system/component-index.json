@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-04T05:21:19.313Z",
+  "generatedAt": "2026-07-16T07:56:06.878Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2373,6 +2373,105 @@
       "specPath": "src/components/WhatsNewDialog/WhatsNewDialog.spec.json",
       "storyPath": "src/components/WhatsNewDialog/WhatsNewDialog.stories.svelte",
       "storyId": "Components/WhatsNewDialog",
+      "specMissing": false
+    },
+    {
+      "name": "Sparkline",
+      "tier": "view",
+      "description": "Pure SVG polyline sparkline for broker-status stat tiles; stroke is currentColor so the parent controls color via a text token.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "points",
+          "type": "object",
+          "required": true,
+          "description": "{t, v}[] time-series samples. Fewer than 2 points renders nothing; a zero value range renders a midline."
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": false,
+          "default": 28,
+          "description": "Rendered height in px; width stretches to the container."
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "No color tokens consumed directly by design — stroke follows currentColor, parent sets e.g. text-primary. No external chart lib.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/Sparkline",
+      "specMissing": false
+    },
+    {
+      "name": "StatTile",
+      "tier": "view",
+      "description": "Broker-status metric tile: small label, big preformatted value with optional unit suffix, optional sparkline, subdued no-data state.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true,
+          "description": "Preformatted display string (SI abbreviation etc. is done by the caller)."
+        },
+        {
+          "name": "unit",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Subdued suffix rendered after the value, e.g. '/s'."
+        },
+        {
+          "name": "points",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "{t, v}[] sparkline samples; omitted or <2 points hides the sparkline."
+        },
+        {
+          "name": "noData",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Shows a subdued 'no data yet' placeholder instead of the value."
+        }
+      ],
+      "tokens": [
+        "elevation-1",
+        "outline",
+        "secondary-text",
+        "emphasis",
+        "primary"
+      ],
+      "dependencies": [
+        "Sparkline"
+      ],
+      "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/StatTile",
       "specMissing": false
     },
     {

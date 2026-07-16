@@ -8,6 +8,8 @@ import (
 	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/security"
 	topicmatching "mqtt-viewer/backend/topic-matching"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -85,6 +87,35 @@ func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, 
 		return nil, err
 	}
 	return messageHistory, nil
+}
+
+// GetSysMessageHistory returns every retained $SYS/* message for a
+// connection, flattened across topics and sorted by arrival time, so a
+// broker-status window opened mid-session starts populated.
+func (a *App) GetSysMessageHistory(connId uint) ([]mqtt.MqttMessage, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	allHistory := appConnection.MqttManager.MessageHistory.GetAllHistory()
+	return flattenSysHistory(allHistory), nil
+}
+
+// flattenSysHistory extracts $SYS/* messages from a per-topic history map
+// into a single time-ascending slice. Pure so it is testable without a
+// broker.
+func flattenSysHistory(allHistory map[string][]mqtt.MqttMessage) []mqtt.MqttMessage {
+	result := []mqtt.MqttMessage{}
+	for topic, messages := range allHistory {
+		if !strings.HasPrefix(topic, "$SYS/") {
+			continue
+		}
+		result = append(result, messages...)
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].TimeMs < result[j].TimeMs
+	})
+	return result
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {
