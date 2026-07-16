@@ -31,6 +31,14 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "A status page for your broker",
+        body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
+      },
+      {
+        title: "Make the status page your own",
+        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic too, and you can pin one as a tile straight from it. Your tiles are saved per connection.",
+      },
+      {
         title: "Chart values that arrive as text",
         body: 'Numeric readings often turn up wrapped in quotes, like "24.6". You can now chart those too, so a quoted number plots just like a plain one. Values that aren\'t really numbers stay out of the way.',
       },

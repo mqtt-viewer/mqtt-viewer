@@ -86,6 +86,9 @@ type Connection struct {
 	// out of JSON/bindings; ConnectionID on the child is the source of truth.
 	Collections      []Collection      `json:"-"`
 	ReceivedMessages []ReceivedMessage `json:"-"`
+	// Declared only for the ON DELETE CASCADE foreign key; fetched via
+	// GetSysMetricMappingsByConnectionId, never preloaded.
+	SysMetricMappings []SysMetricMapping `json:"-" gorm:"constraint:OnDelete:CASCADE"`
 }
 
 type FilterHistory struct {
@@ -163,6 +166,27 @@ type Subscription struct {
 	ConnectionID uint      `json:"connectionId"`
 	QoS          *uint     `json:"qos"`
 	Topic        string    `json:"topic"`
+}
+
+// SysMetricMapping is a per-connection broker-status tile mapping: either an
+// override redirecting a builtin metric tile to a user-chosen topic
+// (MetricKey set) or a fully custom tile (MetricKey empty).
+type SysMetricMapping struct {
+	ID           uint      `json:"id" gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	ConnectionID uint      `json:"connectionId" gorm:"index:sys_metric_mappings_connid"`
+	// builtin tile id to override, or "" = custom tile
+	MetricKey string `json:"metricKey"`
+	// display label (custom tiles)
+	Label string `json:"label"`
+	// exact topic to read (any topic, not only $SYS)
+	Topic string `json:"topic"`
+	// optional dotted JSON path into the payload
+	PayloadPath string `json:"payloadPath"`
+	// optional display suffix
+	Unit      string `json:"unit"`
+	SortOrder int    `json:"sortOrder"`
 }
 
 type PanelSize struct {

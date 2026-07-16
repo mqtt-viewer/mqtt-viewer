@@ -3,6 +3,7 @@ package mqtt
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -201,6 +202,32 @@ func (m *MessageHistory) GetMessagesByIds(topic string, ids []string, timesMs []
 	for i, id := range ids {
 		if msg, found := m.getMessageByIdLocked(topic, id, timesMs[i]); found {
 			result = append(result, msg)
+		}
+	}
+	return result
+}
+
+// GetHistoryByTopicPrefix returns retained messages whose topic starts with
+// prefix, in global arrival order, plus the latest value of any matching topic
+// whose messages have fully aged out of the recent window. The prefix filter is
+// applied inside the lock so hold time and allocation scale with the matching
+// volume only, not the whole retained window (unlike GetAllHistory, which copies
+// everything). Result is unsorted across topics; callers that need time order
+// sort the (much smaller) returned slice.
+func (m *MessageHistory) GetHistoryByTopicPrefix(prefix string) []MqttMessage {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	result := []MqttMessage{}
+	inWindow := make(map[string]bool)
+	for i := m.head; i < len(m.recent); i++ {
+		if strings.HasPrefix(m.recent[i].Topic, prefix) {
+			result = append(result, *m.recent[i])
+			inWindow[m.recent[i].Topic] = true
+		}
+	}
+	for topic, latest := range m.latest {
+		if strings.HasPrefix(topic, prefix) && !inWindow[topic] {
+			result = append(result, *latest)
 		}
 	}
 	return result

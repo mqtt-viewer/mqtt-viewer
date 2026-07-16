@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import * as echarts from "echarts";
+  import theme from "@/stores/theme";
   import type { SelectedTopicStore } from "../../../../stores/selected-topic-store";
   import type { ChartSeriesStore } from "./chart-series-store";
   import { buildChartOption } from "./chart-option";
@@ -37,8 +38,10 @@
   // present, and never populate chartHistory) working unchanged.
   $: chartData = $selectedTopicStore.chartHistory ?? $selectedTopicStore.history;
 
-  const render = () => {
-    if (!chart || paused) return;
+  // force bypasses the paused guard: a theme flip must restyle the axis and
+  // tooltip chrome immediately, even while the chart is paused.
+  const render = (force = false) => {
+    if (!chart || (paused && !force)) return;
     chart.setOption(
       buildChartOption({
         history: chartData,
@@ -47,6 +50,7 @@
         showPoints,
         style,
         now: Date.now(),
+        theme: $theme,
       }),
       { replaceMerge: ["series"] }
     );
@@ -70,6 +74,8 @@
   $: if (isActive) {
     selectedTopicStore.ensureChartHistory();
   }
+
+  $: $theme, render(true);
 
   // Keep the ticker running only while a finite, unpaused window is shown.
   const syncWindowTick = () => {

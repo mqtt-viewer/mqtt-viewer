@@ -62,7 +62,6 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
-| Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
@@ -75,6 +74,11 @@
 
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
+| Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
+| Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/MetricMappingEditor | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/Sparkline | [x] | [ ] | [x] | [ ] |
+| Views/BrokerStatusWindow/StatTile | [x] | [ ] | [x] | [x] |
 | Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
@@ -89,7 +93,6 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/MqttGraphView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -137,7 +140,7 @@
 
 ## Summary
 
-- Components scanned: 111
-- Story present: 111
+- Components scanned: 114
+- Story present: 114
 - Figma-linked: 0
 - Missing specs: 0
