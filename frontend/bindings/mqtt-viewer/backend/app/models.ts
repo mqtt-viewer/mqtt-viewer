@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Create as $Create} from "@wailsio/runtime";
+import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -59,7 +59,7 @@ export class Connection {
 }
 
 export class Connections {
-    "connections": { [_: `${number}`]: Connection };
+    "connections": { [_ in `${number}`]?: Connection };
 
     /** Creates a new Connections instance. */
     constructor($$source: Partial<Connections> = {}) {
@@ -146,7 +146,7 @@ export class MqttStats {
     "totalMessagesSent": number;
     "totalBytesReceived": number;
     "totalBytesSent": number;
-    "statsByConnection": { [_: `${number}`]: mqtt$0.ConnectionStats };
+    "statsByConnection": { [_ in `${number}`]?: mqtt$0.ConnectionStats };
 
     /** Creates a new MqttStats instance. */
     constructor($$source: Partial<MqttStats> = {}) {
@@ -301,7 +301,7 @@ export class PublishProperties {
     "responseTopic"?: string;
     "correlationData"?: string;
     "subscriptionIdentifier"?: number;
-    "userProperties"?: { [_: string]: string };
+    "userProperties"?: { [_ in string]?: string };
 
     /** Creates a new PublishProperties instance. */
     constructor($$source: Partial<PublishProperties> = {}) {
