@@ -452,7 +452,9 @@ export const createBrokerStatusStore = (
         const epoch = dataEpoch;
         let hist: mqtt.MqttMessage[];
         try {
-          hist = (await GetMessageHistory(connectionId, topic)) ?? [];
+          // limit 0 = no limit: the backfill wants the topic's full retained
+          // window so observed rates recompute from complete history.
+          hist = (await GetMessageHistory(connectionId, topic, 0)) ?? [];
         } catch {
           // GetMessageHistory rejects with "topic not found in message history"
           // for a topic that hasn't published yet. A mapping for a not-yet-seen
