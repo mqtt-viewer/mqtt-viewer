@@ -1,4 +1,4 @@
-h1:MyujW+2ivOhdXU8r9bJjJzngeaMWGQMIdSAA635+yzs=
+h1:37GjSNFkhND5cglqWHqQPXPiFDVw3fVVHIR2E0RvTzA=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -13,3 +13,4 @@ h1:MyujW+2ivOhdXU8r9bJjJzngeaMWGQMIdSAA635+yzs=
 20260702032219_add-changelog-version.sql h1:ELFjvpUawUhnM7QIlqDMU2pc7j2Lm5708LKEGTJoyvg=
 20260704051603_add-star-prompt-tracking.sql h1:zG2yaLTFTUlZiFeCC0KePn6TMzT2TOpf7rl97xZBIXQ=
 20260708101852_add-connection-debug-logging.sql h1:5zwWvoMSfjq6l/AYZ5brlAVOQWzWknb60wC5cL9D59c=
+20260716075440_add-sys-metric-mappings.sql h1:HdiefeGtY1IMarYGr3ZU798qEy5DbpRZ33VZlU8GmfE=

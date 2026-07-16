@@ -11,5 +11,6 @@ export {
     PublishHistory,
     SortState,
     Subscription,
+    SysMetricMapping,
     Tab
 } from "./models.js";

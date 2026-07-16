@@ -74,6 +74,11 @@
 
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
+| Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
+| Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/MetricMappingEditor | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/Sparkline | [x] | [ ] | [x] | [ ] |
+| Views/BrokerStatusWindow/StatTile | [x] | [ ] | [x] | [x] |
 | Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
@@ -112,7 +117,6 @@
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [ ] |
-| Views/Connection/DataView/Sidebar/ConnectionLogsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
@@ -136,7 +140,7 @@
 
 ## Summary
 
-- Components scanned: 110
-- Story present: 110
+- Components scanned: 114
+- Story present: 114
 - Figma-linked: 0
 - Missing specs: 0

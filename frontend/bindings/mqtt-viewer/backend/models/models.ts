@@ -570,6 +570,88 @@ export class Subscription {
     }
 }
 
+/**
+ * SysMetricMapping is a per-connection broker-status tile mapping: either an
+ * override redirecting a builtin metric tile to a user-chosen topic
+ * (MetricKey set) or a fully custom tile (MetricKey empty).
+ */
+export class SysMetricMapping {
+    "id": number;
+    "createdAt": time$0.Time;
+    "updatedAt": time$0.Time;
+    "connectionId": number;
+
+    /**
+     * builtin tile id to override, or "" = custom tile
+     */
+    "metricKey": string;
+
+    /**
+     * display label (custom tiles)
+     */
+    "label": string;
+
+    /**
+     * exact topic to read (any topic, not only $SYS)
+     */
+    "topic": string;
+
+    /**
+     * optional dotted JSON path into the payload
+     */
+    "payloadPath": string;
+
+    /**
+     * optional display suffix
+     */
+    "unit": string;
+    "sortOrder": number;
+
+    /** Creates a new SysMetricMapping instance. */
+    constructor($$source: Partial<SysMetricMapping> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("createdAt" in $$source)) {
+            this["createdAt"] = null;
+        }
+        if (!("updatedAt" in $$source)) {
+            this["updatedAt"] = null;
+        }
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("metricKey" in $$source)) {
+            this["metricKey"] = "";
+        }
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+        if (!("payloadPath" in $$source)) {
+            this["payloadPath"] = "";
+        }
+        if (!("unit" in $$source)) {
+            this["unit"] = "";
+        }
+        if (!("sortOrder" in $$source)) {
+            this["sortOrder"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SysMetricMapping instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SysMetricMapping {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SysMetricMapping($$parsedSource as Partial<SysMetricMapping>);
+    }
+}
+
 export class Tab {
     "id": number;
     "tabIndex": number;
