@@ -18,6 +18,11 @@
   export let toggleExpansion: (expandKey: string) => void;
   export let onTopicSelect: () => void;
   export let highlightedTopicStore: HighlightedMqttTopicsStore;
+  // Set only by MqttTopicTree for the root-level `$SYS` row. When present, a
+  // hover-revealed "broker status" button is rendered. Undefined for every
+  // other row so no per-row listener/markup cost is incurred (see the tree-row
+  // performance rule in docs/broker-status-spec.md).
+  export let onOpenBrokerStatus: (() => void) | undefined = undefined;
 
   $: syntaxHighlightedMessage = !!message ? highlightJson(message) : "";
 
@@ -82,7 +87,7 @@
 
 <div
   class={twMerge(
-    "flex whitespace-nowrap cursor-pointer select-none",
+    "group relative flex whitespace-nowrap cursor-pointer select-none",
     "overflow-hidden min-w-0 w-full"
   )}
 >
@@ -149,4 +154,22 @@
       </p>
     {/if}
   </div>
+  {#if onOpenBrokerStatus}
+    <!-- Sibling (not nested) button so it isn't inside the row's clickable
+         area; CSS-only hover reveal keeps the row cost unchanged. -->
+    <button
+      type="button"
+      aria-label="Broker status"
+      title="Broker status"
+      class={twMerge(
+        "absolute right-1 top-1/2 -translate-y-1/2 rounded p-[1px]",
+        "text-secondary-text hover:text-white-text hover:bg-hovered",
+        "opacity-0 pointer-events-none",
+        "group-hover:opacity-100 group-hover:pointer-events-auto"
+      )}
+      on:click|stopPropagation={onOpenBrokerStatus}
+    >
+      <Icon type="pulse" size={14} />
+    </button>
+  {/if}
 </div>

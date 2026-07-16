@@ -9,7 +9,7 @@
 </script>
 
 <div
-  class="flex min-w-0 flex-col gap-1 rounded border border-outline bg-elevation-1 p-3"
+  class="flex h-full min-w-0 flex-col gap-1 rounded border border-outline bg-elevation-1 p-3"
 >
   <span class="truncate text-sm text-secondary-text">{label}</span>
   {#if noData}

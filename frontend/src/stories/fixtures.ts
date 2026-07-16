@@ -149,6 +149,213 @@ export const mockSparklinePoints = Array.from({ length: 30 }, (_, i) => ({
   v: 40 + i * 1.5 + Math.sin(i / 2) * 6,
 }));
 
+// --- Broker Status window fixtures -----------------------------------------
+// A mock BrokerStatusStore (a writable with the BrokerStatusState shape plus
+// no-op lifecycle/reload methods) so BrokerStatusView stories can render rich
+// states without a live broker.
+
+const brokerSparkline = (base: number, amp: number) =>
+  Array.from({ length: 30 }, (_, i) => ({
+    t: now - (29 - i) * 2000,
+    v: Math.max(0, base + Math.sin(i / 3) * amp + i * (amp / 40)),
+  }));
+
+type MockBrokerTile = {
+  key: string;
+  label: string;
+  unit?: string;
+  tooltip?: string;
+  computed?: boolean;
+  valueKind?: "number" | "text" | "empty";
+  value?: number | null;
+  text?: string | null;
+  display?: string;
+  isDuration?: boolean;
+  samples?: { t: number; v: number }[];
+};
+
+const brokerTile = (t: MockBrokerTile) => ({
+  key: t.key,
+  label: t.label,
+  unit: t.unit,
+  tooltip: t.tooltip,
+  computed: t.computed ?? false,
+  valueKind: t.valueKind ?? "number",
+  value: t.value ?? null,
+  text: t.text ?? null,
+  display: t.display ?? "",
+  isDuration: t.isDuration ?? false,
+  samples: t.samples ?? [],
+});
+
+const observedTiles = () => [
+  brokerTile({
+    key: "observed_msg_rate",
+    label: "Observed msgs/s",
+    computed: true,
+    tooltip: "Measured by this client across its subscriptions",
+    value: 36.5,
+    display: "36.5",
+    samples: brokerSparkline(30, 9),
+  }),
+  brokerTile({
+    key: "observed_byte_rate",
+    label: "Observed bytes/s",
+    computed: true,
+    tooltip: "Measured by this client across its subscriptions",
+    value: 3400,
+    display: "3.4k",
+    samples: brokerSparkline(3200, 700),
+  }),
+];
+
+export const mockBrokerTilesPopulated = [
+  brokerTile({
+    key: "clients_connected",
+    label: "Connected clients",
+    value: 17,
+    display: "17",
+    samples: brokerSparkline(15, 3),
+  }),
+  brokerTile({
+    key: "msg_rate_in",
+    label: "Msgs/s in",
+    value: 842,
+    display: "842",
+    samples: brokerSparkline(820, 120),
+  }),
+  brokerTile({
+    key: "msg_rate_out",
+    label: "Msgs/s out",
+    value: 1180,
+    display: "1.2k",
+    samples: brokerSparkline(1100, 160),
+  }),
+  brokerTile({
+    key: "bytes_rate_in",
+    label: "Bytes/s in",
+    value: 48200,
+    display: "48.2k",
+    samples: brokerSparkline(46000, 6000),
+  }),
+  brokerTile({
+    key: "subscriptions",
+    label: "Subscriptions",
+    value: 126,
+    display: "126",
+  }),
+  brokerTile({
+    key: "retained",
+    label: "Retained msgs",
+    value: 89,
+    display: "89",
+  }),
+  brokerTile({
+    key: "uptime",
+    label: "Uptime",
+    value: 273600,
+    display: "3d 4h",
+    isDuration: true,
+  }),
+  brokerTile({
+    key: "version",
+    label: "Broker",
+    valueKind: "text",
+    text: "mosquitto 2.0.18",
+    display: "mosquitto 2.0.18",
+  }),
+  ...observedTiles(),
+  brokerTile({
+    key: "custom:0:factory/line/temp#",
+    label: "Line temp",
+    unit: "°C",
+    value: 21.4,
+    display: "21.4 °C",
+    samples: brokerSparkline(21, 1.5),
+  }),
+];
+
+const emptyBuiltins = () =>
+  [
+    { key: "clients_connected", label: "Connected clients" },
+    { key: "msg_rate_in", label: "Msgs/s in" },
+    { key: "msg_rate_out", label: "Msgs/s out" },
+    { key: "bytes_rate_in", label: "Bytes/s in" },
+    { key: "bytes_rate_out", label: "Bytes/s out" },
+    { key: "subscriptions", label: "Subscriptions" },
+    { key: "retained", label: "Retained msgs" },
+    { key: "uptime", label: "Uptime" },
+    { key: "version", label: "Broker" },
+  ].map((b) => brokerTile({ ...b, valueKind: "empty" }));
+
+export const mockBrokerLatestByTopic = () =>
+  new Map<string, { value: string; timeMs: number }>([
+    ["$SYS/broker/clients/connected", { value: "17", timeMs: now - 4000 }],
+    ["$SYS/broker/clients/total", { value: "24", timeMs: now - 4000 }],
+    [
+      "$SYS/broker/load/messages/received/1min",
+      { value: "50510.30", timeMs: now - 3000 },
+    ],
+    [
+      "$SYS/broker/load/messages/sent/1min",
+      { value: "70810.10", timeMs: now - 3000 },
+    ],
+    ["$SYS/broker/subscriptions/count", { value: "126", timeMs: now - 5000 }],
+    [
+      "$SYS/broker/retained messages/count",
+      { value: "89", timeMs: now - 8000 },
+    ],
+    ["$SYS/broker/uptime", { value: "273600 seconds", timeMs: now - 2000 }],
+    [
+      "$SYS/broker/version",
+      { value: "mosquitto version 2.0.18", timeMs: now - 60000 },
+    ],
+    ["$SYS/broker/bytes/received", { value: "8123400", timeMs: now - 3000 }],
+    ["$SYS/broker/bytes/sent", { value: "9910233", timeMs: now - 3000 }],
+  ]);
+
+type MockBrokerState = {
+  tiles: ReturnType<typeof brokerTile>[];
+  latestByTopic: Map<string, { value: string; timeMs: number }>;
+  connected: boolean;
+  sysEverSeen: boolean;
+  windowOpenedAt: number;
+};
+
+export const createMockBrokerStatusStore = (
+  overrides: Partial<MockBrokerState> = {},
+  connectionId = 1
+) => {
+  const state: MockBrokerState = {
+    tiles: mockBrokerTilesPopulated,
+    latestByTopic: mockBrokerLatestByTopic(),
+    connected: true,
+    sysEverSeen: true,
+    windowOpenedAt: now,
+    ...overrides,
+  };
+  const { subscribe } = writable<MockBrokerState>(state);
+  return {
+    subscribe,
+    init: asyncNoop,
+    reloadMappings: asyncNoop,
+    destroy: noop,
+    snapshot: () => state,
+    connectionId,
+  };
+};
+
+export const createMockBrokerStatusEmptyStore = () =>
+  createMockBrokerStatusStore({
+    tiles: [...emptyBuiltins(), ...observedTiles()],
+    latestByTopic: new Map(),
+    sysEverSeen: false,
+    windowOpenedAt: now - 20000,
+  });
+
+export const createMockBrokerStatusDisconnectedStore = () =>
+  createMockBrokerStatusStore({ connected: false }, 2);
+
 export const mockMqttData = {
   factory: {
     subtopicCount: 1,
