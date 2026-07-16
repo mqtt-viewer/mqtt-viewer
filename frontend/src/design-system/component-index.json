@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-14T05:44:25.842Z",
+  "generatedAt": "2026-07-16T14:17:19.984Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2376,6 +2376,253 @@
       "specMissing": false
     },
     {
+      "name": "BrokerStatusWindow",
+      "tier": "view",
+      "description": "Storybook coverage for BrokerStatusWindow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "warning",
+        "emphasis",
+        "secondary-text",
+        "white-text",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/BrokerStatusWindow/BrokerStatusWindow.svelte",
+      "specPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow",
+      "specMissing": false
+    },
+    {
+      "name": "BrokerStatusView",
+      "tier": "view",
+      "description": "Body of the Broker Status window: responsive stat-tile grid with an always-last add-tile '+', a no-$SYS empty state with an add-subscription CTA, and a collapsible raw $SYS topic browser. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "store",
+          "type": "store",
+          "required": true,
+          "description": "BrokerStatusStore providing tiles, latestByTopic, connected, sysEverSeen, windowOpenedAt. Lifecycle (init/destroy) is owned by the window shell, not this view."
+        },
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true,
+          "description": "Connection whose mappings and $SYS/# subscription this view reads and edits."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-1",
+        "secondary-text",
+        "emphasis",
+        "hovered",
+        "divider"
+      ],
+      "dependencies": [
+        "StatTile",
+        "MetricMappingEditor",
+        "Icon",
+        "IconButton",
+        "Tooltip",
+        "Button",
+        "BaseInput"
+      ],
+      "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/BrokerStatusView",
+      "specMissing": false
+    },
+    {
+      "name": "MetricMappingEditor",
+      "tier": "view",
+      "description": "Dialog for a connection's broker-status metric-tile mappings: add/edit/delete rows with Label, Topic (required), JSON path, Unit, and an Overrides target (a builtin tile id or a custom tile). Persists via the SysMetricMapping CRUD bindings and reloads the store. Opens blank or prefilled from the raw browser's pin action.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true,
+          "description": "Connection whose mappings are listed and edited."
+        },
+        {
+          "name": "store",
+          "type": "store",
+          "required": true,
+          "description": "BrokerStatusStore; reloadMappings() is called after every create/update/delete so tiles refresh live."
+        },
+        {
+          "name": "isOpen",
+          "type": "store",
+          "required": false,
+          "default": null,
+          "description": "Writable<boolean> controlling visibility; the form reloads and resets each time it opens."
+        },
+        {
+          "name": "prefill",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "{ topic?, label? } seeding the add-mode draft (used by the raw browser's pin-as-tile)."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-0",
+        "secondary-text",
+        "emphasis",
+        "error",
+        "divider"
+      ],
+      "dependencies": [
+        "Dialog",
+        "Button",
+        "IconButton",
+        "Icon",
+        "BaseInput",
+        "Select"
+      ],
+      "notes": "Figma is not linked yet. Delete has no confirm step (rows are cheap to recreate) but uses the destructive text-error styling. Override targets exclude the computed observed_* tiles, which have no topic to redirect.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/MetricMappingEditor/MetricMappingEditor.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/MetricMappingEditor/MetricMappingEditor.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/MetricMappingEditor/MetricMappingEditor.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/MetricMappingEditor",
+      "specMissing": false
+    },
+    {
+      "name": "Sparkline",
+      "tier": "view",
+      "description": "Pure SVG polyline sparkline for broker-status stat tiles; stroke is currentColor so the parent controls color via a text token.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "points",
+          "type": "object",
+          "required": true,
+          "description": "{t, v}[] time-series samples. Fewer than 2 points renders nothing; a zero value range renders a midline."
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": false,
+          "default": 28,
+          "description": "Rendered height in px; width stretches to the container."
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "No color tokens consumed directly by design — stroke follows currentColor, parent sets e.g. text-primary. No external chart lib.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/Sparkline",
+      "specMissing": false
+    },
+    {
+      "name": "StatTile",
+      "tier": "view",
+      "description": "Broker-status metric tile: small label, big preformatted value with optional unit suffix, optional sparkline, subdued no-data state.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true,
+          "description": "Preformatted display string (SI abbreviation etc. is done by the caller)."
+        },
+        {
+          "name": "unit",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Subdued suffix rendered after the value, e.g. '/s'."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "required": false,
+          "default": "number",
+          "description": "'number' renders big, tabular, one line; 'text' renders smaller and wraps to two lines. Fed from the tile's valueKind."
+        },
+        {
+          "name": "points",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "{t, v}[] sparkline samples; omitted or <2 points hides the sparkline."
+        },
+        {
+          "name": "noData",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Shows a subdued 'no data yet' placeholder instead of the value."
+        }
+      ],
+      "tokens": [
+        "elevation-1",
+        "outline",
+        "secondary-text",
+        "emphasis",
+        "primary"
+      ],
+      "dependencies": [
+        "Sparkline"
+      ],
+      "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/StatTile",
+      "specMissing": false
+    },
+    {
       "name": "ChartWindow",
       "tier": "view",
       "description": "Storybook coverage for ChartWindow.",
@@ -2844,6 +3091,12 @@
           "name": "highlightedTopicStore",
           "type": "store",
           "required": true
+        },
+        {
+          "name": "onOpenBrokerStatus",
+          "type": "function",
+          "required": false,
+          "default": "undefined"
         }
       ],
       "tokens": [

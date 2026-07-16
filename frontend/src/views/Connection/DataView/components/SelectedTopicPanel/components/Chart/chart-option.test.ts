@@ -59,6 +59,26 @@ describe("buildChartOption xAxis bounds", () => {
   });
 });
 
+describe("buildChartOption theme", () => {
+  const tooltip = (p: ChartOptionParams) =>
+    buildChartOption(p).tooltip as {
+      backgroundColor: string;
+      textStyle: { color: string };
+    };
+
+  it("defaults to the dark chrome palette", () => {
+    expect(tooltip(params()).backgroundColor).toBe("#1f1e1e");
+  });
+
+  it("uses the light chrome palette when theme is light", () => {
+    const dark = tooltip(params({ theme: "dark" }));
+    const light = tooltip(params({ theme: "light" }));
+    expect(light.backgroundColor).toBe("#ffffff");
+    expect(light.backgroundColor).not.toBe(dark.backgroundColor);
+    expect(light.textStyle.color).not.toBe(dark.textStyle.color);
+  });
+});
+
 describe("buildChartOption series", () => {
   it("plots only visible series, keyed by path, with points from the payload", () => {
     const opt = buildChartOption(

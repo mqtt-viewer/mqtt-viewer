@@ -310,6 +310,59 @@ export async function DeleteCollectionMessage(id: number): Promise<void> {
   }
 }
 
+// In-memory sys metric mappings so the broker-status editor behaves in
+// storybook like the app.
+let nextSysMetricMappingId = 100;
+const mockSysMetricMappings: models.SysMetricMapping[] = [];
+
+export async function GetSysMetricMappingsByConnectionId(
+  connId: number
+): Promise<models.SysMetricMapping[]> {
+  return mockSysMetricMappings
+    .filter((m) => m.connectionId === connId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+}
+
+export async function AddSysMetricMapping(
+  connId: number,
+  mapping: models.SysMetricMapping
+): Promise<models.SysMetricMapping | null> {
+  const added = new models.SysMetricMapping({
+    ...mapping,
+    id: nextSysMetricMappingId++,
+    connectionId: connId,
+  });
+  mockSysMetricMappings.push(added);
+  return added;
+}
+
+export async function UpdateSysMetricMapping(
+  _connId: number,
+  mapping: models.SysMetricMapping
+): Promise<models.SysMetricMapping | null> {
+  const index = mockSysMetricMappings.findIndex((m) => m.id === mapping.id);
+  if (index >= 0) mockSysMetricMappings[index] = mapping;
+  return mapping;
+}
+
+export async function DeleteSysMetricMapping(
+  _connId: number,
+  id: number
+): Promise<void> {
+  const index = mockSysMetricMappings.findIndex((m) => m.id === id);
+  if (index >= 0) mockSysMetricMappings.splice(index, 1);
+}
+
+export async function GetSysMessageHistory(
+  _connectionId: number
+): Promise<any[]> {
+  return [];
+}
+
+export async function OpenBrokerStatusWindow(
+  _connectionId: number
+): Promise<void> {}
+
 export async function OpenChartWindow(_params: {
   connectionId: number;
   topic: string;

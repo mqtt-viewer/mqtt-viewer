@@ -70,7 +70,10 @@
   });
 
   $: isOpen = $open;
-  $: hasContent = $selected !== undefined && $selected.value !== "";
+  // A selection is present whenever `selected` is set, regardless of its value.
+  // (An empty-string value is a legitimate selection — e.g. a "None" option —
+  // and must still float the label, not read as "nothing selected".)
+  $: hasContent = $selected !== undefined;
   $: hasIcon = icon !== undefined;
   let isFocused = false;
   const onFocus = () => (isFocused = true);

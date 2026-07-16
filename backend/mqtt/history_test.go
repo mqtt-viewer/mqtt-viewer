@@ -98,6 +98,62 @@ func TestHistoryGetAllIncludesEvictedTopicLatest(t *testing.T) {
 	}
 }
 
+func TestHistoryGetByTopicPrefixFiltersAndOrders(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+
+	// Interleave $SYS and non-$SYS topics; arrival order is insertion order.
+	h.addMessageToHistory(msg("$SYS/broker/uptime", 10))
+	h.addMessageToHistory(msg("factory/line1/s1", 10))
+	h.addMessageToHistory(msg("$SYS/broker/clients/connected", 10))
+	// "$SYS" alone (no trailing slash) must not match the "$SYS/" prefix.
+	h.addMessageToHistory(msg("$SYS", 10))
+
+	got := h.GetHistoryByTopicPrefix("$SYS/")
+	if len(got) != 2 {
+		t.Fatalf("expected 2 $SYS/ messages, got %d (%+v)", len(got), got)
+	}
+	for _, m := range got {
+		if m.Topic != "$SYS/broker/uptime" && m.Topic != "$SYS/broker/clients/connected" {
+			t.Errorf("unexpected topic in prefix result: %v", m.Topic)
+		}
+	}
+}
+
+func TestHistoryGetByTopicPrefixIncludesEvictedLatest(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	h.SetBudgetBytes(int64(perMsg * 3))
+
+	// One $SYS message, then flood a different $SYS topic so the first ages out
+	// of the recent window; its latest value must still be returned.
+	h.addMessageToHistory(msg("$SYS/broker/uptime", 1024))
+	for i := 0; i < 20; i++ {
+		h.addMessageToHistory(msg("$SYS/broker/load", 1024))
+	}
+
+	got := h.GetHistoryByTopicPrefix("$SYS/")
+	seen := map[string]bool{}
+	for _, m := range got {
+		seen[m.Topic] = true
+	}
+	if !seen["$SYS/broker/uptime"] {
+		t.Error("expected aged-out $SYS/broker/uptime latest present in prefix result")
+	}
+	if !seen["$SYS/broker/load"] {
+		t.Error("expected $SYS/broker/load present in prefix result")
+	}
+}
+
+func TestHistoryGetByTopicPrefixEmpty(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.addMessageToHistory(msg("factory/line1/s1", 10))
+	if got := h.GetHistoryByTopicPrefix("$SYS/"); len(got) != 0 {
+		t.Errorf("expected no matches, got %d", len(got))
+	}
+}
+
 func TestHistoryClearPreservesBudget(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(123456)

@@ -354,14 +354,26 @@
     height: 70px;
   }
 
+  /* vis-timeline's default pale-blue item fill is invisible on the light
+     theme, so unselected markers take the primary colour at reduced
+     opacity; selection and retained rules below override it. */
+  .vis-item.vis-box {
+    background-color: var(--primary);
+    opacity: 0.55;
+  }
+
+  .vis-item.vis-box.vis-selected,
+  .vis-item.vis-box.retained {
+    opacity: 1;
+  }
+
   .vis-item.vis-box.retained {
     background-color: var(--secondary);
   }
 
   .vis-item.vis-box.vis-selected {
     background-color: var(--primary-light);
-    --tw-ring-opacity: 1;
-    --tw-ring-color: rgb(119 136 252 / var(--tw-ring-opacity));
+    --tw-ring-color: var(--color-primary);
     --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0
       var(--tw-ring-offset-width) var(--tw-ring-offset-color);
     --tw-ring-shadow: var(--tw-ring-inset) 0 0 0
@@ -377,7 +389,7 @@
 
   .vis-item {
     border-width: 0px;
-    border-color: black;
+    border-color: var(--color-timeline-border);
   }
 
   .vis-item.vis-dot {
@@ -397,6 +409,10 @@
   .vis-itemset {
     height: 50px !important;
     overflow: hidden;
+  }
+
+  .vis-time-axis .vis-text {
+    color: var(--color-secondary-text);
   }
 
   .vis-time-axis .vis-grid.vis-minor {
