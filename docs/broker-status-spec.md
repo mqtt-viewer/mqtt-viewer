@@ -359,3 +359,23 @@ messages per minute**; divide by 60 and label `/s`.
   hover-revealed inline button on the root `$SYS` tree row (user request at Gate 2)
   — inline button limited to `$SYS` root; custom status roots use the toolbar button.
 - Spec committed at `docs/broker-status-spec.md` per repo convention (PR #76 precedent).
+- Post-build review (8-angle + adversarial verify) confirmed 12 bugs; all fixed:
+  backfill rejection on unpublished custom topics, cumulative-rate reseed on
+  candidate-topic switch, observed-rate warm-up scaling, clear-history epoch
+  guard, stable id-based custom tile keys, subscriptions-store init in the
+  status window, tabs-wipe guard for detached windows (ConnectionDeleted),
+  connection-state seeding routed through updateConnectionState, mapping CRUD
+  ownership checks + created_at preservation, prefix-filtered history accessor,
+  keyboard a11y on the tree pulse button, `#` wildcard support in
+  topicMatchesPattern. Plus: Select empty-value root fix (replaced the editor's
+  sentinel), StatTile kind prop (replaced string-length heuristic), no em
+  dashes in user-facing copy (docs/WRITING_STYLE.md hard rule), windows.go
+  focus-or-create dedup.
+- Verified live end to end via Wails server mode (`scripts/serve-browser.sh`,
+  see AGENTS.md): connect to local mosquitto (docker), backfill, live tiles
+  under a ~2k-message flood, custom tile add + persistence across app restart,
+  editor CRUD, raw browser, both entry points, empty/disconnected states.
+  Native-window E2E (OpenBrokerStatusWindow focus-or-create, window chrome) and
+  the official 2-broker native flood run were NOT exercised (no human at the
+  native app); store-level flood benchmark shows ~70x headroom vs the 5 ms/batch
+  bar (broker-status-store.perf.test.ts).
