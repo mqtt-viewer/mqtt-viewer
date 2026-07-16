@@ -99,6 +99,7 @@
   <div
     class="flex flex-row items-center h-full gap-2 px-2 text-emphasis overflow-hidden"
   >
+    <slot name="leading" />
     <SearchAndHistory bind:searchText />
     <Tooltip placement="bottom">
       <Button on:click={onExpandClick}

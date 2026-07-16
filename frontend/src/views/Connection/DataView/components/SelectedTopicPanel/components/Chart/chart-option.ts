@@ -45,6 +45,8 @@ const seriesData = (
 ): [number, number][] => {
   const points: [number, number][] = [];
   for (const m of history) {
+    // stub entries haven't had their payload fetched yet
+    if (m.payload === null) continue;
     const value = valueAtPath(m.payload, path);
     if (value !== null) points.push([m.timeMs, value]);
   }

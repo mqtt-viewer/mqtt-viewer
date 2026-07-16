@@ -79,13 +79,67 @@ func (a *App) DisconnectMqtt(connId uint) error {
 	return nil
 }
 
-func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, error) {
-	appConnection := a.AppConnections[connId]
-	messageHistory, err := appConnection.MqttManager.MessageHistory.GetTopicHistory(topic)
+// GetMessageHistory returns up to `limit` of the newest retained messages for
+// a topic (limit <= 0 returns everything). The UI passes its window size:
+// returning a busy topic's entire RAM history serializes an unbounded JSON
+// blob across the webview bridge, which crashed the app on huge
+// public-broker topics.
+func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.MqttMessage, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	messageHistory, err := appConnection.MqttManager.MessageHistory.GetTopicHistoryWindow(topic, limit)
 	if err != nil {
 		return nil, err
 	}
 	return messageHistory, nil
+}
+
+// GetMessageTimeline returns up to `limit` of the newest retained messages
+// for a topic as lightweight stubs (id, timeMs, qos, retain, no payload).
+// This is the memory-mode counterpart to GetReceivedTimelineWindow: selecting
+// a topic fetches stubs to draw the timeline, then fetches individual
+// payloads on demand via GetMessageById.
+func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.MqttMessageStub, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	stubs, err := appConnection.MqttManager.MessageHistory.GetTopicTimelineWindow(topic, limit)
+	if err != nil {
+		return nil, err
+	}
+	return stubs, nil
+}
+
+// GetMessageById fetches a single full message (with its payload) by id from
+// a topic's in-RAM history. timeMs is the message's receive time from its
+// stub; it lets the lookup binary-search the history window instead of
+// scanning it (pass 0 when unknown). found=false (no error) means the message
+// has aged out of the RAM window (evicted by the memory budget), so the
+// frontend can render a graceful "no longer available" state instead of an
+// error.
+func (a *App) GetMessageById(connId uint, topic string, id string, timeMs int64) (msg mqtt.MqttMessage, found bool) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		// a call racing connection teardown: treat as aged out, not a panic
+		return mqtt.MqttMessage{}, false
+	}
+	return appConnection.MqttManager.MessageHistory.GetMessageById(topic, id, timeMs)
+}
+
+// GetMessagesByIds fetches a batch of full messages (with payloads) by id
+// from a topic's in-RAM history. ids and timesMs are parallel slices (the
+// stubs' receive times drive the same fast lookup as GetMessageById). Only
+// the messages still retained are returned; the frontend treats any omitted
+// id as aged out.
+func (a *App) GetMessagesByIds(connId uint, topic string, ids []string, timesMs []int64) ([]mqtt.MqttMessage, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection.MqttManager.MessageHistory.GetMessagesByIds(topic, ids, timesMs), nil
 }
 
 // GetSysMessageHistory returns every retained $SYS/* message for a

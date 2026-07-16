@@ -9,6 +9,7 @@
     MqttHistoryMessage,
     SelectedTopicStore,
   } from "../../stores/selected-topic-store";
+  import { HISTORY_WINDOW_SIZE } from "../../stores/selected-topic-store";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import SelectedMessageArrivalDetails from "./components/SelectedMessageArrivalDetails.svelte";
@@ -71,9 +72,17 @@
           selectedMessageIndex
         ] as MqttHistoryMessage)
       : null;
-  $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
+  $: selectedMessagePayloadState = selectedMessage?.payloadState ?? null;
+  $: selectedMessagePayload = selectedMessage?.payload ?? null;
   $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
+
+  // history[] only carries stubs until fetched. Ensure the selected
+  // message's payload as soon as it's picked (timeline click or
+  // auto-select-latest). Cheap/no-op if already loaded or in flight.
+  $: if (selectedMessageId !== null) {
+    selectedTopicStore.ensurePayload(selectedMessageId);
+  }
 
   $: selectedMessagePayload,
     (() => {
@@ -104,7 +113,22 @@
       ? $selectedTopicStore.history[previousMessageIndex]
       : null;
   $: prevMessageRetained = previousMessage?.retain ?? false;
-  $: previousMessagePayload = previousMessage?.payload.toString() ?? null;
+  $: previousMessagePayloadState = previousMessage?.payloadState ?? null;
+  $: previousMessagePayload = previousMessage?.payload ?? null;
+  // Distinguishes "previous message exists but its payload hasn't landed
+  // yet" from "there genuinely is no previous message" for PayloadTab's
+  // compare view (both otherwise present as payload === null).
+  $: previousMessageLoading =
+    previousMessage !== null &&
+    previousMessagePayloadState !== "loaded" &&
+    previousMessagePayloadState !== "aged-out";
+  $: previousMessageAgedOut = previousMessagePayloadState === "aged-out";
+
+  // Compare mode needs the previous message's payload too, still only ever
+  // 1-2 messages fetched, never the whole history.
+  $: if (isComparing && previousMessage !== null) {
+    selectedTopicStore.ensurePayload(previousMessage.id);
+  }
 
   // Windowed durable history (recording on): older/newer/latest navigation.
   $: isDiskHistory = $selectedTopicStore.historySource === "disk";
@@ -112,6 +136,11 @@
   $: totalHistoryCount = $selectedTopicStore.totalCount;
   $: shownHistoryCount = $selectedTopicStore.history.length;
   $: atLatestWindow = historyWindow?.isNewest ?? true;
+  $: atOldestWindow = historyWindow?.atOldest ?? true;
+  $: isLoadingHistory = $selectedTopicStore.isLoadingHistory;
+  $: isLoadingWindow = $selectedTopicStore.isLoadingWindow;
+  $: recordingEnabled = $selectedTopicStore.recordingEnabled;
+  $: recordedCount = $selectedTopicStore.recordedCount;
 </script>
 
 <div
@@ -177,17 +206,25 @@
     </div></PanelHeader
   >
   <div class="h-[100px] min-h-[100px] overflow-hidden relative">
-    <MessageTimeline
-      {connectionId}
-      {firstConnectedAtMs}
-      {selectedTopicStore}
-      bind:isAutoSelectingMostRecent={$selectedTopicStore.options.autoSelect}
-      onMessageSelect={(id) => {
-        selectedMessageId = id;
-      }}
-    />
+    {#if isLoadingHistory}
+      <div
+        class="size-full flex items-center justify-center text-secondary-text"
+      >
+        Loading history...
+      </div>
+    {:else}
+      <MessageTimeline
+        {connectionId}
+        {firstConnectedAtMs}
+        {selectedTopicStore}
+        bind:isAutoSelectingMostRecent={$selectedTopicStore.options.autoSelect}
+        onMessageSelect={(id) => {
+          selectedMessageId = id;
+        }}
+      />
+    {/if}
   </div>
-  {#if isDiskHistory && totalHistoryCount > shownHistoryCount}
+  {#if !isLoadingHistory && isDiskHistory && totalHistoryCount > shownHistoryCount}
     <div
       class="flex items-center gap-2 text-sm text-secondary-text mt-1 mb-1 select-none"
     >
@@ -196,15 +233,18 @@
         iconType="left"
         iconPlacement="left"
         iconSize={12}
-        on:click={() => selectedTopicStore.loadOlderWindow()}>Older</Button
+        disabled={atOldestWindow || isLoadingWindow !== null}
+        on:click={() => selectedTopicStore.loadOlderWindow()}
+        >Load older</Button
       >
       <Button
         variant="text"
         iconType="right"
         iconPlacement="right"
         iconSize={12}
-        disabled={atLatestWindow}
-        on:click={() => selectedTopicStore.loadNewerWindow()}>Newer</Button
+        disabled={atLatestWindow || isLoadingWindow !== null}
+        on:click={() => selectedTopicStore.loadNewerWindow()}
+        >Load newer</Button
       >
       {#if !atLatestWindow}
         <Button variant="text" on:click={() => selectedTopicStore.jumpToLatest()}
@@ -217,8 +257,30 @@
         {atLatestWindow ? "(latest)" : ""}
       </span>
     </div>
+  {:else if !isLoadingHistory && !isDiskHistory && recordingEnabled && (recordedCount ?? 0) > 0}
+    <div
+      class="flex items-center gap-2 text-sm text-secondary-text mt-1 mb-1 select-none"
+    >
+      <Button
+        variant="text"
+        on:click={() => selectedTopicStore.loadRecordedHistory()}
+        >Load recorded history</Button
+      >
+      <div class="grow"></div>
+      <span class="whitespace-nowrap">
+        {(recordedCount ?? 0).toLocaleString()} recorded messages on disk
+      </span>
+    </div>
+  {:else if !isLoadingHistory && !isDiskHistory && !recordingEnabled && shownHistoryCount >= HISTORY_WINDOW_SIZE}
+    <div class="text-sm text-secondary-text mt-1 mb-1">
+      Showing the latest {HISTORY_WINDOW_SIZE.toLocaleString()} messages. Enable
+      recording in settings to browse older history.
+    </div>
   {/if}
-  {#if selectedMessage === null}
+  {#if isLoadingHistory}
+    <!-- The timeline area above already shows the loading state; avoid
+      flashing "No message selected" underneath it while history loads. -->
+  {:else if selectedMessage === null}
     <div class="mt-12 flex justify-center text-secondary-text">
       No message selected
     </div>
@@ -231,7 +293,30 @@
         tabs={[{ title: "Payload" }, { title: "Chart" }]}
       >
         <div slot="tab-1" class="size-full pt-2">
-          {#if selectedMessagePayload !== null}
+          {#if selectedMessagePayloadState === "aged-out"}
+            <div
+              class="mt-12 flex flex-col items-center gap-2 px-4 text-center text-secondary-text"
+            >
+              {#if isDiskHistory}
+                <span>
+                  No longer on disk. Recorded history prunes the oldest
+                  messages to stay within its storage budget.
+                </span>
+              {:else if recordingEnabled}
+                <span>No longer in session memory.</span>
+                <Button
+                  variant="text"
+                  on:click={() => selectedTopicStore.loadRecordedHistory()}
+                  >Load recorded history</Button
+                >
+              {:else}
+                <span>
+                  No longer in session memory. Enable recording in settings to
+                  keep messages across restarts.
+                </span>
+              {/if}
+            </div>
+          {:else if selectedMessagePayload !== null}
             <PayloadTab
               bind:codec={$selectedTopicStore.options.decoding}
               bind:format={$selectedTopicStore.options.format}
@@ -240,9 +325,19 @@
               payload={selectedMessagePayload}
               payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
+              payloadLeftLoading={previousMessageLoading}
+              payloadLeftAgedOut={previousMessageAgedOut}
+              historySource={$selectedTopicStore.historySource}
+              {recordingEnabled}
+              onLoadRecordedHistory={() =>
+                selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
             />
+          {:else}
+            <div class="mt-12 flex justify-center text-secondary-text">
+              Loading message...
+            </div>
           {/if}
         </div>
         <div slot="tab-2" class="size-full pt-2">
@@ -252,6 +347,7 @@
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
+            isActive={isChartTabActive}
           />
         </div>
       </Tabs>
@@ -268,7 +364,30 @@
         ]}
       >
         <div slot="tab-1" class="size-full pt-2">
-          {#if selectedMessagePayload !== null}
+          {#if selectedMessagePayloadState === "aged-out"}
+            <div
+              class="mt-12 flex flex-col items-center gap-2 px-4 text-center text-secondary-text"
+            >
+              {#if isDiskHistory}
+                <span>
+                  No longer on disk. Recorded history prunes the oldest
+                  messages to stay within its storage budget.
+                </span>
+              {:else if recordingEnabled}
+                <span>No longer in session memory.</span>
+                <Button
+                  variant="text"
+                  on:click={() => selectedTopicStore.loadRecordedHistory()}
+                  >Load recorded history</Button
+                >
+              {:else}
+                <span>
+                  No longer in session memory. Enable recording in settings to
+                  keep messages across restarts.
+                </span>
+              {/if}
+            </div>
+          {:else if selectedMessagePayload !== null}
             <PayloadTab
               bind:codec={$selectedTopicStore.options.decoding}
               bind:format={$selectedTopicStore.options.format}
@@ -277,9 +396,19 @@
               payload={selectedMessagePayload}
               payloadB64={selectedMessagePayloadB64}
               payloadLeftForCompare={previousMessagePayload}
+              payloadLeftLoading={previousMessageLoading}
+              payloadLeftAgedOut={previousMessageAgedOut}
+              historySource={$selectedTopicStore.historySource}
+              {recordingEnabled}
+              onLoadRecordedHistory={() =>
+                selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
             />
+          {:else}
+            <div class="mt-12 flex justify-center text-secondary-text">
+              Loading message...
+            </div>
           {/if}
         </div>
         <div slot="tab-2" class="size-full pt-2">
@@ -308,6 +437,7 @@
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
+            isActive={isChartTabActive}
           />
         </div>
       </Tabs>

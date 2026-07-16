@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Topic Graph — dev harness</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #161514; color: #ece9e7;
+        font-family: Inter, system-ui, sans-serif; overflow: hidden; }
+      #bar { position: absolute; top: 10px; left: 12px; z-index: 10; display: flex;
+        gap: 8px; align-items: center; font-size: 12px; }
+      #bar select, #bar input, #bar button { background: #262422; color: #ece9e7;
+        border: 1px solid #34302c; border-radius: 6px; padding: 5px 8px; font-size: 12px; }
+      #bar .status { color: #9a938c; }
+      #stage { width: 100vw; height: 100vh; display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <input id="filter" placeholder="filter topics…" />
+      <select id="sort">
+        <option value="rate">sort: rate</option>
+        <option value="recency">sort: recency</option>
+        <option value="alpha">sort: alpha</option>
+        <option value="count">sort: count</option>
+      </select>
+      <button id="d1">depth 1</button>
+      <button id="d2">depth 2</button>
+      <button id="d9">expand all</button>
+      <span class="status" id="status"></span>
+    </div>
+    <canvas id="stage"></canvas>
+    <script type="module" src="/dev/topic-graph-dev.ts"></script>
+  </body>
+</html>

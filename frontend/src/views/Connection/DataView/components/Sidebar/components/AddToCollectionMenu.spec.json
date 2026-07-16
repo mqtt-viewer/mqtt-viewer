@@ -48,7 +48,9 @@
     "secondary",
     "white-text",
     "secondary-text",
-    "divider"
+    "divider",
+    "elevation-2-hover",
+    "emphasis"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet."

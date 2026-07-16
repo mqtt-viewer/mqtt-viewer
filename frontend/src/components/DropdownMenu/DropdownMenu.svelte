@@ -57,6 +57,10 @@
   const { trigger, menu, item, separator, arrow } = elements;
 
   setContext("menu-elements", elements);
+
+  // Lets menu content close the menu programmatically (e.g. after an
+  // action triggered from an input rather than a menu item).
+  export const close = () => open.set(false);
 </script>
 
 <button type="button" class="trigger" {disabled} use:melt={$trigger}>

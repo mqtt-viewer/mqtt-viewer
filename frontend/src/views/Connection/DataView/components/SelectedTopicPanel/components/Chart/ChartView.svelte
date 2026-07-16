@@ -14,6 +14,11 @@
   export let onAddFromPayload: (() => void) | null = null;
   // Pop-out control (shown in the docked panel, hidden in a popped-out window).
   export let onPopOut: (() => void) | null = null;
+  // Forwarded to TopicChart: true once the Chart tab is genuinely visible, so
+  // the full-payload fetch only happens when the user actually looks at the
+  // chart. Defaults to true so a popped-out chart window (which has no tabs
+  // to hide behind) always fetches.
+  export let isActive = true;
 
   let paused = false;
   let style: "line" | "area" = "line";
@@ -54,6 +59,7 @@
       {style}
       {showPoints}
       {windowMinutes}
+      {isActive}
     />
   </div>
 

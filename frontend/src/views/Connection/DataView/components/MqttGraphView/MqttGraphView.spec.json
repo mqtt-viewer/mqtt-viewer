@@ -1,0 +1,63 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "MqttGraphView",
+  "tier": "view",
+  "description": "Volume-weighted tidy-tree topic explorer (PixiJS): node size = message rate, colour = recency, with collapse, pan/zoom, minimap and follow-hottest.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "selectedTopicStore",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "initialData",
+      "type": "object",
+      "required": false
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": false,
+      "default": "0"
+    },
+    {
+      "name": "messageSource",
+      "type": "object",
+      "required": false
+    }
+  ],
+  "tokens": [
+    "secondary-text",
+    "outline",
+    "elevation-0",
+    "elevation-1",
+    "elevation-2",
+    "emphasis",
+    "white-text",
+    "primary",
+    "hovered"
+  ],
+  "dependencies": [
+    "PanelHeader",
+    "BaseInput",
+    "Button",
+    "Icon",
+    "Tooltip",
+    "DropdownMenu",
+    "DropdownMenuItem"
+  ],
+  "notes": "Figma page: Topic Graph - Exploration (Direction D). Canvas renderer; story mounts the real Pixi canvas on live mock traffic. Hover inspector shows msg/s + last-message age; legend explains recency ramp and sizing. Click model: clicking a collapsed parent expands it and zooms the view to the revealed subtree (a further click then selects it); clicking an expanded parent or a leaf selects it, and clicking the selected node again deselects it. Selecting a topic from the sidebar (outside the graph) zooms the graph to that topic, expanding its ancestors as needed. Message arrivals draw a brief expanding ring pulse on the node. Minimap: clicking centres the viewport on the clicked point; holding and moving drags the viewport rectangle (continuous re-centring). Gear menu's Display section also has a 'Performance stats' toggle (statsOn, persisted per connection, default off) that renders a top-right HUD overlay (fps/cap, avg frame ms, visible/placed node counts, ingest msg/s) updated on a 1s interval; see docs/topic-graph-view-spec.md 'Performance monitoring' section."
+}

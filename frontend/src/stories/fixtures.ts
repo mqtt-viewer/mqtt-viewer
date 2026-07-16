@@ -1,4 +1,4 @@
-import { writable, type Writable } from "svelte/store";
+import { get, writable, type Writable } from "svelte/store";
 import connections from "@/stores/connections";
 import defaultSorts from "@/stores/default-sorts";
 import env from "@/stores/env";
@@ -487,19 +487,152 @@ export const createMockSelectedTopicStore = () => {
           ? '{"temp":21.4,"unit":"C"}'
           : '{"humidity":42.8}',
       payloadB64: message.payload,
+      payloadState: "loaded",
     })) as any,
     historySource: "memory",
     window: null,
     totalCount: mockMqttMessages.length,
+    isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
     options: {
       autoSelect: true,
       compare: true,
       decoding: "none",
       format: "json",
     },
-    onNewMessages: null,
+    onHistoryDelta: null,
   });
   return store;
+};
+
+// Builds a synthetic history of `count` tiny messages spread evenly over
+// `spanMs` milliseconds, ending at `endMs`. Mirrors the shape decode() in
+// selected-topic-store.ts produces (payload + payloadB64 present).
+const buildBusyHistory = (count: number, spanMs: number, endMs: number) => {
+  const startMs = endMs - spanMs;
+  const messages = [];
+  for (let i = 0; i < count; i++) {
+    const timeMs = Math.round(startMs + (spanMs * i) / (count - 1));
+    const payload = `{"n":${i}}`;
+    messages.push({
+      id: `history-${i}`,
+      topic: "factory/line/temperature",
+      payload,
+      payloadB64: btoa(payload),
+      payloadState: "loaded",
+      qos: 0,
+      retain: false,
+      properties: undefined,
+      timeMs,
+      middlewareProperties: { IsDecodedProto: false },
+    });
+  }
+  return messages;
+};
+
+// Simulates a busy topic for perf testing/repro: seeds `historyCount`
+// messages (default 5,000, matching HISTORY_WINDOW_SIZE) spread over
+// `spanMinutes`, then — once `startLiveAppends()` is called — fires a batch
+// of tiny live messages every `intervalMs` (default 300ms, matching the
+// real drain cadence) via the same setOnHistoryDelta path the real store
+// uses, so it exercises MessageTimeline exactly like production traffic.
+// Kept entirely in fixtures/stories per the component-only-fix constraint.
+export const createBusyMockSelectedTopicStore = (
+  options: {
+    historyCount?: number;
+    spanMinutes?: number;
+    messagesPerBatch?: number;
+    intervalMs?: number;
+  } = {}
+) => {
+  const {
+    historyCount = 5000,
+    spanMinutes = 40,
+    messagesPerBatch = 40,
+    intervalMs = 300,
+  } = options;
+
+  const store = createSelectedTopicStore(1, mockEventSet as any);
+  const endMs = now;
+  const history = buildBusyHistory(historyCount, spanMinutes * 60 * 1000, endMs);
+
+  store.set({
+    connectionId: 1,
+    connectionEventSet: mockEventSet as any,
+    selectedTopic: "factory/line/temperature",
+    history: history as any,
+    historySource: "memory",
+    window: null,
+    totalCount: history.length,
+    isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
+    options: {
+      autoSelect: true,
+      compare: true,
+      decoding: "none",
+      format: "json",
+    },
+    onHistoryDelta: null,
+  });
+
+  let liveTimer: ReturnType<typeof setInterval> | null = null;
+  let nextId = historyCount;
+
+  const startLiveAppends = () => {
+    if (liveTimer !== null) return;
+    liveTimer = setInterval(() => {
+      const batchEndMs = Date.now();
+      const batch = [];
+      for (let i = 0; i < messagesPerBatch; i++) {
+        const id = `live-${nextId++}`;
+        const payload = `{"n":${id}}`;
+        batch.push({
+          id,
+          topic: "factory/line/temperature",
+          payload,
+          payloadB64: btoa(payload),
+          payloadState: "loaded",
+          qos: 0,
+          retain: false,
+          properties: undefined,
+          timeMs: batchEndMs,
+          middlewareProperties: { IsDecodedProto: false },
+        });
+      }
+      const current = get({ subscribe: store.subscribe });
+      store.set({
+        ...current,
+        history: [...current.history, ...(batch as any)],
+        totalCount: current.totalCount + batch.length,
+      });
+      // Mirrors registerMessageListener in the real store: history is
+      // updated above, then the registered onHistoryDelta callback (set by
+      // MessageTimeline via setOnHistoryDelta) is invoked with the delta.
+      const onHistoryDelta = get({ subscribe: store.subscribe }).onHistoryDelta;
+      if (onHistoryDelta !== null) {
+        onHistoryDelta({ kind: "append", messages: batch as any });
+      }
+    }, intervalMs);
+  };
+
+  const stopLiveAppends = () => {
+    if (liveTimer !== null) {
+      clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  };
+
+  return { store, startLiveAppends, stopLiveAppends };
 };
 
 export const createMockPublishStore = () => {
