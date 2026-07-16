@@ -7,8 +7,10 @@ new-migration NAME:
 build VERSION="v0.0.1-defaultv":
   wails3 task package VERSION={{VERSION}} LD_FLAGS="-X mqtt-viewer/backend/env.Version={{VERSION}}"
 
+# Port derived per checkout (scripts/dev-ports.sh) so parallel worktrees
+# don't collide; set WAILS_VITE_PORT to override.
 dev:
-  wails3 dev
+  wails3 dev -port $(scripts/dev-ports.sh vite)
 
 # Publish a release: merges develop→main and creates the GitHub release that
 # triggers the mac/windows/linux build+sign+portal-registration workflows.

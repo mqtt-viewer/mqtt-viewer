@@ -17,6 +17,9 @@ jobs:
           - arch: amd64
             os: windows-latest
             tag: windows_amd64
+          - arch: arm64
+            os: windows-11-arm
+            tag: windows_arm64
     runs-on: ${{ matrix.build.os }}
     name: Release MQTT Viewer (${{ matrix.build.tag }})
     steps:

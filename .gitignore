@@ -21,3 +21,9 @@ build/linux/appimage/build/
 build/linux/appimage/mqtt-viewer
 build/linux/appimage/mqtt-viewer.png
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+# Python venv for scripts/ (mqtt-flood.py, mqtt-sim.py)
+scripts/.venv/
+
+# Per-checkout dev-server ports; generate with scripts/dev-ports.sh write-launch
+.claude/launch.json

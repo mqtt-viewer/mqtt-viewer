@@ -1,0 +1,21 @@
+#!/bin/sh
+# Reject pushes to main unless ALLOW_MAIN_PUSH=1 is set.
+#
+# main only moves by fast-forward from develop at release time
+# (docs/RELEASING.md). This guard exists because agents and tooling push
+# with the maintainer's credentials, so server-side rules can't tell a
+# release push from a mistake. Activate with:
+#   git config core.hooksPath .githooks
+
+remote_url="$2"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+	if [ "$remote_ref" = "refs/heads/main" ] && [ "$ALLOW_MAIN_PUSH" != "1" ]; then
+		echo "pre-push: blocked push to main on $remote_url" >&2
+		echo "pre-push: main only moves by fast-forward at release time." >&2
+		echo "pre-push: if this is a release, run: ALLOW_MAIN_PUSH=1 git push" >&2
+		exit 1
+	fi
+done
+
+exit 0

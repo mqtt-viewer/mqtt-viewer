@@ -5,10 +5,12 @@ const assign = <T extends object>(target: T, source: any = {}) =>
 
 export class UpdateResponse {
   latest_version = "v9.9.9";
-  can_update = false;
   release_notes = "Storybook fixture release notes.";
-  notification_text = "A fixture update is available.";
-  notification_url = "";
+  can_self_update = false;
+  install_type = "flatpak";
+  update_command = "flatpak update app.mqttviewer.MQTTViewer";
+  instructions = "Update MQTT Viewer through your software centre, or run:";
+  releases_url = "";
 
   static createFrom(source: any = {}) {
     return new UpdateResponse(source);

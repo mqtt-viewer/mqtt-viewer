@@ -74,6 +74,11 @@
 
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
+| Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
+| Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/MetricMappingEditor | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/Sparkline | [x] | [ ] | [x] | [ ] |
+| Views/BrokerStatusWindow/StatTile | [x] | [ ] | [x] | [x] |
 | Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
@@ -135,7 +140,7 @@
 
 ## Summary
 
-- Components scanned: 109
-- Story present: 109
+- Components scanned: 114
+- Story present: 114
 - Figma-linked: 0
 - Missing specs: 0

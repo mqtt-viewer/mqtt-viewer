@@ -1,0 +1,52 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "MetricMappingEditor",
+  "tier": "view",
+  "description": "Dialog for a connection's broker-status metric-tile mappings: add/edit/delete rows with Label, Topic (required), JSON path, Unit, and an Overrides target (a builtin tile id or a custom tile). Persists via the SysMetricMapping CRUD bindings and reloads the store. Opens blank or prefilled from the raw browser's pin action.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": true,
+      "description": "Connection whose mappings are listed and edited."
+    },
+    {
+      "name": "store",
+      "type": "store",
+      "required": true,
+      "description": "BrokerStatusStore; reloadMappings() is called after every create/update/delete so tiles refresh live."
+    },
+    {
+      "name": "isOpen",
+      "type": "store",
+      "required": false,
+      "default": null,
+      "description": "Writable<boolean> controlling visibility; the form reloads and resets each time it opens."
+    },
+    {
+      "name": "prefill",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "{ topic?, label? } seeding the add-mode draft (used by the raw browser's pin-as-tile)."
+    }
+  ],
+  "tokens": [
+    "outline",
+    "elevation-0",
+    "secondary-text",
+    "emphasis",
+    "error",
+    "divider"
+  ],
+  "dependencies": ["Dialog", "Button", "IconButton", "Icon", "BaseInput", "Select"],
+  "notes": "Figma is not linked yet. Delete has no confirm step (rows are cheap to recreate) but uses the destructive text-error styling. Override targets exclude the computed observed_* tiles, which have no topic to redirect."
+}

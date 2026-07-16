@@ -8,6 +8,7 @@ import (
 	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/security"
 	topicmatching "mqtt-viewer/backend/topic-matching"
+	"sort"
 	"time"
 )
 
@@ -85,6 +86,30 @@ func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, 
 		return nil, err
 	}
 	return messageHistory, nil
+}
+
+// GetSysMessageHistory returns every retained $SYS/* message for a
+// connection, flattened across topics and sorted by arrival time, so a
+// broker-status window opened mid-session starts populated.
+func (a *App) GetSysMessageHistory(connId uint) ([]mqtt.MqttMessage, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	// Prefix-filter inside the history lock so we only copy $SYS/* messages,
+	// rather than struct-copying the entire retained window under the ingest
+	// mutex (GetAllHistory).
+	messages := appConnection.MqttManager.MessageHistory.GetHistoryByTopicPrefix("$SYS/")
+	sortMessagesByTimeAsc(messages)
+	return messages, nil
+}
+
+// sortMessagesByTimeAsc orders messages by arrival time ascending, stably.
+// Pure so it is testable without a broker.
+func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
+	sort.SliceStable(messages, func(i, j int) bool {
+		return messages[i].TimeMs < messages[j].TimeMs
+	})
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {
@@ -223,10 +248,11 @@ func makePublishProperties(properties *PublishProperties) (*mqtt.MessageProperti
 
 func getConnectionDetailsFromConnectionModel(connection *models.Connection) (*mqtt.MqttConnectionDetails, error) {
 	details := &mqtt.MqttConnectionDetails{
-		MqttVersion: connection.MqttVersion,
-		Protocol:    connection.Protocol,
-		Host:        connection.Host,
-		Port:        connection.Port,
+		MqttVersion:   connection.MqttVersion,
+		Protocol:      connection.Protocol,
+		Host:          connection.Host,
+		Port:          connection.Port,
+		WebsocketPath: connection.WebsocketPath,
 	}
 
 	if connection.Username != nil {

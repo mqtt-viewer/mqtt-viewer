@@ -1,0 +1,5 @@
+# Build outputs produced by `task linux:create:flatpak`
+staging/
+repo/
+builddir/
+.flatpak-builder/

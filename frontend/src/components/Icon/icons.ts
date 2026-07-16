@@ -54,6 +54,7 @@ import {
   ArrowSquareOut,
   Pause,
   Image,
+  Pulse,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -106,6 +107,7 @@ export const ICON_MAP = {
   bug: Bug,
   download: DownloadSimple,
   chart: ChartLine,
+  pulse: Pulse,
   show: Eye,
   hide: EyeSlash,
   popOut: ArrowSquareOut,
