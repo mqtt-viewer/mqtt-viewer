@@ -1,0 +1,24 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "BrokerStatusWindow",
+  "tier": "view",
+  "description": "Storybook coverage for BrokerStatusWindow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [],
+  "tokens": [
+    "warning",
+    "emphasis",
+    "secondary-text",
+    "white-text",
+    "elevation-0"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

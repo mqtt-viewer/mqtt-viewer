@@ -16,6 +16,7 @@
   import {
     ClearConnectionHistory,
     ExportAllMessages,
+    OpenBrokerStatusWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import SearchAndHistory from "./SearchAndHistory.svelte";
@@ -108,6 +109,13 @@
         /></Button
       >
       <span slot="tooltip-content">Expand/Collapse all topics</span>
+    </Tooltip>
+
+    <Tooltip placement="bottom">
+      <Button on:click={() => OpenBrokerStatusWindow(connectionId)}
+        ><Icon type="pulse" width={20} height={20} /></Button
+      >
+      <span slot="tooltip-content">Broker status</span>
     </Tooltip>
 
     <Tooltip placement="bottom">
