@@ -352,6 +352,28 @@ describe("createBrokerStatusStore — empty state & teardown", () => {
     store.destroy();
   });
 
+  it("starts the observed ticker when the window is opened while already connected", async () => {
+    // Window/instance created *after* the broker connected: no mqttConnected
+    // event will fire, so init() must start the ticker off the seeded
+    // `connected: true` option, otherwise the observed-rate tiles stay frozen.
+    const store = createBrokerStatusStore(CONN, eventSet, { connected: true });
+    await store.init();
+    expect(get(store).connected).toBe(true);
+    expect(vi.getTimerCount()).toBe(1); // ticker running without a connected event
+    store.destroy();
+  });
+
+  it("leaves the ticker stopped when opened while disconnected until a connect event", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, { connected: false });
+    await store.init();
+    expect(get(store).connected).toBe(false);
+    expect(vi.getTimerCount()).toBe(0); // no ticker while disconnected
+    emit("conn");
+    expect(get(store).connected).toBe(true);
+    expect(vi.getTimerCount()).toBe(1); // a later connect event starts it
+    store.destroy();
+  });
+
   it("unbinds all listeners and stops the ticker on destroy", async () => {
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();

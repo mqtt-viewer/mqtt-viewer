@@ -90,7 +90,15 @@ const getConnectionFromAppConnection = (appConnection: app.Connection) => {
     connectionString: getConnectionString(
       typedAppConn.connectionDetails as Connection["connectionDetails"]
     ),
-    connectionState: "disconnected" as ConnectionState,
+    // Seed from the backend's live connection state so windows/instances
+    // created *after* connecting (broker status, chart) don't start out stale
+    // as "disconnected" — the Wails events only fire on state *changes*, so a
+    // fresh init would otherwise never learn it's already connected. This seeds
+    // the store value directly (not via updateConnectionState), so the
+    // "just disconnected" transition logic there is never triggered by init.
+    connectionState: (typedAppConn.isConnected
+      ? "connected"
+      : "disconnected") as ConnectionState,
     showDataPageWhileDisconnected: false,
     connectionDetails: {
       ...(typedAppConn.connectionDetails as Connection["connectionDetails"]),

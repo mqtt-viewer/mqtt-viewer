@@ -6,6 +6,12 @@
   export let unit: string | undefined = undefined;
   export let points: { t: number; v: number }[] | undefined = undefined;
   export let noData = false;
+
+  // Numbers are SI-abbreviated by the caller and stay short, so they render big
+  // on one line. Long strings (e.g. "mosquitto version 2.0.18") would truncate
+  // to "mosquitto versio…" at text-xl, so drop to a smaller size and wrap to two
+  // lines instead of clipping.
+  $: isLong = value.length > 12;
 </script>
 
 <div
@@ -16,7 +22,10 @@
     <span class="text-base text-secondary-text opacity-60">no data yet</span>
   {:else}
     <div class="flex min-w-0 items-baseline gap-1">
-      <span class="truncate text-xl font-medium tabular-nums text-emphasis"
+      <span
+        class={isLong
+          ? "line-clamp-2 text-base font-medium leading-snug text-emphasis"
+          : "truncate text-xl font-medium tabular-nums text-emphasis"}
         >{value}</span
       >
       {#if unit}

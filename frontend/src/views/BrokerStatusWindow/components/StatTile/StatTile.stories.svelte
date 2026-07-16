@@ -63,6 +63,17 @@
   {template}
 />
 <Story
+  name="LongStringValue"
+  args={{
+    ...storyArgs,
+    label: "Broker version",
+    value: "mosquitto version 2.0.18",
+    unit: undefined,
+    points: undefined,
+  }}
+  {template}
+/>
+<Story
   name="NoData"
   args={{
     ...storyArgs,

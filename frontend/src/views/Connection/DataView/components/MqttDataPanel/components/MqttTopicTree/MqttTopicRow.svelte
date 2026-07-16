@@ -142,6 +142,27 @@
         <span>{messageCount}</span>
       </div>
     {/if}
+    {#if onOpenBrokerStatus}
+      <!-- Inline, right after the count content, so it reads as attached to the
+           $SYS row rather than orphaned ~600px away at the far right edge.
+           Hover-revealed via the row's `group`; stopPropagation keeps it from
+           selecting the row. Only the $SYS row passes onOpenBrokerStatus, so no
+           other row renders it or pays any cost (no layout shift elsewhere). -->
+      <button
+        type="button"
+        aria-label="Broker status"
+        title="Broker status"
+        class={twMerge(
+          "ml-2 inline-flex items-center rounded p-[1px]",
+          "text-secondary-text hover:text-white-text hover:bg-hovered",
+          "opacity-0 pointer-events-none",
+          "group-hover:opacity-100 group-hover:pointer-events-auto"
+        )}
+        on:click|stopPropagation={onOpenBrokerStatus}
+      >
+        <Icon type="pulse" size={14} />
+      </button>
+    {/if}
     {#if isDecodedProto}
       <span class="inline-block ml-2 mt-[1px]">
         <ProtobufLogo class="size-4" isActive />
@@ -154,22 +175,4 @@
       </p>
     {/if}
   </div>
-  {#if onOpenBrokerStatus}
-    <!-- Sibling (not nested) button so it isn't inside the row's clickable
-         area; CSS-only hover reveal keeps the row cost unchanged. -->
-    <button
-      type="button"
-      aria-label="Broker status"
-      title="Broker status"
-      class={twMerge(
-        "absolute right-1 top-1/2 -translate-y-1/2 rounded p-[1px]",
-        "text-secondary-text hover:text-white-text hover:bg-hovered",
-        "opacity-0 pointer-events-none",
-        "group-hover:opacity-100 group-hover:pointer-events-auto"
-      )}
-      on:click|stopPropagation={onOpenBrokerStatus}
-    >
-      <Icon type="pulse" size={14} />
-    </button>
-  {/if}
 </div>
