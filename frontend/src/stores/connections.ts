@@ -51,6 +51,11 @@ const { subscribe, set, update } = writable<ConnectionStore>({
 
 const init = async () => {
   try {
+    // First fetch: learn which connections exist plus their config/event sets.
+    // Connections are seeded as "disconnected" here; live "connected" state is
+    // applied via updateConnectionState *after* listeners are registered (below)
+    // so no transition is lost in the gap and the session bookkeeping the seed
+    // depends on is populated.
     let { connections: appConnections } = await GetAllConnections();
     const connections: ConnectionStore["connections"] = {};
     const connectionsArray: Connection[] = [];
@@ -66,6 +71,11 @@ const init = async () => {
     set({
       connections: connections,
     });
+
+    // Register per-connection listeners BEFORE reading live connection state, so
+    // a transition that lands while we set up can't slip through the gap. Ids
+    // are only known from the snapshot above, so we register here and then
+    // re-read the snapshot to seed authoritative state.
     for (const connection of connectionsArray) {
       registerConnectionEvents(connection);
     }
@@ -77,6 +87,23 @@ const init = async () => {
         delete store.connections[id];
         return store;
       });
+    });
+
+    // Re-fetch now that listeners are live and seed the already-connected
+    // connections through updateConnectionState, so firstConnectedThisSessionAtMs,
+    // lastConnectedAt and showDataPageWhileDisconnected are set. DataView's
+    // never-connected prompt and MessageTimeline's time lower-bound depend on
+    // these — a bare "connected" seed with firstConnectedThisSessionAtMs unset
+    // shows the connect prompt after a later disconnect and a 1970 timeline
+    // bound. Any transition after this read is delivered by the now-registered
+    // listeners. On a cold main-window start nothing is connected, so this loop
+    // is a no-op and launch behavior is unchanged.
+    const { connections: liveConnections } = await GetAllConnections();
+    Object.keys(liveConnections).forEach((id) => {
+      const connId = parseInt(id);
+      if (liveConnections[id as `${number}`]?.isConnected) {
+        updateConnectionState(connId, "connected");
+      }
     });
   } catch (e) {
     console.error(e);
@@ -90,6 +117,12 @@ const getConnectionFromAppConnection = (appConnection: app.Connection) => {
     connectionString: getConnectionString(
       typedAppConn.connectionDetails as Connection["connectionDetails"]
     ),
+    // Always seed "disconnected" here. Live "connected" state (for windows or
+    // instances created *after* connecting — broker status, chart — since Wails
+    // events only fire on state *changes*) is applied by init() via
+    // updateConnectionState once listeners are registered, so the session
+    // bookkeeping (firstConnectedThisSessionAtMs, lastConnectedAt,
+    // showDataPageWhileDisconnected) is populated rather than left stale.
     connectionState: "disconnected" as ConnectionState,
     showDataPageWhileDisconnected: false,
     connectionDetails: {

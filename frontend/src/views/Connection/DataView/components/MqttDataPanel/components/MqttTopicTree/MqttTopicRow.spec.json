@@ -74,6 +74,12 @@
       "name": "highlightedTopicStore",
       "type": "store",
       "required": true
+    },
+    {
+      "name": "onOpenBrokerStatus",
+      "type": "function",
+      "required": false,
+      "default": "undefined"
     }
   ],
   "tokens": [

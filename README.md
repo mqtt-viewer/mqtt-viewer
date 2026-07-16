@@ -16,14 +16,17 @@ But wait, there's more:
 | ---------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Topic tree data visualisation            | ✅     |                                                                                                                                                                                                              |
 | MQTT v3 + v5 compatibility               | ✅     |                                                                                                                                                                                                              |
-| Run multiple concurrent connections      | ✅     | Up to 10 supported.                                                                                                                                                                                          |
+| Run multiple concurrent connections      | ✅     |                                                                                                                                                                                                              |
 | Message publishing (+ v5 headers)        | ✅     |                                                                                                                                                                                                              |
 | Interactive message timeline             | ✅     |                                                                                                                                                                                                              |
 | Message comparison                       | ✅     | Currently only compares to previous message but I'm planning on making this more flexible.                                                                                                                   |
-| Sparkplug + Base64 + Hex codecs          | ✅     | ⭐ New!                                                                                                                                                                                                      |
-| Free-text / pattern-based filters        | ✅     | ⭐ New!                                                                                                                                                                                                      |
-| Publish history                          | ✅     | ⭐ New!                                                                                                                                                                                                      |
-| Saved message collections                | 🚧     | In progress                                                                                                                                                                                                  |
+| Live topic charting                      | ✅     | ⭐ New! Chart numeric payload fields over time, with a pop-out chart window.                                                                                                                                 |
+| Saved message collections                | ✅     | ⭐ New! Save messages per connection or globally and republish them with a click.                                                                                                                            |
+| Bounded memory usage                     | ✅     | ⭐ New! Message history stays within a configurable memory budget, with opt-in recording to disk.                                                                                                            |
+| Image payload previews                   | ✅     | ⭐ New! PNG, JPEG, GIF, WebP and BMP payloads render as images.                                                                                                                                              |
+| Sparkplug + Base64 + Hex codecs          | ✅     |                                                                                                                                                                                                              |
+| Free-text / pattern-based filters        | ✅     |                                                                                                                                                                                                              |
+| Publish history                          | ✅     |                                                                                                                                                                                                              |
 | Client logs                              | 🚧     | In progress                                                                                                                                                                                                  |
 | Broker status page (based on $SYS data)  | ❓     | Potential. Let me know if you might use this [here](https://github.com/mqtt-viewer/mqtt-viewer/discussions/1).                                                                                               |
 | In-app local test broker                 | ❓     | Potential. This would be an alternative to running a local mosquitto instance for debugging/development. Let me know if you might use this [here](https://github.com/mqtt-viewer/mqtt-viewer/discussions/2). |
@@ -50,7 +53,7 @@ MQTT Viewer is built using [Wails](https://wails.io/), a Go-based application fr
 
 - [Go](https://golang.org/doc/install)
 - [Node.js](https://nodejs.org/en/download/)
-- [Wails v3](https://v3.wails.io/quick-start/installation/) (install via `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98`)
+- [Wails v3](https://v3.wails.io/quick-start/installation/) (install via `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98-tui`, matching the version pinned in go.mod)
 - [pnpm](https://pnpm.io/installation) (install via `npm install -g pnpm`)
 - [Just](https://github.com/casey/just?tab=readme-ov-file#cross-platform) - optional, but recommended for running commands in the project
 - [Atlas](https://github.com/ariga/atlas) - optional, only necessary if you need to create database migrations
@@ -63,11 +66,36 @@ MQTT Viewer is built using [Wails](https://wails.io/), a Go-based application fr
 4. Navigate to the frontend directory with `cd frontend`
 5. Install the Node.js dependencies with `pnpm install`
 6. Navigate back to the root directory with `cd ..`
-7. Run the application with `wails3 dev`
+7. Run the application with `just dev` (or `wails3 dev` if you don't use Just)
 
 If there are problems with Wails, try running `wails3 doctor` to check your installation.
 
 Please open an issue if you have any problems.
+
+### Common commands
+
+From the repository root:
+
+```sh
+just dev                 # run the app with hot reload
+just test                # run the Go tests
+just build               # package the app for your platform
+just new-migration NAME  # create a database migration (requires Atlas)
+```
+
+From the `frontend/` directory:
+
+```sh
+pnpm check          # svelte-check, keep at 0 errors
+pnpm test:run       # vitest unit tests
+pnpm storybook      # component library on port 6006
+pnpm ds:validate    # design-system validation (run by CI)
+pnpm test-storybook # Storybook interaction tests
+```
+
+`just dev` derives its dev-server port from the checkout path so parallel
+checkouts don't collide. See `docs/MULTI_AGENT_DEV.md` if you need to
+override it.
 
 ### Hot Reloading
 
@@ -79,6 +107,6 @@ Changes to the Go code will trigger a full rebuild which may take anywhere from 
 
 ## License
 
-MQTT Viewer is open-source under [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html).
+MQTT Viewer is open-source under [GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html).
 
-All features are currently available to use freely.
+All features are free to use.
