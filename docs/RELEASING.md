@@ -5,9 +5,11 @@ fires three workflows (mac / windows / linux) that build, sign, upload assets,
 and register the version with the portal. Nothing reaches users until you flip
 the `released` toggle in the portal admin.
 
-The `/release` skill drives this whole runbook (changelog promotion, release
-creation, workflow watching, and the go-live handoff). This doc is the
-reference it follows.
+The `/release` skill drives this whole runbook. Its first step is always a
+changelog draft presented for approval, so you see and shape what the release
+will say before any mechanics run; then changelog promotion, release creation,
+workflow watching, and the go-live handoff. This doc is the reference it
+follows.
 
 ## TL;DR
 

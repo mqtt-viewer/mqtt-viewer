@@ -26,6 +26,9 @@ or `.spec.json`. It is the design-system contract and its rules are
 enforced by CI (`design-system.yml` runs `pnpm ds:validate` and
 `pnpm test-storybook`).
 
+Read the root `AGENTS.md` too. It carries the always-binding writing-style
+contract (`docs/WRITING_STYLE.md`) for anything a user reads.
+
 ## Commands
 
 Backend (repo root):
@@ -82,7 +85,7 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 - Backend tests use `getTestApp(t)` with golden dirs under
   `backend/app/_test/<TestName>/`; keep new tests in that pattern.
 - Anything a user reads follows `docs/WRITING_STYLE.md`. Hard rules: no
-  emojis, no em dashes, first person singular, British spelling.
+  emojis, no em dashes, first person singular, British spelling, terse.
 - Changelog: every user-facing feature or fix MUST add a section to the
   unreleased entry in `frontend/src/changelog.ts` in the same PR (the
   `/changelog` skill has the format). If the change traces back to a
