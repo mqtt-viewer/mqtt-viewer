@@ -33,10 +33,12 @@ rather than silently moving).
 
 ## What is shared
 
-- The local test broker (`mqtt-test-broker` container on `localhost:1883`)
-  and `test.mosquitto.org`. Fine to share, but prefix your test topics with
-  something unique (for example the branch name) so parallel agents do not
-  read each other's traffic.
+- The local test broker (`mqtt-test-broker` container on `localhost:1883`
+  for mqtt and `localhost:9001` for websockets) and `test.mosquitto.org`.
+  The Go tests in `backend/mqtt` and `backend/app` need it running; start
+  it with `scripts/test-broker.sh up`. Fine to share, but prefix your test
+  topics with something unique (for example the branch name) so parallel
+  agents do not read each other's traffic.
 - The user's installed `/Applications/MQTT Viewer.app`. Dev builds use the
   bundle id `com.mqttviewer.MQTTViewer.dev` (`build/darwin/Info.dev.plist`)
   so LaunchServices never confuses a dev build with the installed app.

@@ -39,6 +39,27 @@ export class Subscription {
   }
 }
 
+export class SysMetricMapping {
+  id = 0;
+  createdAt: any = null;
+  updatedAt: any = null;
+  connectionId = 0;
+  metricKey = "";
+  label = "";
+  topic = "";
+  payloadPath = "";
+  unit = "";
+  sortOrder = 0;
+
+  static createFrom(source: any = {}) {
+    return new SysMetricMapping(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class PublishHistory {
   id = 0;
   connectionId = 0;

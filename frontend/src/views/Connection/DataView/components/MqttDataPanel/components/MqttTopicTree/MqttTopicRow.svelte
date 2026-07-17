@@ -18,6 +18,11 @@
   export let toggleExpansion: (expandKey: string) => void;
   export let onTopicSelect: () => void;
   export let highlightedTopicStore: HighlightedMqttTopicsStore;
+  // Set only by MqttTopicTree for the root-level `$SYS` row. When present, a
+  // hover-revealed "broker status" button is rendered. Undefined for every
+  // other row so no per-row listener/markup cost is incurred (see the tree-row
+  // performance rule in docs/broker-status-spec.md).
+  export let onOpenBrokerStatus: (() => void) | undefined = undefined;
 
   $: syntaxHighlightedMessage = !!message ? highlightJson(message) : "";
 
@@ -82,7 +87,7 @@
 
 <div
   class={twMerge(
-    "flex whitespace-nowrap cursor-pointer select-none",
+    "group relative flex whitespace-nowrap cursor-pointer select-none",
     "overflow-hidden min-w-0 w-full"
   )}
 >
@@ -136,6 +141,32 @@
         </span>
         <span>{messageCount}</span>
       </div>
+    {/if}
+    {#if onOpenBrokerStatus}
+      <!-- Inline, right after the count content, so it reads as attached to the
+           $SYS row rather than orphaned ~600px away at the far right edge.
+           Hover-revealed via the row's `group`; stopPropagation keeps it from
+           selecting the row. Only the $SYS row passes onOpenBrokerStatus, so no
+           other row renders it or pays any cost (no layout shift elsewhere). -->
+      <button
+        type="button"
+        aria-label="Broker status"
+        title="Broker status"
+        class={twMerge(
+          "ml-2 inline-flex items-center rounded p-[1px]",
+          "text-secondary-text hover:text-white-text hover:bg-hovered",
+          "opacity-0 pointer-events-none",
+          "group-hover:opacity-100 group-hover:pointer-events-auto",
+          // Reveal it for keyboard users when it's focused, otherwise a
+          // Tab-focused button stays invisible.
+          "focus-visible:opacity-100 focus-visible:pointer-events-auto"
+        )}
+        on:click|stopPropagation={onOpenBrokerStatus}
+        on:keypress|stopPropagation
+        on:keydown|stopPropagation
+      >
+        <Icon type="pulse" size={14} />
+      </button>
     {/if}
     {#if isDecodedProto}
       <span class="inline-block ml-2 mt-[1px]">
