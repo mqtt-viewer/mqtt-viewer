@@ -111,3 +111,26 @@ test("clear resets nodeCount and marks visibleDirty", () => {
   expect(model.topicCount).toBe(0);
   expect(model.visibleDirty).toBe(true);
 });
+
+test("retained: marks the exact topic, never its ancestors", () => {
+  const m = new TopicModel();
+  m.ingest("a/b/c", 1000, true);
+  const c = m.root.children.get("a")!.children.get("b")!.children.get("c")!;
+  expect(c.ownRetained).toBe(true);
+  expect(m.root.children.get("a")!.ownRetained).toBe(false);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(false);
+});
+
+test("retained: a tombstone clears the mark", () => {
+  const m = new TopicModel();
+  m.ingest("a", 1000, true);
+  m.ingest("a", 2000, false);
+  expect(m.root.children.get("a")!.ownRetained).toBe(false);
+});
+
+test("retained: an ordinary message leaves the mark alone", () => {
+  const m = new TopicModel();
+  m.ingest("a", 1000, true);
+  m.ingest("a", 2000);
+  expect(m.root.children.get("a")!.ownRetained).toBe(true);
+});

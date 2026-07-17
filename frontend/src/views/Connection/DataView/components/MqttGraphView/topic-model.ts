@@ -21,6 +21,12 @@ export class TopicNode {
   ownLastMsg = 0;
   ownCount = 0;
 
+  // does this exact topic hold a retained message, as far as we know? Drives
+  // the retained marker only; the backend is authoritative for counting and
+  // clearing. Never aggregated up the tree: retained is a property of the
+  // topic a message was published to, not of its ancestors.
+  ownRetained = false;
+
   // subtree aggregate (this node + all descendants)
   agg: DecayScore = { score: 0, lastMs: 0 };
   aggLastMsg = 0;
@@ -98,8 +104,15 @@ export class TopicModel {
     this.structureGen++;
   }
 
-  // Record a message arrival on `topic` at time `tMs`.
-  ingest(topic: string, tMs: number): void {
+  /**
+   * Record a message arrival on `topic` at time `tMs`.
+   *
+   * `retained` says what the message implies about the topic's retained state:
+   * true if it carries a retained value, false if it is the zero-length
+   * retained tombstone that clears one, and undefined if it says nothing (an
+   * ordinary message). Mirrors the rule the backend applies.
+   */
+  ingest(topic: string, tMs: number, retained?: boolean): void {
     const levels = topic.split("/");
     let node = this.root;
     for (let i = 0; i < levels.length; i++) {
@@ -132,6 +145,7 @@ export class TopicModel {
     bumpScore(node.own, tMs, this.tauMs);
     node.ownLastMsg = tMs;
     node.ownCount++;
+    if (retained !== undefined) node.ownRetained = retained;
   }
 
   // current subtree rate-score, decayed to now

@@ -15,6 +15,9 @@
   export let isExpanded: boolean;
   export let isSelected: boolean;
   export let isDecodedProto: boolean = false;
+  // Whether this topic holds a retained message, as far as we know. Drives the
+  // retained marker only; the backend is authoritative for counting/clearing.
+  export let isRetained: boolean = false;
   export let toggleExpansion: (expandKey: string) => void;
   export let onTopicSelect: () => void;
   export let highlightedTopicStore: HighlightedMqttTopicsStore;
@@ -85,7 +88,12 @@
   });
 </script>
 
+<!-- data-topic is how the tree's single ContextMenu resolves which row was
+     right-clicked. It sits on the outer row so a right-click anywhere on the
+     row (including the chevron) finds it, and costs no per-row listener: one
+     menu covers the whole virtualised list. -->
 <div
+  data-topic={topic}
   class={twMerge(
     "group relative flex whitespace-nowrap cursor-pointer select-none",
     "overflow-hidden min-w-0 w-full"
@@ -120,6 +128,17 @@
     on:keypress={onTopicSelect}
   >
     <p class="font-semibold text-white-text mr-2">{topicLevel}</p>
+    {#if isRetained}
+      <!-- Retained marker. `secondary` matches how the message timeline colours
+           retained messages, so the two surfaces agree. Deliberately quiet: it
+           is a property of the topic, not a call to action. Sized well under the
+           text line-height so it cannot alter the fixed 19px row height the
+           virtual list depends on. -->
+      <span
+        title="Has a retained message"
+        class="mr-2 size-[5px] shrink-0 self-center rounded-full bg-secondary"
+      ></span>
+    {/if}
     {#if subtopicCount > 0}
       <div class="w-3 min-w-3 ml-[2px] relative">
         <div class="absolute top-[4px] left-0">

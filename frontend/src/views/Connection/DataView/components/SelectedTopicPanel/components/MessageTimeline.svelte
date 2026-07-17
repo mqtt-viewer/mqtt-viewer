@@ -637,7 +637,7 @@
      theme, so unselected markers take the primary colour at reduced
      opacity; selection and retained rules below override it. */
   .vis-item.vis-box {
-    background-color: var(--primary);
+    background-color: var(--color-primary);
     opacity: 0.55;
   }
 
@@ -647,7 +647,7 @@
   }
 
   .vis-item.vis-box.retained {
-    background-color: var(--secondary);
+    background-color: var(--color-secondary);
   }
 
   .vis-item.vis-box.vis-selected {

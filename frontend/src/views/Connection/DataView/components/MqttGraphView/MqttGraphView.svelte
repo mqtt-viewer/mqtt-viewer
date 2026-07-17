@@ -3,7 +3,15 @@
    *  Injectable so storybook / browser harnesses can drive synthetic traffic. */
   export interface GraphMessageSource {
     subscribe: (
-      onMessages: (msgs: Array<{ topic: string; timeMs?: number }>) => void,
+      onMessages: (
+        msgs: Array<{
+          topic: string;
+          timeMs?: number;
+          /** what this message implies about the topic's retained state;
+           *  undefined means it says nothing (see TopicModel.ingest) */
+          retained?: boolean;
+        }>
+      ) => void,
       onClear: () => void
     ) => () => void;
   }
@@ -36,6 +44,15 @@
     rateFromScore,
   } from "./cooldown";
   import type { SortKey } from "./tidy-layout";
+  import { get } from "svelte/store";
+  import ContextMenu from "@/components/ContextMenu/ContextMenu.svelte";
+  import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
+  import type { MqttDataStore } from "../MqttDataPanel/stores/mqtt-data";
+  import { retainedStateOf } from "../MqttDataPanel/stores/mqtt-data";
+  import { findTopicPayload, formatPayloadForCopy } from "../../payload-copy";
+  import { copyToClipboard } from "@/util/copy";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
   export let selectedTopicStore: SelectedTopicStore;
@@ -44,6 +61,19 @@
   export let width = 0;
   /** override the live message feed (storybook / dev harnesses) */
   export let messageSource: GraphMessageSource | undefined = undefined;
+  /**
+   * The list view's tree store, read once when the context menu opens so
+   * "copy payload" produces the same text here as it does in the list.
+   *
+   * Deliberately not subscribed to: the graph keeps its own model and its own
+   * feed so store churn cannot touch the render path. This is an on-demand
+   * lookup for a user-initiated action, nothing more.
+   */
+  export let mqttDataStore: MqttDataStore | null = null;
+  export let copyTopicPath: (topic: string) => void = () => {};
+  export let exportTopicMessages: (topic: string) => void = () => {};
+  export let onClearRetained: (topic: string) => void = () => {};
+  export let onClearRetainedBelow: (prefix: string) => void = () => {};
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
@@ -175,7 +205,7 @@
           const t = n.latestMessageTime
             ? new Date(n.latestMessageTime).getTime()
             : Date.now();
-          model.ingest(n.topic, t);
+          model.ingest(n.topic, t, n.isRetained);
         }
         walk(n.children);
       }
@@ -195,6 +225,9 @@
             minimapBgAlpha: 0.7,
             minimapBorder: 0xb8b8c0,
             pulse: 0x2a2a33,
+            // --color-secondary (:root.light in style.css), the same colour the
+            // message timeline gives retained messages
+            retained: 0xdfa900,
           }
         : {
             text: 0xbdb7b0,
@@ -203,6 +236,8 @@
             minimapBgAlpha: 0.32,
             minimapBorder: 0x8a8a8a,
             pulse: 0xffffff,
+            // --color-secondary (:root in style.css)
+            retained: 0xf7d66a,
           }
     );
   };
@@ -234,6 +269,73 @@
     y: number;
   }
   let hover: HoverInfo | null = null;
+
+  // ---- context menu ----
+  // The menu opens at the pointer and stays there rather than tracking the
+  // node, because node positions are not stable: relayout, zoom-to-subtree and
+  // follow-hottest all move the camera, so an anchored menu would drift out
+  // from under the pointer while open.
+  let menuTopic: string | null = null;
+  let menuHasPayload = false;
+  let menuIsRetained = false;
+  let menuRetainedBelowCount = 0;
+
+  /**
+   * Resolve the node under a right-click, and set up what the menu renders.
+   * Returns false over empty canvas so no menu opens.
+   *
+   * The target is hit-tested here, from the native event, rather than coming
+   * from a Pixi `rightclick` handler: Pixi's synthetic event and the browser's
+   * contextmenu event have no guaranteed order, so resolving on one and opening
+   * on the other would be a race. This is also exactly how the list view
+   * resolves its target.
+   */
+  const resolveGraphMenuTarget = (event: MouseEvent) => {
+    if (!renderer) return false;
+    const rect = canvasEl.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const topic = renderer.topicAt(x, y);
+    if (topic === null) return false;
+
+    const node = findNode(topic);
+    menuTopic = topic;
+    menuIsRetained = node?.ownRetained ?? false;
+    // A node with no traffic of its own is a structural level in the path, so
+    // it has no payload to copy or export, matching the list view's rule.
+    menuHasPayload =
+      (node?.ownCount ?? 0) > 0 &&
+      mqttDataStore !== null &&
+      findTopicPayload(get(mqttDataStore), topic) !== null;
+    menuRetainedBelowCount = 0;
+    GetRetainedTopicsUnderPrefix(connection.connectionDetails.id, topic)
+      .then((topics) => {
+        if (menuTopic === topic) {
+          menuRetainedBelowCount = topics.filter((t) => t !== topic).length;
+        }
+      })
+      .catch(() => {
+        // no count means the bulk action stays hidden; the rest still works
+      });
+    return true;
+  };
+
+  const copyGraphPayload = async (topic: string) => {
+    if (mqttDataStore === null) return;
+    const payload = findTopicPayload(get(mqttDataStore), topic);
+    if (payload === null) return;
+    try {
+      await copyToClipboard(formatPayloadForCopy(payload));
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to copy payload",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
 
   const findNode = (topic: string): TopicNode | null => {
     let n = model.root;
@@ -344,7 +446,15 @@
     subscribe: (onMessages, onClear) => {
       const unMsgs = Events.On(connection.eventSet.mqttMessages, (e) => {
         const messages: mqtt.MqttMessage[] = e.data;
-        onMessages(messages);
+        // retainedStateOf is shared with the list view's store so both views
+        // read the retained flag by exactly the same rule.
+        onMessages(
+          messages.map((m) => ({
+            topic: m.topic,
+            timeMs: m.timeMs,
+            retained: retainedStateOf(m),
+          }))
+        );
       });
       const unClear = Events.On(connection.eventSet.mqttClearHistory, () =>
         onClear()
@@ -391,7 +501,8 @@
     unsubSource = (messageSource ?? wailsSource).subscribe(
       (msgs) => {
         ingestCounter += msgs.length;
-        for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
+        for (const m of msgs)
+          model.ingest(m.topic, m.timeMs || Date.now(), m.retained);
       },
       () => {
         model.clear();
@@ -669,7 +780,28 @@
     bind:clientHeight={containerH}
     class="relative min-h-0 w-full grow bg-elevation-0"
   >
-    <canvas bind:this={canvasEl} class="block h-full w-full"></canvas>
+    <!-- portal={containerEl}, never document.body: fullscreen is requested on
+         containerEl's parent, so a body-portalled menu would vanish the moment
+         the user goes fullscreen. -->
+    <ContextMenu portal={containerEl} onOpen={resolveGraphMenuTarget}>
+      <canvas slot="trigger" bind:this={canvasEl} class="block h-full w-full"
+      ></canvas>
+      <svelte:fragment slot="menu-content">
+        {#if menuTopic !== null}
+          <TopicContextMenu
+            topic={menuTopic}
+            hasPayload={menuHasPayload}
+            isRetained={menuIsRetained}
+            retainedBelowCount={menuRetainedBelowCount}
+            onCopyTopic={copyTopicPath}
+            onCopyPayload={copyGraphPayload}
+            onExport={exportTopicMessages}
+            {onClearRetained}
+            {onClearRetainedBelow}
+          />
+        {/if}
+      </svelte:fragment>
+    </ContextMenu>
     {#if paused}
       <div
         class="pointer-events-none absolute top-1 rounded border border-outline bg-elevation-1 px-1.5 py-0.5 text-xs text-secondary-text"

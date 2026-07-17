@@ -16,11 +16,35 @@ export type MqttData = {
     latestMessageTime: Date;
     message?: string; // byte array
     isDecodedProto: boolean;
+    // Whether this topic currently holds a retained message, as far as we
+    // know. Mirrors the backend's retained index (see mqtt.MessageHistory) so
+    // the tree can show a retained marker without a binding call per row. The
+    // backend is authoritative for counting and clearing; this is for display.
+    isRetained: boolean;
     children: MqttData;
   };
 };
 
 export type MqttDataStore = ReturnType<typeof createMqttDataStore>;
+
+/**
+ * What a message says about its topic's retained state, mirroring the rule the
+ * backend applies (see mqtt.MessageHistory's retained field):
+ * a retained message with a payload means the topic holds a retained value, a
+ * retained zero-length payload is the MQTT tombstone that clears one, and a
+ * non-retained message says nothing either way.
+ *
+ * Returns undefined for "no change".
+ */
+export const retainedStateOf = (
+  message: mqtt.MqttMessage
+): boolean | undefined => {
+  if (!message.retain) return undefined;
+  // payload crosses the bridge base64-encoded, so an empty string is a
+  // zero-length payload.
+  const payload = (message.payload as unknown as string) ?? "";
+  return payload.length > 0;
+};
 
 export const createMqttDataStore = (
   highlightedTopicStore: HighlightedMqttTopicsStore,
@@ -51,15 +75,26 @@ export const createMqttDataStore = (
   const processMessages = (messages: mqtt.MqttMessage[]) => {
     const latestByTopic = new Map<
       string,
-      { last: mqtt.MqttMessage; count: number }
+      { last: mqtt.MqttMessage; count: number; retained?: boolean }
     >();
     for (const message of messages) {
       const existing = latestByTopic.get(message.topic);
       if (existing === undefined) {
-        latestByTopic.set(message.topic, { last: message, count: 1 });
+        latestByTopic.set(message.topic, {
+          last: message,
+          count: 1,
+          retained: retainedStateOf(message),
+        });
       } else {
         existing.last = message;
         existing.count += 1;
+        // Retained state is tracked across the whole batch rather than taken
+        // from the last message, because collapsing to the last message would
+        // lose a state change: a retained tombstone followed by ordinary
+        // traffic on the same topic within one drain would leave the topic
+        // still marked retained.
+        const retained = retainedStateOf(message);
+        if (retained !== undefined) existing.retained = retained;
       }
     }
 
@@ -70,7 +105,7 @@ export const createMqttDataStore = (
     }> = [];
 
     update((mqttData) => {
-      for (const { last: message, count } of latestByTopic.values()) {
+      for (const { last: message, count, retained } of latestByTopic.values()) {
         const topicLevels = message.topic.split("/");
         const timestamp = new Date(message.timeMs);
         const decodedMessage = base64ToUtf8(
@@ -96,7 +131,8 @@ export const createMqttDataStore = (
           decodedMessage,
           isDecodedProto,
           timestamp,
-          count
+          count,
+          retained
         );
       }
       return mqttData;
@@ -116,7 +152,10 @@ export const createMqttDataStore = (
     message: string,
     isDecodedProto: boolean,
     timestamp: Date,
-    count: number
+    count: number,
+    // undefined means "this message says nothing about retained state"; only
+    // the topic the message was published to is affected, never its ancestors.
+    retained: boolean | undefined
   ): boolean => {
     const topicLevel = topicLevels[currentTopicLevel];
     if (mqttData[topicLevel] !== undefined) {
@@ -125,6 +164,9 @@ export const createMqttDataStore = (
         mqttData[topicLevel].message = message;
         mqttData[topicLevel].isDecodedProto = isDecodedProto;
         mqttData[topicLevel].latestMessageTime = timestamp;
+        if (retained !== undefined) {
+          mqttData[topicLevel].isRetained = retained;
+        }
 
         return false;
       }
@@ -135,7 +177,8 @@ export const createMqttDataStore = (
         message,
         isDecodedProto,
         timestamp,
-        count
+        count,
+        retained
       );
       mqttData[topicLevel].isDecodedProto = isDecodedProto;
       mqttData[topicLevel].messageCount += count;
@@ -153,6 +196,7 @@ export const createMqttDataStore = (
         messageCount: count,
         topic,
         isDecodedProto,
+        isRetained: retained ?? false,
         message,
         children: {},
         latestMessageTime: timestamp,
@@ -168,7 +212,8 @@ export const createMqttDataStore = (
       message,
       false,
       timestamp,
-      count
+      count,
+      retained
     );
     const topic = topicLevels.slice(0, currentTopicLevel + 1).join("/");
     mqttData[topicLevel] = {
@@ -178,6 +223,9 @@ export const createMqttDataStore = (
       topic,
       message: undefined,
       isDecodedProto: false,
+      // An intermediate level is not the topic the message was published to,
+      // so it holds no retained value of its own.
+      isRetained: false,
       children,
       latestMessageTime: timestamp,
     };

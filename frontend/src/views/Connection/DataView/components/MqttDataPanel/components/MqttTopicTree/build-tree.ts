@@ -13,6 +13,7 @@ export type TreeRow = {
   countSubtopicTotal: number;
   countMessage: number;
   message?: string;
+  isRetained: boolean;
 };
 
 interface BuildTreeParams {
@@ -69,6 +70,7 @@ const buildRows = (params: BuildRowParams) => {
       countSubtopicTotal: topicData.subtopicCount,
       countMessage: topicData.messageCount,
       isExpanded: thisRowIsExpanded,
+      isRetained: topicData.isRetained,
     });
 
     if (thisRowIsExpanded) {

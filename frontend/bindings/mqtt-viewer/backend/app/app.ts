@@ -122,6 +122,10 @@ export function DeleteRetainedMessage(connId: number, topic: string): $Cancellab
     return $Call.ByID(1837950630, connId, topic);
 }
 
+export function DeleteRetainedMessages(connId: number, topics: string[]): $CancellablePromise<void> {
+    return $Call.ByID(1238327631, connId, topics);
+}
+
 export function DeleteSubscription(connId: number, id: number): $CancellablePromise<void> {
     return $Call.ByID(1291658, connId, id);
 }
@@ -289,6 +293,19 @@ export function GetReceivedMessageById(connectionID: number, topic: string, id: 
         $result[0] = $$createType16($result[0]);
         return $result;
     });
+}
+
+/**
+ * GetRetainedTopicsUnderPrefix returns the known-retained topics at or below a
+ * topic prefix, sorted. It backs the count shown before a bulk retained
+ * cleanup.
+ *
+ * "Known" is doing real work here: this reflects the retained messages this
+ * session has seen, not the broker's true retained set. UI copy must not
+ * present it as complete.
+ */
+export function GetRetainedTopicsUnderPrefix(connId: number, prefix: string): $CancellablePromise<string[]> {
+    return $Call.ByID(570234138, connId, prefix);
 }
 
 /**

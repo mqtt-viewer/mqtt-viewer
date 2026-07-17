@@ -200,3 +200,84 @@ describe("processMessages batching", () => {
     unsub();
   });
 });
+
+const makeRetainedMessage = (
+  id: string,
+  topic: string,
+  payload: string,
+  timeMs: number
+): mqtt.MqttMessage =>
+  ({
+    ...makeMessage(id, topic, payload, timeMs),
+    retain: true,
+  }) as any;
+
+describe("retained tracking", () => {
+  it("marks a topic retained from a retained message with a payload", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    expect(get(store).home.children.a.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("unmarks a topic on a zero-length retained message", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    fireMessages([makeRetainedMessage("2", "home/a", "", 2)]);
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    unsub();
+  });
+
+  it("leaves retained state alone for non-retained messages", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    // ordinary traffic says nothing about the retained value, so it must not
+    // clear the mark
+    fireMessages([makeMessage("2", "home/a", "live", 2)]);
+    expect(get(store).home.children.a.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("never marks intermediate levels retained", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a/b", "value", 1)]);
+    expect(get(store).home.isRetained).toBe(false);
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    expect(get(store).home.children.a.children.b.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("applies a tombstone that arrives mid-batch, not just the last message", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    // A batch is collapsed to its last message per topic. If retained state
+    // came from that last message alone, the tombstone here would be lost and
+    // the topic would stay marked retained.
+    fireMessages([
+      makeRetainedMessage("2", "home/a", "", 2),
+      makeMessage("3", "home/a", "live", 3),
+    ]);
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    unsub();
+  });
+});

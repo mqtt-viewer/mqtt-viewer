@@ -232,6 +232,50 @@ func (a *App) DeleteRetainedMessage(connId uint, topic string) error {
 	return nil
 }
 
+// GetRetainedTopicsUnderPrefix returns the known-retained topics at or below a
+// topic prefix, sorted. It backs the count shown before a bulk retained
+// cleanup.
+//
+// "Known" is doing real work here: this reflects the retained messages this
+// session has seen, not the broker's true retained set (see
+// mqtt.MessageHistory's retained field). UI copy must not present it as
+// complete.
+func (a *App) GetRetainedTopicsUnderPrefix(connId uint, prefix string) ([]string, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection.MqttManager.MessageHistory.RetainedUnderPrefix(prefix), nil
+}
+
+// DeleteRetainedMessages clears the retained message on each of the given
+// topics by publishing a zero-length retained payload to it.
+//
+// It takes an explicit topic list rather than a prefix so the caller clears
+// exactly the topics it counted and showed the user. Re-resolving a prefix here
+// would race live traffic: a topic retained between the confirmation opening
+// and the user accepting it would be swept up silently, making the number they
+// agreed to a lie.
+//
+// Every topic is attempted even if earlier ones fail, because a half-cleared
+// branch that reports nothing is worse than a full attempt that reports what
+// broke. The error names how many succeeded and how many failed.
+func (a *App) DeleteRetainedMessages(connId uint, topics []string) error {
+	var failed []string
+	for _, topic := range topics {
+		if err := a.DeleteRetainedMessage(connId, topic); err != nil {
+			failed = append(failed, topic)
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf(
+			"cleared %d of %d retained messages, %d failed (first failure: %s)",
+			len(topics)-len(failed), len(topics), len(failed), failed[0],
+		)
+	}
+	return nil
+}
+
 func (a *App) GetMatchingSubscriptionForTopic(connId uint, topic string) (*models.Subscription, error) {
 	appConnection, err := getConnectedConnection(a, connId)
 	if err != nil {
