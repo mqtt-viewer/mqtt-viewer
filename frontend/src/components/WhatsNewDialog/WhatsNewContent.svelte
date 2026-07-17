@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Browser } from "@wailsio/runtime";
   import Button from "@/components/Button/Button.svelte";
   import type { ChangelogEntry } from "@/changelog";
 
@@ -58,7 +59,18 @@
         {#each entry.sections as section}
           <div class="flex flex-col gap-[2px] border-l-2 border-outline pl-3">
             <span class="text-emphasis">{section.title}</span>
-            <span class="text-secondary-text text-base">{section.body}</span>
+            <span class="text-secondary-text text-base"
+              >{section.body}{#if section.thanks?.length}
+                {" Thanks "}{#each section.thanks as t, i}{#if i > 0}{i ===
+                    (section.thanks?.length ?? 0) - 1
+                      ? " and "
+                      : ", "}{/if}<a
+                    href={t.url}
+                    class="text-primary hover:underline"
+                    on:click|preventDefault={() => Browser.OpenURL(t.url)}
+                    >@{t.name}</a
+                  >{/each}.{/if}</span
+            >
           </div>
         {/each}
       </div>
