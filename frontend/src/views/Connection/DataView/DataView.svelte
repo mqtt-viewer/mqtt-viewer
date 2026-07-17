@@ -15,12 +15,15 @@
     DeleteRetainedMessage,
     DeleteRetainedMessages,
     ExportTopicMessages,
+    ExportTopicMessagesData,
     GetRetainedTopicsUnderPrefix,
-    OpenChartWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
   import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
-  import { writable } from "svelte/store";
+  import { writable, get } from "svelte/store";
   import { copyToClipboard } from "@/util/copy";
+  import { openChartWindow } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
+  import envStore from "@/stores/env";
 
   export let connection: Connection;
 
@@ -190,6 +193,23 @@
 
   const exportTopicMessages = async (topic: string) => {
     try {
+      if (get(envStore).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportTopicMessagesData(
+          connection.connectionDetails.id,
+          topic
+        );
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportTopicMessages(
         connection.connectionDetails.id,
         topic
@@ -286,7 +306,7 @@
             ? "3"
             : "5"}
           openChartWindow={(topic, fields) =>
-            OpenChartWindow({
+            openChartWindow({
               connectionId: connection.connectionDetails.id,
               topic,
               fields,

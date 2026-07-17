@@ -16,11 +16,15 @@
   import {
     ClearConnectionHistory,
     ExportAllMessages,
-    OpenBrokerStatusWindow,
+    ExportAllMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import SearchAndHistory from "./SearchAndHistory.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import { get } from "svelte/store";
+  import { openBrokerStatusWindow } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
+  import envStore from "@/stores/env";
 
   export let getAllTopics: () => string[];
   export let searchStore: SearchStore;
@@ -60,6 +64,20 @@
 
   $: onExportDataClick = async () => {
     try {
+      if (get(envStore).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportAllMessagesData(connectionId);
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportAllMessages(connectionId);
       if (path !== "") {
         addToast({
@@ -113,7 +131,7 @@
     </Tooltip>
 
     <Tooltip placement="bottom">
-      <Button on:click={() => OpenBrokerStatusWindow(connectionId)}
+      <Button on:click={() => openBrokerStatusWindow(connectionId)}
         ><Icon type="pulse" width={20} height={20} /></Button
       >
       <span slot="tooltip-content">Broker status</span>

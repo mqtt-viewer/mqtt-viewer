@@ -13,6 +13,26 @@
         }
       } catch (e) {}
     </script>
+    <script>
+      // Server mode pushes backend->frontend events over a WebSocket
+      // bootstrapped by /wails/custom.js, which the server serves but does not
+      // auto-inject; the native webview has no such route. Probe for it and
+      // append the script only where it exists, before the main module so the
+      // event bridge is up first. See frontend/AGENTS.md "Driving the app from
+      // a browser".
+      (function () {
+        try {
+          fetch("/wails/custom.js", { method: "HEAD" })
+            .then(function (res) {
+              if (!res.ok) return;
+              var script = document.createElement("script");
+              script.src = "/wails/custom.js";
+              document.head.appendChild(script);
+            })
+            .catch(function () {});
+        } catch (e) {}
+      })();
+    </script>
     <link href="./src/style.css" rel="stylesheet" />
     <title>MQTT Viewer</title>
   </head>

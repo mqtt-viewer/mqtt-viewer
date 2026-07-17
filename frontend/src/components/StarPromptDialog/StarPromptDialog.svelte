@@ -8,7 +8,7 @@
 <script lang="ts">
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import Button from "@/components/Button/Button.svelte";
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import {
     whatsNewResolved,
     whatsNewOpen,
@@ -72,7 +72,7 @@
   };
 
   const onStar = () => {
-    Browser.OpenURL(REPO_URL);
+    openExternal(REPO_URL);
     starPromptOpen.set(false);
   };
 

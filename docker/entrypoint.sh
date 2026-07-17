@@ -13,7 +13,10 @@
 set -eu
 
 DATA_DIR="${MQTT_VIEWER_DATA_DIR:-/data}"
-MACHINE_ID_FILE="$DATA_DIR/machine-id"
+# Always /data/machine-id: the /etc/machine-id and /var/lib/dbus/machine-id
+# symlinks baked into the image point there, regardless of any
+# MQTT_VIEWER_DATA_DIR override.
+MACHINE_ID_FILE="/data/machine-id"
 
 mkdir -p "$DATA_DIR" 2>/dev/null || true
 

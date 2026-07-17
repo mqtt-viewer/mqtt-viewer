@@ -12,7 +12,7 @@
   import { buildTree, type TreeRow } from "./build-tree";
   import type { HighlightedMqttTopicsStore } from "../../stores/highlighted-topics";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
-  import { OpenBrokerStatusWindow } from "bindings/mqtt-viewer/backend/app/app";
+  import { openBrokerStatusWindow } from "@/util/popout";
 
   const connectionId = getConnectionIdContext();
 
@@ -55,7 +55,7 @@
         toggleExpansion={expandedTopicsStore.toggleMqttTopicExpansion}
         onTopicSelect={() => onTopicSelect(item)}
         onOpenBrokerStatus={item.levelCount === 0 && item.topicLevel === "$SYS"
-          ? () => OpenBrokerStatusWindow(connectionId)
+          ? () => openBrokerStatusWindow(connectionId)
           : undefined}
         {highlightedTopicStore}
       />
