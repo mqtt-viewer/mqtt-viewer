@@ -83,6 +83,12 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
   `backend/app/_test/<TestName>/`; keep new tests in that pattern.
 - Anything a user reads follows `docs/WRITING_STYLE.md`. Hard rules: no
   emojis, no em dashes, first person singular, British spelling.
+- Changelog: every user-facing feature or fix MUST add a section to the
+  unreleased entry in `frontend/src/changelog.ts` in the same PR (the
+  `/changelog` skill has the format). If the change traces back to a
+  GitHub issue, discussion, or comment, credit the person with a
+  `thanks` link to that thread (never to a bare profile unless there is
+  no single thread, and never credit the maintainer, samfweb).
 
 ## Performance bar
 
