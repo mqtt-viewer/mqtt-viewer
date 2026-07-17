@@ -16,6 +16,9 @@ var (
 	CloudUsername          = "dev-username"
 	CloudPassword          = "dev-password"
 	IsAppImage             = "false"
+	// IsServerBuild is true when the binary is compiled with -tags server
+	// (the headless browser/Docker deployment). Set by server_build.go.
+	IsServerBuild = false
 )
 
 func init() {
