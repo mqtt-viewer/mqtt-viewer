@@ -1,0 +1,35 @@
+# Example compose file for MQTT Viewer's web/server image.
+#
+# Copy this file (drop the .example) and adjust the port/volume as needed:
+#   cp docker/docker-compose.example.yml docker-compose.yml
+#   docker compose -f docker/docker-compose.example.yml up -d
+#
+# There is no built-in authentication in the web UI: anyone who can reach
+# the published port can see and use your saved connections, including
+# decrypted broker credentials. Keep this on a trusted network, or put an
+# authenticating reverse proxy (Caddy, Traefik, nginx, Authelia, a
+# Cloudflare tunnel, etc.) in front of it. Do not expose the port directly
+# to the internet.
+
+services:
+  mqtt-viewer:
+    image: ghcr.io/mqtt-viewer/mqtt-viewer:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - mqtt-viewer-data:/data
+    environment:
+      # Uncomment to change the in-container port; update the port mapping
+      # above to match if you do.
+      # WAILS_SERVER_PORT: "8080"
+      WAILS_SERVER_HOST: "0.0.0.0"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  mqtt-viewer-data:
