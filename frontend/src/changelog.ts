@@ -132,6 +132,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Light mode looks right everywhere",
+        body: "Charts, the message timeline and a few icons were keeping their dark colours in light mode. They all follow the theme properly now.",
+      },
+      {
         title: "Chart and dropdown fixes",
         body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
         thanks: [
@@ -153,7 +157,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "July 2026",
     headline: "MQTT Viewer 1.0 is here",
     intro:
-      "After years of betas, MQTT Viewer is officially 1.0. Thanks for sticking with it. The big new features (charting, collections, bounded memory, image previews) arrived in 0.7.0, so have a look at that tab too. Here's what 1.0 adds on top.",
+      "After years of betas, MQTT Viewer is officially 1.0. The big new features (charting, collections, bounded memory, image previews) arrived in 0.7.0, so have a look at that tab too. Here's what 1.0 adds on top.",
     sections: [
       {
         title: "Release notes",
@@ -171,7 +175,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
     ],
     outro:
-      "Found a bug or a rough edge? Use the Feedback button, I really want to know.",
+      "Found a bug or a rough edge? Use the Feedback button, I want to know.",
   },
   {
     version: "0.7.0",
@@ -181,6 +185,20 @@ export const CHANGELOG: ChangelogEntry[] = [
     intro:
       "A big one: charting, collections, bounded memory, image previews, and a new engine under the hood.",
     sections: [
+      {
+        title: "Light mode",
+        body: "The app now has a proper light theme, with a toggle that remembers your choice.",
+        thanks: [
+          {
+            name: "oeed",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/18",
+          },
+          {
+            name: "juggledad",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/21",
+          },
+        ],
+      },
       {
         title: "Topic charting",
         body: "Chart numeric payload fields over time, live, with a pop-out window.",
