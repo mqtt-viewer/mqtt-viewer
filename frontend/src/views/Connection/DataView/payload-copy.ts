@@ -20,6 +20,22 @@ export const formatPayloadForCopy = (payload: string): string => {
   return formatPayload(payload, "json-prettier");
 };
 
+/** Walk a full topic path to its node, or null if it isn't in the tree. */
+const findTopicNode = (
+  data: MqttData,
+  topic: string
+): MqttData[string] | null => {
+  const levels = topic.split("/");
+  let current: MqttData | undefined = data;
+  for (let i = 0; i < levels.length; i++) {
+    const node: MqttData[string] | undefined = current?.[levels[i]];
+    if (node === undefined) return null;
+    if (i === levels.length - 1) return node;
+    current = node.children;
+  }
+  return null;
+};
+
 /**
  * Find a topic's latest payload in the tree store.
  *
@@ -34,31 +50,12 @@ export const formatPayloadForCopy = (payload: string): string => {
 export const findTopicPayload = (
   data: MqttData,
   topic: string
-): string | null => {
-  const levels = topic.split("/");
-  let current: MqttData | undefined = data;
-  for (let i = 0; i < levels.length; i++) {
-    const node: MqttData[string] | undefined = current?.[levels[i]];
-    if (node === undefined) return null;
-    if (i === levels.length - 1) return node.message ?? null;
-    current = node.children;
-  }
-  return null;
-};
+): string | null => findTopicNode(data, topic)?.message ?? null;
 
 /**
  * Whether a topic holds a retained message, as far as the tree store knows.
  * Used to decide whether the clear action is enabled. The backend is
  * authoritative for counting and clearing; this only drives the menu.
  */
-export const findTopicIsRetained = (data: MqttData, topic: string): boolean => {
-  const levels = topic.split("/");
-  let current: MqttData | undefined = data;
-  for (let i = 0; i < levels.length; i++) {
-    const node: MqttData[string] | undefined = current?.[levels[i]];
-    if (node === undefined) return false;
-    if (i === levels.length - 1) return node.isRetained;
-    current = node.children;
-  }
-  return false;
-};
+export const findTopicIsRetained = (data: MqttData, topic: string): boolean =>
+  findTopicNode(data, topic)?.isRetained ?? false;

@@ -836,7 +836,6 @@ const propDefaults: Record<string, () => unknown> = {
   defaultTab: () => 0,
   defaultValue: () => "mqtt",
   defaultValueText: () => "mqtt",
-  deleteRetainedMessage: () => asyncNoop,
   disabled: () => false,
   errorMessage: () => "Field is required",
   expandedTopicsStore: () => {
@@ -845,6 +844,11 @@ const propDefaults: Record<string, () => unknown> = {
     return store;
   },
   exportTopicMessages: () => asyncNoop,
+  copyTopicPath: () => noop,
+  copyPayload: () => noop,
+  getTopicPayload: () => () => null,
+  onClearRetained: () => noop,
+  onClearRetainedBelow: () => noop,
   feedbackText: () => "Copied",
   firstConnectedAtMs: () => now - 600000,
   forceOpen: () => true,

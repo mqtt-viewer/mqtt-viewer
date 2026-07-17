@@ -44,14 +44,9 @@
     rateFromScore,
   } from "./cooldown";
   import type { SortKey } from "./tidy-layout";
-  import { get } from "svelte/store";
   import ContextMenu from "@/components/ContextMenu/ContextMenu.svelte";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
-  import type { MqttDataStore } from "../MqttDataPanel/stores/mqtt-data";
   import { retainedStateOf } from "../MqttDataPanel/stores/mqtt-data";
-  import { findTopicPayload, formatPayloadForCopy } from "../../payload-copy";
-  import { copyToClipboard } from "@/util/copy";
-  import { addToast } from "@/components/Toast/Toast.svelte";
   import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
@@ -62,21 +57,26 @@
   /** override the live message feed (storybook / dev harnesses) */
   export let messageSource: GraphMessageSource | undefined = undefined;
   /**
-   * The list view's tree store, read once when the context menu opens so
-   * "copy payload" produces the same text here as it does in the list.
+   * A topic's latest payload, or null if it has none. Called only when the
+   * context menu opens, to decide whether payload actions apply.
    *
-   * Deliberately not subscribed to: the graph keeps its own model and its own
-   * feed so store churn cannot touch the render path. This is an on-demand
-   * lookup for a user-initiated action, nothing more.
+   * A function rather than the tree store itself: the graph keeps its own model
+   * and its own feed so store churn cannot reach the render path, and the copy
+   * behaviour then lives in one place shared with the list rather than being
+   * reimplemented here.
    */
-  export let mqttDataStore: MqttDataStore | null = null;
+  export let getTopicPayload: (topic: string) => string | null = () => null;
   export let copyTopicPath: (topic: string) => void = () => {};
+  export let copyPayload: (topic: string) => void = () => {};
   export let exportTopicMessages: (topic: string) => void = () => {};
   export let onClearRetained: (topic: string) => void = () => {};
   export let onClearRetainedBelow: (prefix: string) => void = () => {};
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
+  // Portal destination for the context menu. Per-connection, because several
+  // connection tabs can each hold a graph and the selector must not collide.
+  const graphContainerId = `graph-container-${connection.connectionDetails.id}`;
   let containerW = 0;
   let containerH = 0;
   const model = new TopicModel();
@@ -304,9 +304,7 @@
     // A node with no traffic of its own is a structural level in the path, so
     // it has no payload to copy or export, matching the list view's rule.
     menuHasPayload =
-      (node?.ownCount ?? 0) > 0 &&
-      mqttDataStore !== null &&
-      findTopicPayload(get(mqttDataStore), topic) !== null;
+      (node?.ownCount ?? 0) > 0 && getTopicPayload(topic) !== null;
     menuRetainedBelowCount = 0;
     GetRetainedTopicsUnderPrefix(connection.connectionDetails.id, topic)
       .then((topics) => {
@@ -318,23 +316,6 @@
         // no count means the bulk action stays hidden; the rest still works
       });
     return true;
-  };
-
-  const copyGraphPayload = async (topic: string) => {
-    if (mqttDataStore === null) return;
-    const payload = findTopicPayload(get(mqttDataStore), topic);
-    if (payload === null) return;
-    try {
-      await copyToClipboard(formatPayloadForCopy(payload));
-    } catch (e) {
-      addToast({
-        data: {
-          title: "Failed to copy payload",
-          description: e as string,
-          type: "error",
-        },
-      });
-    }
   };
 
   const findNode = (topic: string): TopicNode | null => {
@@ -776,14 +757,16 @@
   </PanelHeader>
   <div
     bind:this={containerEl}
+    id={graphContainerId}
     bind:clientWidth={containerW}
     bind:clientHeight={containerH}
     class="relative min-h-0 w-full grow bg-elevation-0"
   >
-    <!-- portal={containerEl}, never document.body: fullscreen is requested on
-         containerEl's parent, so a body-portalled menu would vanish the moment
-         the user goes fullscreen. -->
-    <ContextMenu portal={containerEl} onOpen={resolveGraphMenuTarget}>
+    <!-- Portalled into this container, never document.body: fullscreen is
+         requested on the container's parent, so a body-portalled menu would
+         vanish the moment the user goes fullscreen. The id is per-connection
+         because several connection tabs can each hold a graph. -->
+    <ContextMenu portal={`#${graphContainerId}`} onOpen={resolveGraphMenuTarget}>
       <canvas slot="trigger" bind:this={canvasEl} class="block h-full w-full"
       ></canvas>
       <svelte:fragment slot="menu-content">
@@ -794,7 +777,7 @@
             isRetained={menuIsRetained}
             retainedBelowCount={menuRetainedBelowCount}
             onCopyTopic={copyTopicPath}
-            onCopyPayload={copyGraphPayload}
+            onCopyPayload={copyPayload}
             onExport={exportTopicMessages}
             {onClearRetained}
             {onClearRetainedBelow}

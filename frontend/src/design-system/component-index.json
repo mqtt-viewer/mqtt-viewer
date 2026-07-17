@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-17T06:56:28.001Z",
+  "generatedAt": "2026-07-17T07:47:55.735Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3074,6 +3074,28 @@
           "name": "width",
           "type": "number",
           "required": true
+        },
+        {
+          "name": "copyTopicPath",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "exportTopicMessages",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": true,
+          "description": "Raises a clear request; DataView confirms it and performs the clear."
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": true,
+          "description": "Raises a bulk clear request for topics below the right-clicked one."
         }
       ],
       "tokens": [
@@ -3422,6 +3444,37 @@
           "name": "messageSource",
           "type": "object",
           "required": false
+        },
+        {
+          "name": "getTopicPayload",
+          "type": "function",
+          "required": false,
+          "description": "A topic's latest payload, or null. Called when the context menu opens to decide whether payload actions apply."
+        },
+        {
+          "name": "copyTopicPath",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "copyPayload",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "exportTopicMessages",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [
@@ -3600,16 +3653,27 @@
           ]
         },
         {
-          "name": "deleteRetainedMessage",
+          "name": "exportTopicMessages",
           "type": "function",
-          "required": false,
+          "required": true,
           "default": "> Promise<void>"
         },
         {
-          "name": "exportTopicMessages",
+          "name": "copyTopicPath",
           "type": "function",
-          "required": false,
-          "default": "> Promise<void>"
+          "required": true
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": true,
+          "description": "Raises a clear request; DataView confirms it and performs the clear."
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": true,
+          "description": "Raises a bulk clear request for topics below the selected one."
         }
       ],
       "tokens": [

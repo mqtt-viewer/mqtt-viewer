@@ -6,7 +6,7 @@
 
   const componentName = "MqttDataPanel";
   const storyId = "Views/Connection/DataView/MqttDataPanel";
-  const props: string[] = ["connection","selectedTopicStore","width"];
+  const props: string[] = ["connection","selectedTopicStore","width","copyTopicPath","exportTopicMessages","onClearRetained","onClearRetainedBelow"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

@@ -1109,7 +1109,11 @@ export class TopicGraphRenderer {
         if (this.retainedColorDirty) this.drawRetainedDot(dot);
         const trailing = showBadge && v.badge ? v.badge.x + v.badge.width : label.x + label.width;
         dot.x = trailing + 7;
-        dot.y = label.y;
+        // An expanded parent's label is lifted above its outgoing edge and
+        // anchored at its bottom (anchor.y = 1), so label.y is its bottom edge
+        // rather than its centre. The dot is centre-anchored, so centre it on
+        // the label instead of copying label.y.
+        dot.y = hasVisibleKids ? label.y - label.height / 2 : label.y;
         dot.visible = true;
       } else if (v.retainedDot) {
         this.releaseRetainedDot(v);

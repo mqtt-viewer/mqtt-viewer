@@ -18,11 +18,21 @@
    */
 
   /**
-   * Where to render the menu. `null` keeps it inline, next to the trigger.
-   * Anything rendered inside an element that goes fullscreen must NOT portal
-   * to document.body, or it disappears when that element is fullscreened.
+   * Where to render the menu, as a CSS selector for the destination element.
+   * `null` keeps it inline, next to the trigger.
+   *
+   * Anything rendered inside an element that can go fullscreen must portal
+   * into that element rather than to document.body, or it disappears when the
+   * element is fullscreened.
+   *
+   * Deliberately a selector rather than an element: melt reads this once when
+   * the menu is built, which happens before a parent's `bind:this` has been
+   * assigned, so passing an element reference would pass undefined — and melt
+   * treats an undefined portal as "portal to body" (getPortalDestination in
+   * internal/helpers/elements.js). A selector is resolved lazily, when the menu
+   * opens.
    */
-  export let portal: HTMLElement | string | null = null;
+  export let portal: string | null = null;
 
   /**
    * Called on right-click before the menu opens. Return false to suppress it.

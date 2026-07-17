@@ -26,6 +26,28 @@
       "name": "width",
       "type": "number",
       "required": true
+    },
+    {
+      "name": "copyTopicPath",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "exportTopicMessages",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onClearRetained",
+      "type": "function",
+      "required": true,
+      "description": "Raises a clear request; DataView confirms it and performs the clear."
+    },
+    {
+      "name": "onClearRetainedBelow",
+      "type": "function",
+      "required": true,
+      "description": "Raises a bulk clear request for topics below the right-clicked one."
     }
   ],
   "tokens": [

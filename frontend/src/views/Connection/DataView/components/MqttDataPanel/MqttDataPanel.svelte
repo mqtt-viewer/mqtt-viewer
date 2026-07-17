@@ -44,11 +44,13 @@
     connection.eventSet
   );
 
-  // Copying a payload reads the tree store rather than fetching: the store
-  // already holds the latest payload per topic, utf8-decoded by the same path
-  // the selected-topic panel uses.
+  // Reads the tree store rather than fetching: it already holds the latest
+  // payload per topic, utf8-decoded by the same path the selected-topic panel
+  // uses. Shared with the graph so both views copy identical text.
+  const getTopicPayload = (topic: string) => findTopicPayload(get(mqttDataStore), topic);
+
   const copyPayload = async (topic: string) => {
-    const payload = findTopicPayload(get(mqttDataStore), topic);
+    const payload = getTopicPayload(topic);
     if (payload === null) return;
     try {
       await copyToClipboard(formatPayloadForCopy(payload));
@@ -179,7 +181,8 @@
         {selectedTopicStore}
         {width}
         initialData={$mqttDataStore}
-        {mqttDataStore}
+        {getTopicPayload}
+        {copyPayload}
         {copyTopicPath}
         {exportTopicMessages}
         {onClearRetained}

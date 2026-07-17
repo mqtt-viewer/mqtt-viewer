@@ -4,6 +4,8 @@ import mqtt from "mqtt";
 import { TopicGraphRenderer } from "@/views/Connection/DataView/components/MqttGraphView/pixi-graph";
 import { TopicModel } from "@/views/Connection/DataView/components/MqttGraphView/topic-model";
 import { startMockTraffic } from "@/views/Connection/DataView/components/MqttGraphView/mock-source";
+// startMockTraffic marks ~25% of topics retained (see isMockRetained), so the
+// harness exercises the retained marker's draw path rather than skipping it.
 import type { SortKey } from "@/views/Connection/DataView/components/MqttGraphView/tidy-layout";
 
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
@@ -102,8 +104,8 @@ async function connectBroker(url: string): Promise<void> {
     updateStatus();
     client.subscribe("#", { qos: 0 });
   });
-  client.on("message", (topic) => {
-    model.ingest(topic, Date.now());
+  client.on("message", (topic, _payload, packet) => {
+    model.ingest(topic, Date.now(), packet.retain ? true : undefined);
   });
   client.on("error", (err) => {
     baseStatus = `broker error: ${err.message}`;
