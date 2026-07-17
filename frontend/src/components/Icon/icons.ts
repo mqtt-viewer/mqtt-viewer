@@ -1,6 +1,7 @@
 import {
   House,
   Clock,
+  GithubLogo,
   Heart,
   Plus,
   PlusSquare,
@@ -61,6 +62,7 @@ export const ICON_MAP = {
   notification: Bell,
   clock: Clock,
   heart: Heart,
+  github: GithubLogo,
   home: House,
   options: Gear,
   settings: Gear,

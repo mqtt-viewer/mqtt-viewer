@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-16T14:24:14.050Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2137,11 +2137,9 @@
         "lastSyncedAt": null
       },
       "props": [],
-      "tokens": [
-        "secondary-text"
-      ],
+      "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
+      "notes": "Figma is not linked yet. Bespoke night-sky illustration (scoped <style>: twinkling stars + CSS shooting stars, adapted from constgenius/ShootingStar) so it uses raw decorative colours rather than design tokens; the surface is intentionally dark regardless of theme. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
       "sourcePath": "src/components/StarPromptDialog/StarPromptDialog.svelte",
       "specPath": "src/components/StarPromptDialog/StarPromptDialog.spec.json",
       "storyPath": "src/components/StarPromptDialog/StarPromptDialog.stories.svelte",
