@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Run MQTT Viewer in your browser",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
       },
