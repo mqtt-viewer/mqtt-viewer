@@ -132,6 +132,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "A small ask, under a night sky",
+        body: "If you've been using the app a while, I'll ask once whether you'd like to star it on GitHub. It's a single dialog with some shooting stars, and it won't nag you again either way.",
+      },
+      {
         title: "Chart and dropdown fixes",
         body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
         thanks: [
