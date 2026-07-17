@@ -132,6 +132,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "The Mac dock icon fits in now",
+        body: "The macOS dock icon was rendering noticeably larger than its neighbours because it had no safe-area margin. It's regenerated on Apple's icon grid, so it sits at the same size as every other app.",
+      },
+      {
         title: "Chart and dropdown fixes",
         body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
         thanks: [
