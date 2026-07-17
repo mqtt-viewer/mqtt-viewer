@@ -41,6 +41,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Peek at messages on the timeline",
+        body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained. Handy for skimming across recent messages to compare values, and it doesn't change which message is selected. Clicking and the arrow keys work exactly as before. Thanks to Daschi2 for suggesting this one.",
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
       },
