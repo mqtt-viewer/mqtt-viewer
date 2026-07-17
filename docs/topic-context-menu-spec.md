@@ -1,6 +1,6 @@
 # Topic context menu, retained tracking, and retained cleanup
 
-Status: approved, not yet implemented
+Status: implemented. See the decisions log for what changed during the build.
 Discussion: https://github.com/mqtt-viewer/mqtt-viewer/discussions/83
 Stacked on: PR #76 (`feat/topic-graph-view-final`) — this branch targets that
 branch, not `develop`.
@@ -588,3 +588,15 @@ draw.
 | Graph pan restricted to left-drag not on a node | User choice, to free right-press for the menu. **Open risk:** a drag starting on a node currently pans and would become a dead gesture, since nodes are not movable. Revisit if it feels broken in the live app. |
 | Menu portalled to `containerEl`, not `document.body` | `requestFullscreen()` targets `containerEl.parentElement` (`MqttGraphView.svelte:519`), so a body-portalled menu vanishes in fullscreen. |
 | Stacked on PR #76 | User instruction. #76 touches `history.go`, `message.go`, `mqtt-data.ts`, `SelectedTopicPanel.svelte`, and `MqttDataPanel.svelte` — every file this work needs. Building on `develop` would guarantee conflicts. |
+
+### Changed during implementation
+
+| Change | Why |
+| --- | --- |
+| The graph resolves its right-click target by hit-testing the native event (`TopicGraphRenderer.topicAt`), not from a Pixi `rightclick` handler on the node sprite as the Design section said. | Pixi's synthetic `rightclick` and the browser's `contextmenu` event have no guaranteed ordering, so resolving on one and opening on the other is a race. Hit-testing in the menu's `onOpen` also makes both views use one mechanism. Pixi's `pointertap` fires for every button, so it needed an `e.button !== 0` guard or a right-click would select/expand the node too. |
+| `ContextMenu`'s `portal` prop is a CSS **selector**, not an element. | Found in review. `portal={containerEl}` reads `undefined`, because `bind:this` is assigned after the child component is constructed, and melt treats an undefined portal as "portal to body" (`getPortalDestination`, `internal/helpers/elements.js:17`). That silently reintroduced the exact fullscreen bug the portal was for. A selector is resolved lazily by `usePortal` when the menu opens. |
+| The graph takes `getTopicPayload`/`copyPayload` functions rather than the `mqttDataStore` itself. | Found in review. Passing the store meant copy behaviour was implemented twice, which is the drift this work exists to remove. Also keeps the graph's reactive isolation without it needing to know the store exists. |
+| `MessageHistory.Clear()` also resets the retained index. | Missed by the spec. Clearing history without clearing the index would leave counts for topics whose history is gone. |
+| `mqtt-data.ts` tracks retained across a whole batch, not from the last message per topic. | The store collapses each batch to the last message per topic. A retained tombstone followed by ordinary traffic on the same topic in one drain would have lost the state change, leaving the topic marked retained. Covered by a test. |
+| `MessageTimeline`'s retained/unselected colours were fixed as part of this work. | Not in the original spec's scope, but the indicator was specified to match the timeline, and the timeline's rules referenced `var(--primary)`/`var(--secondary)`, which are not defined anywhere (the tokens are `--color-*`). The rules were dead, so there was no colour to match until they were fixed. A broader audit of undefined `var()` references is spun out separately. |
+| The mock graph source marks ~25% of topics retained. | The perf harness otherwise measured a graph where no node is retained, so the marker's draw and pooling cost never ran and the reported number did not describe what users get. |
