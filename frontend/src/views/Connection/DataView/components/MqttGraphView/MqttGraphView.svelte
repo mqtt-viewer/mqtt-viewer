@@ -486,14 +486,19 @@
       // alpha/count don't drift at all: alpha never reorders existing nodes, and
       // topic-count changes bump structureGen -> visibleDirty -> notifyData
       // relayouts on their own.
-      const ingestedSinceLastTick = ingestCounter !== lastTickIngest;
-      lastTickIngest = ingestCounter;
-      const needsRelayout =
-        sortKey === "rate" ||
-        sortKey === "recency" ||
-        ((sortKey === "stale" || sortKey === "msgs") && ingestedSinceLastTick);
-      if (!paused && dueThisTick && needsRelayout) {
-        renderer.relayout();
+      // Only consume the arrival signal on ticks where a relayout could
+      // actually run: on throttled big trees (or while paused) arrivals must
+      // stay pending until the next eligible tick, not be forgotten.
+      if (!paused && dueThisTick) {
+        const ingestedSinceLastTick = ingestCounter !== lastTickIngest;
+        lastTickIngest = ingestCounter;
+        const needsRelayout =
+          sortKey === "rate" ||
+          sortKey === "recency" ||
+          ((sortKey === "stale" || sortKey === "msgs") && ingestedSinceLastTick);
+        if (needsRelayout) {
+          renderer.relayout();
+        }
       }
       // keep the hover inspector's numbers live while the pointer rests
       if (hover) hover = buildHover(hover.topic, hover.x, hover.y);
