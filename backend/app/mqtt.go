@@ -74,13 +74,19 @@ func (a *App) ConnectMqtt(connId uint) error {
 }
 
 func (a *App) DisconnectMqtt(connId uint) error {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
 	appConnection.MqttManager.Disconnect(nil)
 	return nil
 }
 
 func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, error) {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
 	messageHistory, err := appConnection.MqttManager.MessageHistory.GetTopicHistory(topic)
 	if err != nil {
 		return nil, err
@@ -113,7 +119,10 @@ func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
 	appConnection.MqttManager.ClearConnectionHistory()
 	a.EventRuntime.EventsEmit(appConnection.EventSet.MqttClearHistory, nil)
 	return nil
