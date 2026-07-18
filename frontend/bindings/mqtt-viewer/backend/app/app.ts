@@ -169,13 +169,19 @@ export function GetAppSettings(): $CancellablePromise<models$0.AppSettings> {
     });
 }
 
+export function GetChartWindows(): $CancellablePromise<models$0.ChartWindow[]> {
+    return $Call.ByID(3282938669).then(($result: any) => {
+        return $$createType13($result);
+    });
+}
+
 /**
  * GetCollectionsForConnection returns global collections (connection_id IS NULL)
  * plus collections scoped to the given connection, messages preloaded.
  */
 export function GetCollectionsForConnection(connectionID: number): $CancellablePromise<models$0.Collection[]> {
     return $Call.ByID(2553763368, connectionID).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType14($result);
     });
 }
 
@@ -188,13 +194,13 @@ export function GetDatabaseSizeBytes(): $CancellablePromise<number> {
 
 export function GetEnvInfo(): $CancellablePromise<$models.EnvInfo> {
     return $Call.ByID(3369643427).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType15($result);
     });
 }
 
 export function GetFilterHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.FilterHistory[]> {
     return $Call.ByID(2941945813, connectionID).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType17($result);
     });
 }
 
@@ -206,25 +212,25 @@ export function GetMatchingSubscriptionForTopic(connId: number, topic: string): 
 
 export function GetMessageHistory(connId: number, topic: string): $CancellablePromise<mqtt$0.MqttMessage[]> {
     return $Call.ByID(3700437937, connId, topic).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType19($result);
     });
 }
 
 export function GetMqttStats(): $CancellablePromise<$models.MqttStats> {
     return $Call.ByID(2888945465).then(($result: any) => {
-        return $$createType18($result);
+        return $$createType20($result);
     });
 }
 
 export function GetPanelSizes(): $CancellablePromise<models$0.PanelSize[]> {
     return $Call.ByID(3836927596).then(($result: any) => {
-        return $$createType20($result);
+        return $$createType22($result);
     });
 }
 
 export function GetPublishHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.PublishHistory[]> {
     return $Call.ByID(3102818020, connectionID).then(($result: any) => {
-        return $$createType22($result);
+        return $$createType24($result);
     });
 }
 
@@ -249,13 +255,13 @@ export function GetReceivedMessageCount(connectionID: number, topic: string): $C
  */
 export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
     return $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType19($result);
     });
 }
 
 export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
     return $Call.ByID(2748919454).then(($result: any) => {
-        return $$createType24($result);
+        return $$createType26($result);
     });
 }
 
@@ -266,19 +272,19 @@ export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
  */
 export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
     return $Call.ByID(2117163184, connId).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType19($result);
     });
 }
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType25($result);
+        return $$createType27($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType27($result);
+        return $$createType29($result);
     });
 }
 
@@ -290,7 +296,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType29($result);
+        return $$createType31($result);
     });
 }
 
@@ -336,13 +342,13 @@ export function SaveCollectionMessage(params: $models.SaveCollectionMessageParam
 
 export function SaveFilterHistoryEntry(connectionId: number, text: string): $CancellablePromise<models$0.FilterHistory> {
     return $Call.ByID(481334387, connectionId, text).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType16($result);
     });
 }
 
 export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): $CancellablePromise<models$0.PublishHistory> {
     return $Call.ByID(3794014424, params).then(($result: any) => {
-        return $$createType21($result);
+        return $$createType23($result);
     });
 }
 
@@ -358,6 +364,10 @@ export function UpdateAppSettings(params: $models.UpdateAppSettingsParams): $Can
     return $Call.ByID(3714588585, params).then(($result: any) => {
         return $$createType0($result);
     });
+}
+
+export function UpdateChartWindow(connId: string, seconds: number): $CancellablePromise<void> {
+    return $Call.ByID(3533930699, connId, seconds);
 }
 
 export function UpdateConnection(conn: models$0.Connection | null): $CancellablePromise<void> {
@@ -401,21 +411,23 @@ const $$createType8 = models$0.CollectionMessage.createFrom;
 const $$createType9 = $models.Connections.createFrom;
 const $$createType10 = $Create.Array($$createType1);
 const $$createType11 = $Create.Map($Create.Any, $$createType10);
-const $$createType12 = $Create.Array($$createType7);
-const $$createType13 = $models.EnvInfo.createFrom;
-const $$createType14 = models$0.FilterHistory.createFrom;
-const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = mqtt$0.MqttMessage.createFrom;
+const $$createType12 = models$0.ChartWindow.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = $Create.Array($$createType7);
+const $$createType15 = $models.EnvInfo.createFrom;
+const $$createType16 = models$0.FilterHistory.createFrom;
 const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = $models.MqttStats.createFrom;
-const $$createType19 = models$0.PanelSize.createFrom;
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = models$0.PublishHistory.createFrom;
+const $$createType18 = mqtt$0.MqttMessage.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = $models.MqttStats.createFrom;
+const $$createType21 = models$0.PanelSize.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = models$0.SortState.createFrom;
+const $$createType23 = models$0.PublishHistory.createFrom;
 const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = $Create.Array($$createType3);
-const $$createType26 = models$0.Tab.createFrom;
-const $$createType27 = $Create.Array($$createType26);
-const $$createType28 = $models.Connection.createFrom;
-const $$createType29 = $Create.Nullable($$createType28);
+const $$createType25 = models$0.SortState.createFrom;
+const $$createType26 = $Create.Array($$createType25);
+const $$createType27 = $Create.Array($$createType3);
+const $$createType28 = models$0.Tab.createFrom;
+const $$createType29 = $Create.Array($$createType28);
+const $$createType30 = $models.Connection.createFrom;
+const $$createType31 = $Create.Nullable($$createType30);

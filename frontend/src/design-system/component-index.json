@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-16T14:17:19.984Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3476,10 +3476,15 @@
           "default": true
         },
         {
-          "name": "windowMinutes",
-          "type": "string",
+          "name": "windowSeconds",
+          "type": "number",
           "required": false,
           "default": 0
+        },
+        {
+          "name": "onWindowSecondsChange",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [
@@ -3690,8 +3695,8 @@
           "default": true
         },
         {
-          "name": "windowMinutes",
-          "type": "string",
+          "name": "windowSeconds",
+          "type": "number",
           "required": false,
           "default": 0
         }

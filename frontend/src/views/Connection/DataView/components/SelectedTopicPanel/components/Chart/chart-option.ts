@@ -9,8 +9,9 @@ import { valueAtPath } from "./payload-fields";
 export interface ChartOptionParams {
   history: MqttHistoryMessage[];
   series: ChartSeries[];
-  // 0 = all history; otherwise show only the last N minutes.
-  windowMinutes: number;
+  // 0 = all history; otherwise show only the last N seconds (the canonical
+  // unit for chart windows since the custom-interval options).
+  windowSeconds: number;
   showPoints: boolean;
   style: "line" | "area";
   // Current time in ms; injected so the sliding window is deterministic in tests.
@@ -54,7 +55,7 @@ const seriesData = (
 export const buildChartOption = ({
   history,
   series,
-  windowMinutes,
+  windowSeconds,
   showPoints,
   style,
   now,
@@ -65,12 +66,12 @@ export const buildChartOption = ({
   const axisColor = chrome.axis;
   const labelColor = chrome.label;
   // Always emit min/max: echarts merges the xAxis on setOption, so when
-  // switching back to "All history" (windowMinutes 0) we must explicitly clear
+  // switching back to "All history" (windowSeconds 0) we must explicitly clear
   // the previous window's bounds with null, else they persist and the axis
   // stays clamped. null lets echarts auto-fit to the data extent.
   let xAxisExtra: Record<string, unknown> = { min: null, max: null };
-  if (windowMinutes > 0) {
-    xAxisExtra = { min: now - windowMinutes * 60_000, max: now };
+  if (windowSeconds > 0) {
+    xAxisExtra = { min: now - windowSeconds * 1000, max: now };
   }
   return {
     animation: false,

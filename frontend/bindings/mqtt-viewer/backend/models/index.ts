@@ -3,6 +3,7 @@
 
 export {
     AppSettings,
+    ChartWindow,
     Collection,
     CollectionMessage,
     Connection,

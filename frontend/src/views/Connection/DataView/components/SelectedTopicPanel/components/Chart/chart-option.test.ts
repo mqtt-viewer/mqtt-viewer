@@ -15,7 +15,7 @@ const series: ChartSeries[] = [
 const params = (over: Partial<ChartOptionParams> = {}): ChartOptionParams => ({
   history: [msg(NOW - 1000, '{"temp":21}'), msg(NOW, '{"temp":22}')],
   series,
-  windowMinutes: 0,
+  windowSeconds: 0,
   showPoints: true,
   style: "line",
   now: NOW,
@@ -27,14 +27,14 @@ const xAxis = (p: ChartOptionParams) =>
   buildChartOption(p).xAxis as { min?: unknown; max?: unknown };
 
 describe("buildChartOption xAxis bounds", () => {
-  it("anchors min/max to a sliding window when windowMinutes > 0", () => {
-    const ax = xAxis(params({ windowMinutes: 5 }));
-    expect(ax.min).toBe(NOW - 5 * 60_000);
+  it("anchors min/max to a sliding window when windowSeconds > 0", () => {
+    const ax = xAxis(params({ windowSeconds: 300 }));
+    expect(ax.min).toBe(NOW - 300 * 1000);
     expect(ax.max).toBe(NOW);
   });
 
-  it("emits null min/max for All history (windowMinutes 0)", () => {
-    const ax = xAxis(params({ windowMinutes: 0 }));
+  it("emits null min/max for All history (windowSeconds 0)", () => {
+    const ax = xAxis(params({ windowSeconds: 0 }));
     // Regression #95: min/max must be present-and-null, not absent. echarts
     // merges the xAxis on setOption, so an absent bound leaves the previous
     // window's clamp in place and "All history" appears to do nothing.
@@ -44,8 +44,8 @@ describe("buildChartOption xAxis bounds", () => {
 
   it("clears the previous window's bounds when switching finite -> All history", () => {
     // Simulate the bug's repro: build with a finite window, then all-history.
-    xAxis(params({ windowMinutes: 15 }));
-    const cleared = xAxis(params({ windowMinutes: 0 }));
+    xAxis(params({ windowSeconds: 900 }));
+    const cleared = xAxis(params({ windowSeconds: 0 }));
     expect(cleared.min).toBeNull();
     expect(cleared.max).toBeNull();
   });

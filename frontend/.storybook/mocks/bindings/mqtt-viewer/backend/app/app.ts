@@ -466,6 +466,15 @@ export async function GetSortStates(): Promise<models.SortState[]> {
   ];
 }
 
+export async function GetChartWindows(): Promise<models.ChartWindow[]> {
+  return [];
+}
+
+export async function UpdateChartWindow(
+  _id: string,
+  _windowSeconds: number
+): Promise<void> {}
+
 export async function LoadOpenTabs(): Promise<models.Tab[]> {
   return [
     new models.Tab({
