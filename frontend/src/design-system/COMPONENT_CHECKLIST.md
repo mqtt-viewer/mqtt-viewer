@@ -93,6 +93,8 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/MqttDataPanel/SparkplugPanel | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/MqttDataPanel/SparkplugPanel/SparkplugRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -140,7 +142,7 @@
 
 ## Summary
 
-- Components scanned: 114
-- Story present: 114
+- Components scanned: 116
+- Story present: 116
 - Figma-linked: 0
 - Missing specs: 0

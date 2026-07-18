@@ -112,6 +112,20 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Sparkplug B with the names filled in",
+        body: "MQTT Viewer now remembers Sparkplug birth certificates, so data messages show real metric names instead of bare aliases. A new Sparkplug tab shows a live group, node and metric tree with sequence gap and rebirth storm warnings, and you can request a rebirth right from the viewer.",
+        thanks: [
+          {
+            name: "adamwoodland2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14",
+          },
+          {
+            name: "thebaldgeek",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14",
+          },
+        ],
+      },
+      {
         title: "A Flatpak for Linux",
         body: "MQTT Viewer now ships as a Flatpak with its own auto-updating repository, alongside the existing AppImage, deb and rpm.",
         thanks: [

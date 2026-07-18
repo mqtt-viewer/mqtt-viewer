@@ -3,8 +3,11 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
+import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as application$0 from "../../../github.com/wailsapp/wails/v3/pkg/application/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as models$0 from "../models/models.js";
@@ -23,26 +26,35 @@ import * as $models from "./models.js";
  * AcknowledgeChangelog records that the user has seen the "What's new" dialog
  * for the given app version, so it isn't shown again until the next update.
  */
-export function AcknowledgeChangelog(version: string): $CancellablePromise<models$0.AppSettings> {
-    return $Call.ByID(3277405218, version).then(($result: any) => {
+export function AcknowledgeChangelog(version: string): Promise<models$0.AppSettings> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3277405218, version) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType0($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * AcknowledgeStarPrompt records that the user has seen the "star us on GitHub"
  * prompt, so it never shows again (whether they starred or dismissed it).
  */
-export function AcknowledgeStarPrompt(): $CancellablePromise<models$0.AppSettings> {
-    return $Call.ByID(2492238430).then(($result: any) => {
+export function AcknowledgeStarPrompt(): Promise<models$0.AppSettings> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2492238430) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType0($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function AddSubscription(connectionId: number): $CancellablePromise<models$0.Subscription | null> {
-    return $Call.ByID(1707702138, connectionId).then(($result: any) => {
+export function AddSubscription(connectionId: number): Promise<models$0.Subscription | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1707702138, connectionId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType2($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
@@ -50,190 +62,253 @@ export function AddSubscription(connectionId: number): $CancellablePromise<model
  * "pin as tile" from the raw $SYS browser creates a populated mapping in one
  * call.
  */
-export function AddSysMetricMapping(connId: number, mapping: models$0.SysMetricMapping): $CancellablePromise<models$0.SysMetricMapping | null> {
-    return $Call.ByID(362334174, connId, mapping).then(($result: any) => {
+export function AddSysMetricMapping(connId: number, mapping: models$0.SysMetricMapping): Promise<models$0.SysMetricMapping | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(362334174, connId, mapping) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType4($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * Exposed to frontend to call as necessary
  */
-export function CheckForUpdates(): $CancellablePromise<update$0.UpdateResponse | null> {
-    return $Call.ByID(2570002251).then(($result: any) => {
+export function CheckForUpdates(): Promise<update$0.UpdateResponse | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2570002251) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType6($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function ChooseCertFile(title: string): $CancellablePromise<string> {
-    return $Call.ByID(2632460757, title);
+export function ChooseCertFile(title: string): Promise<string> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2632460757, title) as any;
+    return $resultPromise;
 }
 
-export function ChooseDirectory(title: string): $CancellablePromise<string> {
-    return $Call.ByID(1399537760, title);
+export function ChooseDirectory(title: string): Promise<string> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1399537760, title) as any;
+    return $resultPromise;
 }
 
-export function ClearConnectionHistory(connId: number): $CancellablePromise<void> {
-    return $Call.ByID(4129774215, connId);
+export function ClearConnectionHistory(connId: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(4129774215, connId) as any;
+    return $resultPromise;
 }
 
 /**
  * ClearReceivedMessages deletes all durable history (optionally for one
  * connection) and compacts the file.
  */
-export function ClearReceivedMessages(connectionID: number): $CancellablePromise<void> {
-    return $Call.ByID(3528502082, connectionID);
+export function ClearReceivedMessages(connectionID: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3528502082, connectionID) as any;
+    return $resultPromise;
 }
 
-export function ConnectMqtt(connId: number): $CancellablePromise<void> {
-    return $Call.ByID(1025617036, connId);
+export function ConnectMqtt(connId: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1025617036, connId) as any;
+    return $resultPromise;
 }
 
-export function CreateCollection(params: $models.CreateCollectionParams): $CancellablePromise<models$0.Collection> {
-    return $Call.ByID(2462867700, params).then(($result: any) => {
+export function CreateCollection(params: $models.CreateCollectionParams): Promise<models$0.Collection> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2462867700, params) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType7($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * DeleteCollection removes a collection and all messages in it.
  */
-export function DeleteCollection(id: number): $CancellablePromise<void> {
-    return $Call.ByID(3185313063, id);
+export function DeleteCollection(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3185313063, id) as any;
+    return $resultPromise;
 }
 
-export function DeleteCollectionMessage(id: number): $CancellablePromise<void> {
-    return $Call.ByID(3507400934, id);
+export function DeleteCollectionMessage(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3507400934, id) as any;
+    return $resultPromise;
 }
 
-export function DeleteConnection(id: number): $CancellablePromise<void> {
-    return $Call.ByID(4008925183, id);
+export function DeleteConnection(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(4008925183, id) as any;
+    return $resultPromise;
 }
 
-export function DeleteFilterHistoryEntry(connectionId: number, text: string): $CancellablePromise<void> {
-    return $Call.ByID(449713245, connectionId, text);
+export function DeleteFilterHistoryEntry(connectionId: number, text: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(449713245, connectionId, text) as any;
+    return $resultPromise;
 }
 
-export function DeletePublishHistoryEntry(id: number): $CancellablePromise<void> {
-    return $Call.ByID(626243294, id);
+export function DeletePublishHistoryEntry(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(626243294, id) as any;
+    return $resultPromise;
 }
 
-export function DeleteRetainedMessage(connId: number, topic: string): $CancellablePromise<void> {
-    return $Call.ByID(1837950630, connId, topic);
+export function DeleteRetainedMessage(connId: number, topic: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1837950630, connId, topic) as any;
+    return $resultPromise;
 }
 
-export function DeleteSubscription(connId: number, id: number): $CancellablePromise<void> {
-    return $Call.ByID(1291658, connId, id);
+export function DeleteSubscription(connId: number, id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1291658, connId, id) as any;
+    return $resultPromise;
 }
 
-export function DeleteSysMetricMapping(connId: number, id: number): $CancellablePromise<void> {
-    return $Call.ByID(3318852174, connId, id);
+export function DeleteSysMetricMapping(connId: number, id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3318852174, connId, id) as any;
+    return $resultPromise;
 }
 
-export function DisconnectMqtt(connId: number): $CancellablePromise<void> {
-    return $Call.ByID(2595921592, connId);
+export function DisconnectMqtt(connId: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2595921592, connId) as any;
+    return $resultPromise;
 }
 
-export function DuplicateCollectionMessage(id: number): $CancellablePromise<models$0.CollectionMessage> {
-    return $Call.ByID(2896789728, id).then(($result: any) => {
+export function DuplicateCollectionMessage(id: number): Promise<models$0.CollectionMessage> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2896789728, id) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType8($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function ExportAllMessages(connId: number): $CancellablePromise<string> {
-    return $Call.ByID(2360991441, connId);
+export function ExportAllMessages(connId: number): Promise<string> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2360991441, connId) as any;
+    return $resultPromise;
 }
 
-export function ExportTopicMessages(connId: number, topic: string): $CancellablePromise<string> {
-    return $Call.ByID(2895564909, connId, topic);
+export function ExportTopicMessages(connId: number, topic: string): Promise<string> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2895564909, connId, topic) as any;
+    return $resultPromise;
 }
 
-export function GetAllConnections(): $CancellablePromise<$models.Connections> {
-    return $Call.ByID(3922339528).then(($result: any) => {
+export function GetAllConnections(): Promise<$models.Connections> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3922339528) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType9($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetAllSubscriptionsByConnectionId(): $CancellablePromise<{ [_ in `${number}`]?: models$0.Subscription[] }> {
-    return $Call.ByID(3141731323).then(($result: any) => {
+export function GetAllSubscriptionsByConnectionId(): Promise<{ [_: `${number}`]: models$0.Subscription[] }> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3141731323) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType11($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * GetAppSettings returns the singleton settings row (seeded by migration).
  */
-export function GetAppSettings(): $CancellablePromise<models$0.AppSettings> {
-    return $Call.ByID(3769940222).then(($result: any) => {
+export function GetAppSettings(): Promise<models$0.AppSettings> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3769940222) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType0($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * GetCollectionsForConnection returns global collections (connection_id IS NULL)
  * plus collections scoped to the given connection, messages preloaded.
  */
-export function GetCollectionsForConnection(connectionID: number): $CancellablePromise<models$0.Collection[]> {
-    return $Call.ByID(2553763368, connectionID).then(($result: any) => {
+export function GetCollectionsForConnection(connectionID: number): Promise<models$0.Collection[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2553763368, connectionID) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType12($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * GetDatabaseSizeBytes reports the live database size (for the settings readout).
  */
-export function GetDatabaseSizeBytes(): $CancellablePromise<number> {
-    return $Call.ByID(1735793535);
+export function GetDatabaseSizeBytes(): Promise<number> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1735793535) as any;
+    return $resultPromise;
 }
 
-export function GetEnvInfo(): $CancellablePromise<$models.EnvInfo> {
-    return $Call.ByID(3369643427).then(($result: any) => {
+export function GetEnvInfo(): Promise<$models.EnvInfo> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3369643427) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType13($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetFilterHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.FilterHistory[]> {
-    return $Call.ByID(2941945813, connectionID).then(($result: any) => {
+export function GetFilterHistoriesForConnection(connectionID: number): Promise<models$0.FilterHistory[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2941945813, connectionID) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType15($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetMatchingSubscriptionForTopic(connId: number, topic: string): $CancellablePromise<models$0.Subscription | null> {
-    return $Call.ByID(2749766752, connId, topic).then(($result: any) => {
+export function GetMatchingSubscriptionForTopic(connId: number, topic: string): Promise<models$0.Subscription | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2749766752, connId, topic) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType2($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetMessageHistory(connId: number, topic: string): $CancellablePromise<mqtt$0.MqttMessage[]> {
-    return $Call.ByID(3700437937, connId, topic).then(($result: any) => {
+export function GetMessageHistory(connId: number, topic: string): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3700437937, connId, topic) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType17($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetMqttStats(): $CancellablePromise<$models.MqttStats> {
-    return $Call.ByID(2888945465).then(($result: any) => {
+export function GetMqttStats(): Promise<$models.MqttStats> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2888945465) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType18($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetPanelSizes(): $CancellablePromise<models$0.PanelSize[]> {
-    return $Call.ByID(3836927596).then(($result: any) => {
+export function GetPanelSizes(): Promise<models$0.PanelSize[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3836927596) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType20($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetPublishHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.PublishHistory[]> {
-    return $Call.ByID(3102818020, connectionID).then(($result: any) => {
+export function GetPublishHistoriesForConnection(connectionID: number): Promise<models$0.PublishHistory[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3102818020, connectionID) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType22($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
  * GetReceivedMessageCount returns how many durable messages exist for a topic
  * (drives the window-count UI).
  */
-export function GetReceivedMessageCount(connectionID: number, topic: string): $CancellablePromise<number> {
-    return $Call.ByID(4098527297, connectionID, topic);
+export function GetReceivedMessageCount(connectionID: number, topic: string): Promise<number> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(4098527297, connectionID, topic) as any;
+    return $resultPromise;
 }
 
 /**
@@ -247,16 +322,37 @@ export function GetReceivedMessageCount(connectionID: number, topic: string): $C
  * So "load older" passes the window's smallest id as beforeID; "load newer"
  * passes its largest id as afterID. limit <= 0 uses the default window size.
  */
-export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
-    return $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit).then(($result: any) => {
+export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType17($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
-    return $Call.ByID(2748919454).then(($result: any) => {
+export function GetSortStates(): Promise<models$0.SortState[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2748919454) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType24($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * GetSparkplugMessageHistory returns every retained Sparkplug message for a
+ * connection (the spBv1.0 namespace plus legacy root-level STATE topics),
+ * flattened across topics and sorted by arrival time, so a Sparkplug view
+ * opened mid-session can replay births received earlier.
+ */
+export function GetSparkplugMessageHistory(connectionId: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(80987752, connectionId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType17($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
@@ -264,34 +360,49 @@ export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
  * connection, flattened across topics and sorted by arrival time, so a
  * broker-status window opened mid-session starts populated.
  */
-export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
-    return $Call.ByID(2117163184, connId).then(($result: any) => {
+export function GetSysMessageHistory(connId: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2117163184, connId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType17($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
-    return $Call.ByID(1443899974, connId).then(($result: any) => {
+export function GetSysMetricMappingsByConnectionId(connId: number): Promise<models$0.SysMetricMapping[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1443899974, connId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType25($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
-    return $Call.ByID(2526018972).then(($result: any) => {
+export function LoadOpenTabs(): Promise<models$0.Tab[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2526018972) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType27($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function MoveCollectionMessage(id: number, targetCollectionID: number): $CancellablePromise<models$0.CollectionMessage> {
-    return $Call.ByID(184359020, id, targetCollectionID).then(($result: any) => {
+export function MoveCollectionMessage(id: number, targetCollectionID: number): Promise<models$0.CollectionMessage> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(184359020, id, targetCollectionID) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType8($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function NewConnection(): $CancellablePromise<$models.Connection | null> {
-    return $Call.ByID(3098702478).then(($result: any) => {
+export function NewConnection(): Promise<$models.Connection | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3098702478) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType29($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
@@ -299,8 +410,9 @@ export function NewConnection(): $CancellablePromise<$models.Connection | null> 
  * for a connection. The new window shares this Go backend and its event
  * stream, so it live-updates from the same messages as the main window.
  */
-export function OpenBrokerStatusWindow(connectionId: number): $CancellablePromise<void> {
-    return $Call.ByID(3759200119, connectionId);
+export function OpenBrokerStatusWindow(connectionId: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3759200119, connectionId) as any;
+    return $resultPromise;
 }
 
 /**
@@ -308,84 +420,135 @@ export function OpenBrokerStatusWindow(connectionId: number): $CancellablePromis
  * chart for a topic. The new window shares this Go backend and its event
  * stream, so it live-updates from the same messages as the main window.
  */
-export function OpenChartWindow(params: $models.OpenChartWindowParams): $CancellablePromise<void> {
-    return $Call.ByID(1350566632, params);
+export function OpenChartWindow(params: $models.OpenChartWindowParams): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1350566632, params) as any;
+    return $resultPromise;
 }
 
-export function PublishMqtt(connId: number, message: $models.PublishParams): $CancellablePromise<void> {
-    return $Call.ByID(3575117605, connId, message);
+export function PublishMqtt(connId: number, message: $models.PublishParams): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3575117605, connId, message) as any;
+    return $resultPromise;
 }
 
-export function RenameCollection(id: number, name: string): $CancellablePromise<models$0.Collection> {
-    return $Call.ByID(1111441190, id, name).then(($result: any) => {
+/**
+ * PublishSparkplugRebirth publishes the standard NCMD Node Control/Rebirth
+ * request for an edge node. It routes through PublishMqtt so the proto-encode
+ * publish middleware turns the JSON body into a Sparkplug B protobuf payload,
+ * which is why the connection must have protobuf decoding enabled.
+ */
+export function PublishSparkplugRebirth(connectionId: number, group: string, edgeNode: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1032928642, connectionId, group, edgeNode) as any;
+    return $resultPromise;
+}
+
+export function RenameCollection(id: number, name: string): Promise<models$0.Collection> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1111441190, id, name) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType7($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function RenameCollectionMessage(id: number, name: string): $CancellablePromise<models$0.CollectionMessage> {
-    return $Call.ByID(379007077, id, name).then(($result: any) => {
+export function RenameCollectionMessage(id: number, name: string): Promise<models$0.CollectionMessage> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(379007077, id, name) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType8($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function SaveCollectionMessage(params: $models.SaveCollectionMessageParams): $CancellablePromise<models$0.CollectionMessage> {
-    return $Call.ByID(1468270044, params).then(($result: any) => {
+export function SaveCollectionMessage(params: $models.SaveCollectionMessageParams): Promise<models$0.CollectionMessage> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1468270044, params) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType8($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function SaveFilterHistoryEntry(connectionId: number, text: string): $CancellablePromise<models$0.FilterHistory> {
-    return $Call.ByID(481334387, connectionId, text).then(($result: any) => {
+export function SaveFilterHistoryEntry(connectionId: number, text: string): Promise<models$0.FilterHistory> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(481334387, connectionId, text) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType14($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): $CancellablePromise<models$0.PublishHistory> {
-    return $Call.ByID(3794014424, params).then(($result: any) => {
+export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): Promise<models$0.PublishHistory> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3794014424, params) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType21($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function StartUpdate(): $CancellablePromise<void> {
-    return $Call.ByID(1435025345);
+/**
+ * ServiceStartup is called by Wails when the application starts up
+ */
+export function ServiceStartup(options: application$0.ServiceOptions): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1191179216, options) as any;
+    return $resultPromise;
 }
 
-export function Startup(options: $models.StartupOptions | null): $CancellablePromise<void> {
-    return $Call.ByID(1674476365, options);
+export function StartUpdate(): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1435025345) as any;
+    return $resultPromise;
 }
 
-export function UpdateAppSettings(params: $models.UpdateAppSettingsParams): $CancellablePromise<models$0.AppSettings> {
-    return $Call.ByID(3714588585, params).then(($result: any) => {
+export function Startup(options: $models.StartupOptions | null): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1674476365, options) as any;
+    return $resultPromise;
+}
+
+export function UpdateAppSettings(params: $models.UpdateAppSettingsParams): Promise<models$0.AppSettings> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3714588585, params) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType0($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function UpdateConnection(conn: models$0.Connection | null): $CancellablePromise<void> {
-    return $Call.ByID(2567523649, conn);
+export function UpdateConnection(conn: models$0.Connection | null): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2567523649, conn) as any;
+    return $resultPromise;
 }
 
-export function UpdateOpenConnectionTabs(connIds: number[]): $CancellablePromise<void> {
-    return $Call.ByID(1501318837, connIds);
+export function UpdateOpenConnectionTabs(connIds: number[]): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1501318837, connIds) as any;
+    return $resultPromise;
 }
 
-export function UpdatePanelSize(panelId: string, size: number, isOpen: boolean): $CancellablePromise<void> {
-    return $Call.ByID(1524249556, panelId, size, isOpen);
+export function UpdatePanelSize(panelId: string, size: number, isOpen: boolean): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1524249556, panelId, size, isOpen) as any;
+    return $resultPromise;
 }
 
-export function UpdateSortState(sortId: string, sortCriteria: string, sortDirection: string): $CancellablePromise<void> {
-    return $Call.ByID(2265023050, sortId, sortCriteria, sortDirection);
+export function UpdateSortState(sortId: string, sortCriteria: string, sortDirection: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2265023050, sortId, sortCriteria, sortDirection) as any;
+    return $resultPromise;
 }
 
-export function UpdateSubscription(connId: number, sub: models$0.Subscription): $CancellablePromise<models$0.Subscription | null> {
-    return $Call.ByID(1582032348, connId, sub).then(($result: any) => {
+export function UpdateSubscription(connId: number, sub: models$0.Subscription): Promise<models$0.Subscription | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1582032348, connId, sub) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType2($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
-export function UpdateSysMetricMapping(connId: number, mapping: models$0.SysMetricMapping): $CancellablePromise<models$0.SysMetricMapping | null> {
-    return $Call.ByID(1283760572, connId, mapping).then(($result: any) => {
+export function UpdateSysMetricMapping(connId: number, mapping: models$0.SysMetricMapping): Promise<models$0.SysMetricMapping | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1283760572, connId, mapping) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType4($result);
-    });
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 // Private type creation functions

@@ -1,0 +1,58 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "SparkplugPanel",
+  "tier": "view",
+  "description": "Sparkplug session tree: host state strip, virtualized group/node/device/metric tree with health meta, pinned warnings strip.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "treeState",
+      "type": "object",
+      "required": true,
+      "description": "SparkplugTreeState snapshot from the sparkplug tree store (plain state in, so stories can feed fixtures)."
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": true,
+      "description": "Panel width for the virtual-list row max-width math."
+    },
+    {
+      "name": "filter",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Case-insensitive substring filter on node/device/metric names."
+    },
+    {
+      "name": "onRequestRebirth",
+      "type": "function",
+      "required": true,
+      "description": "(group, node) callback for the Request rebirth actions."
+    },
+    {
+      "name": "onCopyMetricList",
+      "type": "function",
+      "required": true,
+      "description": "(node) callback for the Copy metric list action."
+    }
+  ],
+  "tokens": [
+    "secondary-text",
+    "white-text",
+    "success",
+    "error",
+    "warning",
+    "divider",
+    "hovered"
+  ],
+  "dependencies": ["SparkplugRow", "Icon"],
+  "notes": "Figma is not linked yet; stories use local fixtures. Expansion state is panel-local (everything defaults expanded)."
+}
