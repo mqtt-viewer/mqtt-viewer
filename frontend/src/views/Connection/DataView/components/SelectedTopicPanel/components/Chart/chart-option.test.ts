@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildChartOption, type ChartOptionParams } from "./chart-option";
+import {
+  buildChartOption,
+  CHROME_COLORS,
+  type ChartOptionParams,
+} from "./chart-option";
 import type { ChartSeries } from "./chart-series-store";
 import type { MqttHistoryMessage } from "../../../../stores/selected-topic-store";
 
@@ -76,6 +80,32 @@ describe("buildChartOption theme", () => {
     expect(light.backgroundColor).toBe("#ffffff");
     expect(light.backgroundColor).not.toBe(dark.backgroundColor);
     expect(light.textStyle.color).not.toBe(dark.textStyle.color);
+  });
+});
+
+describe("CHROME_COLORS export", () => {
+  // Pinned because hero-chart-option.ts consumes this exact palette; a silent
+  // hue change here would drift the broker-status hero axis/tooltip chrome.
+  it("pins the dark chrome palette", () => {
+    expect(CHROME_COLORS.dark).toEqual({
+      axis: "#525252",
+      label: "#aeaeae",
+      splitLine: "#2e2e2e",
+      tooltipBackground: "#1f1e1e",
+      tooltipBorder: "#525252",
+      tooltipText: "#eee",
+    });
+  });
+
+  it("pins the light chrome palette", () => {
+    expect(CHROME_COLORS.light).toEqual({
+      axis: "#b8b8c0",
+      label: "#5f5f69",
+      splitLine: "#e4e4e8",
+      tooltipBackground: "#ffffff",
+      tooltipBorder: "#c8c8ce",
+      tooltipText: "#26262b",
+    });
   });
 });
 

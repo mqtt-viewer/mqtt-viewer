@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-18T01:17:32.715Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2454,6 +2454,55 @@
       "specMissing": false
     },
     {
+      "name": "HeroChart",
+      "tier": "view",
+      "description": "Broker-status traffic hero: msgs/s in and out co-plotted with a dashed client-observed series, ECharts line chart under a custom live-value legend row.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "series",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "HeroSeries[] — each { id, label, points: {t, v}[], dashed, emphasis?, tooltip? }. `v` null marks a gap (line break). ids are stable ('in'/'out'/'observed')."
+        },
+        {
+          "name": "windowMinutes",
+          "type": "number",
+          "required": false,
+          "default": 5,
+          "description": "Visible span in minutes; anchors the sliding x-axis window."
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": false,
+          "default": 160,
+          "description": "Canvas height in pixels."
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "emphasis"
+      ],
+      "dependencies": [
+        "Tooltip"
+      ],
+      "notes": "ECharts paints to canvas, so axis/tooltip chrome and series colours come from literal JS palettes (CHROME_COLORS, CHART_PALETTE) rather than tokens; the legend value swatch is coloured inline from the same shared palette. Stories inject a fixed `now` + static series for deterministic test-storybook.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/HeroChart/HeroChart.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/HeroChart/HeroChart.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/HeroChart/HeroChart.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/HeroChart",
+      "specMissing": false
+    },
+    {
       "name": "MetricMappingEditor",
       "tier": "view",
       "description": "Dialog for a connection's broker-status metric-tile mappings: add/edit/delete rows with Label, Topic (required), JSON path, Unit, and an Overrides target (a builtin tile id or a custom tile). Persists via the SysMetricMapping CRUD bindings and reloads the store. Opens blank or prefilled from the raw browser's pin action.",
@@ -2620,6 +2669,62 @@
       "specPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.stories.svelte",
       "storyId": "Views/BrokerStatusWindow/StatTile",
+      "specMissing": false
+    },
+    {
+      "name": "TimeRangeSelector",
+      "tier": "view",
+      "description": "Small segmented control for the broker-status window range (1m / 5m / 15m); emits a legacy `change` event with the selected minutes.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "value",
+          "type": "number",
+          "required": false,
+          "default": 5,
+          "description": "Selected window in minutes; one of `options`."
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "required": false,
+          "default": [
+            1,
+            5,
+            15
+          ],
+          "description": "Selectable windows in minutes."
+        },
+        {
+          "name": "sparseNote",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Optional tooltip on the group explaining sparse broker series at short ranges. Nothing is ever disabled."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-1",
+        "selected",
+        "emphasis",
+        "secondary-text"
+      ],
+      "dependencies": [
+        "Tooltip"
+      ],
+      "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/TimeRangeSelector",
       "specMissing": false
     },
     {

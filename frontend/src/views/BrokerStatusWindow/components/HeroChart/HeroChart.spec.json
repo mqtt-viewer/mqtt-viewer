@@ -1,0 +1,40 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "HeroChart",
+  "tier": "view",
+  "description": "Broker-status traffic hero: msgs/s in and out co-plotted with a dashed client-observed series, ECharts line chart under a custom live-value legend row.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "series",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "HeroSeries[] — each { id, label, points: {t, v}[], dashed, emphasis?, tooltip? }. `v` null marks a gap (line break). ids are stable ('in'/'out'/'observed')."
+    },
+    {
+      "name": "windowMinutes",
+      "type": "number",
+      "required": false,
+      "default": 5,
+      "description": "Visible span in minutes; anchors the sliding x-axis window."
+    },
+    {
+      "name": "height",
+      "type": "number",
+      "required": false,
+      "default": 160,
+      "description": "Canvas height in pixels."
+    }
+  ],
+  "tokens": ["secondary-text", "emphasis"],
+  "dependencies": ["Tooltip"],
+  "notes": "ECharts paints to canvas, so axis/tooltip chrome and series colours come from literal JS palettes (CHROME_COLORS, CHART_PALETTE) rather than tokens; the legend value swatch is coloured inline from the same shared palette. Stories inject a fixed `now` + static series for deterministic test-storybook."
+}
