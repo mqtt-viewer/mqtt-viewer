@@ -5,19 +5,16 @@
     messageType: string;
   }
 
-  // fileCount/typeCount/loadError/zeroTypes mirror the section's own status
-  // line (rendered above this component by the container). dirMissing (no
-  // dir configured) picks between the two empty states below; folderNotFound
+  // loadError/dirMissing/folderNotFound mirror the section's own status line
+  // (rendered above this component by the container). dirMissing (no dir
+  // configured) picks between the two empty states below; folderNotFound
   // (dir configured but not found on disk) and loadError together suppress
   // the stale-type warning on rows, since neither case means the type is
   // actually stale.
   export interface ProtoBindingStatusView {
-    fileCount: number;
-    typeCount: number;
     loadError: string;
     dirMissing: boolean;
     folderNotFound: boolean;
-    zeroTypes: boolean;
   }
 
   export interface ProtoBindingMatchView {
@@ -28,7 +25,7 @@
 </script>
 
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, tick } from "svelte";
   import { debounce } from "lodash";
   import type { DebouncedFunc } from "lodash";
   import { twMerge } from "tailwind-merge";
@@ -44,12 +41,9 @@
   export let rules: ProtoBindingRuleView[] = [];
   export let descriptorNames: string[] = [];
   export let status: ProtoBindingStatusView = {
-    fileCount: 0,
-    typeCount: 0,
     loadError: "",
     dirMissing: true,
     folderNotFound: false,
-    zeroTypes: false,
   };
   export let disabled = false;
   export let connected = false;
@@ -147,16 +141,24 @@
     };
   };
 
+  // Debounced commit, one per rule id. The callback looks up the current
+  // rule from `rules` by id *at fire time* rather than closing over the
+  // `rule` object passed in when the debounced function was first created:
+  // the debounce instance is cached and reused across every keystroke for
+  // that row, so a stale closure would keep comparing against the rule's
+  // topicFilter as it was on the very first keystroke. That made an
+  // A -> B -> A edit silently drop the second edit, since B -> A looked
+  // like a no-op against the stale "A" snapshot.
   const debouncedCommitByRuleId: Record<number, DebouncedFunc<() => void>> =
     {};
-  const debouncedCommitFor = (rule: ProtoBindingRuleView) => {
-    if (!debouncedCommitByRuleId[rule.id]) {
-      debouncedCommitByRuleId[rule.id] = debounce(
-        () => commitRowEdit(rule),
-        400
-      );
+  const debouncedCommitFor = (ruleId: number) => {
+    if (!debouncedCommitByRuleId[ruleId]) {
+      debouncedCommitByRuleId[ruleId] = debounce(() => {
+        const currentRule = rules.find((r) => r.id === ruleId);
+        if (currentRule) commitRowEdit(currentRule);
+      }, 400);
     }
-    return debouncedCommitByRuleId[rule.id];
+    return debouncedCommitByRuleId[ruleId];
   };
 
   const onRowFilterChange = (rule: ProtoBindingRuleView, value: string) => {
@@ -164,7 +166,7 @@
       ...editStateByRuleId,
       [rule.id]: { value, dirty: true },
     };
-    debouncedCommitFor(rule)();
+    debouncedCommitFor(rule.id)();
   };
 
   const onRowFilterBlur = (rule: ProtoBindingRuleView) => {
@@ -173,7 +175,10 @@
   };
 
   onDestroy(() => {
-    Object.values(debouncedCommitByRuleId).forEach((fn) => fn.cancel());
+    // Flush, not cancel: closing the dialog (which destroys this component)
+    // should persist a just-typed valid edit sitting in the debounce window
+    // rather than drop it.
+    Object.values(debouncedCommitByRuleId).forEach((fn) => fn.flush());
   });
 
   // Per-row type-picker search text, keyed by rule id. The draft row (no
@@ -187,73 +192,100 @@
   };
 
   // Draft row: "Add binding" opens this instead of writing to the backend
-  // immediately. It commits (calls onAdd) once its topic filter validates,
-  // following the same commit-on-blur/debounced-while-typing pattern as the
-  // real rows above.
+  // immediately. Unlike the real rows above, the draft never auto-commits
+  // while typing: a typeless binding does nothing, so committing on every
+  // keystroke would just spam the backend with rules the user hasn't
+  // finished setting up. It commits only on blur, Enter, or picking a type,
+  // and only once the filter validates and a type is chosen.
   let draft: { topicFilter: string; messageType: string } | null = null;
   let draftSubmitting = false;
+  // First keystroke or blur, gates the error/red-border state so clicking
+  // "Add binding" doesn't immediately show "Enter a topic filter" before
+  // the user has typed anything.
+  let draftTouched = false;
+  let draftInputEl: HTMLInputElement | undefined = undefined;
 
-  const onAddClicked = () => {
+  const onAddClicked = async () => {
     if (draft !== null) return;
     draft = { topicFilter: "", messageType: "" };
+    draftTouched = false;
+    await tick();
+    draftInputEl?.focus();
   };
 
   const commitDraft = async () => {
     if (!draft || draftSubmitting) return;
     if (validateTopicFilter(draft.topicFilter)) return;
+    // A typeless binding does nothing (the middleware treats it as no
+    // match), so don't create one.
+    if (!draft.messageType) return;
     draftSubmitting = true;
     try {
       await onAdd({ ...draft });
       draft = null;
       draftSubmitting = false;
+      draftTouched = false;
     } catch (e) {
       console.error(e);
       draftSubmitting = false;
     }
   };
 
-  const debouncedCommitDraft = debounce(commitDraft, 400);
-  onDestroy(() => debouncedCommitDraft.cancel());
+  // BaseInput doesn't forward `on:keydown` to its inner <input>, so Enter is
+  // wired directly on the bound element instead.
+  $: if (draftInputEl) {
+    draftInputEl.onkeydown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        draftTouched = true;
+        commitDraft();
+      }
+    };
+  }
 
   const onDraftFilterChange = (value: string) => {
     if (!draft) return;
+    draftTouched = true;
     draft = { ...draft, topicFilter: value };
-    debouncedCommitDraft();
   };
 
   const onDraftFilterBlur = () => {
-    debouncedCommitDraft.cancel();
+    draftTouched = true;
     commitDraft();
   };
 
   const onDraftTypePicked = (name: string) => {
     if (!draft) return;
     draft = { ...draft, messageType: name };
-    typeSearchByRuleId = { ...typeSearchByRuleId, draft: "" };
-    if (!validateTopicFilter(draft.topicFilter)) {
-      debouncedCommitDraft.cancel();
-      commitDraft();
-    }
+    commitDraft();
   };
 
   const onDraftCancel = () => {
     draft = null;
+    draftTouched = false;
   };
 
   let testTopic = "";
   let testResult: ProtoBindingMatchView | null | undefined = undefined;
   let testError = false;
+  // Guards against an earlier, slower request's result landing after a
+  // later one's and clobbering it: only the response matching the most
+  // recently issued request is ever assigned.
+  let testRequestToken = 0;
 
   const runTest = async (topic: string) => {
+    const token = ++testRequestToken;
     if (!topic) {
       testResult = undefined;
       testError = false;
       return;
     }
     try {
-      testResult = await onTestTopic(topic);
+      const result = await onTestTopic(topic);
+      if (token !== testRequestToken) return;
+      testResult = result;
       testError = false;
     } catch (e) {
+      if (token !== testRequestToken) return;
       console.error(e);
       testError = true;
     }
@@ -266,19 +298,65 @@
   // (not just when the topic text changes), so a rule edit or a registry
   // reload updates the tester's result without the user retyping the topic.
   $: rules, descriptorNames, debouncedRunTest(testTopic);
-
-  $: testResultLine = testError
-    ? "Could not check that topic."
-    : testResult === undefined
-      ? null
-      : testResult === null
-        ? "No match. Payload stays raw."
-        : testResult.source === "sparkplug"
-          ? `Sparkplug topic, decodes as ${testResult.messageType}`
-          : testResult.messageType
-            ? `Matches ${testResult.filter}, decodes as ${testResult.messageType}`
-            : `Matches ${testResult.filter}`;
 </script>
+
+{#snippet typePicker(
+  key: number | "draft",
+  value: string,
+  onPick: (name: string) => void
+)}
+  <DropdownMenu {disabled} placement="bottom-end">
+    <div
+      slot="trigger"
+      class={twMerge(
+        "h-[30px] w-[180px] flex items-center justify-between gap-1 rounded border border-outline px-2 text-base bg-elevation-0 transition-colors",
+        disabled ? "opacity-60" : "cursor-pointer hover:border-hovered",
+        value ? "text-white-text" : "text-secondary-text"
+      )}
+    >
+      <span class="truncate min-w-0" style:direction="rtl"
+        ><bdi>{value || "Choose a type"}</bdi></span
+      >
+      <Icon type="down" size={12} />
+    </div>
+    <div class="flex flex-col min-w-[220px]" slot="menu-content">
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"
+        autofocus
+        placeholder="Filter types..."
+        bind:value={typeSearchByRuleId[key]}
+        on:keydown|stopPropagation={() => {}}
+      />
+      <div class="flex flex-col max-h-[320px] overflow-y-auto">
+        {#each filteredTypes(key) as name (name)}
+          <DropdownMenuItem
+            onClick={() => {
+              onPick(name);
+              typeSearchByRuleId = { ...typeSearchByRuleId, [key]: "" };
+            }}
+          >
+            <div class="flex items-center gap-2 w-full">
+              <span class="truncate grow">{name}</span>
+              {#if name === value}
+                <Icon type="tick" size={14} />
+              {/if}
+            </div>
+          </DropdownMenuItem>
+        {/each}
+        {#if descriptorNames.length === 0}
+          <div class="px-2 py-1 text-base text-secondary-text">
+            No types loaded
+          </div>
+        {:else if filteredTypes(key).length === 0}
+          <div class="px-2 py-1 text-base text-secondary-text">
+            No matching types
+          </div>
+        {/if}
+      </div>
+    </div>
+  </DropdownMenu>
+{/snippet}
 
 <div>
   <span class="text-base text-white-text">Topic bindings</span>
@@ -291,7 +369,7 @@
     </div>
   {/if}
 
-  <div class="mt-4 space-y-3">
+  <div class="mt-4 space-y-4">
     {#if rules.length === 0 && draft === null}
       <div class="text-secondary-text text-sm">
         {status.dirMissing
@@ -332,60 +410,9 @@
               onBlur={() => onRowFilterBlur(rule)}
             />
           </div>
-          <DropdownMenu {disabled} placement="bottom-end">
-            <div
-              slot="trigger"
-              class={twMerge(
-                "h-[30px] w-[180px] flex items-center justify-between gap-1 rounded border border-outline px-2 text-sm",
-                disabled ? "opacity-60" : "cursor-pointer",
-                rule.messageType ? "text-white-text" : "text-secondary-text"
-              )}
-            >
-              <span class="truncate min-w-0" style:direction="rtl"
-                >{rule.messageType || "Choose a type"}</span
-              >
-              <Icon type="down" size={12} />
-            </div>
-            <div class="flex flex-col min-w-[220px]" slot="menu-content">
-              <!-- svelte-ignore a11y_autofocus -->
-              <input
-                class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"
-                autofocus
-                placeholder="Filter types..."
-                bind:value={typeSearchByRuleId[rule.id]}
-                on:keydown|stopPropagation={() => {}}
-              />
-              <div class="max-h-[320px] overflow-y-auto">
-                {#each filteredTypes(rule.id) as name (name)}
-                  <DropdownMenuItem
-                    onClick={() => {
-                      onUpdate(rule.id, { messageType: name });
-                      typeSearchByRuleId = {
-                        ...typeSearchByRuleId,
-                        [rule.id]: "",
-                      };
-                    }}
-                  >
-                    <div class="flex items-center gap-2 w-full">
-                      <span class="truncate grow">{name}</span>
-                      {#if name === rule.messageType}
-                        <Icon type="tick" size={14} />
-                      {/if}
-                    </div>
-                  </DropdownMenuItem>
-                {/each}
-                {#if descriptorNames.length === 0}
-                  <div class="px-2 py-1 text-base text-secondary-text">
-                    No types loaded
-                  </div>
-                {:else if filteredTypes(rule.id).length === 0}
-                  <div class="px-2 py-1 text-base text-secondary-text">
-                    No matching types
-                  </div>
-                {/if}
-              </div>
-            </div>
-          </DropdownMenu>
+          {@render typePicker(rule.id, rule.messageType, (name) =>
+            onUpdate(rule.id, { messageType: name })
+          )}
           <Button
             {disabled}
             variant="text"
@@ -405,74 +432,45 @@
     {/each}
     {#if draft !== null}
       {@const draftError = validateTopicFilter(draft.topicFilter)}
+      {@const showDraftError = draftTouched && !!draftError}
       <div>
         <div class="flex gap-3 items-center">
+          {#if showReorder}
+            <!-- Equal-width spacer for the reorder column so the draft
+                 row's input lines up with committed rows. Invisible rather
+                 than omitted so it still takes up layout space. -->
+            <div class="flex flex-col -my-1 invisible" aria-hidden="true">
+              <IconButton tooltipText="" disabled onClick={() => {}}>
+                <Icon type="up" size={12} />
+              </IconButton>
+              <IconButton tooltipText="" disabled onClick={() => {}}>
+                <Icon type="down" size={12} />
+              </IconButton>
+            </div>
+          {/if}
           <div class="flex-grow">
             <BaseInput
               {disabled}
               name="proto-binding-filter-draft"
               placeholder="sensors/+/telemetry"
               value={draft.topicFilter}
-              hasError={!!draftError}
+              hasError={showDraftError}
+              autofocus
+              bind:inputEl={draftInputEl}
               onChange={(value) => onDraftFilterChange(value ?? "")}
               onBlur={onDraftFilterBlur}
             />
           </div>
-          <DropdownMenu {disabled} placement="bottom-end">
-            <div
-              slot="trigger"
-              class={twMerge(
-                "h-[30px] w-[180px] flex items-center justify-between gap-1 rounded border border-outline px-2 text-sm",
-                disabled ? "opacity-60" : "cursor-pointer",
-                draft.messageType ? "text-white-text" : "text-secondary-text"
-              )}
-            >
-              <span class="truncate min-w-0" style:direction="rtl"
-                >{draft.messageType || "Choose a type"}</span
-              >
-              <Icon type="down" size={12} />
-            </div>
-            <div class="flex flex-col min-w-[220px]" slot="menu-content">
-              <!-- svelte-ignore a11y_autofocus -->
-              <input
-                class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"
-                autofocus
-                placeholder="Filter types..."
-                bind:value={typeSearchByRuleId["draft"]}
-                on:keydown|stopPropagation={() => {}}
-              />
-              <div class="max-h-[320px] overflow-y-auto">
-                {#each filteredTypes("draft") as name (name)}
-                  <DropdownMenuItem onClick={() => onDraftTypePicked(name)}>
-                    <div class="flex items-center gap-2 w-full">
-                      <span class="truncate grow">{name}</span>
-                      {#if name === draft.messageType}
-                        <Icon type="tick" size={14} />
-                      {/if}
-                    </div>
-                  </DropdownMenuItem>
-                {/each}
-                {#if descriptorNames.length === 0}
-                  <div class="px-2 py-1 text-base text-secondary-text">
-                    No types loaded
-                  </div>
-                {:else if filteredTypes("draft").length === 0}
-                  <div class="px-2 py-1 text-base text-secondary-text">
-                    No matching types
-                  </div>
-                {/if}
-              </div>
-            </div>
-          </DropdownMenu>
+          {@render typePicker("draft", draft.messageType, onDraftTypePicked)}
           <Button
             disabled={disabled || draftSubmitting}
             variant="text"
             iconType="closeCircle"
-            aria-label="Delete binding"
+            aria-label="Cancel"
             on:click={onDraftCancel}
           />
         </div>
-        {#if draftError}
+        {#if showDraftError}
           <div class="text-error text-sm mt-1">{draftError}</div>
         {/if}
       </div>
@@ -493,8 +491,25 @@
       label="Try a topic"
       bind:value={testTopic}
     />
-    {#if testResultLine}
-      <div class="text-secondary-text text-sm mt-2">{testResultLine}</div>
+    {#if testError}
+      <div class="text-warning text-sm mt-2">Could not check that topic.</div>
+    {:else if testResult !== undefined}
+      <div class="text-secondary-text text-sm mt-2">
+        {#if testResult === null}
+          No match. Payload stays raw.
+        {:else if testResult.source === "sparkplug"}
+          Sparkplug topic, decodes as
+          <span class="font-mono text-white-text">{testResult.messageType}</span>
+        {:else if testResult.messageType}
+          Matches
+          <span class="font-mono text-white-text">{testResult.filter}</span>,
+          decodes as
+          <span class="font-mono text-white-text">{testResult.messageType}</span>
+        {:else}
+          Matches
+          <span class="font-mono text-white-text">{testResult.filter}</span>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>

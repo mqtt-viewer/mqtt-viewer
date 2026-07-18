@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { get, writable } from "svelte/store";
   import { twMerge } from "tailwind-merge";
   import { GetMatchingProtoTypeForTopic } from "bindings/mqtt-viewer/backend/app/app";
@@ -46,7 +46,6 @@
   // line and suppresses the stale-type warning).
   $: noDirConfigured = !protoRegDir;
   $: folderNotFound = !!protoStateForConnection?.dirMissing;
-  $: zeroTypes = !noDirConfigured && !loadError && typeCount === 0;
 
   $: isCompileError = !!loadError && !folderNotFound;
 
@@ -56,10 +55,38 @@
   $: isStateFresh =
     !!protoStateForConnection && protoStateForConnection.dir === protoRegDir;
 
+  // The "Loading types..." line only appears once the load has taken a
+  // moment: a fresh compile is usually near-instant on a warm dialog
+  // remount, so showing it immediately just flashes it on every open.
+  const LOADING_LINE_DELAY_MS = 200;
+  let showLoadingLine = false;
+  let loadingLineTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  $: if (!!protoRegDir && !isStateFresh) {
+    if (!loadingLineTimeout) {
+      loadingLineTimeout = setTimeout(() => {
+        showLoadingLine = true;
+        loadingLineTimeout = null;
+      }, LOADING_LINE_DELAY_MS);
+    }
+  } else {
+    if (loadingLineTimeout) {
+      clearTimeout(loadingLineTimeout);
+      loadingLineTimeout = null;
+    }
+    showLoadingLine = false;
+  }
+
+  onDestroy(() => {
+    if (loadingLineTimeout) clearTimeout(loadingLineTimeout);
+  });
+
   $: statusLineText = !protoRegDir
     ? ""
     : !isStateFresh
-      ? "Loading types..."
+      ? showLoadingLine
+        ? "Loading types..."
+        : ""
       : folderNotFound
         ? "Folder not found. Choose it again."
         : isCompileError
@@ -183,7 +210,7 @@
   };
 </script>
 
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-6">
   <span class="text-lg w-full">Protobuf</span>
 
   <div class="flex flex-col gap-2">
@@ -201,7 +228,7 @@
   </div>
 
   {#if currentProtoEnabled}
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-2">
       <FilePathPicker
         variant="directory"
         actionLabel="Choose .proto folder"
@@ -228,12 +255,9 @@
       {rules}
       {descriptorNames}
       status={{
-        fileCount,
-        typeCount,
         loadError,
         dirMissing: noDirConfigured,
         folderNotFound,
-        zeroTypes,
       }}
       connected={isConnected}
       onAdd={onAddRule}

@@ -98,9 +98,11 @@
     $publishStore.protoOverrideChoice === "none"
       ? "Raw (no Protobuf)"
       : $publishStore.protoOverrideChoice === "auto"
-        ? matchingProtoType
-          ? `Auto: ${matchingProtoType}`
-          : "Auto: no match"
+        ? !$publishStore.topic
+          ? "Auto"
+          : matchingProtoType
+            ? `Auto (${matchingProtoType})`
+            : "Auto (no match)"
         : $publishStore.protoOverrideChoice;
 
   onMount(() => {
@@ -118,11 +120,29 @@
     }
   }, 500);
 
+  // Re-resolves the auto match whenever the proto registry changes for this
+  // connection (a reload, a rule add/edit/reorder), so a stale match never
+  // lingers next to the topic that's currently typed in.
+  $: protoStateForConnection,
+    (() => {
+      if (connection.connectionDetails.isProtoEnabled && $publishStore.topic) {
+        debouncedGetMatchingProtoType($publishStore.topic);
+      }
+    })();
+
   $: connection.connectionState,
     (() => {
       if (connection.connectionState !== "connected") {
         matchingSub = null;
         matchingProtoType = null;
+      } else if (
+        connection.connectionDetails.isProtoEnabled &&
+        $publishStore.topic
+      ) {
+        // Reconnecting can land on a freshly (re)compiled registry; re-run
+        // the match rather than leaving whatever was resolved before the
+        // disconnect.
+        debouncedGetMatchingProtoType($publishStore.topic);
       }
     })();
 
@@ -357,70 +377,92 @@
       <div class="h-2"></div>
     {/if}
     {#if connection.connectionDetails.isProtoEnabled}
-      <div class="w-full flex items-center gap-2 text-sm mt-1 mb-2">
-        <span class="text-secondary-text">Protobuf:</span>
-        <DropdownMenu
-          placement="bottom-start"
-          triggerText={protoTriggerText}
-          triggerVariant="text"
-          triggerClass={twMerge(
-            "px-0 py-[3px]",
-            $publishStore.protoOverrideChoice !== "auto" && "text-secondary"
-          )}
-          triggerIconSize={12}
-        >
-          <div class="flex flex-col min-w-[220px]" slot="menu-content">
-            <DropdownMenuItem
-              isSelected={$publishStore.protoOverrideChoice === "auto"}
-              onClick={() =>
-                publishStore.setPartial({ protoOverrideChoice: "auto" })}
+      <div class="w-full flex items-center gap-2 text-sm mt-1 mb-2 min-w-0">
+        <span class="text-secondary-text shrink-0">Protobuf:</span>
+        <div class="min-w-0">
+          <DropdownMenu
+            placement="bottom-start"
+            triggerText={protoTriggerText}
+            triggerVariant="text"
+            triggerClass={twMerge(
+              // A percentage max-width can't constrain this: DropdownMenu's
+              // trigger button isn't itself a flex item, so `max-w-full`
+              // resolves against an indeterminate (shrink-to-fit) ancestor
+              // and never actually clamps. A fixed cap is the only thing
+              // that reliably keeps a long type name from overflowing the
+              // row at the panel's minimum width (275px, see DataView.svelte).
+              "px-0 py-[3px] max-w-[160px]",
+              $publishStore.protoOverrideChoice !== "auto" && "text-secondary"
+            )}
+            triggerIconSize={12}
+          >
+            <span slot="trigger-content" class="truncate min-w-0"
+              >{protoTriggerText}</span
             >
-              {matchingProtoType
-                ? `Auto (${matchingProtoType})`
-                : "Auto (no match, raw)"}
-            </DropdownMenuItem>
-            <!-- svelte-ignore a11y_autofocus -->
-            <input
-              class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 my-1 text-base text-white-text placeholder:text-secondary-text"
-              autofocus
-              placeholder="Filter types..."
-              bind:value={protoTypeSearch}
-              on:keydown|stopPropagation={() => {}}
-            />
-            <div class="max-h-[320px] overflow-y-auto">
-              {#each filteredDescriptorNames as name (name)}
+            <div class="flex flex-col min-w-[220px]" slot="menu-content">
+              <DropdownMenuItem
+                onClick={() =>
+                  publishStore.setPartial({ protoOverrideChoice: "auto" })}
+              >
+                <div class="flex items-center gap-2 w-full">
+                  <span class="truncate grow">
+                    {matchingProtoType
+                      ? `Auto (${matchingProtoType})`
+                      : "Auto (no match, raw)"}
+                  </span>
+                  {#if $publishStore.protoOverrideChoice === "auto"}
+                    <Icon type="tick" size={14} />
+                  {/if}
+                </div>
+              </DropdownMenuItem>
+              <!-- svelte-ignore a11y_autofocus -->
+              <input
+                class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 my-1 text-base text-white-text placeholder:text-secondary-text"
+                autofocus
+                placeholder="Filter types..."
+                bind:value={protoTypeSearch}
+                on:keydown|stopPropagation={() => {}}
+              />
+              <div class="flex flex-col max-h-[320px] overflow-y-auto">
+                {#each filteredDescriptorNames as name (name)}
+                  <DropdownMenuItem
+                    onClick={() =>
+                      publishStore.setPartial({ protoOverrideChoice: name })}
+                  >
+                    <div class="flex items-center gap-2 w-full">
+                      <span class="truncate grow">{name}</span>
+                      {#if name === $publishStore.protoOverrideChoice}
+                        <Icon type="tick" size={14} />
+                      {/if}
+                    </div>
+                  </DropdownMenuItem>
+                {/each}
+                {#if descriptorNames.length === 0}
+                  <div class="px-2 py-1 text-base text-secondary-text">
+                    No types loaded
+                  </div>
+                {:else if filteredDescriptorNames.length === 0}
+                  <div class="px-2 py-1 text-base text-secondary-text">
+                    No matching types
+                  </div>
+                {/if}
+              </div>
+              <div class="mt-1 pt-1 border-t border-divider">
                 <DropdownMenuItem
-                  isSelected={$publishStore.protoOverrideChoice === name}
                   onClick={() =>
-                    publishStore.setPartial({ protoOverrideChoice: name })}
+                    publishStore.setPartial({ protoOverrideChoice: "none" })}
                 >
                   <div class="flex items-center gap-2 w-full">
-                    <span class="truncate grow">{name}</span>
-                    {#if name === $publishStore.protoOverrideChoice}
+                    <span class="truncate grow">Raw (no Protobuf)</span>
+                    {#if $publishStore.protoOverrideChoice === "none"}
                       <Icon type="tick" size={14} />
                     {/if}
                   </div>
                 </DropdownMenuItem>
-              {/each}
-              {#if descriptorNames.length === 0}
-                <div class="px-2 py-1 text-base text-secondary-text">
-                  No types loaded
-                </div>
-              {:else if filteredDescriptorNames.length === 0}
-                <div class="px-2 py-1 text-base text-secondary-text">
-                  No matching types
-                </div>
-              {/if}
+              </div>
             </div>
-            <DropdownMenuItem
-              isSelected={$publishStore.protoOverrideChoice === "none"}
-              onClick={() =>
-                publishStore.setPartial({ protoOverrideChoice: "none" })}
-            >
-              Raw (no Protobuf)
-            </DropdownMenuItem>
-          </div>
-        </DropdownMenu>
+          </DropdownMenu>
+        </div>
       </div>
     {/if}
     {#if connection.connectionDetails.mqttVersion === "3"}

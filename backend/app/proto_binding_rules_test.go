@@ -167,6 +167,47 @@ func TestUpdateProtoBindingRuleRejectsCrossConnection(t *testing.T) {
 	}
 }
 
+// TestUpdateProtoBindingRuleIgnoresStaleSortOrder guards against a client
+// sending back a rule it fetched before a reorder happened elsewhere: the
+// stale SortOrder on that payload must not clobber the reorder that already
+// landed in the DB.
+func TestUpdateProtoBindingRuleIgnoresStaleSortOrder(t *testing.T) {
+	app, connId := getTestAppWithConnection(t)
+
+	first, err := app.AddProtoBindingRule(connId, models.ProtoBindingRule{TopicFilter: "a/b", MessageType: "TypeA"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	second, err := app.AddProtoBindingRule(connId, models.ProtoBindingRule{TopicFilter: "c/d", MessageType: "TypeB"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Reverse the order, same as a drag-to-reorder in the UI.
+	if err := app.ReorderProtoBindingRules(connId, []uint{second.ID, first.ID}); err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// A client still holding the pre-reorder `first` row edits its filter and
+	// sends the whole row back, including the now-stale SortOrder of 0.
+	staleEdit := *first
+	staleEdit.TopicFilter = "a/b/c"
+	if _, err := app.UpdateProtoBindingRule(connId, staleEdit); err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	rules, err := app.GetProtoBindingRulesByConnectionId(connId)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(rules) != 2 || rules[0].ID != second.ID || rules[1].ID != first.ID {
+		t.Errorf("Expected the reorder to survive the stale-SortOrder update, got %+v", rules)
+	}
+	if rules[1].TopicFilter != "a/b/c" {
+		t.Errorf("Expected the filter edit to still apply, got %v", rules[1].TopicFilter)
+	}
+}
+
 func TestDeleteProtoBindingRule(t *testing.T) {
 	app, connId := getTestAppWithConnection(t)
 

@@ -121,6 +121,28 @@ func TestProtoDecodeMiddlewareNoMatchUntouched(t *testing.T) {
 	}
 }
 
+func TestProtoDecodeMiddlewareEmptyMessageTypeUntouched(t *testing.T) {
+	registry := loadGoodRegistry(t)
+	resolver := &fakeResolver{
+		enabled:  true,
+		match:    topicmatching.ProtoBindingMatch{MessageType: "", Filter: "greet/#", Source: topicmatching.SourceRule},
+		registry: registry,
+	}
+	middleware := NewProtoDecodeMiddleware(resolver, sparkplugRegistryFunc(nil))
+
+	original := []byte("raw bytes")
+	msg := newTestMessage("greet/hi", original)
+	if err := middleware.Func(msg); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(*msg.MiddlewareProperties) != 0 {
+		t.Errorf("expected no middleware properties set for a matched rule with no MessageType, got %v", *msg.MiddlewareProperties)
+	}
+	if string(msg.Payload) != string(original) {
+		t.Errorf("expected payload untouched")
+	}
+}
+
 func TestProtoDecodeMiddlewareSparkplugFallbackOk(t *testing.T) {
 	sparkplugRegistry := loadSparkplugRegistry(t)
 	descriptor, ok := sparkplugRegistry.GetMessageDescriptorFromName("SparkplugBPayload")

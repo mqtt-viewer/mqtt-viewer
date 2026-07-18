@@ -182,7 +182,7 @@
       </span>
     {:else if protoDecode === "failed"}
       <span
-        class="inline-block ml-2 mt-[1px] text-warning"
+        class="inline-flex size-4 items-center justify-center ml-2 mt-[1px] text-warning"
         title={protoDescriptorName
           ? `Failed to decode as ${protoDescriptorName}. Showing raw payload.`
           : "Failed to decode. Showing raw payload."}

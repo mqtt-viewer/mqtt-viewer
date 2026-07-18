@@ -38,7 +38,11 @@ func NewProtoEncodeMiddleware(resolver ProtoResolver, sparkplugRegistry Sparkplu
 				switch {
 				case params.ProtoOverride == nil:
 					match := resolver.Match(params.Topic)
-					if match.Source == "" {
+					// A rule match with no MessageType set (the user hasn't
+					// picked a type yet) is a no-op binding: treat it the
+					// same as no match at all and pass the payload through
+					// raw.
+					if match.Source == "" || match.MessageType == "" {
 						return nil
 					}
 					descriptor, ok := resolveDescriptor(resolver, sparkplugRegistry, match.Source, match.MessageType)

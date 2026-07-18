@@ -89,6 +89,9 @@ func (a *App) AddProtoBindingRule(connId uint, rule models.ProtoBindingRule) (*m
 // writing (a caller can't edit another connection's rule by supplying its
 // id), then writes the user-mutable columns explicitly with Select so a
 // cleared value persists and created_at/connection_id are left untouched.
+// SortOrder is deliberately excluded: reordering goes through
+// ReorderProtoBindingRules, and a client sending back a stale sortOrder here
+// would otherwise clobber a reorder that landed after it last fetched.
 func (a *App) UpdateProtoBindingRule(connId uint, rule models.ProtoBindingRule) (*models.ProtoBindingRule, error) {
 	if _, ok := a.AppConnections[connId]; !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
@@ -107,9 +110,8 @@ func (a *App) UpdateProtoBindingRule(connId uint, rule models.ProtoBindingRule) 
 
 	existingRule.TopicFilter = rule.TopicFilter
 	existingRule.MessageType = rule.MessageType
-	existingRule.SortOrder = rule.SortOrder
 	if res := a.Db.Model(&existingRule).
-		Select("TopicFilter", "MessageType", "SortOrder").
+		Select("TopicFilter", "MessageType").
 		Updates(&existingRule); res.Error != nil {
 		return nil, res.Error
 	}

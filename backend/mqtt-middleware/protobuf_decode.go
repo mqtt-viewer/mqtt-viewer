@@ -20,7 +20,9 @@ var PROTO_DECODE_MIDDLEWARE_ID = "ProtoDecodeMiddleware"
 // errors: a decode failure or a stale/unloaded descriptor leaves the payload
 // untouched and marks it via MiddlewareProperties for the frontend, except a
 // sparkplug match with no loaded global registry yet, which passes through
-// silently (matches pre-binding behaviour).
+// silently (matches pre-binding behaviour). A rule match with no MessageType
+// set is a no-op binding (the user hasn't picked a type yet) and is treated
+// as no match at all: passthrough, no failed marker.
 func NewProtoDecodeMiddleware(resolver ProtoResolver, sparkplugRegistry SparkplugRegistryFunc) *ProtoDecodeMiddleware {
 	return &ProtoDecodeMiddleware{
 		Middleware: mqtt.Middleware[mqtt.MqttMessage]{
@@ -31,7 +33,7 @@ func NewProtoDecodeMiddleware(resolver ProtoResolver, sparkplugRegistry Sparkplu
 				}
 
 				match := resolver.Match(params.Topic)
-				if match.Source == "" {
+				if match.Source == "" || match.MessageType == "" {
 					return nil
 				}
 

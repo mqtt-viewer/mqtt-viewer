@@ -30,7 +30,7 @@
       "name": "status",
       "type": "object",
       "required": false,
-      "description": "fileCount/typeCount/loadError/dirMissing/folderNotFound/zeroTypes summary. dirMissing (no dir configured) picks the empty-state copy; loadError and folderNotFound gate the stale-type warning on rows. The rest is carried for parity with the section's own status line, rendered by the container above this component."
+      "description": "loadError/dirMissing/folderNotFound summary. dirMissing (no dir configured) picks the empty-state copy; loadError and folderNotFound gate the stale-type warning on rows. The section's own status line (file/type counts) is rendered by the container above this component and isn't passed down."
     },
     {
       "name": "disabled",
@@ -93,5 +93,5 @@
     "DropdownMenuItem",
     "Icon"
   ],
-  "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The inline type picker (search BaseInput row + DropdownMenuItem list, max-h-[320px] overflow-y-auto) duplicates the AddToCollectionMenu pattern; extracting a shared SearchableDropdownMenu primitive is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc)."
+  "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The type picker (search input + DropdownMenuItem list, max-h-[320px] overflow-y-auto) is a single component-internal {#snippet}, shared by committed rows and the draft row, and mirrors the AddToCollectionMenu pattern; extracting a shared SearchableDropdownMenu primitive across components is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc)."
 }

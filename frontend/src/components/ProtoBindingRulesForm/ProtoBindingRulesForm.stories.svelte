@@ -22,28 +22,19 @@
 
   const noop = (...args: unknown[]) => {};
   const noStatus = {
-    fileCount: 0,
-    typeCount: 0,
     loadError: "",
     dirMissing: true,
     folderNotFound: false,
-    zeroTypes: false,
   };
   const okStatus = {
-    fileCount: 2,
-    typeCount: 3,
     loadError: "",
     dirMissing: false,
     folderNotFound: false,
-    zeroTypes: false,
   };
   const errorStatus = {
-    fileCount: 0,
-    typeCount: 0,
     loadError: "line 12: unexpected token '}'",
     dirMissing: false,
     folderNotFound: false,
-    zeroTypes: false,
   };
 
   const mockDescriptorNames = [
@@ -91,7 +82,7 @@
 </script>
 
 {#snippet template(args: any)}
-  <div class="w-[550px]">
+  <div class="w-[502px]">
     <StoryRender component={Component} {args} {componentName} />
   </div>
 {/snippet}

@@ -247,7 +247,7 @@
         {#if protoDecodeStatus.status === "ok"}
           <span class="size-4"><ProtobufLogo isActive /></span>
           <span class="text-secondary-text">
-            Decoded as {protoDecodeStatus.name ?? "protobuf"}
+            Decoded as {protoDecodeStatus.name ?? "Protobuf"}
           </span>
         {:else}
           <span class="text-warning"><Icon type="warning" size={14} /></span>

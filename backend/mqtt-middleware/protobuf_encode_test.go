@@ -40,6 +40,25 @@ func TestProtoEncodeMiddlewareAutoNoMatchSkips(t *testing.T) {
 	}
 }
 
+func TestProtoEncodeMiddlewareAutoEmptyMessageTypeSkips(t *testing.T) {
+	registry := loadGoodRegistry(t)
+	resolver := &fakeResolver{
+		enabled:  true,
+		match:    topicmatching.ProtoBindingMatch{MessageType: "", Filter: "greet/#", Source: topicmatching.SourceRule},
+		registry: registry,
+	}
+	middleware := NewProtoEncodeMiddleware(resolver, sparkplugRegistryFunc(nil))
+
+	original := []byte(`{"bam":"hi"}`)
+	params := newTestPublish("greet/hi", original, nil)
+	if err := middleware.Func(params); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if string(params.Payload) != string(original) {
+		t.Errorf("expected payload untouched when the matched rule has no MessageType")
+	}
+}
+
 func TestProtoEncodeMiddlewareForcedType(t *testing.T) {
 	registry := loadGoodRegistry(t)
 	resolver := &fakeResolver{enabled: true, registry: registry}

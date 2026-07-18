@@ -145,9 +145,11 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 
 // refreshProtoStateAfterConnectionUpdate keeps the live protoState in sync
 // when a connection edit touches IsProtoEnabled or ProtoRegDir: the enabled
-// flag always mirrors the DB row, a dir change while enabled recompiles the
-// registry (outside protoState's lock), and clearing the dir clears any
-// loaded registry. Emits ProtoStateChanged once if either changed.
+// flag always mirrors the DB row, and a dir change (including clearing it)
+// drops any loaded registry rather than recompiling here. Recompiling is
+// left to the frontend's explicit LoadProtoRegistry call so a dir change
+// only compiles once, not twice. Emits ProtoStateChanged once if either
+// changed.
 func (a *App) refreshProtoStateAfterConnectionUpdate(appConnection *AppConnection, existing *models.Connection, updated *models.Connection) {
 	oldEnabled := existing.IsProtoEnabled != nil && *existing.IsProtoEnabled
 	newEnabled := oldEnabled
@@ -173,12 +175,7 @@ func (a *App) refreshProtoStateAfterConnectionUpdate(appConnection *AppConnectio
 	appConnection.ProtoState.SetEnabled(newEnabled)
 
 	if dirChanged {
-		if newDir == "" {
-			appConnection.ProtoState.Clear()
-		} else if newEnabled {
-			registry, loadErr, dirMissing := compileProtoRegistry(newDir)
-			appConnection.ProtoState.SetRegistry(registry, newDir, loadErr, dirMissing)
-		}
+		appConnection.ProtoState.Clear()
 	}
 
 	a.emitProtoStateChanged(updated.ID)
