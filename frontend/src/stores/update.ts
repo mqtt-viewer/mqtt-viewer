@@ -1,8 +1,7 @@
-import { get, writable } from "svelte/store";
+import { writable } from "svelte/store";
 import * as wailsupdate from "bindings/mqtt-viewer/backend/update/models";
 import { CheckForUpdates } from "bindings/mqtt-viewer/backend/app/app";
 import notificationStore, { type Notification } from "./notifications";
-import envStore from "./env";
 
 const updateMessage = (u: wailsupdate.UpdateResponse): string => {
   if (u.can_self_update) {
@@ -24,19 +23,16 @@ const { subscribe, set, update } = writable<UpdatesStore>(
     isUpdateDialogOpen: false,
     availableUpdate: null,
   },
-  (set) => {
-    // In server mode CheckForUpdates always returns null (the container image
-    // is updated by pulling a new tag, not by the in-app updater), so skip the
-    // polling entirely. The env store may still be initialising at t+2s, so
-    // read it lazily inside each callback rather than at subscribe time.
-    setTimeout(async () => {
-      if (get(envStore).isServerMode) return;
+  () => {
+    // Poll in every mode, including server (Docker) mode: the backend still
+    // reports when a newer image exists, just with pull instructions instead
+    // of the in-app self-update flow.
+    setTimeout(() => {
       getAvailableUpdate();
     }, 2 * 1000);
     // Check every 10 minutes
     setInterval(
-      async () => {
-        if (get(envStore).isServerMode) return;
+      () => {
         getAvailableUpdate();
       },
       10 * 60 * 1000
