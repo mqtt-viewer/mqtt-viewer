@@ -7,11 +7,46 @@
   const width = 100;
   const pad = 2;
 
-  const toPolylinePoints = (
-    pts: { t: number; v: number }[],
-    h: number
-  ): string => {
-    if (pts.length < 2) return "";
+  // Cap on rendered points. A 15 m sparkline holds up to 900 samples; the SVG
+  // is ~100 px wide, so more than ~150 points is invisible detail and wasted
+  // DOM. See docs/broker-status-v2-spec.md.
+  const MAX_POINTS = 150;
+
+  type Pt = { t: number; v: number };
+
+  // Min-max decimation bucketed BY ARRAY INDEX (never by time): each bucket
+  // emits its lowest and highest sample in original order, so peaks and troughs
+  // survive. Index bucketing sidesteps the degenerate case where every sample
+  // shares one timestamp (a time-bucketed pass would collapse them all). The
+  // true last sample is always emitted so the line ends where the data does.
+  const decimate = (pts: Pt[]): Pt[] => {
+    if (pts.length <= MAX_POINTS) return pts;
+    const buckets = Math.floor(MAX_POINTS / 2); // 2 emitted points per bucket
+    const bucketSize = pts.length / buckets;
+    const out: Pt[] = [];
+    for (let b = 0; b < buckets; b++) {
+      const start = Math.floor(b * bucketSize);
+      const end = Math.min(pts.length, Math.floor((b + 1) * bucketSize));
+      if (start >= end) continue;
+      let minI = start;
+      let maxI = start;
+      for (let i = start + 1; i < end; i++) {
+        if (pts[i].v < pts[minI].v) minI = i;
+        if (pts[i].v > pts[maxI].v) maxI = i;
+      }
+      const lo = Math.min(minI, maxI);
+      const hi = Math.max(minI, maxI);
+      out.push(pts[lo]);
+      if (hi !== lo) out.push(pts[hi]);
+    }
+    const last = pts[pts.length - 1];
+    if (out.length === 0 || out[out.length - 1] !== last) out.push(last);
+    return out;
+  };
+
+  const toPolylinePoints = (rawPts: Pt[], h: number): string => {
+    if (rawPts.length < 2) return "";
+    const pts = decimate(rawPts);
     let tMin = Infinity;
     let tMax = -Infinity;
     let vMin = Infinity;

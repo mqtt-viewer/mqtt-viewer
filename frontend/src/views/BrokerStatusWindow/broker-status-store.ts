@@ -242,27 +242,14 @@ const emptyRuntime = (): TileRuntime => ({
 });
 
 /**
- * v1 builtins reclassified `hidden` for v2's eventual layout but kept on the
- * gauges grid until the surfaces commit relocates them to the hero / facts row.
- * Keeping the running app unchanged in the store-engine commit.
+ * Which effective tiles render on the gauges grid. v2 (surfaces commit): a plain
+ * `!hidden` filter. The reclassified v1 builtins (`msg_rate_*`, `uptime`,
+ * `version`) and every brand-new diagnostic/derived metric are `hidden`, so they
+ * leave the grid and reach the view through `metricByKey` (hero, facts row,
+ * health chips, derived tiles) instead. Custom/override tiles and the observed
+ * computed tiles stay visible.
  */
-const KEEP_VISIBLE_WHILE_HIDDEN = new Set<string>([
-  "msg_rate_in",
-  "msg_rate_out",
-  "uptime",
-  "version",
-]);
-
-/**
- * Which effective tiles render on the gauges grid THIS commit. Non-hidden
- * tiles (custom/override tiles, the surviving v1 builtins, the observed
- * computed tiles) always show; the reclassified v1 tiles are grandfathered in;
- * the brand-new hidden diagnostic/derived metrics never do (they reach the view
- * via `metricByKey`). The surfaces commit replaces this with a plain `!hidden`
- * filter once the new consumers exist.
- */
-const isVisibleTile = (tile: MetricTile): boolean =>
-  !tile.hidden || KEEP_VISIBLE_WHILE_HIDDEN.has(tile.key);
+const isVisibleTile = (tile: MetricTile): boolean => !tile.hidden;
 
 export const createBrokerStatusStore = (
   connectionId: number,

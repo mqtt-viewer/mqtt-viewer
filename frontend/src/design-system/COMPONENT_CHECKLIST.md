@@ -76,7 +76,11 @@
 |---|:---:|:---:|:---:|:---:|
 | Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
 | Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/FactsRow | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/HealthChip | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/HealthStrip | [x] | [ ] | [x] | [ ] |
 | Views/BrokerStatusWindow/HeroChart | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/LoudestTopics | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/MetricMappingEditor | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/Sparkline | [x] | [ ] | [x] | [ ] |
 | Views/BrokerStatusWindow/StatTile | [x] | [ ] | [x] | [x] |
@@ -142,7 +146,7 @@
 
 ## Summary
 
-- Components scanned: 116
-- Story present: 116
+- Components scanned: 120
+- Story present: 120
 - Figma-linked: 0
 - Missing specs: 0

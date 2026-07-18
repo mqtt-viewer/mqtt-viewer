@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "HealthStrip",
+  "tier": "view",
+  "description": "Row of broker-health chips. Renders only chips that have their minimum samples (chip.render) and hides entirely when none do. Composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix).",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "health",
+      "type": "object",
+      "required": false,
+      "default": [],
+      "description": "HealthChip[] from the store; only entries with render:true are shown."
+    }
+  ],
+  "tokens": [],
+  "dependencies": ["HealthChip"],
+  "notes": "Figma is not linked yet; stories use local health-chip fixtures. Stickiness and the capability-notice fallback are owned by BrokerStatusView, not this component."
+}

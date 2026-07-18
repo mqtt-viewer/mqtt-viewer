@@ -26,6 +26,18 @@
     { t: now - 2000, v: 10 },
     { t: now, v: 30 },
   ];
+  // 900 samples (a full 15 m window at 1 Hz) to exercise the min-max decimation
+  // down to <= 150 rendered points; peaks and troughs must survive.
+  const manyPoints = Array.from({ length: 900 }, (_, i) => ({
+    t: now - (899 - i) * 1000,
+    v: 50 + Math.sin(i / 11) * 30 + (i % 53 === 0 ? 40 : 0),
+  }));
+  // Every sample shares one timestamp (degenerate case): index bucketing must
+  // still render rather than collapse.
+  const sameTime = Array.from({ length: 400 }, (_, i) => ({
+    t: now,
+    v: 20 + (i % 9) * 5,
+  }));
 
   const { Story } = defineMeta({
     title: "Views/BrokerStatusWindow/Sparkline",
@@ -51,4 +63,6 @@
   args={{ ...storyArgs, points: [{ t: now, v: 5 }] }}
   {template}
 />
+<Story name="ManyPoints" args={{ ...storyArgs, points: manyPoints }} {template} />
+<Story name="SameTimestamp" args={{ ...storyArgs, points: sameTime }} {template} />
 <Story name="Empty" args={{ ...storyArgs, points: [] }} {template} />

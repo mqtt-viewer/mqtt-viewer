@@ -1,0 +1,34 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "LoudestTopics",
+  "tier": "view",
+  "description": "Client-side loudest-topics table for the broker-status window: top rows over the selected range with msg/s, bytes/s and a share bar, a '(collecting)' header suffix while the window fills, and an overflow footer line. Topics middle-ellipsise with the full topic in a tooltip; at narrow widths the share bar drops first, then bytes/s.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "loudest",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "LoudestState from the store: { rows: {topic, msgPerSec, bytesPerSec}[], overflowTopics, overflowMsgPerSec, collecting }."
+    }
+  ],
+  "tokens": [
+    "outline",
+    "elevation-1",
+    "elevation-2",
+    "secondary-text",
+    "emphasis",
+    "divider",
+    "primary"
+  ],
+  "dependencies": ["Tooltip"],
+  "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport."
+}

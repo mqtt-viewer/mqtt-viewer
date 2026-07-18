@@ -87,6 +87,14 @@ const customTile = (state: BrokerStatusState): BrokerTileView => {
   return t;
 };
 
+// v2: the reclassified builtins are `hidden` and no longer render as gauge
+// tiles, so their live values are read from metricByKey instead of `tiles`.
+const metric = (state: BrokerStatusState, key: string) => {
+  const m = state.metricByKey.get(key);
+  if (!m) throw new Error(`no metric ${key}: have ${[...state.metricByKey.keys()]}`);
+  return m;
+};
+
 const BASE_MS = 1_000_000_000; // fixed epoch base for deterministic buckets
 
 beforeEach(() => {
@@ -118,8 +126,9 @@ describe("createBrokerStatusStore — backfill", () => {
 
     expect(tile(state, "clients_connected").display).toBe("5");
     expect(tile(state, "subscriptions").display).toBe("3");
-    expect(tile(state, "version").display).toBe("mosquitto 2.0.18");
-    expect(tile(state, "version").valueKind).toBe("text");
+    // version is hidden (feeds the facts row) — read it from metricByKey.
+    expect(metric(state, "version").text).toBe("mosquitto 2.0.18");
+    expect(metric(state, "version").value).toBeNull();
 
     expect(state.latestByTopic.get("$SYS/broker/clients/connected")).toEqual({
       value: "5",
@@ -332,7 +341,7 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     ]);
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
-    expect(tile(get(store), "msg_rate_in").value).toBeCloseTo(75, 6);
+    expect(metric(get(store), "msg_rate_in").value).toBeCloseTo(75, 6);
     store.destroy();
   });
 
@@ -345,7 +354,7 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     await store.init();
     // Broker restart: counter drops below the previous value.
     emit("msgs", [msg(EMQX, "50", BASE_MS + 2000)]);
-    expect(tile(get(store), "msg_rate_in").value).toBe(0);
+    expect(metric(get(store), "msg_rate_in").value).toBe(0);
     store.destroy();
   });
 
@@ -361,7 +370,7 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     ]);
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
-    const t = tile(get(store), "msg_rate_in");
+    const t = metric(get(store), "msg_rate_in");
     expect(t.samples.map((s) => s.v)).toEqual([100]);
     expect(t.value).toBeCloseTo(100, 6);
     store.destroy();
@@ -491,7 +500,10 @@ describe("createBrokerStatusStore — empty state & teardown", () => {
 
     emit("msgs", [msg("$SYS/broker/uptime", "60 seconds", BASE_MS)]);
     expect(get(store).sysEverSeen).toBe(true);
-    expect(tile(get(store), "uptime").display).toBe("1m");
+    // uptime is hidden (feeds the facts row) — read it from metricByKey.
+    const up = metric(get(store), "uptime");
+    expect(up.value).toBe(60);
+    expect(up.isDuration).toBe(true);
     store.destroy();
   });
 
@@ -537,21 +549,26 @@ describe("createBrokerStatusStore — empty state & teardown", () => {
 // --- v2: hidden metrics, metricByKey, visible-tile predicate ------------------
 
 describe("createBrokerStatusStore — hidden metrics & metricByKey", () => {
-  it("keeps the relocated v1 tiles visible but omits the new hidden metrics", async () => {
+  it("omits every hidden metric from the gauges grid (v2 surfaces)", async () => {
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
     const keys = get(store).tiles.map((t) => t.key);
-    // v1 tiles reclassified hidden but grandfathered in this commit.
+    // v1 tiles reclassified hidden now leave the grid (they feed the hero and
+    // facts row via metricByKey instead).
     for (const k of ["msg_rate_in", "msg_rate_out", "uptime", "version"]) {
-      expect(keys, k).toContain(k);
+      expect(keys, k).not.toContain(k);
+    }
+    // Brand-new hidden diagnostic / derived metrics never surface as tiles.
+    for (const k of ["msgs_dropped", "delivery_backlog", "heap_current", "fan_out"]) {
+      expect(keys, k).not.toContain(k);
     }
     // Non-hidden gauges + observed computed tiles stay.
     for (const k of ["clients_connected", "bytes_rate_in", OBSERVED_MSG_KEY]) {
       expect(keys, k).toContain(k);
     }
-    // Brand-new hidden diagnostic / derived metrics never surface as tiles.
-    for (const k of ["msgs_dropped", "delivery_backlog", "heap_current", "fan_out"]) {
-      expect(keys, k).not.toContain(k);
+    // ...but the hidden values remain available via metricByKey.
+    for (const k of ["msg_rate_in", "uptime", "version", "heap_current"]) {
+      expect(get(store).metricByKey.has(k), k).toBe(true);
     }
     store.destroy();
   });

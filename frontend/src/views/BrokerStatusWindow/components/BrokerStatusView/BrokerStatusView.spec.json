@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "BrokerStatusView",
   "tier": "view",
-  "description": "Body of the Broker Status window: responsive stat-tile grid with an always-last add-tile '+', a no-$SYS empty state with an add-subscription CTA, and a collapsible raw $SYS topic browser. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+  "description": "Body of the Broker Status window (v2): sticky health strip (or capability notice), traffic hero chart, loudest-topics table, gauges grid with an always-last '+', facts row, and a collapsible raw $SYS browser with a derived rate column. Keeps the v1 no-$SYS empty state + add-subscription CTA. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -27,6 +27,7 @@
   ],
   "tokens": [
     "outline",
+    "elevation-0",
     "elevation-1",
     "secondary-text",
     "emphasis",
@@ -36,11 +37,15 @@
   "dependencies": [
     "StatTile",
     "MetricMappingEditor",
+    "HealthStrip",
+    "HeroChart",
+    "LoudestTopics",
+    "FactsRow",
     "Icon",
     "IconButton",
     "Tooltip",
     "Button",
     "BaseInput"
   ],
-  "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed."
+  "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed. The derived rate column tracks per-topic prev-values in a tracker owned here and reset on a history clear."
 }

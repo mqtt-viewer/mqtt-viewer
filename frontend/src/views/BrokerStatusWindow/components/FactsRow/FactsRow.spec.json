@@ -1,0 +1,61 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "FactsRow",
+  "tier": "view",
+  "description": "One-line broker facts under the gauges: broker/version, uptime, session counts with word labels ('17 live, 6 offline, 2 expired'), and average message size. Each part is omitted when its metric has no data.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "version",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Broker/version string, or null when unpublished."
+    },
+    {
+      "name": "uptimeSeconds",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Uptime in seconds; rendered via humanizeDuration."
+    },
+    {
+      "name": "clientsConnected",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Live sessions."
+    },
+    {
+      "name": "clientsDisconnected",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Offline sessions."
+    },
+    {
+      "name": "clientsExpired",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Expired sessions."
+    },
+    {
+      "name": "avgMsgSize",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Average message size in bytes."
+    }
+  ],
+  "tokens": ["secondary-text"],
+  "dependencies": [],
+  "notes": "Figma is not linked yet. Values are read from the store's metricByKey by BrokerStatusView and passed in as plain props."
+}

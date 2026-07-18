@@ -19,6 +19,6 @@
     "white-text",
     "elevation-0"
   ],
-  "dependencies": [],
-  "notes": "Figma is not linked yet."
+  "dependencies": ["BrokerStatusView", "TimeRangeSelector"],
+  "notes": "Figma is not linked yet. The shell owns the header staleness pill and time-range selector, and wraps the body in an overflow-y-auto scroll container for the sticky health strip."
 }
