@@ -31,8 +31,8 @@ describe("buildChartWindowURL", () => {
       topic: "home/sensors/temp",
       fields: ["payload.temp", "payload.humidity"],
     });
-    expect(url.startsWith("/?")).toBe(true);
-    const params = new URLSearchParams(url.slice(2));
+    expect(url.startsWith("?")).toBe(true);
+    const params = new URLSearchParams(url.slice(1));
     expect(params.get("view")).toBe("chart");
     expect(params.get("conn")).toBe("7");
     expect(params.get("topic")).toBe("home/sensors/temp");
@@ -48,7 +48,7 @@ describe("buildChartWindowURL", () => {
       topic: "a/b",
       fields: [],
     });
-    const params = new URLSearchParams(url.slice(2));
+    const params = new URLSearchParams(url.slice(1));
     expect(params.has("fields")).toBe(false);
   });
 
@@ -59,17 +59,20 @@ describe("buildChartWindowURL", () => {
       topic,
       fields: ["a b", "c&d"],
     });
-    const params = new URLSearchParams(url.slice(2));
+    const params = new URLSearchParams(url.slice(1));
     expect(params.get("topic")).toBe(topic);
     expect(JSON.parse(params.get("fields") ?? "[]")).toEqual(["a b", "c&d"]);
   });
 });
 
 describe("buildStatusWindowURL", () => {
-  it("matches the backend's encoding exactly for the simple case", () => {
-    // Go's url.Values.Encode() sorts keys, so conn precedes view.
-    // buildStatusWindowURL in backend/app/windows.go yields this string.
-    expect(buildStatusWindowURL(3)).toBe("/?conn=3&view=status");
+  it("matches the backend's query encoding exactly for the simple case", () => {
+    // Go's url.Values.Encode() sorts keys, so conn precedes view. The frontend
+    // reference is path-relative (no leading slash) so window.open carries a
+    // reverse-proxy prefix; the query bytes after "?" stay identical to
+    // buildStatusWindowURL in backend/app/windows.go, which yields
+    // "/?conn=3&view=status".
+    expect(buildStatusWindowURL(3)).toBe("?conn=3&view=status");
   });
 });
 
@@ -112,6 +115,6 @@ describe("open helpers", () => {
 
     openBrokerStatusWindow(4);
     expect(OpenBrokerStatusWindow).not.toHaveBeenCalled();
-    expect(windowOpen).toHaveBeenCalledWith("/?conn=4&view=status", "mv-status-4");
+    expect(windowOpen).toHaveBeenCalledWith("?conn=4&view=status", "mv-status-4");
   });
 });
