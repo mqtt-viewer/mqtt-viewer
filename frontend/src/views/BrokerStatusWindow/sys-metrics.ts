@@ -126,7 +126,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   },
   {
     key: "msg_rate_in",
-    label: "Msgs/s in",
+    label: "Msg/s in",
     // v2: samples feed the traffic hero's inbound series, not a gauge tile.
     hidden: true,
     overrideKind: "gauge",
@@ -144,7 +144,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   },
   {
     key: "msg_rate_out",
-    label: "Msgs/s out",
+    label: "Msg/s out",
     // v2: samples feed the traffic hero's outbound series, not a gauge tile.
     hidden: true,
     overrideKind: "gauge",
@@ -254,7 +254,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   // Their samples are tracked in runtime and reach the view via `metricByKey`.
   {
     key: "msgs_dropped",
-    label: "Dropped msgs/s",
+    label: "Dropped msg/s",
     hidden: true,
     overrideTarget: false,
     overrideKind: "gauge",
@@ -378,7 +378,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   // Broker-published 5m/15m load averages — legend-tooltip context only.
   {
     key: "msg_rate_in_5min",
-    label: "Msgs/s in (5m avg)",
+    label: "Msg/s in (5m avg)",
     hidden: true,
     overrideTarget: false,
     overrideKind: "gauge",
@@ -393,7 +393,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   },
   {
     key: "msg_rate_in_15min",
-    label: "Msgs/s in (15m avg)",
+    label: "Msg/s in (15m avg)",
     hidden: true,
     overrideTarget: false,
     overrideKind: "gauge",
@@ -408,7 +408,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   },
   {
     key: "msg_rate_out_5min",
-    label: "Msgs/s out (5m avg)",
+    label: "Msg/s out (5m avg)",
     hidden: true,
     overrideTarget: false,
     overrideKind: "gauge",
@@ -423,7 +423,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   },
   {
     key: "msg_rate_out_15min",
-    label: "Msgs/s out (15m avg)",
+    label: "Msg/s out (15m avg)",
     hidden: true,
     overrideTarget: false,
     overrideKind: "gauge",
@@ -485,7 +485,7 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   // their values from its observed-rate ring buffer.
   {
     key: "observed_msg_rate",
-    label: "Observed msgs/s",
+    label: "Observed msg/s",
     candidates: [],
     computed: true,
     tooltip: OBSERVED_TOOLTIP,

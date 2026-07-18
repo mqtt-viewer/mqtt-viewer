@@ -102,7 +102,7 @@
   name="DeltaUp"
   args={{
     ...storyArgs,
-    label: "Msgs/s in",
+    label: "Msg/s in",
     value: "1.2k",
     unit: undefined,
     deltaPct: 8,
@@ -141,7 +141,7 @@
   name="WithDescription"
   args={{
     ...storyArgs,
-    label: "Observed msgs/s",
+    label: "Observed msg/s",
     value: "36.5",
     unit: undefined,
     description: "Measured by this client across its subscriptions",

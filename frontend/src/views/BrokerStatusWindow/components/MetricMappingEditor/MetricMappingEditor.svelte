@@ -188,9 +188,9 @@
 <Dialog
   {isOpen}
   title="Metric tiles"
-  description="Redirect a builtin tile to your broker's topics, or add your own custom tiles. Changes apply to this connection."
+  description="Redirect a built-in tile to your broker's topics, or add your own custom tiles. Changes apply to this connection."
 >
-  <div class="flex w-[520px] max-w-[86vw] flex-col gap-5">
+  <div class="flex max-h-[70vh] w-[520px] max-w-[86vw] flex-col gap-5 overflow-y-auto">
     <!-- Draft form: add mode, or edit when a row was picked. The floating
          labels sit above each input's box, so rows need the larger gap (and
          the first row clearance from the description) to keep them readable. -->

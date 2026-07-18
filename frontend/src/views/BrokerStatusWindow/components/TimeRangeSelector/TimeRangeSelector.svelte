@@ -18,7 +18,7 @@
   };
 </script>
 
-<Tooltip text={sparseNote ?? ""} placement="bottom">
+<Tooltip text={sparseNote ?? ""} placement="bottom" class="inline-flex w-fit">
   <div
     class="inline-flex items-center gap-0.5 rounded border border-outline bg-elevation-1 p-0.5"
     role="group"

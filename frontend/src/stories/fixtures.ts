@@ -229,7 +229,7 @@ const brokerTile = (t: MockBrokerTile) => ({
 const observedTiles = () => [
   brokerTile({
     key: "observed_msg_rate",
-    label: "Observed msgs/s",
+    label: "Observed msg/s",
     computed: true,
     tooltip: "Measured by this client across its subscriptions",
     value: 36.5,
@@ -984,7 +984,7 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   Sidebar: { isOpen: true, open: noop, close: noop },
   Sparkline: { points: mockSparklinePoints, height: 28 },
   StatTile: {
-    label: "Msgs/s in",
+    label: "Msg/s in",
     value: "1.2k",
     unit: "/s",
     points: mockSparklinePoints,

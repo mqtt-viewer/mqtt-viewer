@@ -127,7 +127,7 @@
   const brokerTooltip = (state: BrokerStatusState, dir: "in" | "out"): string => {
     const a5 = state.metricByKey.get(`msg_rate_${dir}_5min`)?.value ?? null;
     const a15 = state.metricByKey.get(`msg_rate_${dir}_15min`)?.value ?? null;
-    let text = "1 min average, from the broker";
+    let text = "1m average, from the broker";
     const segs: string[] = [];
     if (a5 !== null) segs.push(`5m: ${formatMetricValue(a5)}`);
     if (a15 !== null) segs.push(`15m: ${formatMetricValue(a15)}`);
@@ -197,6 +197,9 @@
   // zero baseline makes a percentage meaningless, so growth from zero returns
   // Infinity and the tile shows the direction glyph without a number.
   const deltaPctFor = (tile: BrokerTileView): number | undefined => {
+    // Custom tiles with a unit can be interval scales (temperature and the
+    // like) where percent change is meaningless; skip the delta for those.
+    if (tile.key.startsWith("custom:") && tile.unit) return undefined;
     const s = tile.samples;
     if (!s || s.length < 2) return undefined;
     const first = s[0].v;
@@ -210,7 +213,7 @@
   // Exact, unabbreviated value string for the tile's hover panel.
   const exactFor = (tile: BrokerTileView): string =>
     tile.valueKind === "number" && !tile.isDuration && tile.value !== null
-      ? tile.value.toLocaleString()
+      ? tile.value.toLocaleString(undefined, { maximumFractionDigits: 2 })
       : tile.display;
 
   // Whether this connection still has a $SYS/# subscription row — drives the
@@ -285,7 +288,7 @@
 <div class="flex flex-col gap-4 p-4">
   <!-- Health strip (sticky) or capability notice. -->
   {#if hasHealth}
-    <div class="sticky top-0 z-10 -mx-4 bg-elevation-0 px-4 pb-2 pt-1">
+    <div class="sticky top-0 z-10 -mx-4 border-b border-divider bg-elevation-0 px-4 pb-2 pt-1">
       <HealthStrip health={$store.health} />
     </div>
   {:else if showCapabilityNotice}
@@ -295,18 +298,19 @@
     </div>
   {/if}
 
-  <!-- Traffic hero: msgs/s in and out with the client-observed series. -->
+  <!-- All data surfaces dim together while disconnected so the frozen values
+       read as stale in the body, not only in the shell's banner. -->
+  <div class="flex flex-col gap-4 transition-opacity" class:opacity-60={!$store.connected}>
+
+  <!-- Traffic hero: msg/s in and out with the client-observed series. -->
   <HeroChart series={heroSeries} windowMinutes={$store.rangeMinutes} />
 
   <!-- Loudest topics (this client's subscriptions). -->
   <LoudestTopics loudest={$store.loudest} />
 
-  <!-- Tile grid: gauges + custom/override tiles, then the always-last +. Dimmed
-       while disconnected so the frozen values read as stale in the body, not
-       only in the shell's banner. -->
+  <!-- Tile grid: gauges + custom/override tiles, then the always-last +. -->
   <div
-    class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3 transition-opacity"
-    class:opacity-70={!$store.connected}
+    class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3"
   >
     {#each visibleTiles as tile (tile.key)}
       <StatTile
@@ -374,7 +378,11 @@
     avgMsgSize={facts.avgMsgSize}
   />
 
-  <!-- Collapsible raw $SYS browser. -->
+  </div>
+
+  <!-- Collapsible raw $SYS browser (hidden until a first topic arrives: an
+       empty expandable under the no-$SYS card reads as dead weight). -->
+  {#if $store.latestByTopic.size > 0}
   <div class="flex flex-col rounded border border-outline bg-elevation-1">
     <button
       type="button"
@@ -408,29 +416,29 @@
           </span>
         {:else}
           <div class="max-h-[320px] overflow-auto">
-            <table class="w-full border-collapse text-sm">
+            <table class="w-full table-fixed border-collapse text-sm">
               <thead>
                 <tr class="text-left text-secondary-text">
-                  <th class="py-1 pr-3 font-normal">Topic</th>
-                  <th class="py-1 pr-3 font-normal">Latest</th>
-                  <th class="py-1 pr-3 font-normal">Rate</th>
-                  <th class="py-1 pr-3 font-normal">Age</th>
-                  <th class="py-1 font-normal"></th>
+                  <th class="w-[42%] py-1 pr-3 font-normal">Topic</th>
+                  <th class="w-[22%] py-1 pr-3 font-normal">Latest</th>
+                  <th class="w-[13%] py-1 pr-3 text-right font-normal">Rate</th>
+                  <th class="w-[15%] py-1 pr-3 font-normal">Age</th>
+                  <th class="w-[8%] py-1 font-normal"></th>
                 </tr>
               </thead>
               <tbody>
                 {#each rawShown as row (row.topic)}
                   <tr class="border-t border-divider align-middle">
-                    <td class="max-w-[220px] truncate py-1 pr-3 text-emphasis">
+                    <td class="truncate py-1 pr-3 text-emphasis" title={row.topic}>
                       {row.topic}
                     </td>
                     <td
-                      class="max-w-[180px] truncate py-1 pr-3 font-mono tabular-nums text-secondary-text"
+                      class="truncate py-1 pr-3 font-mono tabular-nums text-secondary-text"
                     >
                       {row.value}
                     </td>
                     <td
-                      class="whitespace-nowrap py-1 pr-3 font-mono tabular-nums text-secondary-text"
+                      class="whitespace-nowrap py-1 pr-3 text-right font-mono tabular-nums text-secondary-text"
                     >
                       {row.rate !== null ? `${formatMetricValue(row.rate)}/s` : ""}
                     </td>
@@ -459,6 +467,7 @@
       </div>
     {/if}
   </div>
+  {/if}
 </div>
 
 <MetricMappingEditor

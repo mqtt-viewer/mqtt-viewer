@@ -139,8 +139,10 @@ describe("buildHeroChartOption dashed flag", () => {
   });
 
   it("colours multiple series from the shared palette in order", () => {
-    expect(heroSeriesColor(inSeries, 0, 3)).toBe(CHART_PALETTE[0]);
-    expect(heroSeriesColor(outSeries, 1, 3)).toBe(CHART_PALETTE[1]);
+    // Non-state hues only: the hero sits under the health strip's
+    // amber/red/green state colours (review cycle 3). In is primary, out teal.
+    expect(heroSeriesColor(inSeries, 0, 3)).toBe(CHART_PALETTE[1]);
+    expect(heroSeriesColor(outSeries, 1, 3)).toBe(CHART_PALETTE[4]);
   });
 });
 

@@ -45,7 +45,9 @@
   <div class="flex items-baseline gap-2">
     <span class="text-emphasis">Loudest topics</span>
     <span class="text-sm text-secondary-text">(this client's subscriptions)</span>
-    {#if loudest.collecting}
+    <!-- Suppressed while the table is empty: the body already says no
+         messages have arrived, and two stacked suffixes read as clutter. -->
+    {#if loudest.collecting && loudest.rows.length > 0}
       <span class="text-sm text-secondary-text opacity-70">(collecting)</span>
     {/if}
   </div>

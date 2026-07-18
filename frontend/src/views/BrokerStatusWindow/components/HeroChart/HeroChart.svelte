@@ -75,17 +75,20 @@
 </script>
 
 <div class="flex flex-col gap-1">
-  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
+  <!-- Values sit tight against their labels (left-aligned in a fixed-min-width
+       slot so 1 Hz updates never reflow) with the wide gap BETWEEN series, so
+       each value pairs visually with its own label, not the next swatch. -->
+  <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-1">
     {#each series as s, i (s.id)}
       <Tooltip text={s.tooltip ?? ""} placement="top">
         <div class="flex items-center gap-1.5">
           <span
             class="size-2.5 min-w-2.5 rounded-[2px]"
-            style:background-color={heroSeriesColor(s, i, series.length)}
+            style:background-color={heroSeriesColor(s, i, series.length, $theme)}
           ></span>
           <span class="text-sm text-secondary-text">{s.label}</span>
           <span
-            class="min-w-[3.5rem] text-right text-sm font-medium tabular-nums text-emphasis"
+            class="min-w-[3rem] text-sm font-medium tabular-nums text-emphasis"
             >{currentValue(s)}</span
           >
         </div>

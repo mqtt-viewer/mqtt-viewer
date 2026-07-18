@@ -6,9 +6,11 @@
 
   const componentName = "HeroChart";
 
-  // Fixed clock + static series so test-storybook renders are deterministic (no
-  // Date.now / Math.random in the render path).
-  const NOW = 1_700_000_000_000;
+  // Series anchored to load time (same approach as stories/fixtures.ts): the
+  // component's window slides with Date.now(), so points anchored to a fixed
+  // past timestamp would fall outside it and render an empty chart. The sine
+  // shapes stay deterministic; only the anchor moves.
+  const NOW = Date.now();
 
   // A gently varying msgs/s series across the last `windowMinutes`, one sample
   // per second, offset and scaled per series so the three lines read apart.

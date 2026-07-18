@@ -42,8 +42,10 @@
   $: sampleMin = hasSamples ? Math.min(...points!.map((p) => p.v)) : null;
   $: sampleMax = hasSamples ? Math.max(...points!.map((p) => p.v)) : null;
 
+  // One number format for the whole panel (exact value and min/max): grouped,
+  // at most two decimals.
   const fmtPanelNumber = (n: number): string =>
-    Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2);
+    n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 </script>
 
 <!-- `group` + focus-within drive the hover panel: it opens on pointer hover and
@@ -75,7 +77,7 @@
   </div>
 
   {#if noData}
-    <span class="text-sm text-secondary-text opacity-60">no data yet</span>
+    <span class="text-sm text-secondary-text opacity-60">No data yet</span>
   {:else}
     <div class="flex min-w-0 items-baseline gap-1">
       <span
@@ -96,10 +98,15 @@
   {/if}
 
   <!-- Hover/focus panel: exact value, min/max, and the window it spans. Owned
-       by the tile so each tile has one hover surface (no outer Tooltip). -->
+       by the tile so each tile has one hover surface (no outer Tooltip). It
+       opens BELOW the tile, anchored to its left edge: above-placement clipped
+       against the sticky health strip and the scroll container's top, and a
+       centred panel overflowed the window edge on the outer columns. Hidden on
+       no-data tiles (nothing to detail). -->
+  {#if !noData}
   <div
-    class="pointer-events-none absolute left-1/2 bottom-full z-[10003] mb-1 hidden w-max max-w-[240px]
-      -translate-x-1/2 flex-col gap-0.5 rounded border border-outline bg-elevation-2 px-3 py-2 text-xs
+    class="pointer-events-none absolute left-0 top-full z-[10003] mt-1 hidden w-max max-w-[240px]
+      flex-col gap-0.5 rounded border border-outline bg-elevation-2 px-3 py-2 text-xs
       shadow group-hover:flex group-focus-within:flex"
     role="tooltip"
   >
@@ -114,4 +121,5 @@
     {/if}
     <span class="text-secondary-text">over {windowName}</span>
   </div>
+  {/if}
 </div>
