@@ -31,6 +31,70 @@ on a trusted network, or put an authenticating reverse proxy in front
 (Caddy, Traefik, nginx, Authelia, a Cloudflare tunnel, whatever you already
 run). Do not expose the raw port to the internet.
 
+Auth has to live in the proxy rather than the app because the live event
+WebSocket is served by the Wails server layer directly, outside any hook the
+app can gate today, so a password check inside the app would still leave the
+message stream open.
+
+### Worked example: Caddy with basic auth
+
+Caddy sits in front, asks for a username and password, and forwards
+everything else to the container. Caddy proxies WebSocket upgrades by
+default, so the `/wails/events` stream that carries live messages works
+without extra config.
+
+Generate a password hash first:
+
+```sh
+docker run --rm -it caddy:2 caddy hash-password
+```
+
+`Caddyfile` (replace the domain and the hash):
+
+```
+mqtt.example.com {
+	basic_auth {
+		admin REPLACE_WITH_HASH
+	}
+	reverse_proxy mqtt-viewer:8080
+}
+```
+
+With a real domain Caddy also provisions TLS for you. On a LAN without a
+domain, use `:80` as the site address instead and accept that there is no
+TLS.
+
+`docker-compose.yml`:
+
+```yaml
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  mqtt-viewer:
+    image: ghcr.io/mqtt-viewer/mqtt-viewer:latest
+    restart: unless-stopped
+    volumes:
+      - mqtt-viewer-data:/data
+    # No ports: only Caddy can reach it on the compose network.
+
+volumes:
+  caddy-data:
+  caddy-config:
+  mqtt-viewer-data:
+```
+
+Note the mqtt-viewer service publishes no ports. The only way in is through
+Caddy, which is the point.
+
 ## Configuration
 
 | Env var | Default | What it does |
