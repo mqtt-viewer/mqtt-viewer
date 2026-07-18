@@ -74,13 +74,22 @@ Caveats:
 - **Headless, not the native window.** It's the real Go backend + services (DB,
   MQTT, etc.), so bindings behave for real — but there's no OS window, menus,
   dialogs, screens, or native file pickers (those are no-ops in server mode).
-- **Backend→frontend live events need one extra step.** Events are pushed over a
-  WebSocket set up by `/wails/custom.js`, which server mode serves but does *not*
-  auto-inject. If you need live pushes (incoming MQTT messages, etc.), add
-  `<script src="/wails/custom.js"></script>` to the page. Plain request/response
-  binding calls need nothing extra.
+- **Backend→frontend live events work out of the box.** Events are pushed over
+  a WebSocket set up by `/wails/custom.js`. The server does not inject that
+  script into the HTML it serves, but the bundled `@wailsio/runtime`
+  (`3.0.0-alpha.79`) bootstraps it itself: its index module runs
+  `loadOptionalScript('/wails/custom.js')` on load, which HEAD-probes the path
+  and appends the script tag only where the route exists (verified: the events
+  socket reaches OPEN and delivers real events with no extra markup). In the
+  native webview the probe 404s and is a no-op. No manual
+  `<script src="/wails/custom.js">` tag is needed.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
+
+To test the app behind a path-prefixing reverse proxy (Home Assistant ingress),
+run `scripts/ingress-sim.go` in front of the server-mode app: it serves
+everything under `/prefix/` and strips the prefix before forwarding, mirroring
+how ingress mounts an add-on (see the file's header for usage).
 
 ### Fallback for human/visual verification
 

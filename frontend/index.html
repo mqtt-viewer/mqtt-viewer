@@ -12,12 +12,12 @@
       // "/wails/events". Under a prefix those bypass the proxy and 404, so no
       // binding call or live event ever reaches the backend. I cannot edit the
       // bundled runtime, so I rewrite /wails/* access at the page level before
-      // anything else loads: fetch (runtime calls and the custom.js probe),
-      // WebSocket (events), and <script src> (the injected custom.js tag) are
-      // wrapped to resolve /wails/* relative to the document directory instead
-      // of the origin root. Served at the root (desktop webview, or server mode
-      // at /) the directory is "/", so the rewrite is a no-op and behaviour is
-      // unchanged.
+      // anything else loads: fetch (runtime calls and the runtime's own
+      // custom.js probe), WebSocket (events), and <script src> (the injected
+      // custom.js tag) are wrapped to resolve /wails/* relative to the
+      // document directory instead of the origin root. Served at the root
+      // (desktop webview, or server mode at /) the directory is "/", so the
+      // rewrite is a no-op and behaviour is unchanged.
       (function () {
         try {
           var rewrite = function (value) {
@@ -90,27 +90,13 @@
         }
       } catch (e) {}
     </script>
-    <script>
-      // Server mode pushes backend->frontend events over a WebSocket
-      // bootstrapped by /wails/custom.js, which the server serves but does not
-      // auto-inject; the native webview has no such route. Probe for it and
-      // append the script only where it exists, before the main module so the
-      // event bridge is up first. The path is relative so it resolves under a
-      // reverse-proxy prefix (the shim above also rewrites it). See
-      // frontend/AGENTS.md "Driving the app from a browser".
-      (function () {
-        try {
-          fetch("wails/custom.js", { method: "HEAD" })
-            .then(function (res) {
-              if (!res.ok) return;
-              var script = document.createElement("script");
-              script.src = "wails/custom.js";
-              document.head.appendChild(script);
-            })
-            .catch(function () {});
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Server mode pushes backend->frontend events over a WebSocket
+         bootstrapped by /wails/custom.js. No loader is needed here: the
+         bundled @wailsio/runtime probes for and injects that script itself
+         (loadOptionalScript in its index module), and the shim above makes
+         both the probe and the injected src resolve under a reverse-proxy
+         prefix. The native webview has no such route, so the probe 404s and
+         is a no-op there. See AGENTS.md "Driving the app from a browser". -->
     <link href="./src/style.css" rel="stylesheet" />
     <title>MQTT Viewer</title>
   </head>
