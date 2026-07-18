@@ -1,0 +1,24 @@
+{
+  "version": "3",
+  "templates": [
+    {
+      "id": 1,
+      "type": 1,
+      "title": "MQTT Viewer",
+      "description": "Browser-based MQTT client. Connects to one or more brokers and shows the topic tree, live message history and charts as data arrives. No built-in login: keep it on a trusted network or put an authenticating reverse proxy in front.",
+      "categories": ["network", "utilities"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/mqtt-viewer/mqtt-viewer/main/build/appicon.png",
+      "image": "ghcr.io/mqtt-viewer/mqtt-viewer:latest",
+      "name": "mqtt-viewer",
+      "ports": ["8080:8080/tcp"],
+      "volumes": [
+        {
+          "container": "/data"
+        }
+      ],
+      "restart_policy": "unless-stopped",
+      "note": "There is no login screen in the web UI. Anyone who can reach the published port can use your saved broker connections. Run it on a trusted network or behind an authenticating reverse proxy. Documentation: https://github.com/mqtt-viewer/mqtt-viewer/blob/main/docs/DOCKER.md"
+    }
+  ]
+}
