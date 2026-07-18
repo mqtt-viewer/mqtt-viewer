@@ -4,7 +4,13 @@ import (
 	"fmt"
 	"log/slog"
 	"mqtt-viewer/backend/machine"
+	"os"
 	"strings"
+)
+
+const (
+	prodServerAddress      = "https://cloud.mqttviewer.app"
+	serverAddressEnvVarKey = "MQTT_VIEWER_SERVER_ADDRESS"
 )
 
 var (
@@ -22,8 +28,8 @@ func init() {
 	if !strings.Contains(Version, "-dev") {
 		IsDev = false
 	}
+	ServerAddress = resolveServerAddress(IsDev, ServerAddress, os.Getenv(serverAddressEnvVarKey))
 	if !IsDev {
-		ServerAddress = "https://cloud.mqttviewer.app"
 		slog.Info("running in prod mode")
 	} else {
 		slog.Info("running in dev mode")
@@ -40,4 +46,16 @@ func init() {
 	}
 
 	slog.Info(fmt.Sprintf("using server address %s", ServerAddress))
+}
+
+// resolveServerAddress picks the portal address. The env var override only
+// applies to dev builds so prod binaries always talk to the real portal.
+func resolveServerAddress(isDev bool, devDefault string, devOverride string) string {
+	if !isDev {
+		return prodServerAddress
+	}
+	if devOverride != "" {
+		return devOverride
+	}
+	return devDefault
 }
