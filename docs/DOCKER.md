@@ -111,6 +111,14 @@ handle yet. If you want this, say so in
 [issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119) so I know
 to prioritise it.
 
+## App store templates
+
+Ready-to-submit manifests for Unraid Community Applications, Portainer,
+CasaOS, Umbrel and Runtipi live in
+[docker/templates](../docker/templates/README.md). Nothing there is live
+yet: I submit them to each platform once the image itself is published, and
+that README has the submission URL and process for each one.
+
 ## Troubleshooting
 
 - **Container exits immediately**: check `docker logs mqtt-viewer`. A
