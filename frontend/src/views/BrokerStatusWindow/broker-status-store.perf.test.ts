@@ -10,17 +10,24 @@
 // O(n²)/per-message-allocation regressions and unbounded state growth.
 //
 // What it drives:
-//   - 3 minutes of 4000 msg/s = 600 batch events × 1200 messages at the real
-//     ~300 ms Wails batch cadence, with the 1 s observed-rate ticker running.
+//   - ~5.5 minutes of 4000 msg/s = 1100 batch events × 1200 messages at the
+//     real ~300 ms Wails batch cadence, with the 1 s observed-rate ticker
+//     running. 1100 batches means each tile samples past the 900 sparkline cap,
+//     so the in-place trim is actually exercised and asserted.
 //   - Message mix: ~2% $SYS topics with numeric payloads (drive the tiles),
 //     ~98% regular topics across a wide, mostly-distinct topic tree with
-//     realistic base64 payloads (~100–300 decoded bytes).
+//     realistic base64 payloads (~100–300 decoded bytes) — ~9k distinct topics
+//     exercise the per-topic engine's 512 admission cap.
 //
 // What it asserts:
-//   - mean per-batch handler time < 5 ms, total handler time < 3 s.
-//   - bounded state: sparkline sample arrays ≤ SPARKLINE_CAP, and latestByTopic
-//     never exceeds the count of distinct tracked ($SYS) topics — i.e. the
-//     thousands of untracked regular topics do NOT accumulate entries.
+//   - mean per-batch handler time < 5 ms, total handler time < 5.5 s
+//     (proportional to the batch count).
+//   - bounded state: sparkline sample arrays ≤ SPARKLINE_CAP (and at least one
+//     reaches it), the per-topic loudest table stays ≤ 6 rows, and
+//     latestByTopic never exceeds the count of distinct tracked ($SYS) topics —
+//     i.e. the thousands of untracked regular topics do NOT accumulate entries.
+//   - a separate fake-timer test fills and wraps the 900-deep per-topic ring
+//     with near-empty batches, asserting the ring stays bounded.
 
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { get } from "svelte/store";
@@ -103,7 +110,7 @@ const mkMsg = (topic: string, payloadB64: string) =>
 
 // --- Flood parameters ---------------------------------------------------------
 
-const BATCHES = 600; // 600 × 300 ms = 180 s = 3 minutes
+const BATCHES = 1100; // 1100 × 300 ms ≈ 330 s; enough to exceed the 900 cap
 const MSGS_PER_BATCH = 1200; // 1200 / 0.3 s = 4000 msg/s
 const BATCH_MS = 300; // real Wails batch cadence
 const TEMPLATES = 8; // handful of reused batch objects
@@ -242,7 +249,7 @@ describe("createBrokerStatusStore — flood perf", () => {
     // Perf contract (generous CI headroom; the point is catching O(n²) /
     // per-message-allocation regressions, not micro-benchmarks).
     expect(mean).toBeLessThan(5);
-    expect(total).toBeLessThan(3000);
+    expect(total).toBeLessThan(5500);
 
     // Bounded state: no sparkline buffer exceeds the cap...
     for (const t of state.tiles) {
@@ -252,12 +259,38 @@ describe("createBrokerStatusStore — flood perf", () => {
     // in-place trim runs (not merely that buffers never grew).
     expect(maxSamples).toBe(SPARKLINE_CAP);
 
+    // Per-topic engine stayed bounded under the wide flood: the loudest table
+    // never exceeds its row cap, and the ring never exceeds its depth.
+    expect(state.loudest.rows.length).toBeLessThanOrEqual(6);
+    expect(store.topicRingSize()).toBeLessThanOrEqual(900);
+
     // Bounded state: latestByTopic holds only the distinct tracked ($SYS)
     // topics. The ~9k distinct untracked regular topics contributed to the rate
     // counters only — they must NOT accumulate entries.
     expect(state.latestByTopic.size).toBeLessThanOrEqual(distinctSysTopics);
     expect(distinctRegularLeaves).toBeGreaterThan(1000); // the flood really was wide
 
+    store.destroy();
+  });
+
+  // Cheap, deterministic ring-wrap test on the fake clock: fire far more than
+  // 900 ticks with tiny batches and assert the 900-deep per-topic ring (and the
+  // observed series ring) stay bounded rather than growing per tick.
+  it("keeps the per-topic ring bounded as it wraps past its depth", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init(); // await so the 1 s ticker is running before the loop
+
+    const TICKS = 1200; // > 900, so the ring wraps fully
+    for (let i = 0; i < TICKS; i++) {
+      // One near-empty batch per second keeps the ring turning cheaply.
+      const m = mkMsg(`ring/topic${i & 7}`, b64("x"));
+      m.timeMs = Date.now();
+      emit("msgs", [m]);
+      vi.advanceTimersByTime(1000); // one ticker tick → one ring record
+    }
+
+    expect(store.topicRingSize()).toBe(900); // capped at depth, not TICKS
+    expect(get(store).observedSeries.length).toBeLessThanOrEqual(900);
     store.destroy();
   });
 });

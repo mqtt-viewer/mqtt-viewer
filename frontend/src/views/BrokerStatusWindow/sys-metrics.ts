@@ -57,11 +57,30 @@ export interface MetricTile {
   unit?: string;
   /** Ordered candidates; first with data wins. Empty for computed tiles. */
   candidates: MetricCandidate[];
-  /** Client-side computed tiles (observed rates) — no topics. */
+  /** Client-side computed tiles (observed rates, derived ratios) — no topics. */
   computed?: boolean;
   tooltip?: string;
   /** Kind used when a user override redirects this builtin to their topic. */
   overrideKind?: MetricKind;
+  /**
+   * v2: the metric is tracked (value + samples fold into runtime and are
+   * exposed via the store's `metricByKey`) but has no gauge tile of its own —
+   * its samples feed the traffic hero, health chips, the facts row, or a
+   * derived ratio instead. Independent of `overrideTarget`: `uptime`/`version`
+   * are hidden yet remain override targets.
+   *
+   * NOTE (commit-staging): the hidden→no-tile filter is applied by the store's
+   * visible-tile predicate, and in the store-engine commit that predicate still
+   * keeps the reclassified v1 tiles (`msg_rate_*`, `uptime`, `version`) on
+   * screen. The brand-new hidden metrics below never surface as tiles.
+   */
+  hidden?: boolean;
+  /**
+   * v2: excluded from the mapping editor's override Select. Defaults to true
+   * (absent = an override target). Set false for the internal diagnostic /
+   * derived-input metrics that would only confuse a manual remap.
+   */
+  overrideTarget?: boolean;
 }
 
 /**
@@ -108,6 +127,8 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   {
     key: "msg_rate_in",
     label: "Msgs/s in",
+    // v2: samples feed the traffic hero's inbound series, not a gauge tile.
+    hidden: true,
     overrideKind: "gauge",
     candidates: [
       {
@@ -124,6 +145,8 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   {
     key: "msg_rate_out",
     label: "Msgs/s out",
+    // v2: samples feed the traffic hero's outbound series, not a gauge tile.
+    hidden: true,
     overrideKind: "gauge",
     candidates: [
       {
@@ -198,6 +221,8 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   {
     key: "uptime",
     label: "Uptime",
+    // v2: feeds the facts row, not a gauge tile — but stays an override target.
+    hidden: true,
     overrideKind: "duration",
     candidates: [
       // mosquitto: "3672 seconds"
@@ -212,6 +237,8 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
   {
     key: "version",
     label: "Broker",
+    // v2: feeds the facts row, not a gauge tile — but stays an override target.
+    hidden: true,
     overrideKind: "string",
     candidates: [
       { pattern: "$SYS/broker/version", payloadPath: "", kind: "string" },
@@ -220,6 +247,240 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
       // VerneMQ systree publishes no version metric.
     ],
   },
+
+  // --- v2 hidden diagnostic / facts / legend metrics -------------------------
+  // All `hidden` (no gauge tile of their own) and NOT override targets (they
+  // are broker-family-specific signals; a manual remap would only confuse).
+  // Their samples are tracked in runtime and reach the view via `metricByKey`.
+  {
+    key: "msgs_dropped",
+    label: "Dropped msgs/s",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      // mosquitto: per-minute average count of dropped publishes → per-second.
+      {
+        pattern: "$SYS/broker/load/publish/dropped/1min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+      // Cumulative dropped counters across broker families; the store derives a
+      // /s rate from successive samples (same as the msg-rate tiles).
+      { pattern: "$SYS/broker/mqtt/publish/dropped", payloadPath: "", kind: "cumulative" },
+      { pattern: "$SYS/broker/publish/messages/dropped", payloadPath: "", kind: "cumulative" },
+      { pattern: "$SYS/broker/messages/publish/dropped", payloadPath: "", kind: "cumulative" },
+      { pattern: "$SYS/broker/messages/dropped", payloadPath: "", kind: "cumulative" },
+      { pattern: "$SYS/brokers/+/metrics/messages/dropped", payloadPath: "", kind: "cumulative" },
+    ],
+  },
+  {
+    key: "delivery_backlog",
+    label: "Delivery backlog",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      // mosquitto-8: "current number of packets queued" — a gauge, not a
+      // counter (an idle-broker fixture asserts it plateaus before the chip
+      // binds; see the registry tests).
+      { pattern: "$SYS/broker/packet/out/count", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "heap_current",
+    label: "Heap in use",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      { pattern: "$SYS/broker/heap/current", payloadPath: "", kind: "gauge" },
+      // aedes-stats + similar `+`-node brokers. NOT Mochi's system/memory
+      // (process memory, deliberately unbound per the spec).
+      { pattern: "$SYS/+/memory/heap/current", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "heap_max",
+    label: "Heap peak",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      // A high-watermark, not a capacity ceiling.
+      { pattern: "$SYS/broker/heap/maximum", payloadPath: "", kind: "gauge" },
+      { pattern: "$SYS/+/memory/heap/maximum", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "store_msgs",
+    label: "Stored messages",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      { pattern: "$SYS/broker/store/messages/count", payloadPath: "", kind: "gauge" },
+      { pattern: "$SYS/broker/messages/stored", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "store_bytes",
+    label: "Stored bytes",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      { pattern: "$SYS/broker/store/messages/bytes", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "clients_disconnected",
+    label: "Disconnected clients",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      { pattern: "$SYS/broker/clients/disconnected", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "clients_expired",
+    label: "Expired clients",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      { pattern: "$SYS/broker/clients/expired", payloadPath: "", kind: "gauge" },
+    ],
+  },
+  {
+    key: "sockets_1min",
+    label: "Socket churn/s",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      {
+        pattern: "$SYS/broker/load/sockets/1min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+      {
+        pattern: "$SYS/broker/load/connections/1min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+    ],
+  },
+  // Broker-published 5m/15m load averages — legend-tooltip context only.
+  {
+    key: "msg_rate_in_5min",
+    label: "Msgs/s in (5m avg)",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      {
+        pattern: "$SYS/broker/load/messages/received/5min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+    ],
+  },
+  {
+    key: "msg_rate_in_15min",
+    label: "Msgs/s in (15m avg)",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      {
+        pattern: "$SYS/broker/load/messages/received/15min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+    ],
+  },
+  {
+    key: "msg_rate_out_5min",
+    label: "Msgs/s out (5m avg)",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      {
+        pattern: "$SYS/broker/load/messages/sent/5min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+    ],
+  },
+  {
+    key: "msg_rate_out_15min",
+    label: "Msgs/s out (15m avg)",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "gauge",
+    candidates: [
+      {
+        pattern: "$SYS/broker/load/messages/sent/15min",
+        payloadPath: "",
+        kind: "gauge",
+        scale: MINUTE_AVG,
+      },
+    ],
+  },
+  // Cumulative message totals: feed the fan-out ratio and avg-msg-size derived
+  // tiles (the store diffs successive samples into a /s rate).
+  {
+    key: "messages_received_total",
+    label: "Messages received",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "cumulative",
+    candidates: [
+      { pattern: "$SYS/broker/messages/received", payloadPath: "", kind: "cumulative" },
+      { pattern: "$SYS/brokers/+/metrics/messages/received", payloadPath: "", kind: "cumulative" },
+    ],
+  },
+  {
+    key: "messages_sent_total",
+    label: "Messages sent",
+    hidden: true,
+    overrideTarget: false,
+    overrideKind: "cumulative",
+    candidates: [
+      { pattern: "$SYS/broker/messages/sent", payloadPath: "", kind: "cumulative" },
+      { pattern: "$SYS/brokers/+/metrics/messages/sent", payloadPath: "", kind: "cumulative" },
+    ],
+  },
+
+  // Derived ratios computed on the tick from the hidden cumulative pair above.
+  // Hidden here (they reach the gauges grid via `metricByKey`); the store fills
+  // or clears them per the derived-rate guards.
+  {
+    key: "fan_out",
+    label: "Fan-out",
+    hidden: true,
+    overrideTarget: false,
+    computed: true,
+    candidates: [],
+  },
+  {
+    key: "avg_msg_size",
+    label: "Avg msg size",
+    hidden: true,
+    overrideTarget: false,
+    computed: true,
+    candidates: [],
+  },
+
   // Client-side computed tiles — always present, no topics; the store fills
   // their values from its observed-rate ring buffer.
   {

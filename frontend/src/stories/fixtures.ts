@@ -358,6 +358,15 @@ type MockBrokerState = {
   connected: boolean;
   sysEverSeen: boolean;
   windowOpenedAt: number;
+  // v2 state fields; minimal defaults here, fleshed-out fixtures land with
+  // the surfaces commit alongside the components that render them.
+  metricByKey: Map<string, import("@/views/BrokerStatusWindow/broker-status-store").MetricSnapshot>;
+  rangeMinutes: number;
+  learnedIntervalMs: number;
+  sysLastSeenMs: number;
+  observedSeries: import("@/views/BrokerStatusWindow/broker-status-store").SparklineSample[];
+  loudest: import("@/views/BrokerStatusWindow/broker-status-store").LoudestState;
+  health: import("@/views/BrokerStatusWindow/health").HealthChip[];
 };
 
 export const createMockBrokerStatusStore = (
@@ -370,6 +379,13 @@ export const createMockBrokerStatusStore = (
     connected: true,
     sysEverSeen: true,
     windowOpenedAt: now,
+    metricByKey: new Map(),
+    rangeMinutes: 5,
+    learnedIntervalMs: 10_000,
+    sysLastSeenMs: now,
+    observedSeries: [],
+    loudest: { rows: [], overflowTopics: 0, overflowMsgPerSec: 0, collecting: true },
+    health: [],
     ...overrides,
   };
   const { subscribe } = writable<MockBrokerState>(state);
@@ -379,6 +395,8 @@ export const createMockBrokerStatusStore = (
     reloadMappings: async () => [],
     destroy: noop,
     snapshot: () => state,
+    setRange: noop,
+    topicRingSize: () => 0,
     connectionId,
   };
 };
