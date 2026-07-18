@@ -86,7 +86,11 @@
     dir: MqttDataSortDirection
   ) => {
     if (key === "time") {
-      return dir === "desc" ? "Newest" : "Oldest";
+      return dir === "desc" ? "Newest" : "Silent";
+    } else if (key === "rate") {
+      return "Busiest";
+    } else if (key === "count") {
+      return "Messages";
     } else {
       return dir === "desc" ? "A → Z" : "Z → A";
     }
@@ -120,7 +124,7 @@
     </Tooltip>
 
     <Tooltip placement="bottom">
-      <DropdownMenu triggerText={sortButtonText} triggerClass="w-[100px]">
+      <DropdownMenu triggerText={sortButtonText} triggerClass="w-[110px]">
         <div class="flex flex-col" slot="menu-content">
           <DropdownMenuItem
             isSelected={$sortStore.key === "topic" && $sortStore.dir === "desc"}
@@ -140,7 +144,17 @@
           <DropdownMenuItem
             isSelected={$sortStore.key === "time" && $sortStore.dir === "asc"}
             onClick={() => sortStore.setSort("time", "asc")}
-            >Oldest first</DropdownMenuItem
+            >Silent first</DropdownMenuItem
+          >
+          <DropdownMenuItem
+            isSelected={$sortStore.key === "rate"}
+            onClick={() => sortStore.setSort("rate", "desc")}
+            >Busiest first</DropdownMenuItem
+          >
+          <DropdownMenuItem
+            isSelected={$sortStore.key === "count"}
+            onClick={() => sortStore.setSort("count", "desc")}
+            >Most messages</DropdownMenuItem
           >
         </div>
       </DropdownMenu>

@@ -255,6 +255,47 @@ test("parent that matches is kept when no children match", () => {
   expect(filteredData).toEqual(expectedResult);
 });
 
+// A5: the top node "house" (topic "house", one level) does NOT itself
+// wildcard-match "house/+", yet the tree keeps it because its child leaf
+// "house/kitchen" matches. A shallow sibling "garage" that matches neither is
+// pruned. Prune semantics: parents of matches are retained.
+test("wildcard pattern keeps a parent via a matching leaf, prunes non-matches", () => {
+  const unfilteredData: MqttData = {
+    house: {
+      topic: "house",
+      isDecodedProto: false,
+      latestMessageTime: new Date(),
+      message: undefined,
+      messageCount: 1,
+      subtopicCount: 1,
+      children: {
+        kitchen: {
+          topic: "house/kitchen",
+          isDecodedProto: false,
+          latestMessageTime: new Date(),
+          message: "22.5",
+          messageCount: 1,
+          subtopicCount: 0,
+          children: {},
+        },
+      },
+    },
+    garage: {
+      topic: "garage",
+      isDecodedProto: false,
+      latestMessageTime: new Date(),
+      message: "closed",
+      messageCount: 1,
+      subtopicCount: 0,
+      children: {},
+    },
+  };
+
+  const filteredData = filterData(unfilteredData, "house/+");
+  expect(Object.keys(filteredData)).toEqual(["house"]);
+  expect(Object.keys(filteredData.house.children)).toEqual(["kitchen"]);
+});
+
 test("search string with trailing empty space filters correctly", () => {
   const unfilteredData = {
     aaaaa: {
