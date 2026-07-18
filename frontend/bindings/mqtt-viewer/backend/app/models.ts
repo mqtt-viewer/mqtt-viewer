@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
+import {Create as $Create} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -59,7 +59,7 @@ export class Connection {
 }
 
 export class Connections {
-    "connections": { [_ in `${number}`]?: Connection };
+    "connections": { [_: `${number}`]: Connection };
 
     /** Creates a new Connections instance. */
     constructor($$source: Partial<Connections> = {}) {
@@ -146,7 +146,7 @@ export class MqttStats {
     "totalMessagesSent": number;
     "totalBytesReceived": number;
     "totalBytesSent": number;
-    "statsByConnection": { [_ in `${number}`]?: mqtt$0.ConnectionStats };
+    "statsByConnection": { [_: `${number}`]: mqtt$0.ConnectionStats };
 
     /** Creates a new MqttStats instance. */
     constructor($$source: Partial<MqttStats> = {}) {
@@ -219,12 +219,78 @@ export class OpenChartWindowParams {
     }
 }
 
+/**
+ * ProtoStateResult is the read model the frontend polls (on dialog open,
+ * after a dir pick, and on ProtoStateChanged) to render the bindings form
+ * and publish panel. Dir/LoadError/FileDescriptors/DescriptorNames describe
+ * the compiled per-connection registry (all zero values until one loads
+ * successfully); Rules is always the live DB row set.
+ */
+export class ProtoStateResult {
+    "dir": string;
+    "loadError": string;
+    "dirMissing": boolean;
+    "fileDescriptors": { [_: string]: string[] };
+    "descriptorNames": string[];
+    "rules": models$0.ProtoBindingRule[];
+
+    /** Creates a new ProtoStateResult instance. */
+    constructor($$source: Partial<ProtoStateResult> = {}) {
+        if (!("dir" in $$source)) {
+            this["dir"] = "";
+        }
+        if (!("loadError" in $$source)) {
+            this["loadError"] = "";
+        }
+        if (!("dirMissing" in $$source)) {
+            this["dirMissing"] = false;
+        }
+        if (!("fileDescriptors" in $$source)) {
+            this["fileDescriptors"] = {};
+        }
+        if (!("descriptorNames" in $$source)) {
+            this["descriptorNames"] = [];
+        }
+        if (!("rules" in $$source)) {
+            this["rules"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProtoStateResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProtoStateResult {
+        const $$createField3_0 = $$createType7;
+        const $$createField4_0 = $$createType6;
+        const $$createField5_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fileDescriptors" in $$parsedSource) {
+            $$parsedSource["fileDescriptors"] = $$createField3_0($$parsedSource["fileDescriptors"]);
+        }
+        if ("descriptorNames" in $$parsedSource) {
+            $$parsedSource["descriptorNames"] = $$createField4_0($$parsedSource["descriptorNames"]);
+        }
+        if ("rules" in $$parsedSource) {
+            $$parsedSource["rules"] = $$createField5_0($$parsedSource["rules"]);
+        }
+        return new ProtoStateResult($$parsedSource as Partial<ProtoStateResult>);
+    }
+}
+
 export class PublishParams {
     "topic": string;
     "qos": number;
     "payload": string;
     "retain": boolean;
     "properties": PublishProperties;
+
+    /**
+     * nil = auto (matcher decides), "" = raw (skip protobuf encoding),
+     * "<name>" = forced message type.
+     */
+    "protoOverride": string | null;
 
     /** Creates a new PublishParams instance. */
     constructor($$source: Partial<PublishParams> = {}) {
@@ -243,6 +309,9 @@ export class PublishParams {
         if (!("properties" in $$source)) {
             this["properties"] = (new PublishProperties());
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -251,7 +320,7 @@ export class PublishParams {
      * Creates a new PublishParams instance from a string or object.
      */
     static createFrom($$source: any = {}): PublishParams {
-        const $$createField4_0 = $$createType7;
+        const $$createField4_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("properties" in $$parsedSource) {
             $$parsedSource["properties"] = $$createField4_0($$parsedSource["properties"]);
@@ -268,7 +337,7 @@ export class PublishProperties {
     "responseTopic"?: string;
     "correlationData"?: string;
     "subscriptionIdentifier"?: number;
-    "userProperties"?: { [_ in string]?: string };
+    "userProperties"?: { [_: string]: string };
 
     /** Creates a new PublishProperties instance. */
     constructor($$source: Partial<PublishProperties> = {}) {
@@ -283,7 +352,7 @@ export class PublishProperties {
      * Creates a new PublishProperties instance from a string or object.
      */
     static createFrom($$source: any = {}): PublishProperties {
-        const $$createField7_0 = $$createType8;
+        const $$createField7_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("userProperties" in $$parsedSource) {
             $$parsedSource["userProperties"] = $$createField7_0($$parsedSource["userProperties"]);
@@ -313,6 +382,7 @@ export class SaveCollectionMessageParams {
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
     "userProperties": string | null;
+    "protoOverride": string | null;
 
     /** Creates a new SaveCollectionMessageParams instance. */
     constructor($$source: Partial<SaveCollectionMessageParams> = {}) {
@@ -367,6 +437,9 @@ export class SaveCollectionMessageParams {
         if (!("userProperties" in $$source)) {
             this["userProperties"] = null;
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -396,6 +469,7 @@ export class SavePublishHistoryEntryParams {
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
     "userProperties": string | null;
+    "protoOverride": string | null;
 
     /** Creates a new SavePublishHistoryEntryParams instance. */
     constructor($$source: Partial<SavePublishHistoryEntryParams> = {}) {
@@ -444,6 +518,9 @@ export class SavePublishHistoryEntryParams {
         if (!("userProperties" in $$source)) {
             this["userProperties"] = null;
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -477,7 +554,7 @@ export class StartupOptions {
      * Creates a new StartupOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): StartupOptions {
-        const $$createField0_0 = $$createType10;
+        const $$createField0_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("PathsOverride" in $$parsedSource) {
             $$parsedSource["PathsOverride"] = $$createField0_0($$parsedSource["PathsOverride"]);
@@ -527,7 +604,10 @@ const $$createType3 = $Create.Map($Create.Any, $$createType2);
 const $$createType4 = mqtt$0.ConnectionStats.createFrom;
 const $$createType5 = $Create.Map($Create.Any, $$createType4);
 const $$createType6 = $Create.Array($Create.Any);
-const $$createType7 = PublishProperties.createFrom;
-const $$createType8 = $Create.Map($Create.Any, $Create.Any);
-const $$createType9 = paths$0.Paths.createFrom;
-const $$createType10 = $Create.Nullable($$createType9);
+const $$createType7 = $Create.Map($Create.Any, $$createType6);
+const $$createType8 = models$0.ProtoBindingRule.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = PublishProperties.createFrom;
+const $$createType11 = $Create.Map($Create.Any, $Create.Any);
+const $$createType12 = paths$0.Paths.createFrom;
+const $$createType13 = $Create.Nullable($$createType12);

@@ -43,7 +43,8 @@
     <div class="grow min-w-0 truncate" style:max-width={`${maxWidth}px`}>
       <MqttTopicRow
         topic={item.expandKey}
-        isDecodedProto={item.isDecodedProto}
+        protoDecode={item.protoDecode}
+        protoDescriptorName={item.protoDescriptorName}
         isSelected={selectedTopic === item.topic}
         isExpanded={item.isExpanded}
         topicLevel={item.topicLevel}

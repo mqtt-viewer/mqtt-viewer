@@ -14,7 +14,8 @@
   export let subtopicCount: number;
   export let isExpanded: boolean;
   export let isSelected: boolean;
-  export let isDecodedProto: boolean = false;
+  export let protoDecode: "ok" | "failed" | undefined = undefined;
+  export let protoDescriptorName: string | undefined = undefined;
   export let toggleExpansion: (expandKey: string) => void;
   export let onTopicSelect: () => void;
   export let highlightedTopicStore: HighlightedMqttTopicsStore;
@@ -168,9 +169,25 @@
         <Icon type="pulse" size={14} />
       </button>
     {/if}
-    {#if isDecodedProto}
-      <span class="inline-block ml-2 mt-[1px]">
+    <!-- Native title attributes only: no melt Tooltip per row (see the
+         tree-row performance rule above). -->
+    {#if protoDecode === "ok"}
+      <span
+        class="inline-block ml-2 mt-[1px]"
+        title={protoDescriptorName
+          ? `Decoded as ${protoDescriptorName}`
+          : "Decoded"}
+      >
         <ProtobufLogo class="size-4" isActive />
+      </span>
+    {:else if protoDecode === "failed"}
+      <span
+        class="inline-block ml-2 mt-[1px] text-warning"
+        title={protoDescriptorName
+          ? `Failed to decode as ${protoDescriptorName}. Showing raw payload.`
+          : "Failed to decode. Showing raw payload."}
+      >
+        <Icon type="warning" size={14} />
       </span>
     {/if}
     {#if message !== undefined}

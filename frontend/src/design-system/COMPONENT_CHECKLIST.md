@@ -64,6 +64,7 @@
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
+| Components/ProtoBindingRulesForm | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
@@ -83,6 +84,7 @@
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
+| Views/Connection/ConnectionDetailsView/ProtoSection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree | [x] | [ ] | [x] | [ ] |
@@ -140,7 +142,7 @@
 
 ## Summary
 
-- Components scanned: 114
-- Story present: 114
+- Components scanned: 116
+- Story present: 116
 - Figma-linked: 0
 - Missing specs: 0

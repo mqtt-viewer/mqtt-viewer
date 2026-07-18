@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
+import {Create as $Create} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -50,7 +50,7 @@ export class MessageProperties {
     "messageExpiry": number | null;
     "subscriptionIdentifier": number | null;
     "topicAlias": number | null;
-    "userProperties": { [_ in string]?: string };
+    "userProperties": { [_: string]: string };
 
     /** Creates a new MessageProperties instance. */
     constructor($$source: Partial<MessageProperties> = {}) {
@@ -107,7 +107,7 @@ export class MqttMessage {
     "retain": boolean;
     "properties"?: MessageProperties | null;
     "timeMs": number;
-    "middlewareProperties"?: { [_ in string]?: any } | null;
+    "middlewareProperties"?: { [_: string]: any } | null;
     "Time": time$0.Time;
 
     /** Creates a new MqttMessage instance. */

@@ -11,6 +11,7 @@
   } from "../../stores/selected-topic-store";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
+  import ProtobufLogo from "@/components/ProtobufLogo/ProtobufLogo.svelte";
   import SelectedMessageArrivalDetails from "./components/SelectedMessageArrivalDetails.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
@@ -74,6 +75,24 @@
   $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
   $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
+
+  // Decode marker from the proto middleware, with a legacy fallback for
+  // messages recorded before ProtoDecode/ProtoDescriptorName existed.
+  $: protoDecodeStatus = (() => {
+    const mw = selectedMessage?.middlewareProperties as
+      | Record<string, unknown>
+      | undefined;
+    if (mw?.ProtoDecode === "ok" || mw?.ProtoDecode === "failed") {
+      return {
+        status: mw.ProtoDecode as "ok" | "failed",
+        name: mw.ProtoDescriptorName as string | undefined,
+      };
+    }
+    if (mw?.IsDecodedProto === true) {
+      return { status: "ok" as const, name: undefined };
+    }
+    return null;
+  })();
 
   $: selectedMessagePayload,
     (() => {
@@ -223,6 +242,23 @@
       No message selected
     </div>
   {:else}
+    {#if protoDecodeStatus}
+      <div class="flex items-center gap-1 text-sm mt-1 mb-1">
+        {#if protoDecodeStatus.status === "ok"}
+          <span class="size-4"><ProtobufLogo isActive /></span>
+          <span class="text-secondary-text">
+            Decoded as {protoDecodeStatus.name ?? "protobuf"}
+          </span>
+        {:else}
+          <span class="text-warning"><Icon type="warning" size={14} /></span>
+          <span class="text-warning">
+            Failed to decode{protoDecodeStatus.name
+              ? ` as ${protoDecodeStatus.name}`
+              : ""}
+          </span>
+        {/if}
+      </div>
+    {/if}
     {#if mqttVersion === "3"}
       <Tabs
         class="w-full grow min-h-0"

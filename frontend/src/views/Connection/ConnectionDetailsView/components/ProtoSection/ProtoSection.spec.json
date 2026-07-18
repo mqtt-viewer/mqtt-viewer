@@ -1,0 +1,29 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "ProtoSection",
+  "tier": "view",
+  "description": "Storybook coverage for ProtoSection.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "object",
+      "required": true,
+      "description": "The live Connection record (connectionDetails plus connection state) this section renders controls for; reactively bound so switch/dir/rule-list state track the connections and proto-state stores."
+    }
+  ],
+  "tokens": [],
+  "dependencies": [
+    "Switch",
+    "FilePathPicker",
+    "ProtoBindingRulesForm"
+  ],
+  "notes": "Wiring component: owns proto-state store reads, connections.updateConnectionDetails calls, and rule CRUD/reorder/test bindings, then passes props to ProtoBindingRulesForm. Renders last in ConnectionDetailsDialog, after SubscriptionsForm. Figma is not linked yet; this story uses local Storybook fixtures."
+}

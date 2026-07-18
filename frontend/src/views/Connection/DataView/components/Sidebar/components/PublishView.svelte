@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type * as models from "bindings/mqtt-viewer/backend/models/models";
+  import { GetMatchingProtoTypeForTopic } from "bindings/mqtt-viewer/backend/app/app";
+  import protoState from "@/stores/proto-state";
   import Button from "@/components/Button/Button.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
   import Tabs from "@/components/Tabs/Tabs.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
-  import ProtobufLogo from "@/components/ProtobufLogo/ProtobufLogo.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
@@ -19,6 +21,7 @@
   import UserPropertiesTab from "../../PublishPanel/components/UserPropertiesTab.svelte";
   import {
     snapshotPublishDetails,
+    protoOverrideParamFromChoice,
     type PublishDetailsStore,
   } from "../../PublishPanel/stores/publish-details";
   import type { createPublishHistoryStore } from "../../PublishPanel/stores/publish-history";
@@ -51,11 +54,16 @@
         }
         matchingSub = null;
         noMatchingSub = false;
+        matchingProtoType = null;
         debouncedGetTopicMatchesSubscription.cancel();
+        debouncedGetMatchingProtoType.cancel();
         return;
       }
       publishStore.setPartial({ topicError: "" });
       debouncedGetTopicMatchesSubscription($publishStore.topic);
+      if (connection.connectionDetails.isProtoEnabled) {
+        debouncedGetMatchingProtoType($publishStore.topic);
+      }
     })();
 
   const debouncedGetTopicMatchesSubscription = _.debounce(
@@ -72,31 +80,49 @@
     500
   );
 
-  $: matchingProtoDescriptor = getMatchingProtoDescriptor(
-    matchingSub,
-    $publishStore.topic
-  );
+  // Proto binding match for the current topic. Independent of the
+  // subscription-match row: encoding applies regardless of subscriptions.
+  $: protoStateForConnection = $protoState.byConnectionId[connectionId];
+  $: descriptorNames = protoStateForConnection?.descriptorNames ?? [];
 
-  const getMatchingProtoDescriptor = (
-    sub: models.Subscription | null,
-    topic: string
-  ) => {
-    if (!sub) {
-      return null;
+  let matchingProtoType: string | null = null;
+  let protoTypeSearch = "";
+
+  $: filteredDescriptorNames = (() => {
+    const query = protoTypeSearch.trim().toLowerCase();
+    if (!query) return descriptorNames;
+    return descriptorNames.filter((name) => name.toLowerCase().includes(query));
+  })();
+
+  $: protoTriggerText =
+    $publishStore.protoOverrideChoice === "none"
+      ? "Raw (no Protobuf)"
+      : $publishStore.protoOverrideChoice === "auto"
+        ? matchingProtoType
+          ? `Auto: ${matchingProtoType}`
+          : "Auto: no match"
+        : $publishStore.protoOverrideChoice;
+
+  onMount(() => {
+    protoState.ensureConnection(connectionId, connection.eventSet);
+    protoState.refresh(connectionId);
+  });
+
+  const debouncedGetMatchingProtoType = _.debounce(async (topic: string) => {
+    try {
+      const match = await GetMatchingProtoTypeForTopic(connectionId, topic);
+      matchingProtoType = match?.Source ? match.MessageType : null;
+    } catch (e) {
+      console.error(e);
+      matchingProtoType = null;
     }
-    if (topic.startsWith("spAv1.0")) {
-      return "Sparkplug A v1.0";
-    }
-    if (topic.startsWith("spBv1.0")) {
-      return "Sparkplug B v1.0";
-    }
-    return null;
-  };
+  }, 500);
 
   $: connection.connectionState,
     (() => {
       if (connection.connectionState !== "connected") {
         matchingSub = null;
+        matchingProtoType = null;
       }
     })();
 
@@ -127,6 +153,9 @@
     headerMessageExpiryInterval: $publishStore.properties.messageExpiryInterval,
     headerTopicAlias: $publishStore.properties.topicAlias,
     headerSubscriptionIdentifier: $publishStore.properties.subscriptionIdentifier,
+    protoOverride: protoOverrideParamFromChoice(
+      $publishStore.protoOverrideChoice
+    ),
   });
 
   // Writes the scratch copy back to the saved collection message.
@@ -212,6 +241,9 @@
         format: $publishStore.format,
         properties: $publishStore.properties,
         userProperties,
+        protoOverride: protoOverrideParamFromChoice(
+          $publishStore.protoOverrideChoice
+        ),
       });
     } catch (e) {
       handlePublishError(e as string);
@@ -220,10 +252,10 @@
   };
 
   const handlePublishError = (e: string) => {
-    let message = e;
-    if (e.includes("proto:")) {
-      message = "protobuf:" + e.split("proto:")[1];
-    }
+    // The Go protobuf library prefixes its errors with "proto:"; expand it
+    // in place rather than discarding the surrounding context (the backend's
+    // encode error names the type: "protobuf encode as <type> failed: ...").
+    const message = e.replaceAll("proto:", "protobuf:");
     addToast({
       data: {
         title: "Publish Error",
@@ -270,7 +302,8 @@
   <div class="grow flex min-h-0 flex-col">
     <div class="relative">
       <BaseInput
-        bind:value={$publishStore.topic}
+        value={$publishStore.topic}
+        onChange={(value) => publishStore.setTopic(value ?? "")}
         errorMessage={$publishStore.topicError ?? undefined}
         name="topic"
         placeholder="Enter a topic"
@@ -285,7 +318,7 @@
                 onClick: (e) => {
                   e.preventDefault();
                   e.stopImmediatePropagation();
-                  $publishStore.topic = "";
+                  publishStore.setTopic("");
                 },
               },
             ]
@@ -317,35 +350,78 @@
               <Icon size={11} type="warning" />
             </div>
           </Tooltip>
-        {:else if matchingProtoDescriptor}
-          <Tooltip
-            class="w-full max-w-full items-center flex mt-[6px] ml-[10px]"
-          >
-            <div slot="tooltip-content">
-              <div class="mb-[2px]">
-                Messages sent to this topic will be protobuf encoded/decoded
-                according to the descriptor:
-              </div>
-              <div class="flex items-center">
-                <span class="size-4 mr-1"><ProtobufLogo isActive /></span>
-                <div class="flex-1 min-w-0 text-ellipsis overflow-hidden">
-                  {matchingProtoDescriptor}
-                </div>
-              </div>
-            </div>
-            <div class="text-sm">Matches:</div>
-            <span class="w-[12px] min-w-[12px] h-[12px] ml-2 mr-1"
-              ><ProtobufLogo isActive /></span
-            >
-            <div class="text-sm flex-1 min-w-0 text-ellipsis overflow-hidden">
-              {matchingProtoDescriptor}
-            </div>
-          </Tooltip>
         {/if}
       </div>
     </div>
-    {#if noMatchingSub || matchingProtoDescriptor}
+    {#if noMatchingSub}
       <div class="h-2"></div>
+    {/if}
+    {#if connection.connectionDetails.isProtoEnabled}
+      <div class="w-full flex items-center gap-2 text-sm mt-1 mb-2">
+        <span class="text-secondary-text">Protobuf:</span>
+        <DropdownMenu
+          placement="bottom-start"
+          triggerText={protoTriggerText}
+          triggerVariant="text"
+          triggerClass={twMerge(
+            "px-0 py-[3px]",
+            $publishStore.protoOverrideChoice !== "auto" && "text-secondary"
+          )}
+          triggerIconSize={12}
+        >
+          <div class="flex flex-col min-w-[220px]" slot="menu-content">
+            <DropdownMenuItem
+              isSelected={$publishStore.protoOverrideChoice === "auto"}
+              onClick={() =>
+                publishStore.setPartial({ protoOverrideChoice: "auto" })}
+            >
+              {matchingProtoType
+                ? `Auto (${matchingProtoType})`
+                : "Auto (no match, raw)"}
+            </DropdownMenuItem>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 my-1 text-base text-white-text placeholder:text-secondary-text"
+              autofocus
+              placeholder="Filter types..."
+              bind:value={protoTypeSearch}
+              on:keydown|stopPropagation={() => {}}
+            />
+            <div class="max-h-[320px] overflow-y-auto">
+              {#each filteredDescriptorNames as name (name)}
+                <DropdownMenuItem
+                  isSelected={$publishStore.protoOverrideChoice === name}
+                  onClick={() =>
+                    publishStore.setPartial({ protoOverrideChoice: name })}
+                >
+                  <div class="flex items-center gap-2 w-full">
+                    <span class="truncate grow">{name}</span>
+                    {#if name === $publishStore.protoOverrideChoice}
+                      <Icon type="tick" size={14} />
+                    {/if}
+                  </div>
+                </DropdownMenuItem>
+              {/each}
+              {#if descriptorNames.length === 0}
+                <div class="px-2 py-1 text-base text-secondary-text">
+                  No types loaded
+                </div>
+              {:else if filteredDescriptorNames.length === 0}
+                <div class="px-2 py-1 text-base text-secondary-text">
+                  No matching types
+                </div>
+              {/if}
+            </div>
+            <DropdownMenuItem
+              isSelected={$publishStore.protoOverrideChoice === "none"}
+              onClick={() =>
+                publishStore.setPartial({ protoOverrideChoice: "none" })}
+            >
+              Raw (no Protobuf)
+            </DropdownMenuItem>
+          </div>
+        </DropdownMenu>
+      </div>
     {/if}
     {#if connection.connectionDetails.mqttVersion === "3"}
       <div class="pt-2 grow w-full min-h-0">

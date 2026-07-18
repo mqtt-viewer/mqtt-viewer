@@ -6,6 +6,7 @@ import {
   mockDisconnectedConnection,
   mockEventSet,
   mockHeaders,
+  mockLoadedProtoFiles,
   mockMqttMessages,
   mockPublishHistory,
   mockSubscriptions,
@@ -13,12 +14,149 @@ import {
 import * as app from "./models";
 import * as models from "../models/models";
 import * as update from "../update/models";
+import * as topicmatching from "../topic-matching/models";
 
 const appConnection = (connection: typeof mockConnection) => ({
   connectionDetails: connection.connectionDetails,
   isConnected: connection.isConnected,
   eventSet: connection.eventSet,
 });
+
+// Proto binding state: mutable per-connection mock data so add/edit/
+// reorder/delete and the folder picker are interactive in Storybook.
+// Matches ChooseDirectory's mock return value; any other dir "fails to
+// compile" as folder-not-found.
+const MOCK_PROTO_SUCCESS_DIR = "/Users/sam/certs";
+
+// Not read from mockConnectionDetails.protoRegDir directly: fixtures.ts
+// pulls in stores/connections.ts, which imports this module (aliased in
+// place of the real bindings), so referencing another fixtures.ts export at
+// module-eval time here is a circular-import footgun. Kept in sync with
+// mockConnectionDetails.protoRegDir by hand instead.
+let mockProtoRegDirByConnectionId: Record<number, string> = {
+  1: "/Users/sam/certs",
+};
+
+let mockProtoRulesByConnectionId: Record<number, models.ProtoBindingRule[]> = {
+  1: [
+    new models.ProtoBindingRule({
+      id: 1,
+      connectionId: 1,
+      topicFilter: "sensors/+/telemetry",
+      messageType: "mqtt.viewer.DeviceState",
+      sortOrder: 0,
+    }),
+  ],
+};
+
+const buildMockProtoStateResult = (connectionId: number): app.ProtoStateResult => {
+  const rules = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const dir = mockProtoRegDirByConnectionId[connectionId] ?? "";
+  if (!dir) {
+    return new app.ProtoStateResult({ dir: "", loadError: "", rules });
+  }
+  if (dir !== MOCK_PROTO_SUCCESS_DIR) {
+    return new app.ProtoStateResult({ dir, loadError: "folder not found", rules });
+  }
+  const descriptorNames = Object.values(mockLoadedProtoFiles).flat().sort();
+  return new app.ProtoStateResult({
+    dir,
+    loadError: "",
+    fileDescriptors: mockLoadedProtoFiles,
+    descriptorNames,
+    rules,
+  });
+};
+
+export async function GetProtoBindingRulesByConnectionId(
+  connectionId: number
+): Promise<models.ProtoBindingRule[]> {
+  return mockProtoRulesByConnectionId[connectionId] ?? [];
+}
+
+export async function AddProtoBindingRule(
+  connectionId: number,
+  rule: models.ProtoBindingRule
+): Promise<models.ProtoBindingRule> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const sortOrder = existing.reduce((max, r) => Math.max(max, r.sortOrder + 1), 0);
+  const created = new models.ProtoBindingRule({
+    ...rule,
+    id: Date.now(),
+    connectionId,
+    sortOrder,
+  });
+  mockProtoRulesByConnectionId[connectionId] = [...existing, created];
+  return created;
+}
+
+export async function UpdateProtoBindingRule(
+  connectionId: number,
+  rule: models.ProtoBindingRule
+): Promise<models.ProtoBindingRule> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  mockProtoRulesByConnectionId[connectionId] = existing.map((r) =>
+    r.id === rule.id ? new models.ProtoBindingRule({ ...r, ...rule }) : r
+  );
+  return rule;
+}
+
+export async function DeleteProtoBindingRule(
+  connectionId: number,
+  id: number
+): Promise<void> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  mockProtoRulesByConnectionId[connectionId] = existing.filter((r) => r.id !== id);
+}
+
+export async function ReorderProtoBindingRules(
+  connectionId: number,
+  orderedIds: number[]
+): Promise<void> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const byId = new Map(existing.map((r) => [r.id, r]));
+  mockProtoRulesByConnectionId[connectionId] = orderedIds
+    .map((id, index) => {
+      const rule = byId.get(id);
+      return rule ? new models.ProtoBindingRule({ ...rule, sortOrder: index }) : undefined;
+    })
+    .filter((r): r is models.ProtoBindingRule => !!r);
+}
+
+export async function LoadProtoRegistry(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function GetProtoState(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function GetMatchingProtoTypeForTopic(
+  connectionId: number,
+  topic: string
+): Promise<topicmatching.ProtoBindingMatch> {
+  const rules = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const rule = rules.find((r) => r.topicFilter === topic);
+  if (rule) {
+    return new topicmatching.ProtoBindingMatch({
+      MessageType: rule.messageType,
+      Filter: rule.topicFilter,
+      Source: "rule",
+    });
+  }
+  if (topic.startsWith("spBv1.0/")) {
+    return new topicmatching.ProtoBindingMatch({
+      MessageType: "SparkplugBPayload",
+      Filter: "spBv1.0/#",
+      Source: "sparkplug",
+    });
+  }
+  return new topicmatching.ProtoBindingMatch();
+}
 
 export async function AddSubscription(
   connectionId: number
@@ -520,8 +658,12 @@ export async function Startup(
   _options: app.StartupOptions | null
 ): Promise<void> {}
 export async function UpdateConnection(
-  _connection: models.Connection | null
-): Promise<void> {}
+  connection: models.Connection | null
+): Promise<void> {
+  if (connection && "protoRegDir" in connection) {
+    mockProtoRegDirByConnectionId[connection.id] = connection.protoRegDir ?? "";
+  }
+}
 export async function UpdateOpenConnectionTabs(
   _connectionIds: number[]
 ): Promise<void> {}

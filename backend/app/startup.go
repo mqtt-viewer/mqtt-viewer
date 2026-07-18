@@ -12,6 +12,7 @@ import (
 	"mqtt-viewer/backend/logging"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/paths"
 	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/backend/update"
@@ -119,7 +120,7 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
 			return
 		}
-		a.ProtoRegistry = registry
+		a.ProtoRegistry.Store(registry)
 	}()
 
 	if a.Mode != AppModes.Test {
@@ -176,12 +177,33 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	mqttManager := mqtt.NewMqttManager(withMqttModule, onLatencyUpdate)
 	mqttManager.SetMessageMemoryBudget(a.memoryBudgetBytes())
 
+	protoRules := []models.ProtoBindingRule{}
+	if res := a.Db.Where("connection_id = ?", conn.ID).Order("sort_order, id").Find(&protoRules); res.Error != nil {
+		return nil, res.Error
+	}
+	protoEnabled := conn.IsProtoEnabled != nil && *conn.IsProtoEnabled
+	connProtoState := newProtoState(protoEnabled, protoRules)
+
 	appConnection := AppConnection{
 		ctx:          &withName,
 		ConnectionId: conn.ID,
 		MqttManager:  mqttManager,
 		EventSet:     &connEvents,
+		ProtoState:   connProtoState,
 	}
+
+	// Installed exactly once, here, for the lifetime of the AppConnection.
+	// Both middlewares early-return when protoState isn't enabled, so they
+	// stay wired up across connect/disconnect cycles; ConnectMqtt only
+	// refreshes protoState's enabled flag and rules.
+	mqttManager.UseMiddleware(mqtt.MqttMiddlewares{
+		BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
+			mqttmiddleware.NewProtoEncodeMiddleware(connProtoState, a.ProtoRegistry.Load).Middleware,
+		},
+		BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
+			mqttmiddleware.NewProtoDecodeMiddleware(connProtoState, a.ProtoRegistry.Load).Middleware,
+		},
+	})
 
 	mqttManager.SetConnectionCallbacks(
 		mqtt.MqttConnectionCallbacks{

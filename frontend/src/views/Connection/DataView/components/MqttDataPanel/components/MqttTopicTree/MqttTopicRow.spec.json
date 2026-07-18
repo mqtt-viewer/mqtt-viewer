@@ -53,10 +53,20 @@
       "required": true
     },
     {
-      "name": "isDecodedProto",
-      "type": "boolean",
+      "name": "protoDecode",
+      "type": "enum",
       "required": false,
-      "default": false
+      "options": [
+        "ok",
+        "failed"
+      ],
+      "default": "undefined"
+    },
+    {
+      "name": "protoDescriptorName",
+      "type": "string",
+      "required": false,
+      "default": "undefined"
     },
     {
       "name": "toggleExpansion",
@@ -85,7 +95,8 @@
   "tokens": [
     "primary",
     "secondary",
-    "secondary-text"
+    "secondary-text",
+    "warning"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

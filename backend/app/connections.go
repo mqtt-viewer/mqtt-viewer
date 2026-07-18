@@ -138,7 +138,50 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	newCtx := logging.ReplaceCtx(*appConnection.ctx, slog.String("name", getMqttManagerName(conn)))
 	appConnection.ctx = &newCtx
 
+	a.refreshProtoStateAfterConnectionUpdate(appConnection, &existingConnection, conn)
+
 	return nil
+}
+
+// refreshProtoStateAfterConnectionUpdate keeps the live protoState in sync
+// when a connection edit touches IsProtoEnabled or ProtoRegDir: the enabled
+// flag always mirrors the DB row, a dir change while enabled recompiles the
+// registry (outside protoState's lock), and clearing the dir clears any
+// loaded registry. Emits ProtoStateChanged once if either changed.
+func (a *App) refreshProtoStateAfterConnectionUpdate(appConnection *AppConnection, existing *models.Connection, updated *models.Connection) {
+	oldEnabled := existing.IsProtoEnabled != nil && *existing.IsProtoEnabled
+	newEnabled := oldEnabled
+	if updated.IsProtoEnabled != nil {
+		newEnabled = *updated.IsProtoEnabled
+	}
+
+	oldDir := ""
+	if existing.ProtoRegDir != nil {
+		oldDir = *existing.ProtoRegDir
+	}
+	newDir := oldDir
+	if updated.ProtoRegDir != nil {
+		newDir = *updated.ProtoRegDir
+	}
+
+	enabledChanged := newEnabled != oldEnabled
+	dirChanged := newDir != oldDir
+	if !enabledChanged && !dirChanged {
+		return
+	}
+
+	appConnection.ProtoState.SetEnabled(newEnabled)
+
+	if dirChanged {
+		if newDir == "" {
+			appConnection.ProtoState.Clear()
+		} else if newEnabled {
+			registry, loadErr, dirMissing := compileProtoRegistry(newDir)
+			appConnection.ProtoState.SetRegistry(registry, newDir, loadErr, dirMissing)
+		}
+	}
+
+	a.emitProtoStateChanged(updated.ID)
 }
 
 func (a *App) DeleteConnection(id uint) error {

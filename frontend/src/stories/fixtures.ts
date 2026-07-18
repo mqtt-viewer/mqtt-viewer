@@ -24,6 +24,7 @@ export const mockEventSet = {
   mqttMessages: "storybook:mqttMessages",
   mqttLatency: "storybook:mqttLatency",
   mqttClearHistory: "storybook:mqttClearHistory",
+  protoStateChanged: "storybook:protoStateChanged",
 };
 
 export const mockSubscriptions = [
@@ -60,6 +61,10 @@ export const mockConnectionDetails = {
   username: "demo",
   password: "demo",
   isProtoEnabled: true,
+  // Matches ChooseDirectory's mock return value, so picking a folder in a
+  // running ProtoSection story resolves to the same "compiled" state as
+  // this default.
+  protoRegDir: "/Users/sam/certs",
   isCertsEnabled: false,
   skipCertVerification: false,
   certCa: "",
@@ -400,14 +405,16 @@ export const mockMqttData = {
     messageCount: 3,
     topic: "factory",
     latestMessageTime: new Date(now - 60000),
-    isDecodedProto: false,
+    // "ok" propagates to ancestors (a decoded message somewhere below),
+    // matching the insert logic in mqtt-data.ts.
+    protoDecode: "ok" as const,
     children: {
       line: {
         subtopicCount: 2,
         messageCount: 3,
         topic: "factory/line",
         latestMessageTime: new Date(now - 60000),
-        isDecodedProto: false,
+        protoDecode: "ok" as const,
         children: {
           temperature: {
             subtopicCount: 0,
@@ -415,7 +422,6 @@ export const mockMqttData = {
             topic: "factory/line/temperature",
             latestMessageTime: new Date(now - 120000),
             message: '{"temp":21.4,"unit":"C"}',
-            isDecodedProto: false,
             children: {},
           },
           humidity: {
@@ -424,7 +430,8 @@ export const mockMqttData = {
             topic: "factory/line/humidity",
             latestMessageTime: new Date(now - 60000),
             message: '{"humidity":42.8}',
-            isDecodedProto: true,
+            protoDecode: "ok" as const,
+            protoDescriptorName: "mqtt.viewer.HumidityReading",
             children: {},
           },
         },
@@ -528,12 +535,15 @@ export const createMockPublishStore = () => {
     sourceMessageName: null,
     sourceCollectionId: null,
     baseline: null,
+    protoOverrideChoice: "auto",
   });
   return {
     subscribe,
     set,
     setPartial: (partial: Record<string, unknown>) =>
       update((store) => ({ ...store, ...partial })),
+    setTopic: (topic: string) =>
+      update((store) => ({ ...store, topic, protoOverrideChoice: "auto" })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -742,7 +752,8 @@ const propDefaults: Record<string, () => unknown> = {
   isActive: () => true,
   isAutoSelectingMostRecent: () => true,
   isComparing: () => true,
-  isDecodedProto: () => false,
+  protoDecode: () => undefined,
+  protoDescriptorName: () => undefined,
   isExpanded: () => true,
   isOpen: () => writable(true),
   isPublishDisabled: () => false,
@@ -943,6 +954,7 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
     kind: ["number", "text"],
     mqttVersion: ["3", "5"],
     placement: ["top", "right", "bottom", "left"],
+    protoDecode: ["ok", "failed"],
     resizeEdge: ["left", "right"],
     size: ["small", "medium"],
     sortDir: ["asc", "desc"],

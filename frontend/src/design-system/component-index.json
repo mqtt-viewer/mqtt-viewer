@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-18T11:15:30.712Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1973,6 +1973,107 @@
       "specMissing": false
     },
     {
+      "name": "ProtoBindingRulesForm",
+      "tier": "component",
+      "description": "Per-connection protobuf topic-binding rules: add, edit, reorder, delete, and test topic matches against loaded message types.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "rules",
+          "type": "object",
+          "required": false,
+          "default": "[]",
+          "description": "ProtoBindingRuleView[] in priority order; the topmost wins ties on an equally specific filter."
+        },
+        {
+          "name": "descriptorNames",
+          "type": "object",
+          "required": false,
+          "default": "[]",
+          "description": "Full message-type names available from the loaded proto registry."
+        },
+        {
+          "name": "status",
+          "type": "object",
+          "required": false,
+          "description": "fileCount/typeCount/loadError/dirMissing/folderNotFound/zeroTypes summary. dirMissing (no dir configured) picks the empty-state copy; loadError and folderNotFound gate the stale-type warning on rows. The rest is carried for parity with the section's own status line, rendered by the container above this component."
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "connected",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Shows the 'Bindings apply immediately' line when true."
+        },
+        {
+          "name": "onAdd",
+          "type": "function",
+          "required": false,
+          "default": "(rule) => void"
+        },
+        {
+          "name": "onUpdate",
+          "type": "function",
+          "required": false,
+          "default": "(id, changes) => void"
+        },
+        {
+          "name": "onDelete",
+          "type": "function",
+          "required": false,
+          "default": "(id) => void"
+        },
+        {
+          "name": "onMove",
+          "type": "function",
+          "required": false,
+          "default": "(id, direction) => void"
+        },
+        {
+          "name": "onTestTopic",
+          "type": "function",
+          "required": false,
+          "default": "(topic) => Promise<match|null>"
+        }
+      ],
+      "tokens": [
+        "white-text",
+        "secondary-text",
+        "error",
+        "warning",
+        "outline",
+        "divider"
+      ],
+      "dependencies": [
+        "BaseInput",
+        "Button",
+        "IconButton",
+        "AddFieldButton",
+        "DropdownMenu",
+        "DropdownMenuItem",
+        "Icon"
+      ],
+      "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The inline type picker (search BaseInput row + DropdownMenuItem list, max-h-[320px] overflow-y-auto) duplicates the AddToCollectionMenu pattern; extracting a shared SearchableDropdownMenu primitive is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc).",
+      "sourcePath": "src/components/ProtoBindingRulesForm/ProtoBindingRulesForm.svelte",
+      "specPath": "src/components/ProtoBindingRulesForm/ProtoBindingRulesForm.spec.json",
+      "storyPath": "src/components/ProtoBindingRulesForm/ProtoBindingRulesForm.stories.svelte",
+      "storyId": "Components/ProtoBindingRulesForm",
+      "specMissing": false
+    },
+    {
       "name": "ProtobufLogo",
       "tier": "primitive",
       "description": "Storybook coverage for ProtobufLogo.",
@@ -2761,6 +2862,39 @@
       "specMissing": false
     },
     {
+      "name": "ProtoSection",
+      "tier": "view",
+      "description": "Storybook coverage for ProtoSection.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connection",
+          "type": "object",
+          "required": true,
+          "description": "The live Connection record (connectionDetails plus connection state) this section renders controls for; reactively bound so switch/dir/rule-list state track the connections and proto-state stores."
+        }
+      ],
+      "tokens": [],
+      "dependencies": [
+        "Switch",
+        "FilePathPicker",
+        "ProtoBindingRulesForm"
+      ],
+      "notes": "Wiring component: owns proto-state store reads, connections.updateConnectionDetails calls, and rule CRUD/reorder/test bindings, then passes props to ProtoBindingRulesForm. Renders last in ConnectionDetailsDialog, after SubscriptionsForm. Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.svelte",
+      "specPath": "src/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.spec.json",
+      "storyPath": "src/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.stories.svelte",
+      "storyId": "Views/Connection/ConnectionDetailsView/ProtoSection",
+      "specMissing": false
+    },
+    {
       "name": "LoadedProtoDetailsDialog",
       "tier": "view",
       "description": "Storybook coverage for LoadedProtoDetailsDialog.",
@@ -3070,10 +3204,20 @@
           "required": true
         },
         {
-          "name": "isDecodedProto",
-          "type": "boolean",
+          "name": "protoDecode",
+          "type": "enum",
           "required": false,
-          "default": false
+          "options": [
+            "ok",
+            "failed"
+          ],
+          "default": "undefined"
+        },
+        {
+          "name": "protoDescriptorName",
+          "type": "string",
+          "required": false,
+          "default": "undefined"
         },
         {
           "name": "toggleExpansion",
@@ -3102,7 +3246,8 @@
       "tokens": [
         "primary",
         "secondary",
-        "secondary-text"
+        "secondary-text",
+        "warning"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
@@ -3436,7 +3581,8 @@
       "tokens": [
         "secondary",
         "secondary-text",
-        "elevation-1"
+        "elevation-1",
+        "warning"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",

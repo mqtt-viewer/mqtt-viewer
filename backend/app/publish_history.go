@@ -33,6 +33,7 @@ type SavePublishHistoryEntryParams struct {
 	HeaderTopicAlias             *int32  `json:"headerTopicAlias"`
 	HeaderSubscriptionIdentifier *int32  `json:"headerSubscriptionIdentifier"`
 	UserPropertiesString         *string `json:"userProperties"`
+	ProtoOverride                *string `json:"protoOverride"`
 }
 
 func (a *App) SavePublishHistoryEntry(params SavePublishHistoryEntryParams) (models.PublishHistory, error) {
@@ -69,6 +70,9 @@ func (a *App) SavePublishHistoryEntry(params SavePublishHistoryEntryParams) (mod
 	}
 	if params.HeaderSubscriptionIdentifier != nil {
 		entry.HeaderSubscriptionIdentifier = params.HeaderSubscriptionIdentifier
+	}
+	if params.ProtoOverride != nil {
+		entry.ProtoOverride = params.ProtoOverride
 	}
 
 	result := a.Db.Create(&entry)

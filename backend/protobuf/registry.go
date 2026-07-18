@@ -87,10 +87,21 @@ func getMessageDescriptors(compiledFiles *linker.Files, filePath string) []proto
 	if compiledFile == nil {
 		return result
 	}
-	messages := compiledFile.Messages()
+	return appendNestedMessageDescriptors(result, compiledFile.Messages())
+}
+
+// appendNestedMessageDescriptors recurses into nested message types so a
+// type like acme.Envelope.Inner is discoverable alongside its parent.
+// Map fields synthesize a MapEntry message per entry; those aren't
+// user-selectable types and are skipped.
+func appendNestedMessageDescriptors(result []protoreflect.MessageDescriptor, messages protoreflect.MessageDescriptors) []protoreflect.MessageDescriptor {
 	for i := 0; i < messages.Len(); i++ {
 		message := messages.Get(i)
+		if message.IsMapEntry() {
+			continue
+		}
 		result = append(result, message)
+		result = appendNestedMessageDescriptors(result, message.Messages())
 	}
 	return result
 }
