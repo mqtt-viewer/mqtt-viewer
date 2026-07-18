@@ -37,9 +37,23 @@ export class EnvInfo {
   isDev = true;
   serverAddress = "localhost";
   version = "storybook";
+  isServerMode = false;
 
   static createFrom(source: any = {}) {
     return new EnvInfo(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
+export class ExportedMessagesPayload {
+  filename = "";
+  json = "";
+
+  static createFrom(source: any = {}) {
+    return new ExportedMessagesPayload(source);
   }
 
   constructor(source: any = {}) {

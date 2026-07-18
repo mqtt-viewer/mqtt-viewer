@@ -3,6 +3,8 @@
   import Icon from "../Icon/Icon.svelte";
   import Tooltip from "../Tooltip/Tooltip.svelte";
   import Button from "../Button/Button.svelte";
+  import BaseInput from "./BaseInput.svelte";
+  import envStore from "@/stores/env";
 
   export let disabled = false;
   export let defaultValue = undefined as string | undefined;
@@ -12,6 +14,18 @@
   export let value = defaultValue ?? "";
   export let onFileChosen: (filePath: string) => void;
   export let onFileRemoved: () => void;
+
+  // In server mode the native picker returns "" (there is no OS file dialog
+  // behind HTTP), so the user types a path that exists inside the container
+  // instead. See docs/DOCKER.md for mounting certificates.
+  $: isServerMode = $envStore.isServerMode;
+
+  const onManualPathCommit = () => {
+    const trimmed = value.trim();
+    if (trimmed !== "") {
+      onFileChosen(trimmed);
+    }
+  };
 
   $: onAddClick = async () => {
     try {
@@ -54,7 +68,34 @@
     !!value && !disabled ? "text-primary" : hoveredIconColorClass;
 </script>
 
-<div class={`flex items-center gap-3 w-full ${disabled ? "opacity-60" : ""}`}>
+{#if isServerMode}
+  <div class={`flex flex-col gap-1 w-full ${disabled ? "opacity-60" : ""}`}>
+    <div class="flex items-center gap-2 w-full">
+      <BaseInput
+        name="file-path"
+        label={actionLabel}
+        placeholder={variant === "certificate" ? "/certs/ca.pem" : "/data"}
+        bind:value
+        {disabled}
+        onChange={() => onManualPathCommit()}
+        onBlur={onManualPathCommit}
+      />
+      {#if value}
+        <Button
+          {disabled}
+          variant="text"
+          iconType="closeCircle"
+          on:click={onRemoveClick}
+        ></Button>
+      {/if}
+    </div>
+    <span class="text-sm text-secondary-text">
+      Type a path inside the container. Certificates must be mounted in (see
+      docs/DOCKER.md).
+    </span>
+  </div>
+{:else}
+  <div class={`flex items-center gap-3 w-full ${disabled ? "opacity-60" : ""}`}>
   <div
     class="flex gap-3 items-center flex-grow min-w-0"
     on:mouseenter={onMouseEnter}
@@ -104,4 +145,5 @@
       on:click={onRemoveClick}
     ></Button>
   {/if}
-</div>
+  </div>
+{/if}

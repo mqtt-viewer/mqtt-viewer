@@ -70,5 +70,5 @@
     "secondary-text"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Reads the env store to branch in server mode (no native file dialog behind HTTP): it renders a BaseInput for typing a container path instead of the browse button. Storybook's env store defaults to desktop, so stories show the browse variant. The BaseInput use is intra-primitive composition; the validator forbids listing it as a dependency."
 }

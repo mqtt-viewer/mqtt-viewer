@@ -1,0 +1,18 @@
+# Runtipi dynamic-compose entry for MQTT Viewer. Pairs with config.json.
+#
+# Schema followed: Runtipi's dynamic compose reference
+# (https://runtipi.io/docs/reference/dynamic-compose, fetched July 2026) and
+# the runtipi/example-appstore reference app's config.json/docker-compose.yml
+# pair. See docker/templates/README.md for the submission flow.
+services:
+  mqtt-viewer:
+    image: ghcr.io/mqtt-viewer/mqtt-viewer:latest
+    restart: unless-stopped
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    x-runtipi:
+      is_main: true
+      internal_port: 8080
+
+x-runtipi:
+  schema_version: 2

@@ -42,11 +42,13 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.Info("starting in production mode")
 			a.Mode = AppModes.Wails
 			a.Paths = paths.GetPaths()
+			// Containers log to stdout, so a server build uses console logging
+			// instead of writing to a file in the data volume.
 			logging.InitLogger(logging.LoggerParams{
 				ResourceDir:          a.Paths.ResourcePath,
 				EnableDebugLogging:   false,
-				EnableFileLogging:    true,
-				EnableConsoleLogging: false,
+				EnableFileLogging:    !env.IsServerBuild,
+				EnableConsoleLogging: env.IsServerBuild,
 			})
 		} else {
 			slog.Info("starting in wails development mode")
@@ -122,7 +124,9 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 		a.ProtoRegistry = registry
 	}()
 
-	if a.Mode != AppModes.Test {
+	// Skip the self-updater in test mode and in server mode (Docker images update
+	// by pulling a new image, so the in-app updater must not run).
+	if a.Mode != AppModes.Test && !env.IsServerBuild {
 		updater, err := update.InitUpdater(application.Get())
 		if err != nil {
 			slog.Error(fmt.Sprintf("error initialising updater: %v", err))

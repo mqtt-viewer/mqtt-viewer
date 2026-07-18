@@ -18,6 +18,7 @@ release work, not just patches.
 | `frontend/src/` | Svelte app: `stores/` for global state, `components/` + `views/` as the design-system library |
 | `frontend/bindings/` | Generated Go-to-TS bindings. Never edit; regenerate with `wails3 task common:generate:bindings` |
 | `build/` | Wails Taskfiles per platform, dev config, icons |
+| `Dockerfile` + `docker/` | Web UI image (Wails server mode, `-tags server`); see `docs/DOCKER.md` |
 | `scripts/` | `mqtt-flood.py` (load harness), `mqtt-sim.py` (realistic traffic) |
 | `docs/` | RELEASING.md, WRITING_STYLE.md, design-system docs, specs |
 

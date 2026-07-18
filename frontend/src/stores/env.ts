@@ -18,6 +18,7 @@ interface EnvStore {
   isLinux: boolean;
   isFullscreen: boolean;
   isBeta: boolean;
+  isServerMode: boolean;
 }
 
 const { subscribe, set, update } = writable<EnvStore>({
@@ -32,6 +33,7 @@ const { subscribe, set, update } = writable<EnvStore>({
   isLinux: false,
   isFullscreen: false,
   isBeta: IS_BETA,
+  isServerMode: false,
 });
 
 const debouncedCheckFullscreen = _.debounce(async () => {
@@ -45,25 +47,43 @@ const debouncedCheckFullscreen = _.debounce(async () => {
 }, 100);
 
 const init = async () => {
+  window.addEventListener("resize", debouncedCheckFullscreen, true);
+
+  // GetEnvInfo carries version + isServerMode and must land in the store even
+  // if the native Window/System calls below fail. In a browser (server mode)
+  // those native calls reject, and a single try/catch around everything would
+  // otherwise leave version and isServerMode unset.
+  let isServerMode = false;
   try {
-    window.addEventListener("resize", debouncedCheckFullscreen, true);
-    const info = await System.Environment();
-    const env = {
-      buildType: info.Debug ? "dev" : "production",
-      platform: info.OS,
-      arch: info.Arch,
-    };
-    const isFullscreen = await Window.IsFullscreen();
     const configuredEnv = await GetEnvInfo();
-    set({
-      env,
-      isFullscreen,
+    isServerMode = configuredEnv.isServerMode;
+    update((store) => ({
+      ...store,
       version: configuredEnv.version,
-      isMac: env.platform === "darwin",
-      isWindows: env.platform === "windows",
-      isLinux: env.platform === "linux",
-      isBeta: IS_BETA,
-    });
+      isServerMode: configuredEnv.isServerMode,
+    }));
+  } catch (e) {
+    console.error(e);
+  }
+
+  // Native environment probing. Headless in server mode these are no-ops that
+  // reject, so keep them in their own try/catch with sensible fallbacks.
+  try {
+    const info = await System.Environment();
+    const platform = info.OS;
+    const isFullscreen = await Window.IsFullscreen();
+    update((store) => ({
+      ...store,
+      env: {
+        buildType: info.Debug ? "dev" : "production",
+        platform,
+        arch: info.Arch,
+      },
+      isFullscreen,
+      isMac: platform === "darwin",
+      isWindows: platform === "windows",
+      isLinux: platform === "linux",
+    }));
   } catch (e) {
     console.error(e);
   }

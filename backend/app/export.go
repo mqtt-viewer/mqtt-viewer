@@ -22,24 +22,68 @@ type exportedMessage struct {
 	Properties *mqtt.MessageProperties `json:"properties,omitempty"`
 }
 
+// ExportedMessagesPayload carries an export's JSON and its default filename to
+// the frontend, so a browser build can trigger a download instead of using the
+// native save dialog (which is a no-op headless in server mode).
+type ExportedMessagesPayload struct {
+	Filename string `json:"filename"`
+	Json     string `json:"json"`
+}
+
 func (a *App) ExportTopicMessages(connId uint, topic string) (string, error) {
-	appConnection, ok := a.AppConnections[connId]
-	if !ok {
-		return "", fmt.Errorf("connection not found")
-	}
-	history, err := appConnection.MqttManager.MessageHistory.GetTopicHistory(topic)
+	messages, filename, err := a.collectTopicMessages(connId, topic)
 	if err != nil {
 		return "", err
 	}
-	messages := toExportedMessages(history)
-	defaultFilename := fmt.Sprintf("mqtt-messages-%s.json", strings.ReplaceAll(topic, "/", "-"))
-	return a.saveMessagesToFile(messages, defaultFilename)
+	return a.saveMessagesToFile(messages, filename)
 }
 
 func (a *App) ExportAllMessages(connId uint) (string, error) {
+	messages, filename, err := a.collectAllMessages(connId)
+	if err != nil {
+		return "", err
+	}
+	return a.saveMessagesToFile(messages, filename)
+}
+
+// ExportTopicMessagesData returns the same export as ExportTopicMessages but as
+// a JSON string plus default filename, for the browser build to download.
+func (a *App) ExportTopicMessagesData(connId uint, topic string) (ExportedMessagesPayload, error) {
+	messages, filename, err := a.collectTopicMessages(connId, topic)
+	if err != nil {
+		return ExportedMessagesPayload{}, err
+	}
+	return marshalMessagesPayload(messages, filename)
+}
+
+// ExportAllMessagesData returns the same export as ExportAllMessages but as a
+// JSON string plus default filename, for the browser build to download.
+func (a *App) ExportAllMessagesData(connId uint) (ExportedMessagesPayload, error) {
+	messages, filename, err := a.collectAllMessages(connId)
+	if err != nil {
+		return ExportedMessagesPayload{}, err
+	}
+	return marshalMessagesPayload(messages, filename)
+}
+
+func (a *App) collectTopicMessages(connId uint, topic string) ([]exportedMessage, string, error) {
 	appConnection, ok := a.AppConnections[connId]
 	if !ok {
-		return "", fmt.Errorf("connection not found")
+		return nil, "", fmt.Errorf("connection not found")
+	}
+	history, err := appConnection.MqttManager.MessageHistory.GetTopicHistory(topic)
+	if err != nil {
+		return nil, "", err
+	}
+	messages := toExportedMessages(history)
+	filename := fmt.Sprintf("mqtt-messages-%s.json", strings.ReplaceAll(topic, "/", "-"))
+	return messages, filename, nil
+}
+
+func (a *App) collectAllMessages(connId uint) ([]exportedMessage, string, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, "", fmt.Errorf("connection not found")
 	}
 	allHistory := appConnection.MqttManager.MessageHistory.GetAllHistory()
 	messages := []exportedMessage{}
@@ -49,7 +93,18 @@ func (a *App) ExportAllMessages(connId uint) (string, error) {
 	sort.Slice(messages, func(i, j int) bool {
 		return messages[i].TimeMs < messages[j].TimeMs
 	})
-	return a.saveMessagesToFile(messages, "mqtt-messages-all.json")
+	return messages, "mqtt-messages-all.json", nil
+}
+
+func marshalMessagesPayload(messages []exportedMessage, filename string) (ExportedMessagesPayload, error) {
+	data, err := json.MarshalIndent(messages, "", "  ")
+	if err != nil {
+		return ExportedMessagesPayload{}, err
+	}
+	return ExportedMessagesPayload{
+		Filename: filename,
+		Json:     string(data),
+	}, nil
 }
 
 func (a *App) saveMessagesToFile(messages []exportedMessage, defaultFilename string) (string, error) {

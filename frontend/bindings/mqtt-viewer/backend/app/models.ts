@@ -116,6 +116,7 @@ export class EnvInfo {
     "isDev": boolean;
     "serverAddress": string;
     "version": string;
+    "isServerMode": boolean;
 
     /** Creates a new EnvInfo instance. */
     constructor($$source: Partial<EnvInfo> = {}) {
@@ -128,6 +129,9 @@ export class EnvInfo {
         if (!("version" in $$source)) {
             this["version"] = "";
         }
+        if (!("isServerMode" in $$source)) {
+            this["isServerMode"] = false;
+        }
 
         Object.assign(this, $$source);
     }
@@ -138,6 +142,36 @@ export class EnvInfo {
     static createFrom($$source: any = {}): EnvInfo {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new EnvInfo($$parsedSource as Partial<EnvInfo>);
+    }
+}
+
+/**
+ * ExportedMessagesPayload carries an export's JSON and its default filename to
+ * the frontend, so a browser build can trigger a download instead of using the
+ * native save dialog (which is a no-op headless in server mode).
+ */
+export class ExportedMessagesPayload {
+    "filename": string;
+    "json": string;
+
+    /** Creates a new ExportedMessagesPayload instance. */
+    constructor($$source: Partial<ExportedMessagesPayload> = {}) {
+        if (!("filename" in $$source)) {
+            this["filename"] = "";
+        }
+        if (!("json" in $$source)) {
+            this["json"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ExportedMessagesPayload instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ExportedMessagesPayload {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ExportedMessagesPayload($$parsedSource as Partial<ExportedMessagesPayload>);
     }
 }
 

@@ -134,6 +134,24 @@ export async function ExportTopicMessages(
   return `/Users/sam/exports/mqtt-messages-${topic.replaceAll("/", "-")}.json`;
 }
 
+export async function ExportAllMessagesData(
+  _connectionId: number
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: "mqtt-messages-all.json",
+    json: "[]",
+  });
+}
+export async function ExportTopicMessagesData(
+  _connectionId: number,
+  topic: string
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: `mqtt-messages-${topic.replaceAll("/", "-")}.json`,
+    json: "[]",
+  });
+}
+
 export async function GetAllConnections(): Promise<app.Connections> {
   return new app.Connections({
     connections: {
@@ -385,6 +403,7 @@ export async function GetEnvInfo(): Promise<app.EnvInfo> {
     isDev: true,
     serverAddress: "localhost",
     version: "storybook",
+    isServerMode: false,
   });
 }
 

@@ -11,6 +11,7 @@ export {
     Connections,
     CreateCollectionParams,
     EnvInfo,
+    ExportedMessagesPayload,
     MqttStats,
     OpenChartWindowParams,
     PublishParams,

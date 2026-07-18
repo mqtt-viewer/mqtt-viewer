@@ -6,7 +6,7 @@
   import Button from "../Button/Button.svelte";
   import { addToast } from "../Toast/Toast.svelte";
   import { StartUpdate } from "bindings/mqtt-viewer/backend/app/app";
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
 
   let isOpen = writable(false);
   $: $updateStore.isUpdateDialogOpen,
@@ -55,7 +55,7 @@
 
   const onOpenReleases = () => {
     if (availableUpdate?.releases_url) {
-      Browser.OpenURL(availableUpdate.releases_url);
+      openExternal(availableUpdate.releases_url);
     }
   };
 </script>
