@@ -9,7 +9,8 @@
 # decrypted broker credentials. Keep this on a trusted network, or put an
 # authenticating reverse proxy (Caddy, Traefik, nginx, Authelia, a
 # Cloudflare tunnel, etc.) in front of it. Do not expose the port directly
-# to the internet.
+# to the internet. docs/DOCKER.md has a worked Caddy example with basic
+# auth that you can copy.
 
 services:
   mqtt-viewer:
