@@ -12,11 +12,13 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { Events } from "@wailsio/runtime";
+  import { get } from "svelte/store";
   import _ from "lodash";
   import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { MqttData } from "../MqttDataPanel/stores/mqtt-data";
+  import type { SearchStore } from "../MqttDataPanel/stores/search";
   import theme from "@/stores/theme";
   import PanelHeader from "@/components/PanelHeader/PanelHeader.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
@@ -35,7 +37,7 @@
     rampCssGradient,
     rateFromScore,
   } from "./cooldown";
-  import type { SortKey } from "./tidy-layout";
+  import { coerceSortKey, type SortKey } from "./tidy-layout";
 
   export let connection: Connection;
   export let selectedTopicStore: SelectedTopicStore;
@@ -44,6 +46,9 @@
   export let width = 0;
   /** override the live message feed (storybook / dev harnesses) */
   export let messageSource: GraphMessageSource | undefined = undefined;
+  /** shared filter text store from the List view, so filter survives the
+   *  List<->Graph toggle. Absent in storybook/dev: falls back to local state. */
+  export let searchStore: SearchStore | undefined = undefined;
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
@@ -52,11 +57,14 @@
   const model = new TopicModel();
   let renderer: TopicGraphRenderer | null = null;
   let unsubSource: (() => void) | null = null;
+  let unsubSearch: (() => void) | null = null;
   let ro: ResizeObserver | null = null;
   let liveTimer: number | null = null;
   let everSized = false;
 
-  let filterText = "";
+  // Seed from the shared store (when present) BEFORE the reactive push below
+  // runs, so switching in from the List doesn't clobber existing filter text.
+  let filterText = searchStore ? get(searchStore).text : "";
   let sortKey: SortKey = "rate";
   let paused = false;
   let allExpanded = false;
@@ -70,9 +78,10 @@
 
   const SORT_LABELS: Record<SortKey, string> = {
     rate: "Busiest first",
-    recency: "Recent first",
+    msgs: "Most messages",
+    recency: "Newest first",
     stale: "Silent first",
-    alpha: "Name",
+    alpha: "Topic A → Z",
     count: "Topic count",
   };
 
@@ -129,6 +138,10 @@
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
       if (typeof s.maxNodeR === "number") maxNodeR = s.maxNodeR;
+      // validate against the full key union; unknown/missing coerces to the
+      // "rate" default so an older blob (no sortKey) or garbage never reaches
+      // the sort comparators
+      sortKey = coerceSortKey(s.sortKey);
     } catch (e) {
       console.error("topic-graph settings load failed", e);
     }
@@ -146,6 +159,7 @@
           cooldownMs,
           tauMs,
           maxNodeR,
+          sortKey,
         })
       );
     } catch (e) {
@@ -159,25 +173,35 @@
     renderer.setCvdSafe(cvdSafe);
     renderer.setCooldownMs(cooldownMs);
     renderer.setMaxNodeSize(maxNodeR);
+    renderer.setSort(sortKey); // reflect the persisted sort into the renderer
     model.tauMs = tauMs;
   };
 
   const seed = (data: MqttData) => {
+    // Recurse into children FIRST (post-order) so that when seedTopic runs for
+    // a topic that both publishes and has subtopics, its child nodes already
+    // exist and it is correctly treated as a non-leaf (its own rate isn't
+    // over-seeded from the subtree aggregate).
     const walk = (d: MqttData) => {
       for (const key of Object.keys(d)) {
         const n = d[key];
-        // Only nodes that actually published get ingested (same structural
-        // check as the list view). Parents carry latestMessageTime propagated
-        // from children, so ingesting them too would record a phantom own
-        // message on every ancestor. ingest() still creates the ancestor
-        // nodes from the leaf's path.
+        walk(n.children);
+        // Only nodes that actually published get their own count/rate; parents
+        // carry a propagated latestMessageTime but no own message. seedTopic
+        // still creates the ancestor path and folds this topic's own count into
+        // every ancestor's aggCount, so each level ends equal to the List's
+        // subtree-cumulative messageCount.
         if (n.message !== undefined) {
-          const t = n.latestMessageTime
+          let childMsgs = 0;
+          for (const ck of Object.keys(n.children)) {
+            childMsgs += n.children[ck].messageCount;
+          }
+          const ownMsgs = n.messageCount - childMsgs;
+          const lastMs = n.latestMessageTime
             ? new Date(n.latestMessageTime).getTime()
             : Date.now();
-          model.ingest(n.topic, t);
+          model.seedTopic(n.topic, ownMsgs, lastMs, n.rate);
         }
-        walk(n.children);
       }
     };
     walk(data);
@@ -356,6 +380,18 @@
     },
   };
 
+  // Mirror the shared List search store into filterText (external edits, e.g.
+  // typing in the List then toggling here). Guarded so the store->local sync
+  // and the local->store push below don't loop.
+  onMount(() => {
+    if (!searchStore) return;
+    unsubSearch = searchStore.subscribe((s) => {
+      if (s.text !== filterText) filterText = s.text;
+    });
+  });
+  // Push local edits back out so the List picks them up on the return toggle.
+  $: if (searchStore) searchStore.setSearchText(filterText);
+
   onMount(async () => {
     loadSettings();
     const w = containerEl.clientWidth || width || 800;
@@ -408,7 +444,19 @@
       // visual reconciliation) is too expensive to run every 1.2s tick, so it
       // only runs every 4th tick (~5s) once the tree crosses 2000 topics.
       const dueThisTick = model.topicCount <= 2000 || liveTick % 4 === 0;
-      if (!paused && dueThisTick && (sortKey === "rate" || sortKey === "recency")) {
+      // rate/recency/stale/msgs all drift with incoming data WITHOUT any
+      // structural change, so their sibling order goes stale between arrivals
+      // and needs the periodic relayout to track the List. alpha/count don't:
+      // alpha never reorders existing nodes, and topic-count changes bump
+      // structureGen -> visibleDirty -> notifyData relayouts on their own.
+      if (
+        !paused &&
+        dueThisTick &&
+        (sortKey === "rate" ||
+          sortKey === "recency" ||
+          sortKey === "stale" ||
+          sortKey === "msgs")
+      ) {
         renderer.relayout();
       }
       // keep the hover inspector's numbers live while the pointer rests
@@ -442,6 +490,7 @@
 
   onDestroy(() => {
     unsubSource?.();
+    unsubSearch?.();
     ro?.disconnect();
     document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (liveTimer) clearInterval(liveTimer);
@@ -465,6 +514,7 @@
   const setSort = (key: SortKey) => {
     sortKey = key;
     renderer?.setSort(key);
+    saveSettings();
   };
   const setDepth = (d: number) => {
     renderer?.expandToDepth(d);

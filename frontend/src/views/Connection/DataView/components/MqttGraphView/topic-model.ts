@@ -134,6 +134,65 @@ export class TopicModel {
     node.ownCount++;
   }
 
+  // Seed one already-observed publisher topic from a List snapshot (taken on a
+  // List -> Graph view toggle) WITHOUT replaying phantom traffic. Unlike
+  // ingest(), this adds no EWMA bump: it transplants the state the List already
+  // computed so the two views agree the instant you switch.
+  //
+  // `ownMsgs` is this exact topic's own message count (List messageCount minus
+  // the direct children's). It is added to aggCount on every node along the
+  // path, so each level's aggCount ends equal to the List's subtree-cumulative
+  // messageCount. `lastMs` is the topic's latest-message time, folded into
+  // aggLastMsg (subtree max) at every level for recency/stale sorts.
+  //
+  // `rate`, when the List supplied one, is that topic's decay score (already a
+  // subtree aggregate on the List side) copied verbatim into `agg` (and, for a
+  // leaf, `own`) so "Busiest" ordering survives the toggle. When absent the
+  // score seeds at 0 with the real lastMs — an hour-idle topic must not seed
+  // hot. Structural interior nodes get exact counts + recency here; their agg
+  // rate score reconverges within ~1 tau of live traffic.
+  seedTopic(
+    topic: string,
+    ownMsgs: number,
+    lastMs: number,
+    rate?: DecayScore
+  ): void {
+    const levels = topic.split("/");
+    let node = this.root;
+    for (let i = 0; i < levels.length; i++) {
+      const seg = levels[i];
+      let child = node.children.get(seg);
+      if (!child) {
+        const full = levels.slice(0, i + 1).join("/");
+        child = new TopicNode(seg, full, i, node);
+        child.expanded = i < this.autoExpandDepth;
+        node.children.set(seg, child);
+        this.nodeCount++;
+        for (let p = node; p && p !== this.root; p = p.parent!) p.descendantCount++;
+        if (this.isVisibleInTree(child)) {
+          this.visibleDirty = true;
+          this.structureGen++;
+        }
+      }
+      node = child;
+      // subtree aggregate COUNT + recency accumulate on every level so the
+      // final aggCount matches the List's cumulative messageCount exactly
+      node.aggCount += ownMsgs;
+      if (lastMs > node.aggLastMsg) node.aggLastMsg = lastMs;
+    }
+    // `node` is now the exact topic: seed its own counters and rate score.
+    node.ownCount += ownMsgs;
+    if (lastMs > node.ownLastMsg) node.ownLastMsg = lastMs;
+    if (rate) {
+      // copy by value — the List keeps mutating its own DecayScore object
+      node.agg = { score: rate.score, lastMs: rate.lastMs };
+      if (node.isLeaf) node.own = { score: rate.score, lastMs: rate.lastMs };
+    } else {
+      node.agg = { score: 0, lastMs };
+      if (node.isLeaf) node.own = { score: 0, lastMs };
+    }
+  }
+
   // current subtree rate-score, decayed to now
   aggScore(node: TopicNode, nowMs: number): number {
     return decayScore(node.agg, nowMs, this.tauMs);

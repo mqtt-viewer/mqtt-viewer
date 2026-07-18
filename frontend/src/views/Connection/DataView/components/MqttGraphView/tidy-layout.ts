@@ -3,9 +3,35 @@
 // See docs/topic-graph-view-spec.md §3.
 
 import { hierarchy, tree, type HierarchyPointNode } from "d3-hierarchy";
+import { topicMatchesQuery } from "@/util/topic-filter";
 import { TopicModel, TopicNode } from "./topic-model";
 
-export type SortKey = "rate" | "recency" | "stale" | "alpha" | "count";
+export type SortKey =
+  | "rate"
+  | "msgs"
+  | "recency"
+  | "stale"
+  | "alpha"
+  | "count";
+
+export const SORT_KEYS: readonly SortKey[] = [
+  "rate",
+  "msgs",
+  "recency",
+  "stale",
+  "alpha",
+  "count",
+];
+
+// Coerce a persisted/untrusted value to a valid SortKey, falling back to the
+// default "rate". Guards the localStorage settings blob: an older build wrote
+// no sortKey (undefined), and a corrupt or newer blob could carry a string
+// this build doesn't know — neither may reach the sort comparators.
+export function coerceSortKey(v: unknown): SortKey {
+  return typeof v === "string" && (SORT_KEYS as readonly string[]).includes(v)
+    ? (v as SortKey)
+    : "rate";
+}
 
 export interface LayoutOptions {
   rowH: number;
@@ -37,8 +63,11 @@ export interface LayoutResult {
   height: number;
 }
 
+// Filter match, shared with the List view: case-insensitive substring on the
+// full topic path OR (when the query is a valid MQTT filter) an MQTT wildcard
+// match. No payload haystack — the graph model stores no payloads.
 function matches(node: TopicNode, q: string): boolean {
-  return node.topic.toLowerCase().includes(q);
+  return topicMatchesQuery(node.topic, q);
 }
 
 // returns true if node or any descendant matches the query
@@ -68,6 +97,9 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
         // real elapsed-time decay). peekAggScore computes the same decayed
         // value without writing it back.
         return -model.peekAggScore(n, nowMs);
+      case "msgs":
+        // most-messages-first: subtree-cumulative message count
+        return -n.aggCount;
       case "recency":
         return -n.aggLastMsg;
       case "stale":

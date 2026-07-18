@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T14:38:26.607Z",
+  "generatedAt": "2026-07-18T08:06:39.528Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3349,6 +3349,11 @@
         },
         {
           "name": "messageSource",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "searchStore",
           "type": "object",
           "required": false
         }

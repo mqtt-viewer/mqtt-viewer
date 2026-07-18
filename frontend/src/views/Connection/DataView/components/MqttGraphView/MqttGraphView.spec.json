@@ -37,6 +37,11 @@
       "name": "messageSource",
       "type": "object",
       "required": false
+    },
+    {
+      "name": "searchStore",
+      "type": "object",
+      "required": false
     }
   ],
   "tokens": [

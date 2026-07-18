@@ -82,6 +82,7 @@
         {selectedTopicStore}
         {width}
         initialData={$mqttDataStore}
+        {searchStore}
       >
         <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
       </MqttGraphView>
