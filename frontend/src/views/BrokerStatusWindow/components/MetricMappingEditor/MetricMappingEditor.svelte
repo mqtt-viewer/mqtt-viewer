@@ -191,9 +191,11 @@
   description="Redirect a builtin tile to your broker's topics, or add your own custom tiles. Changes apply to this connection."
 >
   <div class="flex w-[520px] max-w-[86vw] flex-col gap-5">
-    <!-- Draft form: add mode, or edit when a row was picked. -->
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-col gap-3 sm:flex-row">
+    <!-- Draft form: add mode, or edit when a row was picked. The floating
+         labels sit above each input's box, so rows need the larger gap (and
+         the first row clearance from the description) to keep them readable. -->
+    <div class="flex flex-col gap-5 pt-2">
+      <div class="flex flex-col gap-5 sm:flex-row">
         <BaseInput
           name="mapping-label"
           label="Label"
@@ -217,7 +219,7 @@
         errorMessage={topicError}
         onChange={() => (topicError = undefined)}
       />
-      <div class="flex flex-col gap-3 sm:flex-row">
+      <div class="flex flex-col gap-5 sm:flex-row">
         <BaseInput
           name="mapping-path"
           label="JSON path (optional)"

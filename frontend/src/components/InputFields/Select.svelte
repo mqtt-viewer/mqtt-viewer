@@ -153,7 +153,7 @@
   {/if}
   {#if $open}
     <div
-      class="z-10 flex max-h-[300px] flex-col
+      class="z-[10002] flex max-h-[300px] flex-col
         overflow-y-auto rounded bg-elevation-2 p-1
         shadow focus:!ring-0"
       use:melt={$menu}
