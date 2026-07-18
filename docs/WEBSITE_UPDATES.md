@@ -10,6 +10,11 @@ docs/WRITING_STYLE.md.
 
 ## Pending
 
+- 2026-07-18 · Per-topic protobuf binding merged. Add to features list
+  and to the protobuf/Sparkplug use-case page. Copy angle: bind proto
+  schemas to topic patterns per connection; most-specific filter wins;
+  decode and publish both honour the rules. MQTTX still lacks this
+  (their #1371/#1997/#1971 remain open).
 - 2026-07-16 · Broker status window ($SYS metrics) merged (#118). Add
   to features list; screenshot candidate. Also: README feature table
   still marks it "Potential" — fix alongside.
