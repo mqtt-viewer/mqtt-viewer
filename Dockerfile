@@ -119,7 +119,8 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENV WAILS_SERVER_HOST=0.0.0.0 \
     WAILS_SERVER_PORT=8080 \
-    MQTT_VIEWER_DATA_DIR=/data
+    MQTT_VIEWER_DATA_DIR=/data \
+    MQTT_VIEWER_INSTALL_TYPE=docker
 
 EXPOSE 8080
 VOLUME ["/data"]

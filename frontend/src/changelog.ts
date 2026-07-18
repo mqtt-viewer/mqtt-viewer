@@ -32,7 +32,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         title: "Run MQTT Viewer in your browser",
-        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. It still lets you know when a newer image is available, with the pull command to update. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
       },
       {
         title: "A status page for your broker",
