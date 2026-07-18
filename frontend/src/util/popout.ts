@@ -8,8 +8,13 @@ import envStore from "@/stores/env";
 // buildChartWindowURL mirrors backend/app/windows.go buildChartWindowURL so the
 // browser build routes to the same standalone chart view (App.svelte reads
 // view/conn/topic/fields). Keys are set in sorted order because Go's
-// url.Values.Encode() sorts them; that keeps the two builders byte-identical.
-// Kept pure so it is unit-testable.
+// url.Values.Encode() sorts them; that keeps the query byte-identical to the
+// backend. The reference is path-relative ("?..." with no leading slash), not
+// root-absolute like the Go builder: window.open resolves it against the
+// current document, so under a reverse-proxy prefix (Home Assistant ingress)
+// the popout tab inherits the prefix instead of jumping to the origin root.
+// Served at "/" it opens "/?..." exactly as before. Kept pure so it is
+// unit-testable.
 export const buildChartWindowURL = (params: {
   connectionId: number;
   topic: string;
@@ -22,7 +27,7 @@ export const buildChartWindowURL = (params: {
   }
   query.set("topic", params.topic);
   query.set("view", "chart");
-  return "/?" + query.toString();
+  return "?" + query.toString();
 };
 
 // buildStatusWindowURL mirrors backend/app/windows.go buildStatusWindowURL.
@@ -30,7 +35,7 @@ export const buildStatusWindowURL = (connectionId: number): string => {
   const query = new URLSearchParams();
   query.set("conn", String(connectionId));
   query.set("view", "status");
-  return "/?" + query.toString();
+  return "?" + query.toString();
 };
 
 // openChartWindow opens (or focuses) the detached chart. On desktop this is a
