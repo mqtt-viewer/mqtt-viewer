@@ -127,7 +127,10 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
       if (typeof a.key === "string" || typeof b.key === "string") {
         return String(a.key).localeCompare(String(b.key));
       }
-      return (a.key as number) - (b.key as number);
+      // Equal numeric keys tie-break by name (A -> Z) so sibling order is
+      // deterministic instead of dependent on Map insertion order.
+      const d = (a.key as number) - (b.key as number);
+      return d !== 0 ? d : a.node.name.localeCompare(b.node.name);
     });
     return decorated.map((d) => d.node);
   };

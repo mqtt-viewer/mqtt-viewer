@@ -12,6 +12,7 @@
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import _ from "lodash";
+  import { onDestroy } from "svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import {
     ClearConnectionHistory,
@@ -29,6 +30,10 @@
 
   let searchText = $searchStore.text;
   const debouncedSetSearchText = _.debounce(searchStore.setSearchText, 200);
+  // Flush any pending debounced text on unmount so a List -> Graph toggle within
+  // 200ms of typing doesn't leave the graph opening unfiltered (the filter would
+  // otherwise flash in late once the trailing call fires against a dead view).
+  onDestroy(() => debouncedSetSearchText.flush());
   $: searchText,
     (() => {
       if (searchText === "") {
@@ -89,7 +94,7 @@
       return dir === "desc" ? "Newest" : "Silent";
     } else if (key === "rate") {
       return "Busiest";
-    } else if (key === "count") {
+    } else if (key === "msgs") {
       return "Messages";
     } else {
       return dir === "desc" ? "A → Z" : "Z → A";
@@ -152,8 +157,8 @@
             >Busiest first</DropdownMenuItem
           >
           <DropdownMenuItem
-            isSelected={$sortStore.key === "count"}
-            onClick={() => sortStore.setSort("count", "desc")}
+            isSelected={$sortStore.key === "msgs"}
+            onClick={() => sortStore.setSort("msgs", "desc")}
             >Most messages</DropdownMenuItem
           >
         </div>

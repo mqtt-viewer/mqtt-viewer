@@ -47,7 +47,7 @@ test("data keys are sorted by topic ascending", () => {
   expect(sortedKeys).toEqual(SORTED_TOPIC_DESC.toReversed());
 });
 
-// ---- count sort ----
+// ---- msgs sort ----
 
 const COUNT_DATA = {
   quiet: { messageCount: 3 },
@@ -56,14 +56,35 @@ const COUNT_DATA = {
   silent: { messageCount: 0 },
 } as unknown as MqttData;
 
-test("count sort desc puts the most-messages topic first", () => {
-  const sortedKeys = getSortedDataKeys(COUNT_DATA, "count", "desc");
+test("msgs sort desc puts the most-messages topic first", () => {
+  const sortedKeys = getSortedDataKeys(COUNT_DATA, "msgs", "desc");
   expect(sortedKeys).toEqual(["loud", "medium", "quiet", "silent"]);
 });
 
-test("count sort asc reverses to fewest-messages first", () => {
-  const sortedKeys = getSortedDataKeys(COUNT_DATA, "count", "asc");
+test("msgs sort asc reverses to fewest-messages first", () => {
+  const sortedKeys = getSortedDataKeys(COUNT_DATA, "msgs", "asc");
   expect(sortedKeys).toEqual(["silent", "quiet", "medium", "loud"]);
+});
+
+test("msgs sort breaks equal-count ties alphabetically (A -> Z under desc)", () => {
+  const data = {
+    charlie: { messageCount: 5 },
+    alpha: { messageCount: 5 },
+    bravo: { messageCount: 5 },
+  } as unknown as MqttData;
+  const sortedKeys = getSortedDataKeys(data, "msgs", "desc");
+  expect(sortedKeys).toEqual(["alpha", "bravo", "charlie"]);
+});
+
+test("rate sort breaks equal-rate ties alphabetically (A -> Z under desc)", () => {
+  const now = Date.now();
+  const data = {
+    charlie: { rate: { score: 9, lastMs: now } },
+    alpha: { rate: { score: 9, lastMs: now } },
+    bravo: { rate: { score: 9, lastMs: now } },
+  } as unknown as MqttData;
+  const sortedKeys = getSortedDataKeys(data, "rate", "desc");
+  expect(sortedKeys).toEqual(["alpha", "bravo", "charlie"]);
 });
 
 // ---- rate sort ----

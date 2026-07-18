@@ -34,11 +34,14 @@ export const getSortedDataKeys = (
     } else if (sortKey === "rate") {
       const aRate = rateByKey![a];
       const bRate = rateByKey![b];
-      res = bRate <= aRate ? 1 : -1;
-    } else if (sortKey === "count") {
+      // Equal rates fall through to the alphabetical order the "topic" key uses
+      // (b.localeCompare(a), so ties render A -> Z under dir "desc") instead of
+      // a constant 1, which left tie order dependent on Object.keys iteration.
+      res = aRate === bRate ? b.localeCompare(a) : bRate < aRate ? 1 : -1;
+    } else if (sortKey === "msgs") {
       const aCount = data[a].messageCount ?? 0;
       const bCount = data[b].messageCount ?? 0;
-      res = bCount <= aCount ? 1 : -1;
+      res = aCount === bCount ? b.localeCompare(a) : bCount < aCount ? 1 : -1;
     }
     return sortDirection === "desc" ? res * -1 : res;
   });

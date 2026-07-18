@@ -67,6 +67,22 @@ test("msgs sort orders topics by descending subtree message count", () => {
   expect(order).toEqual(["b", "c", "a"]);
 });
 
+test("equal-rate siblings are ordered alphabetically (deterministic tie-break)", () => {
+  const model = new TopicModel(14000);
+  // three siblings that all published exactly once at the same instant: equal
+  // decayed rate, so the tie-break by name (A -> Z) must decide the order
+  model.ingest("charlie", T);
+  model.ingest("alpha", T);
+  model.ingest("bravo", T);
+
+  const res = layoutTopicTree(model, { ...baseOpts, nowMs: T, sortKey: "rate" });
+  const order = res.nodes
+    .filter((pn) => pn.node.depth === 0)
+    .sort((x, y) => x.y - y.y)
+    .map((pn) => pn.node.name);
+  expect(order).toEqual(["alpha", "bravo", "charlie"]);
+});
+
 test("wildcard filter keeps the matching branch and prunes non-matching siblings", () => {
   const model = new TopicModel(14000);
   model.ingest("factory/line1/temp", T);

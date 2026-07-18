@@ -146,11 +146,13 @@ export class TopicModel {
   // aggLastMsg (subtree max) at every level for recency/stale sorts.
   //
   // `rate`, when the List supplied one, is that topic's decay score (already a
-  // subtree aggregate on the List side) copied verbatim into `agg` (and, for a
-  // leaf, `own`) so "Busiest" ordering survives the toggle. When absent the
-  // score seeds at 0 with the real lastMs — an hour-idle topic must not seed
-  // hot. Structural interior nodes get exact counts + recency here; their agg
-  // rate score reconverges within ~1 tau of live traffic.
+  // subtree aggregate on the List side, tau-scaled by the caller to the graph's
+  // tau) copied verbatim into `agg` (and, for a leaf, `own`) so "Busiest"
+  // ordering survives the toggle. When absent the score seeds at 0 with the real
+  // lastMs — an hour-idle topic must not seed hot. Structural interior nodes get
+  // exact counts + recency here; their agg rate score is seeded on every level
+  // by seedAggRate() from the List's per-level aggregates, so collapsed
+  // namespaces rank correctly from the instant of the toggle.
   seedTopic(
     topic: string,
     ownMsgs: number,
@@ -191,6 +193,23 @@ export class TopicModel {
       node.agg = { score: 0, lastMs };
       if (node.isLeaf) node.own = { score: 0, lastMs };
     }
+  }
+
+  // Seed the subtree-aggregate rate score on an already-existing node path from
+  // the List's per-level aggregate (taken on a List -> Graph toggle). The List
+  // bumps every ancestor, so each node's rate is already its subtree total; this
+  // transplants it onto `agg` at every level so collapsed namespaces rank by
+  // "Busiest" from the instant of the toggle, not ~1 tau later. Walks the path
+  // and bails silently if any segment is missing (the node must already exist,
+  // created by seedTopic). Copies by value — the List keeps mutating its own
+  // DecayScore object. The caller tau-scales `rate` to the graph's tau.
+  seedAggRate(topic: string, rate: DecayScore): void {
+    let node: TopicNode | undefined = this.root;
+    for (const seg of topic.split("/")) {
+      node = node.children.get(seg);
+      if (!node) return; // missing path: no-op
+    }
+    node.agg = { score: rate.score, lastMs: rate.lastMs };
   }
 
   // current subtree rate-score, decayed to now

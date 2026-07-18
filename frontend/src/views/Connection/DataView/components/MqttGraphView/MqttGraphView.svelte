@@ -28,6 +28,7 @@
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { untypedColors } from "@/util/resolvedTailwindConfig";
+  import { LIST_RATE_TAU_MS, type DecayScore } from "@/util/decay-score";
   import { TopicModel, type TopicNode } from "./topic-model";
   import { TopicGraphRenderer } from "./pixi-graph";
   import {
@@ -178,10 +179,20 @@
   };
 
   const seed = (data: MqttData) => {
-    // Recurse into children FIRST (post-order) so that when seedTopic runs for
-    // a topic that both publishes and has subtopics, its child nodes already
-    // exist and it is correctly treated as a non-leaf (its own rate isn't
-    // over-seeded from the subtree aggregate).
+    // The List accumulated its rate scores at LIST_RATE_TAU_MS, but the graph's
+    // tau is user-configurable. At steady state score = rate x tau, so a score
+    // transplanted across taus misreports rate magnitude by tauGraph/tauList;
+    // scale every seeded score by this factor so both views agree on busyness.
+    const tauScale = tauMs / LIST_RATE_TAU_MS;
+    const scaleRate = (r: DecayScore): DecayScore => ({
+      score: r.score * tauScale,
+      lastMs: r.lastMs,
+    });
+
+    // Pass 1 (post-order): recurse into children FIRST so that when seedTopic
+    // runs for a topic that both publishes and has subtopics, its child nodes
+    // already exist and it is correctly treated as a non-leaf (its own rate
+    // isn't over-seeded from the subtree aggregate).
     const walk = (d: MqttData) => {
       for (const key of Object.keys(d)) {
         const n = d[key];
@@ -200,11 +211,30 @@
           const lastMs = n.latestMessageTime
             ? new Date(n.latestMessageTime).getTime()
             : Date.now();
-          model.seedTopic(n.topic, ownMsgs, lastMs, n.rate);
+          model.seedTopic(
+            n.topic,
+            ownMsgs,
+            lastMs,
+            n.rate ? scaleRate(n.rate) : undefined
+          );
         }
       }
     };
     walk(data);
+
+    // Pass 2: seed EVERY node's subtree-aggregate rate onto model.agg, not just
+    // publisher leaves. The List bumps ancestors too, so each node's rate field
+    // is already its subtree aggregate; without this, interior non-publisher
+    // nodes keep agg score 0 and the default "Busiest first" sort ranks
+    // collapsed namespaces last for ~1 tau after a List -> Graph toggle.
+    const walkAgg = (d: MqttData) => {
+      for (const key of Object.keys(d)) {
+        const n = d[key];
+        if (n.rate) model.seedAggRate(n.topic, scaleRate(n.rate));
+        walkAgg(n.children);
+      }
+    };
+    walkAgg(data);
   };
 
   const applyTheme = (t: "dark" | "light") => {
@@ -390,7 +420,11 @@
     });
   });
   // Push local edits back out so the List picks them up on the return toggle.
-  $: if (searchStore) searchStore.setSearchText(filterText);
+  // Guarded symmetrically with the subscribe above: only push when the value
+  // genuinely originated here, else a store-driven filterText change would
+  // bounce straight back into the store.
+  $: if (searchStore && get(searchStore).text !== filterText)
+    searchStore.setSearchText(filterText);
 
   onMount(async () => {
     loadSettings();
@@ -436,6 +470,7 @@
     );
 
     let liveTick = 0;
+    let lastTickIngest = 0;
     liveTimer = window.setInterval(() => {
       if (!renderer) return;
       renderer.notifyData();
@@ -444,19 +479,20 @@
       // visual reconciliation) is too expensive to run every 1.2s tick, so it
       // only runs every 4th tick (~5s) once the tree crosses 2000 topics.
       const dueThisTick = model.topicCount <= 2000 || liveTick % 4 === 0;
-      // rate/recency/stale/msgs all drift with incoming data WITHOUT any
-      // structural change, so their sibling order goes stale between arrivals
-      // and needs the periodic relayout to track the List. alpha/count don't:
-      // alpha never reorders existing nodes, and topic-count changes bump
-      // structureGen -> visibleDirty -> notifyData relayouts on their own.
-      if (
-        !paused &&
-        dueThisTick &&
-        (sortKey === "rate" ||
-          sortKey === "recency" ||
-          sortKey === "stale" ||
-          sortKey === "msgs")
-      ) {
+      // rate/recency drift continuously between arrivals via decay-driven node
+      // sizing, so their sibling order always needs the periodic relayout to
+      // track the List. stale/msgs only change when a message actually arrives,
+      // so skip their relayout on idle ticks (no batch since the last tick).
+      // alpha/count don't drift at all: alpha never reorders existing nodes, and
+      // topic-count changes bump structureGen -> visibleDirty -> notifyData
+      // relayouts on their own.
+      const ingestedSinceLastTick = ingestCounter !== lastTickIngest;
+      lastTickIngest = ingestCounter;
+      const needsRelayout =
+        sortKey === "rate" ||
+        sortKey === "recency" ||
+        ((sortKey === "stale" || sortKey === "msgs") && ingestedSinceLastTick);
+      if (!paused && dueThisTick && needsRelayout) {
         renderer.relayout();
       }
       // keep the hover inspector's numbers live while the pointer rests

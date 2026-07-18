@@ -3,7 +3,7 @@ import { writable } from "svelte/store";
 
 export const DEFAULT_SORT_PERSIST_KEY = "mqtt-data-sort";
 
-export type MqttDataSortKey = "time" | "topic" | "rate" | "count";
+export type MqttDataSortKey = "time" | "topic" | "rate" | "msgs";
 export type MqttDataSortDirection = "asc" | "desc";
 
 export interface MqtttDataSort {
@@ -17,7 +17,7 @@ const VALID_SORT_KEYS: readonly MqttDataSortKey[] = [
   "time",
   "topic",
   "rate",
-  "count",
+  "msgs",
 ];
 const VALID_SORT_DIRS: readonly MqttDataSortDirection[] = ["asc", "desc"];
 

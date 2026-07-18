@@ -176,6 +176,62 @@ test("seedTopic copies the List rate into agg and own for a leaf, by value", () 
   expect(leaf.own.score).toBe(4.2);
 });
 
+test("seedAggRate seeds an interior non-publisher node's subtree agg score from the List aggregate", () => {
+  const model = new TopicModel(14000);
+  // Only the leaves publish; factory/line1 is structural. After seedTopic its
+  // agg RATE score is still 0 (seedTopic only sets the exact publisher's score).
+  model.seedTopic("factory/line1/temp", 3, SEED_T);
+  model.seedTopic("factory/line1/hum", 2, SEED_T);
+  const line1 = model.root.children.get("factory")!.children.get("line1")!;
+  expect(line1.agg.score).toBe(0);
+
+  // The List carries a per-level aggregate rate for factory/line1 (its subtree
+  // total). seedAggRate transplants it so the collapsed namespace ranks by
+  // "Busiest" from the instant of the toggle.
+  model.seedAggRate("factory/line1", { score: 7.5, lastMs: SEED_T });
+  expect(line1.agg.score).toBe(7.5);
+  expect(line1.agg.lastMs).toBe(SEED_T);
+  // the root-side interior node too
+  const factory = model.root.children.get("factory")!;
+  model.seedAggRate("factory", { score: 9.25, lastMs: SEED_T });
+  expect(factory.agg.score).toBe(9.25);
+});
+
+test("seedAggRate copies by value and is a no-op on a missing path", () => {
+  const model = new TopicModel(14000);
+  model.seedTopic("a/b", 1, SEED_T);
+  const b = model.root.children.get("a")!.children.get("b")!;
+
+  const rate = { score: 4, lastMs: SEED_T };
+  model.seedAggRate("a/b", rate);
+  rate.score = 999; // the List keeps mutating its own object
+  expect(b.agg.score).toBe(4);
+
+  // a path segment that was never created: silent no-op, no node materialised
+  expect(() =>
+    model.seedAggRate("a/x/y", { score: 5, lastMs: SEED_T })
+  ).not.toThrow();
+  expect(model.root.children.get("a")!.children.has("x")).toBe(false);
+});
+
+test("tau scaling: the caller doubles the seeded score when graph tau is 2x list tau", () => {
+  // The scaling lives at the seed() call site in MqttGraphView (score = rate x
+  // tau, so a score accumulated at LIST tau must be scaled by tauGraph/tauList
+  // before it is transplanted). This asserts the model stores exactly the
+  // scaled value the caller hands it.
+  const listTau = 14000;
+  const graphTau = 28000;
+  const model = new TopicModel(graphTau);
+  model.seedTopic("a/b", 1, SEED_T);
+  const listRate = { score: 3, lastMs: SEED_T };
+  model.seedAggRate("a", {
+    score: listRate.score * (graphTau / listTau),
+    lastMs: listRate.lastMs,
+  });
+  const a = model.root.children.get("a")!;
+  expect(a.agg.score).toBe(6); // 3 x (28000 / 14000)
+});
+
 test("seedTopic does not copy the subtree rate into own for a non-leaf publisher", () => {
   const model = new TopicModel(14000);
   // seed the child first so the parent is a non-leaf when it is seeded
