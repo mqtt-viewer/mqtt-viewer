@@ -44,7 +44,7 @@ func (a *App) ConnectMqtt(connId uint) error {
 				mqttmiddleware.NewProtoEncodeMiddleware(a.ProtoRegistry).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				mqttmiddleware.NewProtoDecodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoDecodeMiddleware(a.ProtoRegistry, appConnection.SparkplugStore).Middleware,
 			},
 		})
 	} else {
@@ -115,6 +115,9 @@ func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
 func (a *App) ClearConnectionHistory(connId uint) error {
 	appConnection := a.AppConnections[connId]
 	appConnection.MqttManager.ClearConnectionHistory()
+	// Cleared history can no longer be replayed, so drop the Sparkplug
+	// session state derived from it.
+	appConnection.SparkplugStore.Reset()
 	a.EventRuntime.EventsEmit(appConnection.EventSet.MqttClearHistory, nil)
 	return nil
 }

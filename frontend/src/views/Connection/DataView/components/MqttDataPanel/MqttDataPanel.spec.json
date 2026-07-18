@@ -29,8 +29,11 @@
     }
   ],
   "tokens": [
-    "elevation-0"
+    "elevation-0",
+    "white-text",
+    "secondary-text",
+    "warning"
   ],
-  "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "dependencies": ["Button", "SearchActionBar", "MqttTopicTree", "SparkplugPanel"],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic."
 }

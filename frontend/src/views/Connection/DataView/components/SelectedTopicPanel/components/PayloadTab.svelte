@@ -21,6 +21,24 @@
     base64ByteSize,
     formatByteSize,
   } from "./image-payload";
+  import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
+  import Button from "@/components/Button/Button.svelte";
+  import { formatClockTime } from "../../MqttDataPanel/components/SparkplugPanel/build-sparkplug-tree";
+  import { PublishSparkplugRebirth } from "bindings/mqtt-viewer/backend/app/app";
+
+  /** The message's middlewareProperties["sparkplug"] meta, when present. */
+  export let sparkplugMeta: {
+    msgType: string;
+    group?: string;
+    edgeNode?: string;
+    device?: string;
+    hostId?: string;
+    resolution?: string;
+    birthAtMs?: number;
+    bdSeq?: number;
+  } | null = null;
+  /** Needed for the unresolved banner's Request rebirth action. */
+  export let connectionId: number | null = null;
 
   export let isComparing: boolean;
   export let payload: string;
@@ -80,6 +98,35 @@
     ($chartSeriesStore ?? []).map((s) => [s.path, s.color])
   );
   $: selectedCount = ($chartSeriesStore ?? []).length;
+
+  // --- Sparkplug banner --------------------------------------------------------
+  $: spIsData =
+    sparkplugMeta?.msgType === "NDATA" || sparkplugMeta?.msgType === "DDATA";
+  $: spUnresolved = spIsData && sparkplugMeta?.resolution === "unresolved";
+  $: spPartial = spIsData && sparkplugMeta?.resolution === "partial";
+  $: spResolvedFrom =
+    spIsData &&
+    (sparkplugMeta?.resolution === "resolved" || spPartial) &&
+    sparkplugMeta?.birthAtMs !== undefined
+      ? formatClockTime(sparkplugMeta!.birthAtMs!)
+      : null;
+
+  let rebirthInFlight = false;
+  const requestRebirth = async () => {
+    if (!sparkplugMeta || connectionId === null) return;
+    rebirthInFlight = true;
+    try {
+      await PublishSparkplugRebirth(
+        connectionId,
+        sparkplugMeta.group ?? "",
+        sparkplugMeta.edgeNode ?? ""
+      );
+    } catch (e) {
+      console.error("sparkplug: rebirth request failed", e);
+    } finally {
+      rebirthInFlight = false;
+    }
+  };
 </script>
 
 <div
@@ -122,6 +169,42 @@
       </Tooltip>
     {/if}
   </div>
+
+  {#if sparkplugMeta}
+    <div
+      class="text-sm border-b border-divider py-1 px-2 flex items-center gap-2 text-secondary-text whitespace-nowrap overflow-hidden"
+    >
+      <SparkplugLogo class="size-4 shrink-0" isActive />
+      {#if sparkplugMeta.msgType === "STATE"}
+        <span class="truncate"
+          >Sparkplug host state - {sparkplugMeta.hostId}</span
+        >
+      {:else if spUnresolved}
+        <span class="text-warning truncate"
+          >aliases unresolved - no birth seen</span
+        >
+        <Button
+          variant="text"
+          class="text-sm"
+          disabled={rebirthInFlight || connectionId === null}
+          on:click={requestRebirth}>Request rebirth</Button
+        >
+      {:else if spIsData && spResolvedFrom}
+        <span class="truncate"
+          >Sparkplug B {sparkplugMeta.msgType} - aliases resolved from birth
+          {spResolvedFrom}</span
+        >
+        {#if spPartial}
+          <span class="text-warning">some aliases unresolved</span>
+        {/if}
+      {:else}
+        <span class="truncate">Sparkplug B {sparkplugMeta.msgType}</span>
+        {#if sparkplugMeta.bdSeq !== undefined}
+          <span>bdSeq {sparkplugMeta.bdSeq}</span>
+        {/if}
+      {/if}
+    </div>
+  {/if}
 
   {#if showImagePreview && detectedImage && payloadB64}
     <div class="grow w-full min-h-0 flex flex-col">

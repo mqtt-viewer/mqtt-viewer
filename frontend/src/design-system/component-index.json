@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-18T03:43:42.829Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3006,10 +3006,18 @@
         }
       ],
       "tokens": [
-        "elevation-0"
+        "elevation-0",
+        "white-text",
+        "secondary-text",
+        "warning"
       ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "dependencies": [
+        "Button",
+        "SearchActionBar",
+        "MqttTopicTree",
+        "SparkplugPanel"
+      ],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.stories.svelte",
@@ -3270,6 +3278,134 @@
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SearchActionBar/SearchAndHistory.stories.svelte",
       "storyId": "Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory",
+      "specMissing": false
+    },
+    {
+      "name": "SparkplugPanel",
+      "tier": "view",
+      "description": "Sparkplug session tree: host state strip, virtualized group/node/device/metric tree with health meta, pinned warnings strip.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "treeState",
+          "type": "object",
+          "required": true,
+          "description": "SparkplugTreeState snapshot from the sparkplug tree store (plain state in, so stories can feed fixtures)."
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "required": true,
+          "description": "Panel width for the virtual-list row max-width math."
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Case-insensitive substring filter on node/device/metric names."
+        },
+        {
+          "name": "onRequestRebirth",
+          "type": "function",
+          "required": true,
+          "description": "(group, node) callback for the Request rebirth actions."
+        },
+        {
+          "name": "onCopyMetricList",
+          "type": "function",
+          "required": true,
+          "description": "(node) callback for the Copy metric list action."
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "white-text",
+        "success",
+        "error",
+        "warning",
+        "divider",
+        "hovered"
+      ],
+      "dependencies": [
+        "SparkplugRow",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet; stories use local fixtures. Expansion state is panel-local (everything defaults expanded).",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel/SparkplugPanel",
+      "specMissing": false
+    },
+    {
+      "name": "SparkplugRow",
+      "tier": "view",
+      "description": "One virtualized Sparkplug tree row: group, edge node (with health meta and hover actions), device, or metric (type/value/last-seen/badges).",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "row",
+          "type": "object",
+          "required": true,
+          "description": "SparkplugTreeRow from build-sparkplug-tree (kind: group | node | device | metric)."
+        },
+        {
+          "name": "nowMs",
+          "type": "number",
+          "required": true,
+          "description": "Reference now for relative ages (from the store snapshot)."
+        },
+        {
+          "name": "onToggleExpansion",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onRequestRebirth",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onCopyMetricList",
+          "type": "function",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "white-text",
+        "success",
+        "error",
+        "warning",
+        "hovered"
+      ],
+      "dependencies": [
+        "Button",
+        "Icon",
+        "DropdownMenu",
+        "DropdownMenuItem",
+        "DropdownCloseOnClick"
+      ],
+      "notes": "Figma is not linked yet; stories use local fixtures. Node actions are hover-revealed (same affordance as MqttTopicRow's broker-status button).",
+      "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugRow.svelte",
+      "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugRow.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugRow.stories.svelte",
+      "storyId": "Views/Connection/DataView/MqttDataPanel/SparkplugPanel/SparkplugRow",
       "specMissing": false
     },
     {
@@ -3857,14 +3993,33 @@
             "json-prettier",
             "xml"
           ]
+        },
+        {
+          "name": "sparkplugMeta",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders the decode banner when present."
+        },
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Needed for the unresolved banner's Request rebirth action."
         }
       ],
       "tokens": [
         "secondary",
         "secondary-text",
-        "outline"
+        "outline",
+        "divider",
+        "warning"
       ],
-      "dependencies": [],
+      "dependencies": [
+        "SparkplugLogo",
+        "Button"
+      ],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/PayloadTab.svelte",
       "specPath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/PayloadTab.spec.json",

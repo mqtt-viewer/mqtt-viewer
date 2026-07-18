@@ -74,6 +74,9 @@
   $: selectedMessagePayload = selectedMessage?.payload.toString() ?? null;
   $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
+  // Sparkplug middleware meta drives PayloadTab's decode banner.
+  $: selectedMessageSparkplugMeta =
+    (selectedMessage?.middlewareProperties as any)?.sparkplug ?? null;
 
   $: selectedMessagePayload,
     (() => {
@@ -242,6 +245,8 @@
               payloadLeftForCompare={previousMessagePayload}
               {chartSeriesStore}
               onViewChart={viewChart}
+              {connectionId}
+              sparkplugMeta={selectedMessageSparkplugMeta}
             />
           {/if}
         </div>
@@ -279,6 +284,8 @@
               payloadLeftForCompare={previousMessagePayload}
               {chartSeriesStore}
               onViewChart={viewChart}
+              {connectionId}
+              sparkplugMeta={selectedMessageSparkplugMeta}
             />
           {/if}
         </div>

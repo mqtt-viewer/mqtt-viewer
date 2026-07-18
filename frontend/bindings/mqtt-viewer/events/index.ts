@@ -6,7 +6,4 @@ export {
     ConnectionEvents
 };
 
-export {
-    ConnectionEventsSet,
-    GlobalEvent
-} from "./models.js";
+export * from "./models.js";
