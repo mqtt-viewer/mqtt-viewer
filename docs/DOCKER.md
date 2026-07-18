@@ -71,9 +71,10 @@ connection settings.
 
 - Exports download through the browser instead of a save dialog.
 - Pop-out chart and broker status windows open as browser tabs.
-- No auto-update. Update by pulling a new image:
-  `docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest` and recreate the
-  container. Your data survives in the volume.
+- No self-update. The app still tells you when a newer image is available and
+  shows the pull command, but it never replaces itself. You update by pulling a
+  new image: `docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest` and recreating
+  the container. Your data survives in the volume.
 - Certificate paths are typed, not picked (see above).
 
 Everything else is the same code path as the desktop app.

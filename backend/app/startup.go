@@ -124,9 +124,12 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 		a.ProtoRegistry = registry
 	}()
 
-	// Skip the self-updater in test mode and in server mode (Docker images update
-	// by pulling a new image, so the in-app updater must not run).
-	if a.Mode != AppModes.Test && !env.IsServerBuild {
+	// Initialise the updater everywhere but test mode. Server (Docker) builds
+	// still run the check so users are told when a newer image exists; the
+	// self-update flow itself is gated off separately (canSelfUpdate is false
+	// for server builds, so StartUpdate refuses). The Wails updater's Init is
+	// headless-safe: it only validates config and opens no window here.
+	if a.Mode != AppModes.Test {
 		updater, err := update.InitUpdater(application.Get())
 		if err != nil {
 			slog.Error(fmt.Sprintf("error initialising updater: %v", err))
