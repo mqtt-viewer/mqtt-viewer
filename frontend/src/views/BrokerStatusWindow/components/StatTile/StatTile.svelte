@@ -105,7 +105,7 @@
        no-data tiles (nothing to detail). -->
   {#if !noData}
   <div
-    class="pointer-events-none absolute left-0 top-full z-[10003] mt-1 hidden w-max max-w-[240px]
+    class="pointer-events-none absolute left-0 right-0 top-full z-[10003] mt-1 hidden
       flex-col gap-0.5 rounded border border-outline bg-elevation-2 px-3 py-2 text-xs
       shadow group-hover:flex group-focus-within:flex"
     role="tooltip"

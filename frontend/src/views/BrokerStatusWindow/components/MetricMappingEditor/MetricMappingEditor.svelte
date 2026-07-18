@@ -192,9 +192,10 @@
 >
   <div class="flex max-h-[70vh] w-[520px] max-w-[86vw] flex-col gap-5 overflow-y-auto">
     <!-- Draft form: add mode, or edit when a row was picked. The floating
-         labels sit above each input's box, so rows need the larger gap (and
-         the first row clearance from the description) to keep them readable. -->
-    <div class="flex flex-col gap-5 pt-2">
+         labels sit ABOVE each input's box, so rows need the larger gap, and
+         the first row needs enough top padding inside the scroll container's
+         clip box or the floated labels render with their tops cut off. -->
+    <div class="flex flex-col gap-5 pt-3">
       <div class="flex flex-col gap-5 sm:flex-row">
         <BaseInput
           name="mapping-label"

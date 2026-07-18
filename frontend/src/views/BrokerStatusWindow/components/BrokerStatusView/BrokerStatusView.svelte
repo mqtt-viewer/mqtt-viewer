@@ -378,10 +378,11 @@
     avgMsgSize={facts.avgMsgSize}
   />
 
-  </div>
-
   <!-- Collapsible raw $SYS browser (hidden until a first topic arrives: an
-       empty expandable under the no-$SYS card reads as dead weight). -->
+       empty expandable under the no-$SYS card reads as dead weight). Inside
+       the dim wrapper: its frozen values must fade with the rest. The health
+       strip stays outside deliberately (it is sticky and needs an opaque,
+       full-strength treatment; chips carry their own stale greying). -->
   {#if $store.latestByTopic.size > 0}
   <div class="flex flex-col rounded border border-outline bg-elevation-1">
     <button
@@ -434,6 +435,7 @@
                     </td>
                     <td
                       class="truncate py-1 pr-3 font-mono tabular-nums text-secondary-text"
+                      title={row.value}
                     >
                       {row.value}
                     </td>
@@ -468,6 +470,7 @@
     {/if}
   </div>
   {/if}
+  </div>
 </div>
 
 <MetricMappingEditor

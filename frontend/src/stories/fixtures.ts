@@ -463,7 +463,10 @@ export const createMockBrokerStatusEmptyStore = () =>
     windowOpenedAt: now - 20000,
     metricByKey: new Map(),
     observedSeries: mockObservedSeries(),
-    loudest: { rows: [], overflowTopics: 0, overflowMsgPerSec: 0, collecting: true },
+    // The client IS receiving traffic (observed tiles show a rate), so the
+    // loudest table must have rows too; an empty table next to a live
+    // observed rate is an impossible state (review cycle 4).
+    loudest: mockLoudest(),
     health: [],
   });
 
