@@ -28,6 +28,13 @@ const (
 	installLinuxPortable = "linux-portable"
 	installMacOS         = "macos"
 	installWindows       = "windows"
+	// Server (headless) builds. These never self-update; a container is
+	// replaced by pulling a new image, so the frontend only shows how to do
+	// that. installDocker is the default; installHomeAssistant is used when
+	// the image runs as a Home Assistant add-on, where updates flow through
+	// the add-on store instead.
+	installDocker        = "docker"
+	installHomeAssistant = "home-assistant-addon"
 )
 
 // UpdateResponse is what the frontend receives when an update is available.
@@ -114,6 +121,17 @@ func (u *Updater) StartUpdate() error {
 	return nil
 }
 
+// canSelfUpdate reports whether this installation can replace its own binary.
+// Server (container) builds never can, regardless of file permissions, because
+// they are updated by pulling a new image rather than swapping the binary in
+// place. Everything else defers to the platform-specific check.
+func canSelfUpdate() bool {
+	if env.IsServerBuild {
+		return false
+	}
+	return binaryIsSelfUpdatable()
+}
+
 // isFlatpak reports whether the app is running inside a Flatpak sandbox.
 // Flatpak sets FLATPAK_ID for every sandboxed process.
 func isFlatpak() bool {
@@ -121,10 +139,22 @@ func isFlatpak() bool {
 }
 
 // resolveInstallType classifies how MQTT Viewer was installed so the frontend
-// can show the correct update instructions. Flatpak and AppImage set their own
-// environment variables; everything else is classified by OS, with Linux split
-// into a self-updatable portable binary and a system package (deb/rpm).
+// can show the correct update instructions. Server builds are containers and
+// are classified from the deployment environment; on the desktop, flatpak and
+// AppImage set their own environment variables and everything else is
+// classified by OS, with Linux split into a self-updatable portable binary and
+// a system package (deb/rpm).
 func resolveInstallType() string {
+	if env.IsServerBuild {
+		// A container never falls through to the desktop classification. The
+		// deployment sets MQTT_VIEWER_INSTALL_TYPE to "home-assistant" when the
+		// image runs as an add-on; anything else (or unset) is a plain Docker
+		// run.
+		if os.Getenv("MQTT_VIEWER_INSTALL_TYPE") == "home-assistant" {
+			return installHomeAssistant
+		}
+		return installDocker
+	}
 	if isFlatpak() {
 		return installFlatpak
 	}
@@ -162,6 +192,16 @@ func updateGuidance(installType string) (command, instructions, releasesURL stri
 		return "",
 			"Download the .deb or .rpm for your distribution from the releases page and install it over your current version.",
 			releasesPageURL
+	case installDocker:
+		return "docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest",
+			"Pull the new image and recreate the container:",
+			releasesPageURL
+	case installHomeAssistant:
+		// Updates come through Home Assistant's add-on store, so there is no
+		// command to run and no releases page to point at.
+		return "",
+			"Update the MQTT Viewer add-on from the add-on store in Home Assistant.",
+			""
 	default:
 		return "", "", releasesPageURL
 	}
