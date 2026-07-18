@@ -16,7 +16,8 @@
 //   - a missing new sample means the value held flat (change-only
 //     republishers like mosquitto only re-emit changed values, so silence is
 //     signal, not a gap);
-//   - a chip renders nothing until it has ≥ 2 samples.
+//   - a chip renders nothing until it has a sample (cumulative sources only
+//     produce their first, rate, sample after two raw counter readings).
 //
 // See the health table in docs/broker-status-v2-spec.md.
 
@@ -41,8 +42,16 @@ export type HealthChipId =
   | "store"
   | "churn";
 
-/** Minimum samples before a chip renders at all (never paint "ok" off one). */
-export const MIN_RENDER_SAMPLES = 2;
+/**
+ * Minimum samples before a chip renders. One suffices: gauge sources are
+ * meaningful from their first (often retained) value, and change-only
+ * republishers like mosquitto never re-emit a permanently-zero gauge, so a
+ * two-sample gate would hide the drops/backlog chips on a healthy broker
+ * forever. Cumulative sources stay protected implicitly — the store only
+ * emits their first sample once a rate exists (two raw counter readings), so
+ * a single EMQX counter snapshot still renders nothing.
+ */
+export const MIN_RENDER_SAMPLES = 1;
 /** A trend clause needs at least this many in-window samples to be considered. */
 export const TREND_MIN_SAMPLES = 3;
 /** Hysteresis floor; the effective hold is max(this, learnedInterval). */

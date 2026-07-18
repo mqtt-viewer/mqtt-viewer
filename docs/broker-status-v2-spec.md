@@ -118,7 +118,11 @@ Cadence-robust trend semantics (identical for every chip):
   to the non-trend column, never "hold previous")
 - absence of a new sample means "value held flat" (mosquitto republishes
   only changed values; silence is signal, not missing data)
-- a chip renders nothing until it has >= 2 samples
+- a chip renders nothing until it has a sample. One gauge sample suffices
+  (change-only republishers never re-emit a permanently-zero gauge, so a
+  two-sample gate would hide the drops and backlog chips on a healthy
+  mosquitto forever); cumulative sources are still protected because their
+  first sample is a rate, which needs two raw counter readings
 
 | Chip | Source (first with data) | ok | attention | problem |
 | --- | --- | --- | --- | --- |

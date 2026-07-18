@@ -136,21 +136,28 @@ describe("applyHysteresis", () => {
 // --- evaluateHealth: rendering + minimum samples -----------------------------
 
 describe("evaluateHealth — rendering gate", () => {
-  it("renders nothing for a chip with fewer than 2 samples", () => {
-    const chips = evalHealth(
-      { msgs_dropped: metric(0, series([0], 10_000)) },
-      10_000
-    );
+  it("renders nothing for a chip with no samples", () => {
+    const chips = evalHealth({ msgs_dropped: metric(null, []) }, 10_000);
     expect(chips.drops.render).toBe(false);
     expect(chips.drops.level).toBeNull();
   });
 
-  it("1-sample degenerate case at 60 s cadence: still nothing", () => {
+  it("renders ok from one gauge sample (change-only republishers never re-emit a flat zero)", () => {
+    const chips = evalHealth(
+      { msgs_dropped: metric(0, series([0], 10_000)) },
+      10_000
+    );
+    expect(chips.drops.render).toBe(true);
+    expect(chips.drops.level).toBe("ok");
+  });
+
+  it("one backlog gauge sample at 60 s cadence renders without a trend state", () => {
     const chips = evalHealth(
       { delivery_backlog: metric(7, series([7], 60_000)) },
       60_000
     );
-    expect(chips.backlog.render).toBe(false);
+    expect(chips.backlog.render).toBe(true);
+    expect(chips.backlog.level).toBe("ok");
   });
 });
 
