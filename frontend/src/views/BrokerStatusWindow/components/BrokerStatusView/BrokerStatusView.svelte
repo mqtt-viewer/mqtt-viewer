@@ -193,13 +193,17 @@
   };
 
   // --- Gauge tiles: delta arrow + hover-panel inputs -------------------------
-  // Percentage change across the visible sparkline window (last vs first).
+  // Percentage change across the visible sparkline window (last vs first). A
+  // zero baseline makes a percentage meaningless, so growth from zero returns
+  // Infinity and the tile shows the direction glyph without a number.
   const deltaPctFor = (tile: BrokerTileView): number | undefined => {
     const s = tile.samples;
     if (!s || s.length < 2) return undefined;
     const first = s[0].v;
     const last = s[s.length - 1].v;
-    if (first === 0) return undefined;
+    if (first === 0) {
+      return last === 0 ? undefined : Number.POSITIVE_INFINITY;
+    }
     return ((last - first) / Math.abs(first)) * 100;
   };
 

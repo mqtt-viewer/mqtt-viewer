@@ -23,8 +23,11 @@
   $: showQualifier = !stale && qualifier !== "";
 </script>
 
+<!-- The dot centres against the row; the three text spans share one baseline
+     (mono and sans sit at different heights under items-center, which made the
+     value ride high). leading-none keeps the chip height driven by padding. -->
 <div
-  class="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-outline bg-elevation-1 px-2 py-1"
+  class="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-outline bg-elevation-1 px-2.5 py-1.5"
 >
   {#if showDot}
     <span
@@ -36,21 +39,25 @@
       aria-hidden="true"
     ></span>
   {/if}
-  <span class="text-sm text-secondary-text">{label}</span>
-  <span
-    class="font-mono text-sm tabular-nums {stale ? 'text-secondary-text' : 'text-emphasis'}"
-  >
-    {valueText}
-  </span>
-  {#if showQualifier}
+  <span class="flex items-baseline gap-1.5">
+    <span class="text-xs leading-none text-secondary-text">{label}</span>
     <span
-      class="text-xs {level === 'problem'
-        ? 'text-error'
-        : level === 'attention'
-          ? 'text-warning'
-          : 'text-secondary-text'}"
+      class="font-mono text-xs font-semibold tabular-nums leading-none {stale
+        ? 'text-secondary-text'
+        : 'text-emphasis'}"
     >
-      {qualifier}
+      {valueText}
     </span>
-  {/if}
+    {#if showQualifier}
+      <span
+        class="text-[11px] leading-none {level === 'problem'
+          ? 'text-error'
+          : level === 'attention'
+            ? 'text-warning'
+            : 'text-secondary-text'}"
+      >
+        {qualifier}
+      </span>
+    {/if}
+  </span>
 </div>
