@@ -365,6 +365,10 @@
   let stats: StatsInfo | null = null;
   let statsTimer: number | null = null;
   let ingestCounter = 0;
+  // Monotonic arrival count for the live-tick re-sort gate. Deliberately
+  // separate from ingestCounter, which the stats HUD zeroes every second and
+  // so cannot signal "anything arrived since the last eligible tick".
+  let totalIngested = 0;
 
   const startStatsTimer = () => {
     if (statsTimer !== null) return;
@@ -461,6 +465,7 @@
     unsubSource = (messageSource ?? wailsSource).subscribe(
       (msgs) => {
         ingestCounter += msgs.length;
+        totalIngested += msgs.length;
         for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
       },
       () => {
@@ -490,8 +495,8 @@
       // actually run: on throttled big trees (or while paused) arrivals must
       // stay pending until the next eligible tick, not be forgotten.
       if (!paused && dueThisTick) {
-        const ingestedSinceLastTick = ingestCounter !== lastTickIngest;
-        lastTickIngest = ingestCounter;
+        const ingestedSinceLastTick = totalIngested !== lastTickIngest;
+        lastTickIngest = totalIngested;
         const needsRelayout =
           sortKey === "rate" ||
           sortKey === "recency" ||
