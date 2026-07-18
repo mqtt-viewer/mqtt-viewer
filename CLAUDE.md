@@ -40,6 +40,19 @@ just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
 
+On a fresh checkout or new worktree, `go build ./...` fails with
+`pattern all:frontend/dist: no matching files found`: main.go embeds the
+frontend build, which does not exist yet (`frontend/dist` is gitignored
+and vite empties it on every build, so a committed placeholder would not
+survive). Stub it once before building Go code:
+
+```sh
+mkdir -p frontend/dist && [ -f frontend/dist/index.html ] || echo "<html></html>" > frontend/dist/index.html
+```
+
+(the same stub `build/Taskfile.yml`'s `generate:bindings` task creates),
+or run a real `pnpm build` from `frontend/`.
+
 Dev-server ports are derived per checkout so parallel agent worktrees
 never collide. Once per checkout, run `scripts/dev-ports.sh write-launch`
 to generate `.claude/launch.json` (gitignored). See
