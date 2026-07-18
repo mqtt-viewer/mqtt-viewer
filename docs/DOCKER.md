@@ -105,11 +105,23 @@ stamps the version shown in the app.
 
 The image is a normal web app on a single port with a single `/data` volume,
 which is the shape Home Assistant add-ons, Unraid templates, Portainer
-templates and similar app stores expect. A Home Assistant add-on needs
-ingress support (serving the UI under a path prefix), which the app does not
-handle yet. If you want this, say so in
-[issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119) so I know
-to prioritise it.
+templates and similar app stores expect.
+
+The UI also works when it is served under a path prefix rather than at the
+origin root, which is what Home Assistant ingress needs: ingress mounts each
+add-on under `/api/hassio_ingress/<token>/` inside an iframe. Built asset URLs
+are relative, and a small shim in the page rewrites the internal `/wails/*`
+calls (the runtime POST, the event WebSocket and the `custom.js` loader) so
+they resolve under the prefix instead of jumping to the origin root. I have
+verified a full round-trip through a prefix-stripping reverse proxy that mirrors
+how ingress forwards requests: the UI loads, binding calls reach the backend and
+the live-event WebSocket connects, all under the prefix. Two things the proxy in
+front must do, both of which ingress already does: strip the prefix before
+forwarding to the container, and pass WebSocket upgrades through.
+
+I have not yet packaged this as a Home Assistant add-on (the `config.yaml` and
+supervisor wiring); if you want that, say so in
+[issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119).
 
 ## Troubleshooting
 
