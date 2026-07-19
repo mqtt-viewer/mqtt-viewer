@@ -3,24 +3,9 @@ package app
 import (
 	"mqtt-viewer/backend/models"
 	topicmatching "mqtt-viewer/backend/topic-matching"
-	"path"
+	"os"
 	"testing"
 )
-
-// setProtoRegDir sets a connection's ProtoRegDir via the same path the
-// frontend uses (a partial UpdateConnection carrying the full row, as
-// ConnectionForm sends), so LoadProtoRegistry has something to read.
-func setProtoRegDir(t *testing.T, app *App, connId uint, dir string) {
-	t.Helper()
-	conn := models.Connection{}
-	if res := app.Db.First(&conn, connId); res.Error != nil {
-		t.Fatalf("fetching connection: %v", res.Error)
-	}
-	conn.ProtoRegDir = &dir
-	if err := app.UpdateConnection(&conn); err != nil {
-		t.Fatalf("setting proto reg dir: %v", err)
-	}
-}
 
 func TestAddAndGetProtoBindingRules(t *testing.T) {
 	app, connId := getTestAppWithConnection(t)
@@ -356,6 +341,9 @@ func TestGetProtoStateOnFreshConnection(t *testing.T) {
 	if state.LoadError != "" {
 		t.Errorf("Expected no load error, got %v", state.LoadError)
 	}
+	if state.HasImport {
+		t.Error("Expected HasImport to be false when nothing has ever been imported")
+	}
 	if len(state.DescriptorNames) != 0 {
 		t.Errorf("Expected no descriptor names, got %v", state.DescriptorNames)
 	}
@@ -367,6 +355,36 @@ func TestGetProtoStateOnFreshConnection(t *testing.T) {
 	}
 }
 
+// TestGetProtoStateHasImportReflectsDiskBeforeCompile is the regression case
+// for the "not imported" flash: right after a restart, protoState hasn't
+// compiled anything yet (Dir is still empty), but HasImport is a plain
+// os.Stat of the internal proto-imports dir, so it already reflects reality
+// before the lazy compile (ConnectMqtt or the ProtoSection mount's
+// LoadProtoRegistry call) has had a chance to run.
+func TestGetProtoStateHasImportReflectsDiskBeforeCompile(t *testing.T) {
+	app, connId := getTestAppWithConnection(t)
+
+	if _, err := app.ImportProtoDir(connId, testProtosGoodDir); err != nil {
+		t.Fatalf("importing: %v", err)
+	}
+
+	// Simulate a fresh app session: nothing compiled into protoState yet
+	// (same as right after a restart, before ConnectMqtt or
+	// LoadProtoRegistry has run), but the import is still on disk.
+	app.AppConnections[connId].ProtoState.Clear()
+
+	state, err := app.GetProtoState(connId)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if !state.HasImport {
+		t.Error("Expected HasImport to reflect the on-disk import even before it's been compiled this session")
+	}
+	if state.Dir != "" {
+		t.Errorf("Expected Dir to stay empty until a compile actually runs, got %v", state.Dir)
+	}
+}
+
 func TestGetProtoStateUnknownConnection(t *testing.T) {
 	app := getTestApp(t)
 
@@ -375,11 +393,14 @@ func TestGetProtoStateUnknownConnection(t *testing.T) {
 	}
 }
 
-func TestLoadProtoRegistrySuccess(t *testing.T) {
+// TestLoadProtoRegistryOnFreshConnectionStaysEmpty covers the "nothing
+// imported yet" path: LoadProtoRegistry compiles the internal proto-imports
+// dir, which doesn't exist until an import happens, so it must come back
+// empty rather than surfacing a "folder not found" error (that error is
+// reserved for an internal dir that existed and then vanished; see
+// proto_import_test.go).
+func TestLoadProtoRegistryOnFreshConnectionStaysEmpty(t *testing.T) {
 	app, connId := getTestAppWithConnection(t)
-
-	dir := path.Join(appDir, "..", "protobuf", "test-protos", "test-protos-good")
-	setProtoRegDir(t, app, connId, dir)
 
 	state, err := app.LoadProtoRegistry(connId)
 	if err != nil {
@@ -388,43 +409,41 @@ func TestLoadProtoRegistrySuccess(t *testing.T) {
 	if state.LoadError != "" {
 		t.Errorf("Expected no load error, got %v", state.LoadError)
 	}
+	if state.DirMissing {
+		t.Error("Expected DirMissing to be false when nothing has been imported")
+	}
+	if len(state.DescriptorNames) != 0 {
+		t.Errorf("Expected no descriptor names, got %v", state.DescriptorNames)
+	}
+}
+
+// TestLoadProtoRegistrySkipsRecompileWhenAlreadyLoaded guards the needs-load
+// gate: once a session has already compiled the connection's internal
+// import dir successfully, a second LoadProtoRegistry call (the ProtoSection
+// mount path, called on every dialog open) must not recompile. Proven here
+// by mutating the internal dir directly (bypassing the app's import APIs)
+// and checking a second call still serves the cached registry rather than
+// noticing the dir is now empty.
+func TestLoadProtoRegistrySkipsRecompileWhenAlreadyLoaded(t *testing.T) {
+	app, connId := getTestAppWithConnection(t)
+
+	if _, err := app.ImportProtoDir(connId, testProtosGoodDir); err != nil {
+		t.Fatalf("importing: %v", err)
+	}
+
+	if err := os.RemoveAll(app.protoImportDir(connId)); err != nil {
+		t.Fatalf("removing internal import dir: %v", err)
+	}
+
+	state, err := app.LoadProtoRegistry(connId)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
 	if len(state.DescriptorNames) == 0 {
-		t.Error("Expected descriptor names to be populated")
-	}
-}
-
-func TestLoadProtoRegistryBadDirSetsLoadErrorNotHardError(t *testing.T) {
-	app, connId := getTestAppWithConnection(t)
-
-	setProtoRegDir(t, app, connId, "/definitely/does/not/exist-abc123")
-
-	state, err := app.LoadProtoRegistry(connId)
-	if err != nil {
-		t.Fatalf("Expected no hard error for a bad dir, got %v", err)
-	}
-	if state.LoadError == "" {
-		t.Error("Expected a load error for a nonexistent dir")
-	}
-	if !state.DirMissing {
-		t.Error("Expected DirMissing to be true for a nonexistent dir")
-	}
-}
-
-func TestLoadProtoRegistryCompileErrorDoesNotSetDirMissing(t *testing.T) {
-	app, connId := getTestAppWithConnection(t)
-
-	dir := path.Join(appDir, "..", "protobuf", "test-protos", "test-protos-one-bad")
-	setProtoRegDir(t, app, connId, dir)
-
-	state, err := app.LoadProtoRegistry(connId)
-	if err != nil {
-		t.Fatalf("Expected no hard error for a compile failure, got %v", err)
-	}
-	if state.LoadError == "" {
-		t.Error("Expected a load error for a directory with a bad proto file")
+		t.Error("Expected LoadProtoRegistry to skip the recompile and keep serving the already-loaded registry")
 	}
 	if state.DirMissing {
-		t.Error("Expected DirMissing to be false when the dir exists but a proto file fails to compile")
+		t.Error("Expected DirMissing to reflect the last successful compile, not a skipped recompile against the now-removed dir")
 	}
 }
 

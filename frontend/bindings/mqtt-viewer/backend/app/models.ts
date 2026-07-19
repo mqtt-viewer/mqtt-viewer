@@ -221,15 +221,26 @@ export class OpenChartWindowParams {
 
 /**
  * ProtoStateResult is the read model the frontend polls (on dialog open,
- * after a dir pick, and on ProtoStateChanged) to render the bindings form
- * and publish panel. Dir/LoadError/FileDescriptors/DescriptorNames describe
- * the compiled per-connection registry (all zero values until one loads
- * successfully); Rules is always the live DB row set.
+ * after an import, and on ProtoStateChanged) to render the bindings form and
+ * publish panel. Dir/LoadError/FileDescriptors/DescriptorNames describe the
+ * compiled per-connection registry, always the internal proto-imports copy
+ * (all zero values until an import has happened, or until it's been
+ * compiled this session — see HasImport); SourceDir is the
+ * last-imported-from folder, display only, for the "Imported from ..." line
+ * and as what Re-import re-reads from; Rules is always the live DB row set.
+ * HasImport is a plain os.Stat of the internal proto-imports directory,
+ * independent of whether it's been compiled into protoState yet: the
+ * frontend derives its "something is imported" state from this rather than
+ * from Dir being non-empty, so a fresh app launch doesn't flash an
+ * "not imported" empty state for the split second before the lazy compile
+ * finishes.
  */
 export class ProtoStateResult {
     "dir": string;
     "loadError": string;
     "dirMissing": boolean;
+    "sourceDir": string;
+    "hasImport": boolean;
     "fileDescriptors": { [_: string]: string[] };
     "descriptorNames": string[];
     "rules": models$0.ProtoBindingRule[];
@@ -244,6 +255,12 @@ export class ProtoStateResult {
         }
         if (!("dirMissing" in $$source)) {
             this["dirMissing"] = false;
+        }
+        if (!("sourceDir" in $$source)) {
+            this["sourceDir"] = "";
+        }
+        if (!("hasImport" in $$source)) {
+            this["hasImport"] = false;
         }
         if (!("fileDescriptors" in $$source)) {
             this["fileDescriptors"] = {};
@@ -262,20 +279,51 @@ export class ProtoStateResult {
      * Creates a new ProtoStateResult instance from a string or object.
      */
     static createFrom($$source: any = {}): ProtoStateResult {
-        const $$createField3_0 = $$createType7;
-        const $$createField4_0 = $$createType6;
-        const $$createField5_0 = $$createType9;
+        const $$createField5_0 = $$createType7;
+        const $$createField6_0 = $$createType6;
+        const $$createField7_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("fileDescriptors" in $$parsedSource) {
-            $$parsedSource["fileDescriptors"] = $$createField3_0($$parsedSource["fileDescriptors"]);
+            $$parsedSource["fileDescriptors"] = $$createField5_0($$parsedSource["fileDescriptors"]);
         }
         if ("descriptorNames" in $$parsedSource) {
-            $$parsedSource["descriptorNames"] = $$createField4_0($$parsedSource["descriptorNames"]);
+            $$parsedSource["descriptorNames"] = $$createField6_0($$parsedSource["descriptorNames"]);
         }
         if ("rules" in $$parsedSource) {
-            $$parsedSource["rules"] = $$createField5_0($$parsedSource["rules"]);
+            $$parsedSource["rules"] = $$createField7_0($$parsedSource["rules"]);
         }
         return new ProtoStateResult($$parsedSource as Partial<ProtoStateResult>);
+    }
+}
+
+/**
+ * ProtoUploadFile is a single .proto file uploaded from the browser (the web
+ * build has no native folder picker, so files are read client-side and sent
+ * as name+content pairs). Name may carry forward-slash relative subpaths
+ * (e.g. "common/types.proto") to preserve import-relative layouts.
+ */
+export class ProtoUploadFile {
+    "name": string;
+    "content": string;
+
+    /** Creates a new ProtoUploadFile instance. */
+    constructor($$source: Partial<ProtoUploadFile> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("content" in $$source)) {
+            this["content"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProtoUploadFile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProtoUploadFile {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProtoUploadFile($$parsedSource as Partial<ProtoUploadFile>);
     }
 }
 

@@ -51,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         title: "Bind proto types to topics",
-        body: "Point a connection at a folder of .proto files, then map topic filters to message types. Matching messages decode in the tree and encode on publish, with a per-publish override when you need to send something else.",
+        body: "Import a folder of .proto files (they are copied into MQTT Viewer's data folder), then map topic filters to message types. Matching messages decode in the tree and encode on publish, with a per-publish override when you need to send something else.",
       },
       {
         title: "A status page for your broker",

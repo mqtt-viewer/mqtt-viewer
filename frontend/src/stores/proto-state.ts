@@ -6,6 +6,10 @@ import {
   UpdateProtoBindingRule,
   DeleteProtoBindingRule,
   ReorderProtoBindingRules,
+  ImportProtoDir,
+  ImportProtoFiles,
+  ReimportProto,
+  ClearProtoImport,
 } from "bindings/mqtt-viewer/backend/app/app";
 import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
@@ -49,10 +53,62 @@ const refresh = async (connId: number) => {
   }
 };
 
-// Explicit (re)compile of the connection's configured proto folder.
+// Explicit (re)compile of the connection's internal proto import dir. Used
+// when the details form opens on a dir that hasn't been compiled yet this
+// session.
 const loadRegistry = async (connId: number) => {
   try {
     const result = await LoadProtoRegistry(connId);
+    setState(connId, result);
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
+
+// Copies every .proto file under sourceDir into the connection's internal
+// proto-imports dir and compiles it. Throws (with a message fit to show the
+// user) on a missing folder, an empty folder, or a compile-time hard error.
+const importDir = async (connId: number, sourceDir: string) => {
+  try {
+    const result = await ImportProtoDir(connId, sourceDir);
+    setState(connId, result);
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
+
+// Writes an in-memory set of uploaded .proto files into the connection's
+// internal proto-imports dir and compiles it. The path used where a native
+// folder dialog is unavailable (the Docker/web build).
+const importFiles = async (connId: number, files: app.ProtoUploadFile[]) => {
+  try {
+    const result = await ImportProtoFiles(connId, files);
+    setState(connId, result);
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
+
+// Re-runs the import from the connection's last recorded source folder.
+// Throws if no source was recorded (an upload-based import) or it's gone.
+const reimport = async (connId: number) => {
+  try {
+    const result = await ReimportProto(connId);
+    setState(connId, result);
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
+
+// Removes the connection's internal proto-imports dir and forgets the
+// recorded source. Binding rules are left in place.
+const clearImport = async (connId: number) => {
+  try {
+    const result = await ClearProtoImport(connId);
     setState(connId, result);
   } catch (e) {
     console.error(e);
@@ -133,6 +189,10 @@ export default {
   subscribe,
   refresh,
   loadRegistry,
+  importDir,
+  importFiles,
+  reimport,
+  clearImport,
   ensureConnection,
   removeConnection,
   addRule,

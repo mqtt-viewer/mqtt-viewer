@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-18T11:49:55.050Z",
+  "generatedAt": "2026-07-19T01:17:21.285Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2884,10 +2884,10 @@
       "tokens": [],
       "dependencies": [
         "Switch",
-        "FilePathPicker",
+        "Button",
         "ProtoBindingRulesForm"
       ],
-      "notes": "Wiring component: owns proto-state store reads, connections.updateConnectionDetails calls, and rule CRUD/reorder/test bindings, then passes props to ProtoBindingRulesForm. Renders last in ConnectionDetailsDialog, after SubscriptionsForm. Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Wiring component: owns proto-state store reads, connections.updateConnectionDetails calls, proto import/re-import/remove actions, and rule CRUD/reorder/test bindings, then passes props to ProtoBindingRulesForm. .proto files are imported (copied into the app's data folder) via a native folder picker or a browser file upload, never compiled from the picked path directly. Renders last in ConnectionDetailsDialog, after SubscriptionsForm. Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.svelte",
       "specPath": "src/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.spec.json",
       "storyPath": "src/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.stories.svelte",

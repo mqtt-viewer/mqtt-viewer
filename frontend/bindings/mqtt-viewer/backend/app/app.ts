@@ -117,6 +117,20 @@ export function ClearConnectionHistory(connId: number): Promise<void> & { cancel
 }
 
 /**
+ * ClearProtoImport removes the connection's internal proto-imports directory
+ * and forgets the recorded source, leaving any binding rules in place: they
+ * simply show as stale once their message types are gone from the registry.
+ */
+export function ClearProtoImport(connId: number): Promise<$models.ProtoStateResult | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(4026602284, connId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType10($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
  * ClearReceivedMessages deletes all durable history (optionally for one
  * connection) and compacts the file.
  */
@@ -133,7 +147,7 @@ export function ConnectMqtt(connId: number): Promise<void> & { cancel(): void } 
 export function CreateCollection(params: $models.CreateCollectionParams): Promise<models$0.Collection> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2462867700, params) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -200,7 +214,7 @@ export function DisconnectMqtt(connId: number): Promise<void> & { cancel(): void
 export function DuplicateCollectionMessage(id: number): Promise<models$0.CollectionMessage> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2896789728, id) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -219,7 +233,7 @@ export function ExportTopicMessages(connId: number, topic: string): Promise<stri
 export function GetAllConnections(): Promise<$models.Connections> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3922339528) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType11($result);
+        return $$createType13($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -228,7 +242,7 @@ export function GetAllConnections(): Promise<$models.Connections> & { cancel(): 
 export function GetAllSubscriptionsByConnectionId(): Promise<{ [_: `${number}`]: models$0.Subscription[] }> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3141731323) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType13($result);
+        return $$createType15($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -253,7 +267,7 @@ export function GetAppSettings(): Promise<models$0.AppSettings> & { cancel(): vo
 export function GetCollectionsForConnection(connectionID: number): Promise<models$0.Collection[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2553763368, connectionID) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType14($result);
+        return $$createType16($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -270,7 +284,7 @@ export function GetDatabaseSizeBytes(): Promise<number> & { cancel(): void } {
 export function GetEnvInfo(): Promise<$models.EnvInfo> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3369643427) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType15($result);
+        return $$createType17($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -279,7 +293,7 @@ export function GetEnvInfo(): Promise<$models.EnvInfo> & { cancel(): void } {
 export function GetFilterHistoriesForConnection(connectionID: number): Promise<models$0.FilterHistory[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2941945813, connectionID) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType17($result);
+        return $$createType19($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -293,7 +307,7 @@ export function GetFilterHistoriesForConnection(connectionID: number): Promise<m
 export function GetMatchingProtoTypeForTopic(connId: number, topic: string): Promise<topicmatching$0.ProtoBindingMatch> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2235332009, connId, topic) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType18($result);
+        return $$createType20($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -311,7 +325,7 @@ export function GetMatchingSubscriptionForTopic(connId: number, topic: string): 
 export function GetMessageHistory(connId: number, topic: string): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3700437937, connId, topic) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType20($result);
+        return $$createType22($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -320,7 +334,7 @@ export function GetMessageHistory(connId: number, topic: string): Promise<mqtt$0
 export function GetMqttStats(): Promise<$models.MqttStats> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2888945465) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType21($result);
+        return $$createType23($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -329,7 +343,7 @@ export function GetMqttStats(): Promise<$models.MqttStats> & { cancel(): void } 
 export function GetPanelSizes(): Promise<models$0.PanelSize[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3836927596) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType23($result);
+        return $$createType25($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -338,7 +352,7 @@ export function GetPanelSizes(): Promise<models$0.PanelSize[]> & { cancel(): voi
 export function GetProtoBindingRulesByConnectionId(connId: number): Promise<models$0.ProtoBindingRule[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(535626398, connId) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType24($result);
+        return $$createType26($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -352,7 +366,7 @@ export function GetProtoBindingRulesByConnectionId(connId: number): Promise<mode
 export function GetProtoState(connId: number): Promise<$models.ProtoStateResult | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2173914579, connId) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType26($result);
+        return $$createType10($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -390,7 +404,7 @@ export function GetReceivedMessageCount(connectionID: number, topic: string): Pr
 export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType20($result);
+        return $$createType22($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -413,7 +427,7 @@ export function GetSortStates(): Promise<models$0.SortState[]> & { cancel(): voi
 export function GetSysMessageHistory(connId: number): Promise<mqtt$0.MqttMessage[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2117163184, connId) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType20($result);
+        return $$createType22($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -423,6 +437,39 @@ export function GetSysMetricMappingsByConnectionId(connId: number): Promise<mode
     let $resultPromise = $Call.ByID(1443899974, connId) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
         return $$createType31($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * ImportProtoDir copies every .proto file found under sourceDir (recursively,
+ * preserving relative paths) into the connection's internal proto-imports
+ * directory, compiles that internal copy, and swaps the result into the live
+ * protoState. sourceDir is persisted onto Connection.ProtoRegDir for display
+ * and as the source ReimportProto re-reads from; it is not itself compiled
+ * from again.
+ */
+export function ImportProtoDir(connId: number, sourceDir: string): Promise<$models.ProtoStateResult | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1195387964, connId, sourceDir) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType10($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * ImportProtoFiles writes an in-memory set of uploaded .proto files into the
+ * connection's internal proto-imports directory (the path the Docker/web
+ * build uses, where a native folder dialog is a no-op), then compiles and
+ * swaps them in the same way as ImportProtoDir. Uploads have no source
+ * folder to remember, so ProtoRegDir is cleared.
+ */
+export function ImportProtoFiles(connId: number, files: $models.ProtoUploadFile[]): Promise<$models.ProtoStateResult | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(456669288, connId, files) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType10($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -438,18 +485,24 @@ export function LoadOpenTabs(): Promise<models$0.Tab[]> & { cancel(): void } {
 }
 
 /**
- * LoadProtoRegistry explicitly (re)compiles the connection's configured
- * ProtoRegDir and swaps the result into its live protoState. Used on
- * directory pick, manual reload, and when the details form opens on a dir
- * that's set but never compiled. Compile failure is reported in the returned
- * ProtoStateResult.LoadError rather than as a hard error, so the UI can
- * render it; a hard error is returned only when the connection itself is
+ * LoadProtoRegistry (re)compiles the connection's internal proto import dir
+ * and swaps the result into its live protoState, but only when it hasn't
+ * already been compiled this session (protoState.NeedsLoad, the same gate
+ * ConnectMqtt uses): the ProtoSection details form calls this on every
+ * mount, and recompiling the whole registry (and broadcasting
+ * ProtoStateChanged to every open window) on every dialog open is wasted
+ * work once a session has already loaded it successfully. ImportProtoDir,
+ * ImportProtoFiles, ReimportProto and ClearProtoImport bypass this gate
+ * entirely (they call refreshProtoImportState directly) since they always
+ * just changed the files on disk. Compile failure is reported in the
+ * returned ProtoStateResult.LoadError rather than as a hard error, so the UI
+ * can render it; a hard error is returned only when the connection itself is
  * unknown.
  */
 export function LoadProtoRegistry(connId: number): Promise<$models.ProtoStateResult | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2112703157, connId) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType26($result);
+        return $$createType10($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -458,7 +511,7 @@ export function LoadProtoRegistry(connId: number): Promise<$models.ProtoStateRes
 export function MoveCollectionMessage(id: number, targetCollectionID: number): Promise<models$0.CollectionMessage> & { cancel(): void } {
     let $resultPromise = $Call.ByID(184359020, id, targetCollectionID) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -498,10 +551,24 @@ export function PublishMqtt(connId: number, message: $models.PublishParams): Pro
     return $resultPromise;
 }
 
+/**
+ * ReimportProto re-runs ImportProtoDir against the connection's last recorded
+ * import source, picking up any edits made to the files on disk since the
+ * last import.
+ */
+export function ReimportProto(connId: number): Promise<$models.ProtoStateResult | null> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2024378258, connId) as any;
+    let $typingPromise = $resultPromise.then(($result: any) => {
+        return $$createType10($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function RenameCollection(id: number, name: string): Promise<models$0.Collection> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1111441190, id, name) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -510,7 +577,7 @@ export function RenameCollection(id: number, name: string): Promise<models$0.Col
 export function RenameCollectionMessage(id: number, name: string): Promise<models$0.CollectionMessage> & { cancel(): void } {
     let $resultPromise = $Call.ByID(379007077, id, name) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -528,7 +595,7 @@ export function ReorderProtoBindingRules(connId: number, orderedIds: number[]): 
 export function SaveCollectionMessage(params: $models.SaveCollectionMessageParams): Promise<models$0.CollectionMessage> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1468270044, params) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -537,7 +604,7 @@ export function SaveCollectionMessage(params: $models.SaveCollectionMessageParam
 export function SaveFilterHistoryEntry(connectionId: number, text: string): Promise<models$0.FilterHistory> & { cancel(): void } {
     let $resultPromise = $Call.ByID(481334387, connectionId, text) as any;
     let $typingPromise = $resultPromise.then(($result: any) => {
-        return $$createType16($result);
+        return $$createType18($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -599,6 +666,9 @@ export function UpdatePanelSize(panelId: string, size: number, isOpen: boolean):
  * writing (a caller can't edit another connection's rule by supplying its
  * id), then writes the user-mutable columns explicitly with Select so a
  * cleared value persists and created_at/connection_id are left untouched.
+ * SortOrder is deliberately excluded: reordering goes through
+ * ReorderProtoBindingRules, and a client sending back a stale sortOrder here
+ * would otherwise clobber a reorder that landed after it last fetched.
  */
 export function UpdateProtoBindingRule(connId: number, rule: models$0.ProtoBindingRule): Promise<models$0.ProtoBindingRule | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(4064221480, connId, rule) as any;
@@ -642,24 +712,24 @@ const $$createType5 = models$0.SysMetricMapping.createFrom;
 const $$createType6 = $Create.Nullable($$createType5);
 const $$createType7 = update$0.UpdateResponse.createFrom;
 const $$createType8 = $Create.Nullable($$createType7);
-const $$createType9 = models$0.Collection.createFrom;
-const $$createType10 = models$0.CollectionMessage.createFrom;
-const $$createType11 = $models.Connections.createFrom;
-const $$createType12 = $Create.Array($$createType3);
-const $$createType13 = $Create.Map($Create.Any, $$createType12);
-const $$createType14 = $Create.Array($$createType9);
-const $$createType15 = $models.EnvInfo.createFrom;
-const $$createType16 = models$0.FilterHistory.createFrom;
-const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = topicmatching$0.ProtoBindingMatch.createFrom;
-const $$createType19 = mqtt$0.MqttMessage.createFrom;
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = $models.MqttStats.createFrom;
-const $$createType22 = models$0.PanelSize.createFrom;
-const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = $Create.Array($$createType1);
-const $$createType25 = $models.ProtoStateResult.createFrom;
-const $$createType26 = $Create.Nullable($$createType25);
+const $$createType9 = $models.ProtoStateResult.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);
+const $$createType11 = models$0.Collection.createFrom;
+const $$createType12 = models$0.CollectionMessage.createFrom;
+const $$createType13 = $models.Connections.createFrom;
+const $$createType14 = $Create.Array($$createType3);
+const $$createType15 = $Create.Map($Create.Any, $$createType14);
+const $$createType16 = $Create.Array($$createType11);
+const $$createType17 = $models.EnvInfo.createFrom;
+const $$createType18 = models$0.FilterHistory.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = topicmatching$0.ProtoBindingMatch.createFrom;
+const $$createType21 = mqtt$0.MqttMessage.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = $models.MqttStats.createFrom;
+const $$createType24 = models$0.PanelSize.createFrom;
+const $$createType25 = $Create.Array($$createType24);
+const $$createType26 = $Create.Array($$createType1);
 const $$createType27 = models$0.PublishHistory.createFrom;
 const $$createType28 = $Create.Array($$createType27);
 const $$createType29 = models$0.SortState.createFrom;

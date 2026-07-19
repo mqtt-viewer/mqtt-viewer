@@ -373,7 +373,7 @@
     {#if rules.length === 0 && draft === null}
       <div class="text-secondary-text text-sm">
         {status.dirMissing
-          ? "Choose a folder of .proto files first."
+          ? "Import your .proto files first."
           : "No bindings yet. Sparkplug topics still decode."}
       </div>
     {/if}

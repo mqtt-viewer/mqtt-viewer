@@ -9,6 +9,7 @@ import (
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/events"
+	"os"
 
 	"gorm.io/gorm"
 )
@@ -129,7 +130,12 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	updated := models.Connection{
 		ID: conn.ID,
 	}
-	err := a.Db.Model(updated).Updates(conn)
+	// proto_reg_dir is owned by the proto-import operations (ImportProtoDir,
+	// ImportProtoFiles, ReimportProto, ClearProtoImport) now, not by the
+	// connection edit form; omit it so a frontend row holding a stale
+	// ProtoRegDir pointer (fetched before an import changed it) can't
+	// silently revert it on save.
+	err := a.Db.Model(updated).Omit("proto_reg_dir").Updates(conn)
 	if err.Error != nil {
 		return err.Error
 	}
@@ -143,13 +149,11 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	return nil
 }
 
-// refreshProtoStateAfterConnectionUpdate keeps the live protoState in sync
-// when a connection edit touches IsProtoEnabled or ProtoRegDir: the enabled
-// flag always mirrors the DB row, and a dir change (including clearing it)
-// drops any loaded registry rather than recompiling here. Recompiling is
-// left to the frontend's explicit LoadProtoRegistry call so a dir change
-// only compiles once, not twice. Emits ProtoStateChanged once if either
-// changed.
+// refreshProtoStateAfterConnectionUpdate keeps the live protoState's enabled
+// flag in sync when a connection edit touches IsProtoEnabled. Proto imports
+// (ImportProtoDir, ImportProtoFiles, ReimportProto, ClearProtoImport) manage
+// ProtoRegDir and the compiled registry themselves; UpdateConnection no
+// longer touches either.
 func (a *App) refreshProtoStateAfterConnectionUpdate(appConnection *AppConnection, existing *models.Connection, updated *models.Connection) {
 	oldEnabled := existing.IsProtoEnabled != nil && *existing.IsProtoEnabled
 	newEnabled := oldEnabled
@@ -157,27 +161,11 @@ func (a *App) refreshProtoStateAfterConnectionUpdate(appConnection *AppConnectio
 		newEnabled = *updated.IsProtoEnabled
 	}
 
-	oldDir := ""
-	if existing.ProtoRegDir != nil {
-		oldDir = *existing.ProtoRegDir
-	}
-	newDir := oldDir
-	if updated.ProtoRegDir != nil {
-		newDir = *updated.ProtoRegDir
-	}
-
-	enabledChanged := newEnabled != oldEnabled
-	dirChanged := newDir != oldDir
-	if !enabledChanged && !dirChanged {
+	if newEnabled == oldEnabled {
 		return
 	}
 
 	appConnection.ProtoState.SetEnabled(newEnabled)
-
-	if dirChanged {
-		appConnection.ProtoState.Clear()
-	}
-
 	a.emitProtoStateChanged(updated.ID)
 }
 
@@ -203,7 +191,12 @@ func (a *App) DeleteConnection(id uint) error {
 	if err != nil {
 		return err
 	}
+	if err := os.RemoveAll(a.protoImportDir(id)); err != nil {
+		slog.Error("failed to remove proto import dir", "connectionId", id, "error", err)
+	}
 	delete(a.AppConnections, id)
-	a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
+	if a.Mode != AppModes.Test {
+		a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
+	}
 	return nil
 }

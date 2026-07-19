@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/paths"
+	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/events"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 )
 
 var _, filename, _, _ = runtime.Caller(0)
@@ -125,6 +128,46 @@ func TestAppConnectionIdMapIsBuiltCorrectly(t *testing.T) {
 	for id, conn := range app.AppConnections {
 		if conn.ConnectionId != uint(id) {
 			t.Errorf("Expected connection id %v, got %v", id+1, conn.ConnectionId)
+		}
+	}
+}
+
+// TestStartupSparkplugRegistryExcludesProtoImports guards against the global
+// Sparkplug registry compile sweeping up connections' proto-imports/: it
+// must be scoped to the sparkplug-only subdir of ResourcePath, or a bad or
+// colliding user import would break Sparkplug decoding app-wide and user
+// types would leak into the globally resolvable registry.
+func TestStartupSparkplugRegistryExcludesProtoImports(t *testing.T) {
+	app, connId := getTestAppWithConnection(t)
+	if _, err := app.ImportProtoDir(connId, testProtosGoodDir); err != nil {
+		t.Fatalf("importing: %v", err)
+	}
+
+	// Simulate a fresh app launch with proto-imports/<connId>/ already
+	// present on disk under ResourcePath: the scenario that would leak the
+	// imported "demo.*" types into the global registry if Startup's compile
+	// weren't scoped to the sparkplug-only subdir.
+	app = reopenTestApp(t, app)
+
+	var registry *protobuf.ProtoRegistry
+	deadline := time.Now().Add(2 * time.Second)
+	for registry == nil && time.Now().Before(deadline) {
+		registry = app.ProtoRegistry.Load()
+		if registry == nil {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if registry == nil {
+		t.Fatal("expected the global Sparkplug registry to load")
+	}
+
+	names := registry.GetLoadedDescriptorNames()
+	if len(names) == 0 {
+		t.Fatal("expected the global registry to contain the Sparkplug types")
+	}
+	for _, name := range names {
+		if strings.HasPrefix(name, "demo.") {
+			t.Errorf("expected the global registry to contain only Sparkplug types, got user import type %v", name)
 		}
 	}
 }

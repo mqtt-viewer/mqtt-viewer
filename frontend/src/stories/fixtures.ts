@@ -61,9 +61,10 @@ export const mockConnectionDetails = {
   username: "demo",
   password: "demo",
   isProtoEnabled: true,
-  // Matches ChooseDirectory's mock return value, so picking a folder in a
-  // running ProtoSection story resolves to the same "compiled" state as
-  // this default.
+  // Display only (the "Imported from ..." line): matches the initial mock
+  // proto-import state in app.ts's storybook mock, and ChooseDirectory's
+  // mock return value, so picking a folder in a running ProtoSection story
+  // resolves to the same "imported" state as this default.
   protoRegDir: "/Users/sam/certs",
   isCertsEnabled: false,
   skipCertVerification: false,

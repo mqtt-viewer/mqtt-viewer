@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path"
 	"time"
 
 	db "mqtt-viewer/backend/db"
@@ -115,7 +116,13 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error writing sparkplug proto files: %v", err))
 			return
 		}
-		registry, err := protobuf.LoadProtoRegistry(a.Paths.ResourcePath)
+		// Scoped to the sparkplug-only subdir, not the whole resource path:
+		// ResourcePath also holds proto-imports/<connId>/, one per
+		// connection's user-supplied .proto files, which must never reach
+		// this global registry (a bad or colliding user import would break
+		// Sparkplug decoding app-wide, and user types have no business being
+		// globally resolvable).
+		registry, err := protobuf.LoadProtoRegistry(path.Join(a.Paths.ResourcePath, protobuf.ProtoResourceDirName))
 		if err != nil {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
 			return

@@ -28,14 +28,25 @@ func compileProtoRegistry(dir string) (*protobuf.ProtoRegistry, string, bool) {
 }
 
 // ProtoStateResult is the read model the frontend polls (on dialog open,
-// after a dir pick, and on ProtoStateChanged) to render the bindings form
-// and publish panel. Dir/LoadError/FileDescriptors/DescriptorNames describe
-// the compiled per-connection registry (all zero values until one loads
-// successfully); Rules is always the live DB row set.
+// after an import, and on ProtoStateChanged) to render the bindings form and
+// publish panel. Dir/LoadError/FileDescriptors/DescriptorNames describe the
+// compiled per-connection registry, always the internal proto-imports copy
+// (all zero values until an import has happened, or until it's been
+// compiled this session — see HasImport); SourceDir is the
+// last-imported-from folder, display only, for the "Imported from ..." line
+// and as what Re-import re-reads from; Rules is always the live DB row set.
+// HasImport is a plain os.Stat of the internal proto-imports directory,
+// independent of whether it's been compiled into protoState yet: the
+// frontend derives its "something is imported" state from this rather than
+// from Dir being non-empty, so a fresh app launch doesn't flash an
+// "not imported" empty state for the split second before the lazy compile
+// finishes.
 type ProtoStateResult struct {
 	Dir             string                    `json:"dir"`
 	LoadError       string                    `json:"loadError"`
 	DirMissing      bool                      `json:"dirMissing"`
+	SourceDir       string                    `json:"sourceDir"`
+	HasImport       bool                      `json:"hasImport"`
 	FileDescriptors map[string][]string       `json:"fileDescriptors"`
 	DescriptorNames []string                  `json:"descriptorNames"`
 	Rules           []models.ProtoBindingRule `json:"rules"`
@@ -156,42 +167,28 @@ func (a *App) ReorderProtoBindingRules(connId uint, orderedIds []uint) error {
 	return a.refreshProtoBindingRulesAndEmit(connId)
 }
 
-// LoadProtoRegistry explicitly (re)compiles the connection's configured
-// ProtoRegDir and swaps the result into its live protoState. Used on
-// directory pick, manual reload, and when the details form opens on a dir
-// that's set but never compiled. Compile failure is reported in the returned
-// ProtoStateResult.LoadError rather than as a hard error, so the UI can
-// render it; a hard error is returned only when the connection itself is
+// LoadProtoRegistry (re)compiles the connection's internal proto import dir
+// and swaps the result into its live protoState, but only when it hasn't
+// already been compiled this session (protoState.NeedsLoad, the same gate
+// ConnectMqtt uses): the ProtoSection details form calls this on every
+// mount, and recompiling the whole registry (and broadcasting
+// ProtoStateChanged to every open window) on every dialog open is wasted
+// work once a session has already loaded it successfully. ImportProtoDir,
+// ImportProtoFiles, ReimportProto and ClearProtoImport bypass this gate
+// entirely (they call refreshProtoImportState directly) since they always
+// just changed the files on disk. Compile failure is reported in the
+// returned ProtoStateResult.LoadError rather than as a hard error, so the UI
+// can render it; a hard error is returned only when the connection itself is
 // unknown.
 func (a *App) LoadProtoRegistry(connId uint) (*ProtoStateResult, error) {
 	appConnection, ok := a.AppConnections[connId]
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
-
-	connection := models.Connection{}
-	if res := a.Db.First(&connection, connId); res.Error != nil {
-		return nil, res.Error
-	}
-
-	dir := ""
-	if connection.ProtoRegDir != nil {
-		dir = *connection.ProtoRegDir
-	}
-
-	if dir == "" {
-		appConnection.ProtoState.Clear()
-		a.emitProtoStateChanged(connId)
+	if !appConnection.ProtoState.NeedsLoad(a.protoImportDir(connId)) {
 		return a.buildProtoStateResult(connId, appConnection)
 	}
-
-	// Compile outside protoState's lock: this walks the filesystem and
-	// parses every .proto file, which can be slow.
-	registry, loadErr, dirMissing := compileProtoRegistry(dir)
-	appConnection.ProtoState.SetRegistry(registry, dir, loadErr, dirMissing)
-	a.emitProtoStateChanged(connId)
-
-	return a.buildProtoStateResult(connId, appConnection)
+	return a.refreshProtoImportState(connId)
 }
 
 // GetProtoState is the cheap, no-compile read used for event-driven
@@ -222,11 +219,24 @@ func (a *App) buildProtoStateResult(connId uint, appConnection *AppConnection) (
 		return nil, err
 	}
 
+	sourceDir := ""
+	connection := models.Connection{}
+	if res := a.Db.First(&connection, connId); res.Error == nil && connection.ProtoRegDir != nil {
+		sourceDir = *connection.ProtoRegDir
+	}
+
+	hasImport := false
+	if info, err := os.Stat(a.protoImportDir(connId)); err == nil && info.IsDir() {
+		hasImport = true
+	}
+
 	snapshot := appConnection.ProtoState.snapshot()
 	result := &ProtoStateResult{
 		Dir:             snapshot.loadedDir,
 		LoadError:       snapshot.loadError,
 		DirMissing:      snapshot.dirMissing,
+		SourceDir:       sourceDir,
+		HasImport:       hasImport,
 		FileDescriptors: map[string][]string{},
 		DescriptorNames: []string{},
 		Rules:           rules,

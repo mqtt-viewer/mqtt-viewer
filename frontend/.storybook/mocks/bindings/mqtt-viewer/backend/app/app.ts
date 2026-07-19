@@ -22,10 +22,10 @@ const appConnection = (connection: typeof mockConnection) => ({
   eventSet: connection.eventSet,
 });
 
-// Proto binding state: mutable per-connection mock data so add/edit/
-// reorder/delete and the folder picker are interactive in Storybook.
-// Matches ChooseDirectory's mock return value; any other dir "fails to
-// compile" as folder-not-found.
+// Proto import state: mutable per-connection mock data so choosing a folder,
+// uploading files, re-importing and removing are all interactive in
+// Storybook. Matches ChooseDirectory's mock return value; any other chosen
+// dir "fails to compile" as folder-not-found.
 const MOCK_PROTO_SUCCESS_DIR = "/Users/sam/certs";
 
 // Not read from mockConnectionDetails.protoRegDir directly: fixtures.ts
@@ -33,8 +33,21 @@ const MOCK_PROTO_SUCCESS_DIR = "/Users/sam/certs";
 // place of the real bindings), so referencing another fixtures.ts export at
 // module-eval time here is a circular-import footgun. Kept in sync with
 // mockConnectionDetails.protoRegDir by hand instead.
-let mockProtoRegDirByConnectionId: Record<number, string> = {
-  1: "/Users/sam/certs",
+//
+// loadError lets a story simulate a connection whose internal import exists
+// but fails to compile (e.g. a broken .proto edited in place since the last
+// successful import).
+let mockProtoImportByConnectionId: Record<
+  number,
+  { imported: boolean; sourceDir: string; loadError?: string }
+> = {
+  1: { imported: true, sourceDir: "/Users/sam/certs" },
+  // Connection id 102: ProtoSection's "Compile error" story.
+  102: {
+    imported: true,
+    sourceDir: "/Users/sam/broken-protos",
+    loadError: 'broken.proto:12:3: syntax error: unexpected "}"',
+  },
 };
 
 let mockProtoRulesByConnectionId: Record<number, models.ProtoBindingRule[]> = {
@@ -51,17 +64,31 @@ let mockProtoRulesByConnectionId: Record<number, models.ProtoBindingRule[]> = {
 
 const buildMockProtoStateResult = (connectionId: number): app.ProtoStateResult => {
   const rules = mockProtoRulesByConnectionId[connectionId] ?? [];
-  const dir = mockProtoRegDirByConnectionId[connectionId] ?? "";
-  if (!dir) {
-    return new app.ProtoStateResult({ dir: "", loadError: "", rules });
+  const importState = mockProtoImportByConnectionId[connectionId];
+  if (!importState?.imported) {
+    return new app.ProtoStateResult({
+      dir: "",
+      loadError: "",
+      sourceDir: "",
+      hasImport: false,
+      rules,
+    });
   }
-  if (dir !== MOCK_PROTO_SUCCESS_DIR) {
-    return new app.ProtoStateResult({ dir, loadError: "folder not found", rules });
+  if (importState.loadError) {
+    return new app.ProtoStateResult({
+      dir: `/mock/proto-imports/${connectionId}`,
+      loadError: importState.loadError,
+      sourceDir: importState.sourceDir,
+      hasImport: true,
+      rules,
+    });
   }
   const descriptorNames = Object.values(mockLoadedProtoFiles).flat().sort();
   return new app.ProtoStateResult({
-    dir,
+    dir: `/mock/proto-imports/${connectionId}`,
     loadError: "",
+    sourceDir: importState.sourceDir,
+    hasImport: true,
     fileDescriptors: mockLoadedProtoFiles,
     descriptorNames,
     rules,
@@ -126,6 +153,52 @@ export async function ReorderProtoBindingRules(
 export async function LoadProtoRegistry(
   connectionId: number
 ): Promise<app.ProtoStateResult> {
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ImportProtoDir(
+  connectionId: number,
+  sourceDir: string
+): Promise<app.ProtoStateResult> {
+  if (sourceDir !== MOCK_PROTO_SUCCESS_DIR) {
+    throw new Error("folder not found");
+  }
+  mockProtoImportByConnectionId[connectionId] = { imported: true, sourceDir };
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ImportProtoFiles(
+  connectionId: number,
+  files: app.ProtoUploadFile[]
+): Promise<app.ProtoStateResult> {
+  if (!files || files.length === 0) {
+    throw new Error("no files to import");
+  }
+  // Mirrors the backend's validateProtoUploadName so a story can exercise
+  // the rejected-upload path (e.g. an "action error" line) the same way a
+  // real non-.proto upload would.
+  const badName = files.find((f) => !f.name.endsWith(".proto"));
+  if (badName) {
+    throw new Error(`invalid file name: "${badName.name}" (must end in .proto)`);
+  }
+  mockProtoImportByConnectionId[connectionId] = { imported: true, sourceDir: "" };
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ReimportProto(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  const importState = mockProtoImportByConnectionId[connectionId];
+  if (!importState?.sourceDir) {
+    throw new Error("no source folder recorded");
+  }
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ClearProtoImport(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  mockProtoImportByConnectionId[connectionId] = { imported: false, sourceDir: "" };
   return buildMockProtoStateResult(connectionId);
 }
 
@@ -658,12 +731,8 @@ export async function Startup(
   _options: app.StartupOptions | null
 ): Promise<void> {}
 export async function UpdateConnection(
-  connection: models.Connection | null
-): Promise<void> {
-  if (connection && "protoRegDir" in connection) {
-    mockProtoRegDirByConnectionId[connection.id] = connection.protoRegDir ?? "";
-  }
-}
+  _connection: models.Connection | null
+): Promise<void> {}
 export async function UpdateOpenConnectionTabs(
   _connectionIds: number[]
 ): Promise<void> {}

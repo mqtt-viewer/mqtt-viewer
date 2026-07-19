@@ -1,13 +1,16 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { get, writable } from "svelte/store";
+  import { writable } from "svelte/store";
   import { twMerge } from "tailwind-merge";
-  import { GetMatchingProtoTypeForTopic } from "bindings/mqtt-viewer/backend/app/app";
+  import {
+    ChooseDirectory,
+    GetMatchingProtoTypeForTopic,
+  } from "bindings/mqtt-viewer/backend/app/app";
   import type * as models from "bindings/mqtt-viewer/backend/models/models";
   import connections, { type Connection } from "@/stores/connections";
   import protoState from "@/stores/proto-state";
   import Switch from "@/components/InputFields/Switch.svelte";
-  import FilePathPicker from "@/components/InputFields/FilePathPicker.svelte";
+  import Button from "@/components/Button/Button.svelte";
   import ProtoBindingRulesForm, {
     type ProtoBindingMatchView,
   } from "@/components/ProtoBindingRulesForm/ProtoBindingRulesForm.svelte";
@@ -16,7 +19,6 @@
 
   $: connectionId = connection.connectionDetails.id;
   $: isConnected = connection.connectionState !== "disconnected";
-  $: protoRegDir = connection.connectionDetails.protoRegDir ?? "";
 
   // Controlled from the connections store (via connections.updateConnectionDetails,
   // which is now optimistic-with-revert, see F5) rather than a mount-time-seeded
@@ -38,31 +40,36 @@
     : 0;
   $: typeCount = descriptorNames.length;
   $: loadError = protoStateForConnection?.loadError ?? "";
+  $: sourceDir = protoStateForConnection?.sourceDir ?? "";
 
-  // Two distinct "no types available" reasons, kept separate: noDirConfigured
-  // is a purely frontend-derived fact (no dir set at all, drives the empty
-  // bindings-list copy); folderNotFound is backend-sourced (a dir IS
-  // configured but wasn't found on disk when last loaded, drives the status
-  // line and suppresses the stale-type warning).
-  $: noDirConfigured = !protoRegDir;
+  // Something has been imported once the internal proto-imports dir exists
+  // on disk, whether or not it's been compiled into protoState yet (or
+  // compiled at all — an empty or failed compile still counts: there's
+  // something to show status for, re-import, or remove). Backed by a plain
+  // os.Stat rather than a compiled dir/typeCount, so a fresh app launch
+  // doesn't flash the "not imported" empty state for the split second
+  // before the lazy compile below finishes.
+  $: imported = !!protoStateForConnection?.hasImport;
+
+  // folderNotFound: the internal import existed a moment ago and has since
+  // vanished from disk (backend-sourced). isCompileError: a real compile
+  // failure against files that are still there.
   $: folderNotFound = !!protoStateForConnection?.dirMissing;
-
   $: isCompileError = !!loadError && !folderNotFound;
 
-  // The status line only reflects protoStateForConnection once it's actually
-  // for the currently-configured dir, so a stale compile result (or missing
-  // state entirely) never flashes as if it described protoRegDir.
-  $: isStateFresh =
-    !!protoStateForConnection && protoStateForConnection.dir === protoRegDir;
+  // busy covers the initial mount compile and every import/re-import action;
+  // it disables the action buttons and (once something is already imported)
+  // drives the "Loading types..." status line.
+  let busy = false;
 
-  // The "Loading types..." line only appears once the load has taken a
-  // moment: a fresh compile is usually near-instant on a warm dialog
-  // remount, so showing it immediately just flashes it on every open.
+  // The "Loading types..." line only appears once a compile has taken a
+  // moment: it's usually near-instant, so showing it immediately just
+  // flashes it on every open or click.
   const LOADING_LINE_DELAY_MS = 200;
   let showLoadingLine = false;
   let loadingLineTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  $: if (!!protoRegDir && !isStateFresh) {
+  $: if (imported && busy) {
     if (!loadingLineTimeout) {
       loadingLineTimeout = setTimeout(() => {
         showLoadingLine = true;
@@ -81,9 +88,9 @@
     if (loadingLineTimeout) clearTimeout(loadingLineTimeout);
   });
 
-  $: statusLineText = !protoRegDir
+  $: statusLineText = !imported
     ? ""
-    : !isStateFresh
+    : busy
       ? showLoadingLine
         ? "Loading types..."
         : ""
@@ -101,21 +108,103 @@
       ? "Sparkplug topics decode without any setup."
       : null;
 
+  // Most recent import/re-import action's failure, shown separately from
+  // statusLineText (which describes the last successful compile, not the
+  // action that just failed).
+  let importActionError = "";
+
+  const errorMessage = (e: unknown): string =>
+    e instanceof Error ? e.message : String(e);
+
   onMount(async () => {
     protoState.ensureConnection(connectionId, connection.eventSet);
     await protoState.refresh(connectionId);
-    // Registry load triggers: dir configured but never compiled this
-    // session (or compiled from a now-stale dir) gets a fresh compile when
-    // the form opens, same as a manual reload.
-    const current = get(protoState).byConnectionId[connectionId];
-    if (protoRegDir && current?.dir !== protoRegDir) {
-      try {
-        await protoState.loadRegistry(connectionId);
-      } catch (e) {
-        console.error(e);
-      }
+    // Compiles the internal proto import dir if it hasn't been compiled yet
+    // this session (e.g. the app just started, or this is the first time the
+    // dialog has been opened for this connection).
+    busy = true;
+    try {
+      await protoState.loadRegistry(connectionId);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      busy = false;
     }
   });
+
+  const onChooseFolder = async () => {
+    if (busy) return;
+    try {
+      const dir = await ChooseDirectory("Choose .proto folder");
+      // A cancelled picker resolves with an empty string.
+      if (!dir) return;
+      importActionError = "";
+      busy = true;
+      await protoState.importDir(connectionId, dir);
+    } catch (e) {
+      console.error(e);
+      importActionError = errorMessage(e);
+    } finally {
+      busy = false;
+    }
+  };
+
+  let fileInputEl: HTMLInputElement | undefined;
+
+  const onChooseFiles = () => {
+    if (busy) return;
+    fileInputEl?.click();
+  };
+
+  const onFilesSelected = async (event: Event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const fileList = input.files;
+    if (!fileList || fileList.length === 0) return;
+    try {
+      const files = await Promise.all(
+        Array.from(fileList).map(async (file) => ({
+          // webkitRelativePath preserves a folder-shaped selection's
+          // subpaths (e.g. "common/types.proto"), falling back to the bare
+          // file name for a flat multi-file selection.
+          name: file.webkitRelativePath || file.name,
+          content: await file.text(),
+        }))
+      );
+      importActionError = "";
+      busy = true;
+      await protoState.importFiles(connectionId, files);
+    } catch (e) {
+      console.error(e);
+      importActionError = errorMessage(e);
+    } finally {
+      busy = false;
+      input.value = "";
+    }
+  };
+
+  const onReimport = async () => {
+    if (busy) return;
+    try {
+      importActionError = "";
+      busy = true;
+      await protoState.reimport(connectionId);
+    } catch (e) {
+      console.error(e);
+      importActionError = errorMessage(e);
+    } finally {
+      busy = false;
+    }
+  };
+
+  const onRemove = async () => {
+    try {
+      importActionError = "";
+      await protoState.clearImport(connectionId);
+    } catch (e) {
+      console.error(e);
+      importActionError = errorMessage(e);
+    }
+  };
 
   const onToggleProtoEnabled = async (checked: boolean) => {
     try {
@@ -123,30 +212,6 @@
         ...connection.connectionDetails,
         isProtoEnabled: checked,
       });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const onDirChosen = async (filePath: string) => {
-    try {
-      await connections.updateConnectionDetails({
-        ...connection.connectionDetails,
-        protoRegDir: filePath,
-      });
-      await protoState.loadRegistry(connectionId);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const onDirCleared = async () => {
-    try {
-      await connections.updateConnectionDetails({
-        ...connection.connectionDetails,
-        protoRegDir: "",
-      });
-      await protoState.loadRegistry(connectionId);
     } catch (e) {
       console.error(e);
     }
@@ -229,25 +294,59 @@
 
   {#if currentProtoEnabled}
     <div class="flex flex-col gap-2">
-      <FilePathPicker
-        variant="directory"
-        actionLabel="Choose .proto folder"
-        valueLabel="Proto folder"
-        defaultValue={protoRegDir || undefined}
-        onFileChosen={onDirChosen}
-        onFileRemoved={onDirCleared}
-      />
-      {#if statusLineText}
-        <div
-          class={twMerge(
-            "text-sm",
-            loadError && isStateFresh ? "text-error" : "text-secondary-text",
-            isCompileError && isStateFresh ? "line-clamp-3" : ""
-          )}
-          title={isCompileError && isStateFresh ? statusLineText : undefined}
-        >
-          {statusLineText}
+      {#if !imported}
+        <div class="flex items-center gap-4">
+          <Button
+            variant="primary"
+            iconType="folder"
+            disabled={busy}
+            on:click={onChooseFolder}
+          >
+            Choose .proto folder
+          </Button>
+          <Button variant="text" disabled={busy} on:click={onChooseFiles}>
+            or import .proto files
+          </Button>
         </div>
+      {:else}
+        {#if statusLineText}
+          <div
+            class={twMerge(
+              "text-sm",
+              loadError && !busy ? "text-error" : "text-secondary-text",
+              isCompileError && !busy ? "line-clamp-3" : ""
+            )}
+            title={isCompileError && !busy ? statusLineText : undefined}
+          >
+            {statusLineText}
+          </div>
+        {/if}
+        {#if sourceDir}
+          <div class="text-secondary-text text-sm truncate" style:direction="rtl" title={sourceDir}>
+            <bdi>Imported from {sourceDir}</bdi>
+          </div>
+        {/if}
+        <div class="flex items-center gap-4">
+          {#if sourceDir}
+            <Button variant="text" disabled={busy} on:click={onReimport}>
+              Re-import
+            </Button>
+          {/if}
+          <Button variant="text" disabled={busy} on:click={onRemove}>
+            Remove
+          </Button>
+        </div>
+      {/if}
+      <input
+        bind:this={fileInputEl}
+        type="file"
+        multiple
+        accept=".proto"
+        class="hidden"
+        on:change={onFilesSelected}
+      />
+      {#if importActionError}
+        <div class="text-error text-sm">{importActionError}</div>
       {/if}
     </div>
 
@@ -256,7 +355,7 @@
       {descriptorNames}
       status={{
         loadError,
-        dirMissing: noDirConfigured,
+        dirMissing: !imported,
         folderNotFound,
       }}
       connected={isConnected}

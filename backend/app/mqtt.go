@@ -43,18 +43,15 @@ func (a *App) ConnectMqtt(connId uint) error {
 	appConnection.ProtoState.SetEnabled(protoEnabled)
 	appConnection.ProtoState.SetRules(protoRules)
 
-	protoDir := ""
-	if connection.ProtoRegDir != nil {
-		protoDir = *connection.ProtoRegDir
-	}
-	if protoEnabled && protoDir != "" && appConnection.ProtoState.NeedsLoad(protoDir) {
-		// Compile outside protoState's lock: this walks the filesystem and
-		// parses every .proto file, which can be slow.
-		registry, loadErr, dirMissing := compileProtoRegistry(protoDir)
-		appConnection.ProtoState.SetRegistry(registry, protoDir, loadErr, dirMissing)
-		// Emitted regardless of success so a compile warning at connect time
-		// reaches every open window.
-		a.emitProtoStateChanged(connId)
+	protoDir := a.protoImportDir(connId)
+	if protoEnabled && appConnection.ProtoState.NeedsLoad(protoDir) {
+		// refreshProtoImportState compiles the internal proto-imports copy
+		// (or clears protoState if nothing has been imported) and emits
+		// ProtoStateChanged regardless of outcome, so a compile warning at
+		// connect time reaches every open window.
+		if _, err := a.refreshProtoImportState(connId); err != nil {
+			slog.Error(err.Error())
+		}
 	}
 
 	connectionDetails, err := getConnectionDetailsFromConnectionModel(&connection)

@@ -28,6 +28,14 @@ type protoState struct {
 	loadError  string
 	loadedDir  string
 	dirMissing bool
+
+	// importMu serialises the import-mutating operations (ImportProtoDir,
+	// ImportProtoFiles, ReimportProto, ClearProtoImport) for this connection,
+	// so two overlapping imports or removes (e.g. triggered from two open
+	// windows) can't interleave the on-disk directory swap. Held across an
+	// entire operation, unlike mu, which only ever guards a single field
+	// read/write.
+	importMu sync.Mutex
 }
 
 func newProtoState(enabled bool, rules []models.ProtoBindingRule) *protoState {
@@ -85,6 +93,19 @@ func (s *protoState) Registry() *protobuf.ProtoRegistry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.registry
+}
+
+// LockImport acquires the per-connection import lock. Callers must call
+// UnlockImport, typically via defer, once the whole import operation
+// (staging, swapping, compiling) has finished.
+func (s *protoState) LockImport() {
+	s.importMu.Lock()
+}
+
+// UnlockImport releases the per-connection import lock acquired by
+// LockImport.
+func (s *protoState) UnlockImport() {
+	s.importMu.Unlock()
 }
 
 // NeedsLoad reports whether dir requires a fresh compile attempt: no attempt
