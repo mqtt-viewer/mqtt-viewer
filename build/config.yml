@@ -39,7 +39,10 @@ dev_mode:
       type: blocking
     - cmd: wails3 task common:dev:frontend
       type: background
-    # wait-for-vite gates the app launch on the dev server being up; without it
-    # the webview can race the Vite bind and stay blank.
-    - cmd: sh scripts/wait-for-vite.sh && wails3 task run
+    # dev-run.sh gates the app launch on the Vite dev server being up (so the
+    # webview never races the bind and stays blank), then launches the app. It
+    # has to be a single wrapper script: wails3 splits each execute cmd into argv
+    # on whitespace and does not run it through a shell, so shell operators like
+    # `&&` and quotes are passed through literally and the launch would not run.
+    - cmd: sh scripts/dev-run.sh
       type: primary
