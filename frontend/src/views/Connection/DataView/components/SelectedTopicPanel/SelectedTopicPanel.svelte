@@ -20,13 +20,21 @@
   import Topic from "./components/Topic.svelte";
   import ChartView from "./components/Chart/ChartView.svelte";
   import { createChartSeriesStore } from "./components/Chart/chart-series-store";
+  import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
+  import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import { copyToClipboard } from "@/util/copy";
+  import { decodePayload } from "@/components/CodeEditor/codec";
+  import { formatPayload } from "@/components/CodeEditor/formatting";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
   export let firstConnectedAtMs: number;
   export let mqttVersion: "3" | "5";
-  export let deleteRetainedMessage: (topic: string) => Promise<void>;
   export let exportTopicMessages: (topic: string) => Promise<void>;
+  export let copyTopicPath: (topic: string) => void;
+  export let onClearRetained: (topic: string) => void;
+  export let onClearRetainedBelow: (prefix: string) => void;
   // Optional: opens the chart in a separate window (wired by DataView).
   export let openChartWindow:
     | ((topic: string, fields: string[]) => void)
@@ -83,6 +91,59 @@
   $: if (selectedMessageId !== null) {
     selectedTopicStore.ensurePayload(selectedMessageId);
   }
+
+  // Retained state for the selected topic and everything below it. One call
+  // answers both questions, since the backend returns the topic itself
+  // alongside its descendants.
+  //
+  // Refreshed when the selection changes rather than when the menu opens
+  // (DropdownMenu has no open hook). It can therefore go stale under live
+  // traffic, which is tolerable: this only decides what the menu offers. The
+  // confirmation re-reads the list, and that number is the one we honour.
+  let retainedAtOrBelow: string[] = [];
+  $: selectedTopicString,
+    (async () => {
+      const topic = selectedTopicString;
+      if (topic === null) {
+        retainedAtOrBelow = [];
+        return;
+      }
+      try {
+        const topics = await GetRetainedTopicsUnderPrefix(connectionId, topic);
+        // Guard against a slow response for a topic we have since left.
+        if (selectedTopicString === topic) retainedAtOrBelow = topics;
+      } catch {
+        retainedAtOrBelow = [];
+      }
+    })();
+
+  $: isSelectedTopicRetained =
+    selectedTopicString !== null &&
+    retainedAtOrBelow.includes(selectedTopicString);
+  $: retainedBelowSelectedCount = retainedAtOrBelow.filter(
+    (t) => t !== selectedTopicString
+  ).length;
+
+  // Copies exactly what the payload tab is showing, honouring the codec and
+  // format the user picked, rather than re-deriving a default.
+  const copySelectedPayload = async () => {
+    if (selectedMessagePayload === null) return;
+    let text = selectedMessagePayload;
+    const codec = $selectedTopicStore.options.decoding;
+    try {
+      if (codec !== "none") text = decodePayload(text, codec);
+      text = formatPayload(text, $selectedTopicStore.options.format);
+      await copyToClipboard(text);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to copy payload",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
 
   $: selectedMessagePayload,
     (() => {
@@ -171,32 +232,27 @@
               defaultChecked={isComparing}
               onChange={(checked) => selectedTopicStore.setComparing(checked)}
             />
-            <DropdownCloseOnClick>
-              <Button
-                variant="text"
-                on:click={() =>
-                  !!$selectedTopicStore.selectedTopic
-                    ? exportTopicMessages($selectedTopicStore.selectedTopic)
-                    : undefined}
-                ><div class="flex mr-[17px] ml-2">
-                  <Icon type="download" size={20} />
-                </div>
-                <span>Export message history</span></Button
-              >
-            </DropdownCloseOnClick>
-            <DropdownCloseOnClick>
-              <Button
-                variant="text"
-                on:click={() =>
-                  !!$selectedTopicStore.selectedTopic
-                    ? deleteRetainedMessage($selectedTopicStore.selectedTopic)
-                    : undefined}
-                ><div class="flex mr-[17px] ml-2">
-                  <Icon type="delete" size={20} />
-                </div>
-                <span>Delete retained message</span></Button
-              >
-            </DropdownCloseOnClick>
+            {#if selectedTopicString !== null}
+              <!-- The same component the tree and graph menus render, so the
+                   three surfaces cannot drift apart. It emits DropdownMenuItems,
+                   which read their melt element from the context DropdownMenu
+                   already provides. The header is off because the panel's
+                   breadcrumb names the topic right above this menu. -->
+              <div class="flex flex-col">
+                <TopicContextMenu
+                  topic={selectedTopicString}
+                  showHeader={false}
+                  hasPayload={selectedMessagePayload !== null}
+                  isRetained={isSelectedTopicRetained}
+                  retainedBelowCount={retainedBelowSelectedCount}
+                  onCopyTopic={copyTopicPath}
+                  onCopyPayload={copySelectedPayload}
+                  onExport={exportTopicMessages}
+                  {onClearRetained}
+                  {onClearRetainedBelow}
+                />
+              </div>
+            {/if}
           </div>
         </DropdownMenu>
         <IconButton onClick={selectedTopicStore.deselectTopic}>

@@ -122,6 +122,24 @@ export function DeleteRetainedMessage(connId: number, topic: string): $Cancellab
     return $Call.ByID(1837950630, connId, topic);
 }
 
+/**
+ * DeleteRetainedMessages clears the retained message on each of the given
+ * topics by publishing a zero-length retained payload to it.
+ * 
+ * It takes an explicit topic list rather than a prefix so the caller clears
+ * exactly the topics it counted and showed the user. Re-resolving a prefix here
+ * would race live traffic: a topic retained between the confirmation opening
+ * and the user accepting it would be swept up silently, making the number they
+ * agreed to a lie.
+ * 
+ * Every topic is attempted even if earlier ones fail, because a half-cleared
+ * branch that reports nothing is worse than a full attempt that reports what
+ * broke. The error names how many succeeded and how many failed.
+ */
+export function DeleteRetainedMessages(connId: number, topics: string[]): $CancellablePromise<void> {
+    return $Call.ByID(1238327631, connId, topics);
+}
+
 export function DeleteSubscription(connId: number, id: number): $CancellablePromise<void> {
     return $Call.ByID(1291658, connId, id);
 }
@@ -342,9 +360,25 @@ export function GetReceivedTimelineWindow(connectionID: number, topic: string, b
     });
 }
 
+/**
+ * GetRetainedTopicsUnderPrefix returns the known-retained topics at or below a
+ * topic prefix, sorted. It backs the count shown before a bulk retained
+ * cleanup.
+ * 
+ * "Known" is doing real work here: this reflects the retained messages this
+ * session has seen, not the broker's true retained set (see
+ * mqtt.MessageHistory's retained field). UI copy must not present it as
+ * complete.
+ */
+export function GetRetainedTopicsUnderPrefix(connId: number, prefix: string): $CancellablePromise<string[]> {
+    return $Call.ByID(570234138, connId, prefix).then(($result: any) => {
+        return $$createType25($result);
+    });
+}
+
 export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
     return $Call.ByID(2748919454).then(($result: any) => {
-        return $$createType26($result);
+        return $$createType27($result);
     });
 }
 
@@ -361,13 +395,13 @@ export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType27($result);
+        return $$createType28($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType29($result);
+        return $$createType30($result);
     });
 }
 
@@ -379,7 +413,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType31($result);
+        return $$createType32($result);
     });
 }
 
@@ -503,10 +537,11 @@ const $$createType21 = models$0.PanelSize.createFrom;
 const $$createType22 = $Create.Array($$createType21);
 const $$createType23 = models$0.PublishHistory.createFrom;
 const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = models$0.SortState.createFrom;
-const $$createType26 = $Create.Array($$createType25);
-const $$createType27 = $Create.Array($$createType3);
-const $$createType28 = models$0.Tab.createFrom;
-const $$createType29 = $Create.Array($$createType28);
-const $$createType30 = $models.Connection.createFrom;
-const $$createType31 = $Create.Nullable($$createType30);
+const $$createType25 = $Create.Array($Create.Any);
+const $$createType26 = models$0.SortState.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = $Create.Array($$createType3);
+const $$createType29 = models$0.Tab.createFrom;
+const $$createType30 = $Create.Array($$createType29);
+const $$createType31 = $models.Connection.createFrom;
+const $$createType32 = $Create.Nullable($$createType31);

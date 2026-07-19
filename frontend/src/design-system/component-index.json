@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-18T08:06:39.528Z",
+  "generatedAt": "2026-07-19T02:25:12.802Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -952,7 +952,7 @@
     {
       "name": "ContextMenu",
       "tier": "primitive",
-      "description": "Storybook coverage for ContextMenu.",
+      "description": "Right-click menu for a region of the UI, opening at the pointer. One instance covers a whole region rather than one per row.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -961,10 +961,25 @@
         "lastSyncedHash": null,
         "lastSyncedAt": null
       },
-      "props": [],
-      "tokens": [],
+      "props": [
+        {
+          "name": "portal",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "onOpen",
+          "type": "function",
+          "required": false,
+          "default": null
+        }
+      ],
+      "tokens": [
+        "elevation-2"
+      ],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Menu items come from DropdownMenuItem, which reads its melt element from the shared \"menu-elements\" context.",
       "sourcePath": "src/components/ContextMenu/ContextMenu.svelte",
       "specPath": "src/components/ContextMenu/ContextMenu.spec.json",
       "storyPath": "src/components/ContextMenu/ContextMenu.stories.svelte",
@@ -2977,6 +2992,62 @@
       "specMissing": false
     },
     {
+      "name": "ConfirmClearRetainedDialog",
+      "tier": "component",
+      "description": "Confirms clearing retained messages, for a single topic or for everything known-retained below a prefix.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "store",
+          "required": false,
+          "default": "writable(false)",
+          "description": "A boolean store, matching Dialog's open-state contract."
+        },
+        {
+          "name": "topic",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "The topic being cleared, or the prefix when clearing a branch."
+        },
+        {
+          "name": "count",
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Number of topics that will be cleared. 0 selects the single-topic wording."
+        },
+        {
+          "name": "onConfirm",
+          "type": "function",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "emphasis",
+        "error",
+        "error-light"
+      ],
+      "dependencies": [
+        "Button",
+        "Dialog"
+      ],
+      "notes": "Figma is not linked yet. The branch copy hedges deliberately: under MQTT 3 the retained flag only arrives on subscribe-time replay, so the count cannot claim to be the broker's complete retained set.",
+      "sourcePath": "src/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.stories.svelte",
+      "storyId": "Components/Connection/DataView/ConfirmClearRetainedDialog",
+      "specMissing": false
+    },
+    {
       "name": "MqttDataPanel",
       "tier": "view",
       "description": "Storybook coverage for MqttDataPanel.",
@@ -3003,6 +3074,28 @@
           "name": "width",
           "type": "number",
           "required": true
+        },
+        {
+          "name": "copyTopicPath",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "exportTopicMessages",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": true,
+          "description": "Raises a clear request; DataView confirms it and performs the clear."
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": true,
+          "description": "Raises a bulk clear request for topics below the right-clicked one."
         }
       ],
       "tokens": [
@@ -3353,9 +3446,41 @@
           "required": false
         },
         {
+          "name": "getTopicPayload",
+          "type": "function",
+          "required": false,
+          "description": "A topic's latest payload, or null. Called when the context menu opens to decide whether payload actions apply."
+        },
+        {
+          "name": "copyTopicPath",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "copyPayload",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "exportTopicMessages",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": false
+        },
+        {
           "name": "searchStore",
           "type": "object",
-          "required": false
+          "required": false,
+          "description": "Shared filter text store from the List view, so filter survives the List/Graph toggle. Absent in storybook/dev: falls back to local state."
         }
       ],
       "tokens": [
@@ -3534,16 +3659,27 @@
           ]
         },
         {
-          "name": "deleteRetainedMessage",
+          "name": "exportTopicMessages",
           "type": "function",
-          "required": false,
+          "required": true,
           "default": "> Promise<void>"
         },
         {
-          "name": "exportTopicMessages",
+          "name": "copyTopicPath",
           "type": "function",
-          "required": false,
-          "default": "> Promise<void>"
+          "required": true
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": true,
+          "description": "Raises a clear request; DataView confirms it and performs the clear."
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": true,
+          "description": "Raises a bulk clear request for topics below the selected one."
         }
       ],
       "tokens": [
@@ -4998,6 +5134,93 @@
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SidebarTopBar.stories.svelte",
       "storyId": "Views/Connection/DataView/Sidebar/SidebarTopBar",
+      "specMissing": false
+    },
+    {
+      "name": "TopicContextMenu",
+      "tier": "component",
+      "description": "The actions offered for a topic, shared by the list tree, the graph, and the selected-topic panel. Renders menu items only; the surrounding menu supplies the melt context.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "topic",
+          "type": "string",
+          "required": true,
+          "description": "The topic these actions apply to."
+        },
+        {
+          "name": "hasPayload",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "False for an intermediate branch node, which has no value of its own. Hides the payload and export actions."
+        },
+        {
+          "name": "isRetained",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Whether this exact topic holds a retained message, as far as we know. Disables the clear action when false."
+        },
+        {
+          "name": "retainedBelowCount",
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "How many known-retained topics sit strictly below this one. The bulk clear action is hidden when 0."
+        },
+        {
+          "name": "showHeader",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Hide the topic header when the surrounding UI already names the topic, as the selected-topic panel does."
+        },
+        {
+          "name": "onCopyTopic",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onCopyPayload",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onExport",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onClearRetained",
+          "type": "function",
+          "required": true
+        },
+        {
+          "name": "onClearRetainedBelow",
+          "type": "function",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [
+        "DropdownMenuItem",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. Right-click does not move selection, so the header names the menu's target.",
+      "sourcePath": "src/views/Connection/DataView/components/TopicContextMenu/TopicContextMenu.svelte",
+      "specPath": "src/views/Connection/DataView/components/TopicContextMenu/TopicContextMenu.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/TopicContextMenu/TopicContextMenu.stories.svelte",
+      "storyId": "Components/Connection/DataView/TopicContextMenu",
       "specMissing": false
     },
     {

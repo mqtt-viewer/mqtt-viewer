@@ -13,9 +13,14 @@
   import connections from "@/stores/connections";
   import {
     DeleteRetainedMessage,
+    DeleteRetainedMessages,
     ExportTopicMessages,
+    GetRetainedTopicsUnderPrefix,
     OpenChartWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
+  import { writable } from "svelte/store";
+  import { copyToClipboard } from "@/util/copy";
 
   export let connection: Connection;
 
@@ -93,13 +98,89 @@
     selectedTopicPanelWidth,
   });
 
-  const deleteRetainedMessage = async (topic: string) => {
+  // Clearing a retained message publishes an empty retained message, which
+  // every other client on the broker sees. It used to fire on a single click
+  // with no confirmation; both the single-topic and branch cases now route
+  // through the dialog below.
+  const isClearRetainedOpen = writable(false);
+  let clearRetainedTopic = "";
+  let clearRetainedTopics: string[] = [];
+  // 0 means the single-topic case; a branch shows its count.
+  let clearRetainedCount = 0;
+
+  const requestClearRetained = (topic: string) => {
+    clearRetainedTopic = topic;
+    clearRetainedTopics = [topic];
+    clearRetainedCount = 0;
+    isClearRetainedOpen.set(true);
+  };
+
+  const requestClearRetainedBelow = async (prefix: string) => {
+    let topics: string[];
     try {
-      await DeleteRetainedMessage(connection.connectionDetails.id, topic);
+      topics = await GetRetainedTopicsUnderPrefix(
+        connection.connectionDetails.id,
+        prefix
+      );
     } catch (e) {
       addToast({
         data: {
-          title: "Failed to delete retained message",
+          title: "Failed to find retained messages",
+          description: e as string,
+          type: "error",
+        },
+      });
+      return;
+    }
+    // The prefix itself may hold a retained message; the menu offers this
+    // action for what is below, so clearing the branch must not silently take
+    // the topic you right-clicked with it.
+    const below = topics.filter((t) => t !== prefix);
+    if (below.length === 0) return;
+    clearRetainedTopic = prefix;
+    // Capture the exact list now. The dialog's number is a promise about what
+    // gets cleared, so it must not be re-resolved after the user agrees to it.
+    clearRetainedTopics = below;
+    clearRetainedCount = below.length;
+    isClearRetainedOpen.set(true);
+  };
+
+  const confirmClearRetained = async () => {
+    const topics = clearRetainedTopics;
+    try {
+      if (topics.length === 1) {
+        await DeleteRetainedMessage(connection.connectionDetails.id, topics[0]);
+      } else {
+        await DeleteRetainedMessages(connection.connectionDetails.id, topics);
+      }
+      addToast({
+        data: {
+          title:
+            topics.length === 1
+              ? "Retained message cleared"
+              : `${topics.length} retained messages cleared`,
+          description: clearRetainedTopic,
+          type: "success",
+        },
+      });
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to clear retained messages",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
+
+  const copyTopicPath = async (topic: string) => {
+    try {
+      await copyToClipboard(topic);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to copy topic path",
           description: e as string,
           type: "error",
         },
@@ -172,7 +253,15 @@
           </Button>
         </div>
       {:else}
-        <MqttDataPanel {connection} {selectedTopicStore} width={dataViewWidth} />
+        <MqttDataPanel
+          {connection}
+          {selectedTopicStore}
+          width={dataViewWidth}
+          {copyTopicPath}
+          {exportTopicMessages}
+          onClearRetained={requestClearRetained}
+          onClearRetainedBelow={requestClearRetainedBelow}
+        />
       {/if}
     </div>
     {#if isSelectedTopicPanelOpen}
@@ -188,8 +277,10 @@
         <SelectedTopicDisplay
           connectionId={connection.connectionDetails.id}
           {selectedTopicStore}
-          {deleteRetainedMessage}
           {exportTopicMessages}
+          {copyTopicPath}
+          onClearRetained={requestClearRetained}
+          onClearRetainedBelow={requestClearRetainedBelow}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
           mqttVersion={connection.connectionDetails.mqttVersion === "3"
             ? "3"
@@ -205,3 +296,13 @@
     {/if}
   </div>
 </div>
+
+<!-- One dialog for every surface: the tree menu, the graph menu, and the
+     selected-topic panel all raise their clear requests here, so the
+     confirmation wording and the clear itself cannot drift between them. -->
+<ConfirmClearRetainedDialog
+  isOpen={isClearRetainedOpen}
+  topic={clearRetainedTopic}
+  count={clearRetainedCount}
+  onConfirm={confirmClearRetained}
+/>

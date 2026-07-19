@@ -22,11 +22,25 @@ const DefaultMemoryBudgetBytes int64 = 512 * 1024 * 1024 // 512 MB
 //   - latest: the newest message per topic, kept even after it falls out of
 //     the recent window, so selecting a topic in the tree always shows at least
 //     its current value. Bounded by topic cardinality, not message volume.
+//   - retained: the topics we currently believe hold a retained message. Like
+//     latest, bounded by topic cardinality and never evicted by the byte
+//     budget. See the field comment for what it can and cannot tell you.
 type MessageHistory struct {
-	mutex       sync.Mutex
-	recent      []*MqttMessage
-	head        int
-	latest      map[string]*MqttMessage
+	mutex  sync.Mutex
+	recent []*MqttMessage
+	head   int
+	latest map[string]*MqttMessage
+	// retained holds the topics we believe currently have a retained message,
+	// maintained from the Retain flag: a retained message with a payload marks
+	// its topic, a retained zero-length payload (the MQTT tombstone) unmarks
+	// it.
+	//
+	// This is "retained messages we know about", NOT broker truth. Under MQTT 3
+	// the flag is only set on subscribe-time replay, because subscribe.go has no
+	// RetainAsPublished equivalent for v3, so a topic another client retains
+	// mid-session goes undetected. Callers must not present this as a complete
+	// picture of the broker.
+	retained    map[string]struct{}
 	totalBytes  int64
 	budgetBytes int64
 }
@@ -35,6 +49,7 @@ func newMessageHistory() *MessageHistory {
 	return &MessageHistory{
 		recent:      make([]*MqttMessage, 0, 1024),
 		latest:      make(map[string]*MqttMessage),
+		retained:    make(map[string]struct{}),
 		budgetBytes: DefaultMemoryBudgetBytes,
 	}
 }
@@ -58,6 +73,7 @@ func (m *MessageHistory) Clear() {
 	m.recent = m.recent[:0]
 	m.head = 0
 	m.latest = make(map[string]*MqttMessage)
+	m.retained = make(map[string]struct{})
 	m.totalBytes = 0
 }
 
@@ -67,9 +83,26 @@ func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
 	defer m.mutex.Unlock()
 	p := &msg
 	m.latest[p.Topic] = p
+	m.trackRetainedLocked(p)
 	m.recent = append(m.recent, p)
 	m.totalBytes += int64(p.estimatedBytes())
 	m.evictLocked()
+}
+
+// trackRetainedLocked maintains the retained index from a message's Retain
+// flag. A retained message with a payload means the topic now holds a retained
+// value; a retained zero-length payload is the MQTT tombstone that clears one.
+// Non-retained messages say nothing either way and are ignored. Caller holds
+// mutex.
+func (m *MessageHistory) trackRetainedLocked(msg *MqttMessage) {
+	if !msg.Retain {
+		return
+	}
+	if len(msg.Payload) == 0 {
+		delete(m.retained, msg.Topic)
+		return
+	}
+	m.retained[msg.Topic] = struct{}{}
 }
 
 // evictLocked drops oldest messages until under budget. Caller holds mutex.
@@ -231,6 +264,45 @@ func (m *MessageHistory) GetHistoryByTopicPrefix(prefix string) []MqttMessage {
 		}
 	}
 	return result
+}
+
+// IsRetained reports whether a topic currently holds a retained message, as
+// far as we know. See the retained field comment: a false here means "I have
+// not seen one", not "the broker has none".
+func (m *MessageHistory) IsRetained(topic string) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	_, ok := m.retained[topic]
+	return ok
+}
+
+// RetainedUnderPrefix returns the known-retained topics at or below prefix, in
+// sorted order so a confirmation dialog lists them stably. An empty prefix
+// matches every retained topic.
+//
+// Matching is on topic-level boundaries, not raw string prefix: "a/b" matches
+// "a/b" and "a/b/c", but never "a/bc".
+func (m *MessageHistory) RetainedUnderPrefix(prefix string) []string {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	result := make([]string, 0, 16)
+	for topic := range m.retained {
+		if matchesTopicPrefix(topic, prefix) {
+			result = append(result, topic)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+// matchesTopicPrefix reports whether topic is at or below prefix, respecting
+// topic-level boundaries so "a/b" does not match "a/bc". An empty prefix
+// matches everything.
+func matchesTopicPrefix(topic string, prefix string) bool {
+	if prefix == "" {
+		return true
+	}
+	return topic == prefix || strings.HasPrefix(topic, prefix+"/")
 }
 
 // getMessageByIdLocked implements the per-id lookup. Caller holds mutex.

@@ -50,6 +50,18 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Adding a value to a chart is clearer",
         body: 'Choosing "Add value from payload" now opens the picker straight on the value, so it\'s obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.',
       },
+      {
+        title: "Right-click a topic",
+        body: "Topics now have a right-click menu, in the list and in the graph. Copy the topic path or the payload, export the message history, or clear the retained message. The selected topic panel offers the same actions, so wherever you are, the options are the same.",
+      },
+      {
+        title: "Clear retained messages in bulk",
+        body: "Right-click a branch and you can clear every retained message beneath it in one go. I'll show you the count and ask first, since clearing a retained message reaches every other client on the broker. One caveat worth knowing: I can only clear retained messages I've seen, and on MQTT 3 brokers I only learn about them when I subscribe, so anything retained by another client mid-session won't be counted.",
+      },
+      {
+        title: "Spot retained topics at a glance",
+        body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages.",
+      },
     ],
   },
   {

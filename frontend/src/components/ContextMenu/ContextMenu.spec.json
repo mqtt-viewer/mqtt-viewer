@@ -2,7 +2,7 @@
   "$schema": "../../design-system/component-spec.schema.json",
   "name": "ContextMenu",
   "tier": "primitive",
-  "description": "Storybook coverage for ContextMenu.",
+  "description": "Right-click menu for a region of the UI, opening at the pointer. One instance covers a whole region rather than one per row.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -11,8 +11,23 @@
     "lastSyncedHash": null,
     "lastSyncedAt": null
   },
-  "props": [],
-  "tokens": [],
+  "props": [
+    {
+      "name": "portal",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "onOpen",
+      "type": "function",
+      "required": false,
+      "default": null
+    }
+  ],
+  "tokens": [
+    "elevation-2"
+  ],
   "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Menu items come from DropdownMenuItem, which reads its melt element from the shared \"menu-elements\" context."
 }

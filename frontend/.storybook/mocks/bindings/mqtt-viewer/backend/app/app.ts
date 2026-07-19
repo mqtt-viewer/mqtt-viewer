@@ -112,6 +112,10 @@ export async function DeleteRetainedMessage(
   _connectionId: number,
   _topic: string
 ): Promise<void> {}
+export async function DeleteRetainedMessages(
+  _connectionId: number,
+  _topics: string[]
+): Promise<void> {}
 export async function DeleteSubscription(
   _connectionId: number,
   _subscriptionId: number
@@ -356,6 +360,13 @@ export async function DeleteSysMetricMapping(
 export async function GetSysMessageHistory(
   _connectionId: number
 ): Promise<any[]> {
+  return [];
+}
+
+export async function GetRetainedTopicsUnderPrefix(
+  _connId: number,
+  _prefix: string
+): Promise<string[]> {
   return [];
 }
 

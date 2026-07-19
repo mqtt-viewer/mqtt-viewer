@@ -1,0 +1,52 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "ConfirmClearRetainedDialog",
+  "tier": "component",
+  "description": "Confirms clearing retained messages, for a single topic or for everything known-retained below a prefix.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isOpen",
+      "type": "store",
+      "required": false,
+      "default": "writable(false)",
+      "description": "A boolean store, matching Dialog's open-state contract."
+    },
+    {
+      "name": "topic",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "The topic being cleared, or the prefix when clearing a branch."
+    },
+    {
+      "name": "count",
+      "type": "number",
+      "required": false,
+      "default": 0,
+      "description": "Number of topics that will be cleared. 0 selects the single-topic wording."
+    },
+    {
+      "name": "onConfirm",
+      "type": "function",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "emphasis",
+    "error",
+    "error-light"
+  ],
+  "dependencies": [
+    "Button",
+    "Dialog"
+  ],
+  "notes": "Figma is not linked yet. The branch copy hedges deliberately: under MQTT 3 the retained flag only arrives on subscribe-time replay, so the count cannot claim to be the broker's complete retained set."
+}

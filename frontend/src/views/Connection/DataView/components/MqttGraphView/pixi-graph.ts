@@ -41,6 +41,7 @@ export interface ThemeUi {
   minimapBgAlpha: number;
   minimapBorder: number;
   pulse: number; // message-arrival ripple stroke colour
+  retained: number; // retained-message marker; matches the message timeline
 }
 
 export interface GraphOptions {
@@ -59,6 +60,7 @@ interface NodeVisual {
   caret: Graphics | null;
   caretHover: boolean;
   badge: Text | null; // lazily created/pooled, same lifecycle as label
+  retainedDot: Graphics | null; // lazily created/pooled, same lifecycle as label
   node: TopicNode;
   expanded: boolean;
   tx: number; // target x (animated toward)
@@ -115,6 +117,9 @@ export class TopicGraphRenderer {
   private minimapBgAlpha = 0.32;
   private minimapBorderColor = 0x8a8a8a;
   private pulseColor = 0xffffff;
+  // retained-marker colour; matches the message timeline's retained items
+  private retainedColor = 0xf7d66a;
+  private retainedColorDirty = false;
   private sortKey: SortKey = "rate";
   private filter = "";
   private selected: string | null = null;
@@ -173,6 +178,7 @@ export class TopicGraphRenderer {
   // ---- label/badge pooling (lazy creation is the biggest win at scale) ----
   private labelPool: Text[] = [];
   private badgePool: Text[] = [];
+  private retainedDotPool: Graphics[] = [];
   private readonly LABEL_POOL_CAP = 300;
   private textColorDirty = false;
 
@@ -351,6 +357,12 @@ export class TopicGraphRenderer {
     this.minimapBgAlpha = ui.minimapBgAlpha;
     this.minimapBorderColor = ui.minimapBorder;
     this.pulseColor = ui.pulse;
+    if (ui.retained !== this.retainedColor) {
+      this.retainedColor = ui.retained;
+      // Dots are drawn once and reused from a pool, so a theme switch has to
+      // mark the live ones for a redraw; nothing else would repaint them.
+      this.retainedColorDirty = true;
+    }
   }
   setSort(key: SortKey): void {
     this.sortKey = key;
@@ -362,6 +374,21 @@ export class TopicGraphRenderer {
   }
   setSelected(topic: string | null): void {
     this.selected = topic;
+  }
+  /**
+   * The topic of the node at canvas-relative (x, y), or null over empty canvas.
+   *
+   * Reuses Pixi's own hit testing rather than re-deriving positions, so it
+   * cannot disagree with what a click would have hit. Callers use it to resolve
+   * a right-click target synchronously, from the native event, before opening a
+   * menu.
+   */
+  topicAt(x: number, y: number): string | null {
+    const hit = this.app.renderer.events.rootBoundary.hitTest(x, y);
+    const label = hit?.label ?? null;
+    // Only node circles carry a topic label; anything else (caret, minimap,
+    // stage) is not a menu target.
+    return label !== null && this.visuals.has(label) ? label : null;
   }
   setCvdSafe(on: boolean): void {
     this.cvdSafe = on;
@@ -444,9 +471,20 @@ export class TopicGraphRenderer {
       { passive: false }
     );
 
+    // The right button opens the topic menu, so the browser's own menu must not
+    // also appear. Mirrors the preventDefault already used for wheel above.
+    canvas.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+    });
+
     this.app.stage.eventMode = "static";
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on("pointerdown", (e: any) => {
+      // Pan is left-drag on empty canvas only. The right button is reserved for
+      // the context menu, and a press that lands on a node is the node's to
+      // handle, so neither starts a pan.
+      if (e.button !== 0) return;
+      if (e.target !== this.app.stage) return;
       this.dragging = true;
       this.dragMoved = false;
       this.lastPointer = { x: e.global.x, y: e.global.y };
@@ -783,8 +821,11 @@ export class TopicGraphRenderer {
     circle.anchor.set(0.5);
     circle.eventMode = "static";
     circle.cursor = "pointer";
-    circle.on("pointertap", () => {
+    circle.on("pointertap", (e: any) => {
       if (this.dragMoved) return;
+      // pointertap fires for every button, so without this a right-click would
+      // expand or select the node as well as opening its menu.
+      if (e.button !== 0) return;
       // collapsed parent: first click expands and brings the subtree into
       // view; an expanded (or leaf) node toggles selection
       if (node.children.size > 0 && !node.expanded) {
@@ -797,6 +838,9 @@ export class TopicGraphRenderer {
       }
       this.cb.onSelect?.(this.selected === node.topic ? null : node.topic);
     });
+    // Lets topicAt() map a hit back to its topic. Pixi's own identity field, so
+    // no side map to keep in sync as visuals are created and destroyed.
+    circle.label = node.topic;
     circle.on("pointerover", (e: any) => {
       this.cb.onHover?.(node.topic, e.global.x, e.global.y);
     });
@@ -821,6 +865,7 @@ export class TopicGraphRenderer {
       caret: null,
       caretHover: false,
       badge: null,
+      retainedDot: null,
       node,
       expanded: node.expanded,
       tx: 0,
@@ -905,6 +950,45 @@ export class TopicGraphRenderer {
       this.badgePool.push(t);
     } else {
       t.destroy();
+    }
+  }
+
+  // Retained marker: a small dot to the right of the node's label (and past its
+  // +N badge, when it has one). Pooled like labels and badges, because the
+  // per-frame cost of allocating one of these per node is exactly what the
+  // pooling elsewhere in this file exists to avoid.
+  private static readonly RETAINED_DOT_R = 2.5;
+
+  private acquireRetainedDot(v: NodeVisual): Graphics {
+    if (v.retainedDot) return v.retainedDot;
+    let g = this.retainedDotPool.pop();
+    if (g) {
+      g.visible = true;
+    } else {
+      g = new Graphics();
+    }
+    this.drawRetainedDot(g);
+    v.container.addChild(g);
+    v.retainedDot = g;
+    return g;
+  }
+
+  private drawRetainedDot(g: Graphics): void {
+    g.clear();
+    g.circle(0, 0, TopicGraphRenderer.RETAINED_DOT_R);
+    g.fill({ color: this.retainedColor });
+  }
+
+  private releaseRetainedDot(v: NodeVisual): void {
+    if (!v.retainedDot) return;
+    const g = v.retainedDot;
+    v.container.removeChild(g);
+    v.retainedDot = null;
+    if (this.retainedDotPool.length < this.LABEL_POOL_CAP) {
+      g.visible = false;
+      this.retainedDotPool.push(g);
+    } else {
+      g.destroy();
     }
   }
 
@@ -1015,9 +1099,29 @@ export class TopicGraphRenderer {
       } else if (v.badge) {
         this.releaseBadge(v);
       }
+
+      // Retained marker sits after everything else on the row — past the +N
+      // badge when there is one — so it never crowds the label or the count.
+      // Tied to showLabels: at zoom levels where labels are hidden, nodes are
+      // small enough that a lone dot would read as noise rather than meaning.
+      if (v.node.ownRetained) {
+        const dot = this.acquireRetainedDot(v);
+        if (this.retainedColorDirty) this.drawRetainedDot(dot);
+        const trailing = showBadge && v.badge ? v.badge.x + v.badge.width : label.x + label.width;
+        dot.x = trailing + 7;
+        // An expanded parent's label is lifted above its outgoing edge and
+        // anchored at its bottom (anchor.y = 1), so label.y is its bottom edge
+        // rather than its centre. The dot is centre-anchored, so centre it on
+        // the label instead of copying label.y.
+        dot.y = hasVisibleKids ? label.y - label.height / 2 : label.y;
+        dot.visible = true;
+      } else if (v.retainedDot) {
+        this.releaseRetainedDot(v);
+      }
     } else {
       if (v.label) this.releaseLabel(v);
       if (v.badge) this.releaseBadge(v);
+      if (v.retainedDot) this.releaseRetainedDot(v);
     }
 
     // keep the caret clear of the node edge, however large the node grows;
@@ -1140,6 +1244,7 @@ export class TopicGraphRenderer {
             // accumulating on invisible containers
             if (v.label) this.releaseLabel(v);
             if (v.badge) this.releaseBadge(v);
+            if (v.retainedDot) this.releaseRetainedDot(v);
           }
           continue;
         }
@@ -1183,6 +1288,7 @@ export class TopicGraphRenderer {
         }
       }
       this.textColorDirty = false;
+      this.retainedColorDirty = false;
     } else if (recomputeCull) {
       // Not a slow-tick frame, but the cull pass above still ran (viewport
       // changed), so a node revealed this frame needs its detail refreshed
@@ -1444,8 +1550,10 @@ export class TopicGraphRenderer {
     document.removeEventListener("visibilitychange", this.visibilityHandler);
     for (const t of this.labelPool) t.destroy();
     for (const t of this.badgePool) t.destroy();
+    for (const g of this.retainedDotPool) g.destroy();
     this.labelPool = [];
     this.badgePool = [];
+    this.retainedDotPool = [];
     this.app.destroy(true, { children: true });
     this.visuals.clear();
     this.aggRingCandidates.clear();

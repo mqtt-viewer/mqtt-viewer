@@ -37,16 +37,27 @@
       ]
     },
     {
-      "name": "deleteRetainedMessage",
+      "name": "exportTopicMessages",
       "type": "function",
-      "required": false,
+      "required": true,
       "default": "> Promise<void>"
     },
     {
-      "name": "exportTopicMessages",
+      "name": "copyTopicPath",
       "type": "function",
-      "required": false,
-      "default": "> Promise<void>"
+      "required": true
+    },
+    {
+      "name": "onClearRetained",
+      "type": "function",
+      "required": true,
+      "description": "Raises a clear request; DataView confirms it and performs the clear."
+    },
+    {
+      "name": "onClearRetainedBelow",
+      "type": "function",
+      "required": true,
+      "description": "Raises a bulk clear request for topics below the selected one."
     }
   ],
   "tokens": [
