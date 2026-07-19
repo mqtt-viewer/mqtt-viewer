@@ -1,40 +1,45 @@
-import _ from "lodash";
 import type { MqttData } from "../../stores/mqtt-data";
 
-export const filterData = (data: MqttData, searchText: string) => {
+// Builds a pruned copy without deep-cloning the input: new node objects are
+// created only for kept entries, unmatched subtrees are never copied, and the
+// input tree is left untouched.
+export const filterData = (data: MqttData, searchText: string): MqttData => {
   if (!searchText) {
     return data;
   }
 
-  const dataToFilter = structuredClone(data);
-
   const result: MqttData = {};
-  for (const key in dataToFilter) {
-    const topicData = dataToFilter[key];
-    topicData.children = filterData(topicData.children, searchText);
-    if (_.isEmpty(topicData.children)) {
-      topicData.subtopicCount = 0;
-      if (dataMatchesSearch(topicData, searchText)) {
-        result[key] = topicData;
-      }
-      continue;
-    }
-    // Keep all parents that have children matching search
+  for (const key in data) {
+    const topicData = data[key];
+    const filteredChildren = filterData(topicData.children, searchText);
+
     let filteredChildMessageCount = 0;
     let filteredSubtopicCount = 0;
     let latestMessageTime = 0;
-    for (const childKey in topicData.children) {
-      const child = topicData.children[childKey];
+    for (const childKey in filteredChildren) {
+      const child = filteredChildren[childKey];
       filteredChildMessageCount += child.messageCount ?? 0;
       filteredSubtopicCount++;
       if (child.latestMessageTime.getTime() > latestMessageTime) {
         latestMessageTime = child.latestMessageTime.getTime();
       }
     }
-    topicData.messageCount = filteredChildMessageCount;
-    topicData.subtopicCount = filteredSubtopicCount;
-    topicData.latestMessageTime = new Date(latestMessageTime);
-    result[key] = topicData;
+
+    if (filteredSubtopicCount === 0) {
+      if (dataMatchesSearch(topicData, searchText)) {
+        result[key] = { ...topicData, children: {}, subtopicCount: 0 };
+      }
+      continue;
+    }
+
+    // Keep all parents that have children matching search
+    result[key] = {
+      ...topicData,
+      children: filteredChildren,
+      messageCount: filteredChildMessageCount,
+      subtopicCount: filteredSubtopicCount,
+      latestMessageTime: new Date(latestMessageTime),
+    };
   }
   return result;
 };
