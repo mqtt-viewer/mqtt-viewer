@@ -17,6 +17,10 @@
     "kind",
     "points",
     "noData",
+    "deltaPct",
+    "exact",
+    "description",
+    "windowName",
   ];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
@@ -91,6 +95,58 @@
     unit: undefined,
     points: undefined,
     noData: true,
+  }}
+  {template}
+/>
+<Story
+  name="DeltaUp"
+  args={{
+    ...storyArgs,
+    label: "Msg/s in",
+    value: "1.2k",
+    unit: undefined,
+    deltaPct: 8,
+    exact: "1,204",
+    points: mockSparklinePoints,
+  }}
+  {template}
+/>
+<Story
+  name="DeltaDown"
+  args={{
+    ...storyArgs,
+    label: "Connected clients",
+    value: "17",
+    unit: undefined,
+    deltaPct: -12,
+    exact: "17",
+    points: mockSparklinePoints,
+  }}
+  {template}
+/>
+<Story
+  name="SmallDeltaNoArrow"
+  args={{
+    ...storyArgs,
+    label: "Subscriptions",
+    value: "126",
+    unit: undefined,
+    deltaPct: 1,
+    exact: "126",
+    points: mockSparklinePoints,
+  }}
+  {template}
+/>
+<Story
+  name="WithDescription"
+  args={{
+    ...storyArgs,
+    label: "Observed msg/s",
+    value: "36.5",
+    unit: undefined,
+    description: "Measured by this client across its subscriptions",
+    exact: "36.5",
+    points: mockSparklinePoints,
   }}
   {template}
 />

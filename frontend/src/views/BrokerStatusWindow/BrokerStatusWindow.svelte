@@ -13,22 +13,81 @@
     type BrokerStatusStore,
   } from "./broker-status-store";
   import BrokerStatusView from "./components/BrokerStatusView/BrokerStatusView.svelte";
+  import TimeRangeSelector from "./components/TimeRangeSelector/TimeRangeSelector.svelte";
+  import { nowTick, formatAge } from "./components/BrokerStatusView/raw-browser";
 
   // State comes from the window URL the backend opened:
   // /?view=status&conn=<id>
   const params = new URLSearchParams(window.location.search);
   const connectionId = parseInt(params.get("conn") ?? "0", 10);
 
+  // How long after opening (or a history clear) with no $SYS before the pill
+  // treats the broker as a no-$SYS broker and hides itself.
+  const PILL_GRACE_MS = 10_000;
+
   let store: BrokerStatusStore | null = null;
   let viewRef: BrokerStatusView | null = null;
   let connectionName = "Broker status";
   let error = "";
+
+  // Header state, mirrored from the store via a manual subscription (the store
+  // is nullable until onMount, so `$store` auto-subscription is not usable here).
+  let sysEverSeen = false;
+  let sysLastSeenMs = -1;
+  let learnedIntervalMs = 10_000;
+  let rangeMinutes = 5;
+  let unsubStore: (() => void) | null = null;
+
+  // Pill grace timer, re-armed whenever the store's opened-at clock changes.
+  let pillGraceElapsed = false;
+  let pillGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastOpenedAt = -1;
+
+  const armPillGrace = (openedAt: number) => {
+    pillGraceElapsed = false;
+    if (pillGraceTimer) clearTimeout(pillGraceTimer);
+    const remaining = Math.max(0, PILL_GRACE_MS - (Date.now() - openedAt));
+    pillGraceTimer = setTimeout(() => (pillGraceElapsed = true), remaining);
+  };
+
+  const bindHeader = (s: BrokerStatusStore) => {
+    unsubStore?.();
+    unsubStore = s.subscribe((st) => {
+      sysEverSeen = st.sysEverSeen;
+      sysLastSeenMs = st.sysLastSeenMs;
+      learnedIntervalMs = st.learnedIntervalMs;
+      rangeMinutes = st.rangeMinutes;
+      if (st.windowOpenedAt !== lastOpenedAt) {
+        lastOpenedAt = st.windowOpenedAt;
+        armPillGrace(st.windowOpenedAt);
+      }
+    });
+  };
 
   // Live connection state for the header dot + disconnected banner. Driven by
   // the connections store, which the backend keeps up to date via events.
   $: connectionState =
     $connections.connections[connectionId]?.connectionState ?? "disconnected";
   $: isDisconnected = connectionState === "disconnected";
+
+  // Staleness pill: "waiting for $SYS" until the first message, then
+  // "$SYS <age> ago" (greyed once the age exceeds 2x the learned interval).
+  // Hidden on brokers that publish no $SYS at all (grace elapsed, none seen).
+  $: pillAgeMs = sysLastSeenMs > 0 ? $nowTick - sysLastSeenMs : 0;
+  $: pill = sysEverSeen
+    ? { show: true, text: `$SYS ${formatAge($nowTick, sysLastSeenMs)}`, grey: pillAgeMs > 2 * learnedIntervalMs }
+    : !pillGraceElapsed
+      ? { show: true, text: "waiting for $SYS", grey: false }
+      : { show: false, text: "", grey: false };
+
+  // When the range is shorter than 5x the learned $SYS interval, the broker
+  // series render as sparse points; the note explains why (nothing is disabled).
+  $: sparseNote =
+    sysEverSeen && rangeMinutes * 60_000 < 5 * learnedIntervalMs
+      ? `broker publishes about every ${Math.round(learnedIntervalMs / 1000)}s`
+      : undefined;
+
+  const onRangeChange = (e: CustomEvent<number>) => store?.setRange(e.detail);
 
   onMount(async () => {
     // Init subscriptions too so BrokerStatusView's hasSysSubscription reflects
@@ -44,6 +103,7 @@
     store = createBrokerStatusStore(connectionId, connection.eventSet, {
       connected: connection.connectionState === "connected",
     });
+    bindHeader(store);
     // Backfills $SYS + mapped-topic history and begins live-appending from the
     // shared event stream.
     await store.init();
@@ -52,6 +112,8 @@
   onDestroy(() => {
     // Drop the app-global event listeners (and the 1 s ticker) when the window
     // closes so we don't leak listeners on the shared backend.
+    unsubStore?.();
+    if (pillGraceTimer) clearTimeout(pillGraceTimer);
     store?.destroy();
   });
 </script>
@@ -69,7 +131,21 @@
       <span class="text-lg text-emphasis truncate">{connectionName}</span>
       <span class="text-secondary-text text-sm">broker status</span>
       {#if store}
-        <div class="ml-auto">
+        <div class="ml-auto flex items-center gap-3">
+          {#if pill.show}
+            <span
+              class="text-sm tabular-nums {pill.grey
+                ? 'text-secondary-text opacity-60'
+                : 'text-secondary-text'}"
+            >
+              {pill.text}
+            </span>
+          {/if}
+          <TimeRangeSelector
+            value={rangeMinutes}
+            {sparseNote}
+            on:change={onRangeChange}
+          />
           <IconButton
             tooltipText="Configure metrics"
             tooltipPlacement="bottom"
@@ -95,7 +171,7 @@
         {error}
       </div>
     {:else if store}
-      <div class="grow min-h-0" style="--wails-draggable:false">
+      <div class="grow min-h-0 overflow-y-auto" style="--wails-draggable:false">
         <BrokerStatusView bind:this={viewRef} {store} {connectionId} />
       </div>
     {:else}

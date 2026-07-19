@@ -1,0 +1,40 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "TimeRangeSelector",
+  "tier": "view",
+  "description": "Small segmented control for the broker-status window range (1m / 5m / 15m); emits a legacy `change` event with the selected minutes.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "value",
+      "type": "number",
+      "required": false,
+      "default": 5,
+      "description": "Selected window in minutes; one of `options`."
+    },
+    {
+      "name": "options",
+      "type": "object",
+      "required": false,
+      "default": [1, 5, 15],
+      "description": "Selectable windows in minutes."
+    },
+    {
+      "name": "sparseNote",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Optional tooltip on the group explaining sparse broker series at short ranges. Nothing is ever disabled."
+    }
+  ],
+  "tokens": ["outline", "elevation-1", "selected", "emphasis", "secondary-text"],
+  "dependencies": ["Tooltip"],
+  "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail."
+}

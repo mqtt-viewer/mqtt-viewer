@@ -464,6 +464,162 @@ describe("mergeMappings", () => {
   });
 });
 
+// --- v2 registry: hidden/overrideTarget flags + new metric bindings ----------
+
+// mosquitto 2.x $SYS leaves for the v2 diagnostic metrics.
+const MOSQUITTO_V2_TOPICS = [
+  "$SYS/broker/load/publish/dropped/1min",
+  "$SYS/broker/packet/out/count",
+  "$SYS/broker/heap/current",
+  "$SYS/broker/heap/maximum",
+  "$SYS/broker/store/messages/count",
+  "$SYS/broker/store/messages/bytes",
+  "$SYS/broker/clients/disconnected",
+  "$SYS/broker/clients/expired",
+  "$SYS/broker/load/sockets/1min",
+  "$SYS/broker/load/messages/received/5min",
+  "$SYS/broker/load/messages/received/15min",
+  "$SYS/broker/load/messages/sent/5min",
+  "$SYS/broker/load/messages/sent/15min",
+  "$SYS/broker/messages/received",
+  "$SYS/broker/messages/sent",
+];
+
+// aedes-stats publishes under $SYS/<random-id>/… with `+`-matched heap leaves.
+const AEDES_TOPICS = [
+  "$SYS/aedes8f3a/memory/heap/current",
+  "$SYS/aedes8f3a/memory/heap/maximum",
+];
+
+describe("v2 registry flags", () => {
+  it("marks the relocated v1 builtins hidden but keeps them override targets", () => {
+    for (const key of ["msg_rate_in", "msg_rate_out", "uptime", "version"]) {
+      const t = builtin(key);
+      expect(t.hidden, key).toBe(true);
+      expect(t.overrideTarget, key).not.toBe(false); // still an override target
+    }
+  });
+
+  it("keeps bytes_rate_* and the core gauges visible (not hidden)", () => {
+    for (const key of [
+      "clients_connected",
+      "bytes_rate_in",
+      "bytes_rate_out",
+      "subscriptions",
+      "retained",
+    ]) {
+      expect(builtin(key).hidden, key).not.toBe(true);
+    }
+  });
+
+  it("marks every new diagnostic metric hidden and not an override target", () => {
+    for (const key of [
+      "msgs_dropped",
+      "delivery_backlog",
+      "heap_current",
+      "heap_max",
+      "store_msgs",
+      "store_bytes",
+      "clients_disconnected",
+      "clients_expired",
+      "sockets_1min",
+      "messages_received_total",
+      "messages_sent_total",
+      "fan_out",
+      "avg_msg_size",
+    ]) {
+      const t = builtin(key);
+      expect(t.hidden, key).toBe(true);
+      expect(t.overrideTarget, key).toBe(false);
+    }
+  });
+
+  it("keeps the observed computed tiles last (facts/derived slot in between)", () => {
+    expect(BUILTIN_METRICS.at(-1)?.key).toBe("observed_byte_rate");
+    expect(BUILTIN_METRICS.at(-2)?.key).toBe("observed_msg_rate");
+  });
+});
+
+describe("v2 metric bindings", () => {
+  it("binds every new diagnostic metric to its exact mosquitto candidate", () => {
+    const expected: Record<string, string> = {
+      msgs_dropped: "$SYS/broker/load/publish/dropped/1min",
+      delivery_backlog: "$SYS/broker/packet/out/count",
+      heap_current: "$SYS/broker/heap/current",
+      heap_max: "$SYS/broker/heap/maximum",
+      store_msgs: "$SYS/broker/store/messages/count",
+      store_bytes: "$SYS/broker/store/messages/bytes",
+      clients_disconnected: "$SYS/broker/clients/disconnected",
+      clients_expired: "$SYS/broker/clients/expired",
+      sockets_1min: "$SYS/broker/load/sockets/1min",
+      messages_received_total: "$SYS/broker/messages/received",
+      messages_sent_total: "$SYS/broker/messages/sent",
+    };
+    for (const [key, topic] of Object.entries(expected)) {
+      const sel = selectCandidate(builtin(key), MOSQUITTO_V2_TOPICS);
+      expect(sel?.topic, key).toBe(topic);
+    }
+  });
+
+  it("scales the mosquitto drop average to drops/s and treats it as a gauge", () => {
+    const sel = selectCandidate(builtin("msgs_dropped"), MOSQUITTO_V2_TOPICS)!;
+    expect(sel.candidate.kind).toBe("gauge");
+    // 120 dropped/min → 2 dropped/s.
+    const sample = parseSample(sel.candidate, "120");
+    expect(sample).toEqual({ kind: "number", value: 2 });
+  });
+
+  it("treats delivery_backlog (packet/out/count) as a gauge, not a counter", () => {
+    // mosquitto-8: a queue length that legitimately plateaus on an idle broker.
+    // If it were mis-typed cumulative, a flat value would derive a 0 rate and a
+    // rising queue would be lost. Assert the gauge kind so the idle plateau is
+    // read at face value.
+    const sel = selectCandidate(builtin("delivery_backlog"), MOSQUITTO_V2_TOPICS)!;
+    expect(sel.candidate.kind).toBe("gauge");
+    expect(parseSample(sel.candidate, "0")).toEqual({ kind: "number", value: 0 });
+  });
+
+  it("derives a rate from the cumulative message totals", () => {
+    expect(
+      selectCandidate(builtin("messages_received_total"), MOSQUITTO_V2_TOPICS)
+        ?.candidate.kind
+    ).toBe("cumulative");
+    expect(
+      selectCandidate(builtin("messages_sent_total"), MOSQUITTO_V2_TOPICS)
+        ?.candidate.kind
+    ).toBe("cumulative");
+  });
+
+  it("binds aedes heap via the + wildcard candidate", () => {
+    const cur = selectCandidate(builtin("heap_current"), AEDES_TOPICS);
+    expect(cur?.topic).toBe("$SYS/aedes8f3a/memory/heap/current");
+    const max = selectCandidate(builtin("heap_max"), AEDES_TOPICS);
+    expect(max?.topic).toBe("$SYS/aedes8f3a/memory/heap/maximum");
+  });
+
+  it("does not cross-family mislabel: mosquitto heap ignores aedes-only leaves", () => {
+    // A mosquitto broker with only its own heap leaf must not resolve via the
+    // aedes `+/memory/heap/current` wildcard onto some unrelated topic.
+    const sel = selectCandidate(builtin("heap_current"), [
+      "$SYS/broker/heap/current",
+    ]);
+    expect(sel?.topic).toBe("$SYS/broker/heap/current");
+    // And an unrelated node topic must not satisfy the exact mosquitto slot.
+    expect(
+      selectCandidate(builtin("delivery_backlog"), [
+        "$SYS/broker/packet/received",
+      ])
+    ).toBeNull();
+  });
+
+  it("does not bind heap to Mochi's process-memory topic", () => {
+    // Mochi's system/memory is process memory, deliberately unbound.
+    expect(
+      selectCandidate(builtin("heap_current"), ["$SYS/broker/system/memory"])
+    ).toBeNull();
+  });
+});
+
 describe("humanizeDuration", () => {
   it("formats sub-minute durations", () => {
     expect(humanizeDuration(45)).toBe("45s");

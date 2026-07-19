@@ -19,8 +19,10 @@ export interface ChartOptionParams {
 }
 
 // echarts paints to canvas, so CSS variables can't be used here; each theme
-// gets its own literal palette, matching the tones in src/style.css.
-const CHROME_COLORS = {
+// gets its own literal palette, matching the tones in src/style.css. Exported
+// so the broker-status hero chart (hero-chart-option.ts) reuses the exact same
+// axis/tooltip chrome instead of forking a second literal palette.
+export const CHROME_COLORS = {
   dark: {
     axis: "#525252",
     label: "#aeaeae",
