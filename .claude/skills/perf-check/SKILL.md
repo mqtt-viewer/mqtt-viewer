@@ -33,6 +33,14 @@ mosquitto -p 1883
 mosquitto -p 1884
 ```
 
+Ports 1883/1884 are often taken on this machine (OrbStack binds 1883,
+other sessions leave mosquitto on 1884). Check with
+`lsof -i :1883 -i :1884` and fall back to 11883/11884; the flood script
+and the app both accept any port. When running the flood scripts in the
+background, note their stdout is block-buffered (no tty), so verify
+throughput with `timeout 3 mosquitto_sub -p <port> -t '#' | wc -l`
+instead of reading their output.
+
 Terminals 3 and 4, one flood each (each prints achieved msg/s once per
 second; confirm it holds the target rate):
 

@@ -255,6 +255,98 @@ test("parent that matches is kept when no children match", () => {
   expect(filteredData).toEqual(expectedResult);
 });
 
+test("input data is not mutated by filtering", () => {
+  const unfilteredData: MqttData = {
+    aaaaa: {
+      topic: "aaaaa",
+      isDecodedProto: false,
+      latestMessageTime: new Date(),
+      message: undefined,
+      messageCount: 5,
+      subtopicCount: 2,
+      children: {
+        hello: {
+          topic: "aaaaa/hello",
+          isDecodedProto: false,
+          latestMessageTime: new Date(),
+          message: "hello",
+          messageCount: 1,
+          subtopicCount: 0,
+          children: {},
+        },
+        world: {
+          topic: "aaaaa/world",
+          isDecodedProto: false,
+          latestMessageTime: new Date(),
+          message: "world",
+          messageCount: 4,
+          subtopicCount: 0,
+          children: {},
+        },
+      },
+    },
+  };
+  const snapshot = structuredClone(unfilteredData);
+  filterData(unfilteredData, "hello");
+  expect(unfilteredData).toEqual(snapshot);
+});
+
+test("filtering a large tree is fast (no per-level deep clone)", () => {
+  // Three levels, 40 x 40 x 5 = 8000 leaves. The old implementation
+  // structuredClone'd every subtree at every recursion level, which made
+  // this take hundreds of milliseconds.
+  const buildLeaf = (topic: string, message: string): MqttData[string] => ({
+    topic,
+    isDecodedProto: false,
+    latestMessageTime: new Date(),
+    message,
+    messageCount: 1,
+    subtopicCount: 0,
+    children: {},
+  });
+  const root: MqttData = {};
+  for (let i = 0; i < 40; i++) {
+    const midChildren: MqttData = {};
+    for (let j = 0; j < 40; j++) {
+      const leafChildren: MqttData = {};
+      for (let k = 0; k < 5; k++) {
+        leafChildren[`leaf${k}`] = buildLeaf(
+          `top${i}/mid${j}/leaf${k}`,
+          i === 0 && j === 0 && k === 0 ? "needle" : "hay",
+        );
+      }
+      midChildren[`mid${j}`] = {
+        topic: `top${i}/mid${j}`,
+        isDecodedProto: false,
+        latestMessageTime: new Date(),
+        message: undefined,
+        messageCount: 5,
+        subtopicCount: 5,
+        children: leafChildren,
+      };
+    }
+    root[`top${i}`] = {
+      topic: `top${i}`,
+      isDecodedProto: false,
+      latestMessageTime: new Date(),
+      message: undefined,
+      messageCount: 200,
+      subtopicCount: 40,
+      children: midChildren,
+    };
+  }
+
+  const start = performance.now();
+  const filtered = filterData(root, "needle");
+  const elapsed = performance.now() - start;
+
+  expect(Object.keys(filtered)).toEqual(["top0"]);
+  expect(filtered.top0.children.mid0.children.leaf0.message).toEqual("needle");
+  // Generous bound to avoid CI flake; the old clone-per-level version
+  // exceeded this by an order of magnitude.
+  expect(elapsed).toBeLessThan(250);
+});
+
 test("search string with trailing empty space filters correctly", () => {
   const unfilteredData = {
     aaaaa: {
