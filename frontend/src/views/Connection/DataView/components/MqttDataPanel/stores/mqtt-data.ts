@@ -3,6 +3,11 @@ import type * as events from "bindings/mqtt-viewer/events/models";
 import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 import { Events } from "@wailsio/runtime";
 import { base64ToUtf8 } from "@/components/CodeEditor/codec";
+import {
+  bumpScore,
+  LIST_RATE_TAU_MS,
+  type DecayScore,
+} from "@/util/decay-score";
 import type {
   HighlightCause,
   HighlightedMqttTopicsStore,
@@ -17,6 +22,9 @@ export type MqttData = {
     message?: string; // byte array
     isDecodedProto: boolean;
     children: MqttData;
+    // EWMA rate score for "Busiest" sort, lazily initialised on first message.
+    // Optional so hand-built fixtures/stories stay valid without it.
+    rate?: DecayScore;
   };
 };
 
@@ -105,6 +113,21 @@ export const createMqttDataStore = (
     highlightedTopicStore.markTopicsForHighlight(highlightMarks);
   };
 
+  // Age the node's rate score to the batch timestamp and credit all `count`
+  // messages (lazily creating the score the first time a node sees traffic).
+  // Called on the leaf node AND every ancestor so each level carries its
+  // subtree-aggregate rate, mirroring the graph's per-level bump.
+  const bumpNodeRate = (
+    node: MqttData[string],
+    nowMs: number,
+    count: number
+  ) => {
+    if (node.rate === undefined) {
+      node.rate = { score: 0, lastMs: 0 };
+    }
+    bumpScore(node.rate, nowMs, LIST_RATE_TAU_MS, count);
+  };
+
   // Returns true when a new topic-level key was created in mqttData, so the
   // caller can maintain subtopicCount (the number of direct child keys) by
   // incrementing it, instead of rescanning every sibling on each insert —
@@ -125,6 +148,7 @@ export const createMqttDataStore = (
         mqttData[topicLevel].message = message;
         mqttData[topicLevel].isDecodedProto = isDecodedProto;
         mqttData[topicLevel].latestMessageTime = timestamp;
+        bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
 
         return false;
       }
@@ -143,6 +167,7 @@ export const createMqttDataStore = (
         mqttData[topicLevel].subtopicCount += 1;
       }
       mqttData[topicLevel].latestMessageTime = timestamp;
+      bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
       return false;
     }
 
@@ -157,6 +182,7 @@ export const createMqttDataStore = (
         children: {},
         latestMessageTime: timestamp,
       };
+      bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
       return true;
     }
 
@@ -181,6 +207,7 @@ export const createMqttDataStore = (
       children,
       latestMessageTime: timestamp,
     };
+    bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
     return true;
   };
 
