@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Sort topics by how busy they are",
+        body: "The topic list can now order itself by what matters in the moment: busiest first, most messages, newest first or silent first, alongside the usual A to Z. The graph view offers the same choices and remembers the one you pick per connection. Its filter box also understands MQTT wildcards now, like sensors/+/temperature, just as the list does, and whatever you type in the filter follows you when you switch between list and graph.",
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
       },

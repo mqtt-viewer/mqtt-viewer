@@ -11,8 +11,7 @@
   import {
     createSortStore,
     DEFAULT_SORT_PERSIST_KEY,
-    type MqttDataSortDirection,
-    type MqttDataSortKey,
+    validateSort,
   } from "./stores/sort";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
@@ -114,10 +113,10 @@
   const searchStore = createSearchStore();
   const sortStore = createSortStore(
     defaultSortState
-      ? {
-          key: defaultSortState.sortCriteria as MqttDataSortKey,
-          dir: defaultSortState.sortDirection as MqttDataSortDirection,
-        }
+      ? validateSort(
+          defaultSortState.sortCriteria,
+          defaultSortState.sortDirection
+        )
       : undefined
   );
 </script>
@@ -187,6 +186,7 @@
         {exportTopicMessages}
         {onClearRetained}
         {onClearRetainedBelow}
+        {searchStore}
       >
         <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
       </MqttGraphView>
