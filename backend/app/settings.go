@@ -40,6 +40,9 @@ func (a *App) UpdateAppSettings(params UpdateAppSettingsParams) (models.AppSetti
 	a.applyMemoryBudgetToAllConnections(settings.MemoryBudgetBytes)
 	a.recordingEnabled.Store(settings.RecordingEnabled)
 	a.diskBudgetBytes.Store(settings.DiskBudgetBytes)
+	// A changed budget shifts the soft memory limit too, not just the
+	// per-connection eviction threshold.
+	a.recomputeMemoryLimit()
 	return settings, nil
 }
 

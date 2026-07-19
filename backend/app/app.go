@@ -31,6 +31,19 @@ type App struct {
 	// Throttles the (PRAGMA-based) disk-size check so it doesn't run on every
 	// 300ms drain. Unix-nano of the last prune check.
 	lastPruneCheckNanos atomic.Int64
+	// recordQueue hands drained batches to the single recording-worker
+	// goroutine so DB writes never happen on the buffer-drain hot path.
+	recordQueue chan recordBatch
+	recordStop  chan struct{}
+	// recordDropped counts batches shed because recordQueue was full.
+	recordDropped atomic.Int64
+	// Throttles the "record queue full" warning the same way lastPruneCheckNanos
+	// throttles the prune check.
+	lastRecordDropLogNanos atomic.Int64
+	// connectedConnCount tracks how many connections are currently up, so the
+	// soft runtime memory limit (memlimit.go) can scale with live connection
+	// count rather than assuming every saved connection is active.
+	connectedConnCount atomic.Int64
 }
 
 type AppConnection struct {
@@ -40,6 +53,13 @@ type AppConnection struct {
 	SubscriptionMatcher *topicmatching.SubscriptionMatcher
 	MqttMessageBuffer   *mqtt.MessageBuffer
 	EventSet            *events.ConnectionEventsSet
+	// connUp guards connectedConnCount against double-counting: the
+	// underlying manager's OnConnectionUp/OnConnectionDown callbacks are not
+	// guaranteed to alternate (e.g. Disconnect() on an already-down
+	// connection, or repeated Connected transitions on reconnect) and are not
+	// guaranteed to be serialised onto one goroutine, so counting is gated by
+	// a CompareAndSwap rather than trusting callback alternation.
+	connUp atomic.Bool
 }
 
 func NewApp(appMode AppMode, version string) *App {

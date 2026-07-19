@@ -8,13 +8,16 @@ import (
 
 const (
 	// How often the disk-size check may actually run, regardless of how often
-	// recordReceivedMessages is called.
+	// the recording worker calls pruneReceivedMessagesToBudget.
 	pruneCheckInterval = 2 * time.Second
 	// Rows deleted per prune iteration — bounded so each DELETE is a short
 	// transaction that doesn't hold the write lock for long.
 	pruneChunkRows = 5000
-	// Safety bound on prune iterations per check.
-	maxPruneIterations = 200
+	// Bounded work per invocation so a backlogged prune never stalls the
+	// single writer for long; it catches up across successive checks
+	// (8 x pruneChunkRows is >20k rows/s of deletion headroom against the
+	// ~4k msg/s perf bar).
+	maxPruneIterations = 8
 )
 
 // usedBytes estimates the live (non-free) size of the database file:
@@ -88,8 +91,9 @@ func (a *App) pruneReceivedMessagesNow(budget int64) {
 		}
 	}
 	// Release freed pages to the OS where the DB supports it (auto_vacuum
-	// INCREMENTAL). Harmless no-op otherwise.
-	if err := a.Db.Exec("PRAGMA incremental_vacuum").Error; err != nil {
+	// INCREMENTAL). Bounded to 2000 pages so this stays a short pass rather
+	// than releasing the whole freelist in one go. Harmless no-op otherwise.
+	if err := a.Db.Exec("PRAGMA incremental_vacuum(2000)").Error; err != nil {
 		slog.Debug("prune: incremental_vacuum no-op", "error", err)
 	}
 }
