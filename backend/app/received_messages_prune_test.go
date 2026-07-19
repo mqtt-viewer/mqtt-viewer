@@ -27,7 +27,7 @@ func insertReceived(app *App, connID uint, n, payloadLen int) {
 			Payload: payload,
 		})
 	}
-	app.recordReceivedMessages(connID, batch)
+	app.insertReceivedMessages(connID, batch)
 }
 
 func minMaxID(app *App) (int64, int64, int64) {
@@ -80,6 +80,44 @@ func TestPruneBoundsSizeAndDropsOldest(t *testing.T) {
 	}
 	if minAfter <= minBefore {
 		t.Errorf("expected oldest rows dropped (min id rose), before=%d after=%d", minBefore, minAfter)
+	}
+}
+
+func TestPruneNowBoundsIterationsPerCall(t *testing.T) {
+	app := getTestApp(t)
+	conn, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	enableRecording(t, app)
+
+	const totalRows = 50000
+	insertReceived(app, conn.ConnectionDetails.ID, totalRows, 64)
+
+	_, _, countBefore := minMaxID(app)
+	if countBefore != totalRows {
+		t.Fatalf("expected %d rows before prune, got %d", totalRows, countBefore)
+	}
+
+	// A near-zero budget keeps every iteration wanting to delete more, so a
+	// single call must stop at maxPruneIterations chunks rather than
+	// draining the table in one pass.
+	app.pruneReceivedMessagesNow(1)
+
+	_, _, countAfterOne := minMaxID(app)
+	wantAfterOne := int64(totalRows - maxPruneIterations*pruneChunkRows)
+	if countAfterOne != wantAfterOne {
+		t.Fatalf("expected exactly %d chunks deleted in one call, got %d rows remaining (want %d)", maxPruneIterations, countAfterOne, wantAfterOne)
+	}
+
+	// Repeated calls converge on the remainder rather than needing to fully
+	// drain in a single call.
+	for i := 0; i < 20 && countAfterOne > 0; i++ {
+		app.pruneReceivedMessagesNow(1)
+		_, _, countAfterOne = minMaxID(app)
+	}
+	if countAfterOne != 0 {
+		t.Errorf("expected repeated calls to converge to 0 rows, got %d remaining", countAfterOne)
 	}
 }
 

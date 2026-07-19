@@ -23,10 +23,11 @@ func (a *App) loadRetentionSettings() {
 	a.diskBudgetBytes.Store(settings.DiskBudgetBytes)
 }
 
-// recordReceivedMessages persists a drained batch to the durable store when
-// recording is enabled. No-op (and no DB cost) when disabled.
-func (a *App) recordReceivedMessages(connectionID uint, messages []mqtt.MqttMessage) {
-	if !a.recordingEnabled.Load() || len(messages) == 0 {
+// insertReceivedMessages persists a batch to the durable store. Callers
+// (the recording worker) are responsible for the recordingEnabled gate and
+// for pruning afterwards — this only writes.
+func (a *App) insertReceivedMessages(connectionID uint, messages []mqtt.MqttMessage) {
+	if len(messages) == 0 {
 		return
 	}
 	rows := make([]models.ReceivedMessage, 0, len(messages))
@@ -35,9 +36,7 @@ func (a *App) recordReceivedMessages(connectionID uint, messages []mqtt.MqttMess
 	}
 	if err := a.Db.CreateInBatches(rows, receivedMessageInsertBatch).Error; err != nil {
 		slog.Error("failed to persist received messages", "error", err, "count", len(rows))
-		return
 	}
-	a.pruneReceivedMessagesToBudget()
 }
 
 func receivedMessageFromMqtt(connectionID uint, m *mqtt.MqttMessage) models.ReceivedMessage {

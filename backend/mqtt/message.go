@@ -47,7 +47,10 @@ func (m *MqttMessage) Stub() MqttMessageStub {
 // estimatedBytes approximates the heap cost of retaining this message, used to
 // keep the in-memory history under its byte budget. It need not be exact —
 // just proportional and dominated by the variable parts (payload, topic,
-// properties) so eviction tracks real memory growth.
+// properties) so eviction tracks real memory growth. Calibrated 2026-07-19
+// against flood-shaped messages: accounted ~380 B/msg vs ~266 B/msg real live
+// heap (ratio 0.70), i.e. deliberately conservative — see
+// history_calibration_test.go.
 func (m *MqttMessage) estimatedBytes() int {
 	// Fixed per-message overhead: struct fields, id/uuid, time.Time, and the
 	// always-allocated property/middleware map headers for v5 messages.

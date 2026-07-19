@@ -1,13 +1,28 @@
 package mqtt
 
 import (
+	"fmt"
+	"log/slog"
 	"sync"
 	"time"
+)
+
+// Backpressure caps for the drain buffer. Without them a slow drain (SQLite
+// writer contention, prune storms) lets the buffer grow every tick with no
+// upper bound, which is what produced multi-GB heaps and a frozen webview
+// under sustained flood load. Once a cap is hit we load-shed the oldest
+// buffered messages rather than let the batch, and therefore the drain, grow
+// without limit.
+const (
+	maxBufferedMessages = 10000
+	maxBufferedBytes    = 32 << 20 // 32 MiB, summed over buffered payloads
 )
 
 type MessageBuffer struct {
 	mu           *sync.Mutex
 	buffer       []MqttMessage
+	bytes        int64
+	dropped      uint64
 	handleTicker *time.Ticker
 	handleChan   chan bool
 }
@@ -52,8 +67,15 @@ func (mb *MessageBuffer) useBufferContents(useContentsFunc func(messages []MqttM
 	// blocked on the buffer mutex while a drain is in flight.
 	mb.mu.Lock()
 	messages := mb.buffer
+	dropped := mb.dropped
 	mb.buffer = []MqttMessage{}
+	mb.bytes = 0
+	mb.dropped = 0
 	mb.mu.Unlock()
+
+	if dropped > 0 {
+		slog.Warn(fmt.Sprintf("message buffer overflow: dropped %d oldest messages", dropped))
+	}
 	if len(messages) > 0 {
 		useContentsFunc(messages)
 	}
@@ -64,10 +86,19 @@ func (mb *MessageBuffer) addMessageToBuffer(mqttMessage MqttMessage) {
 	defer mb.mu.Unlock()
 
 	mb.buffer = append(mb.buffer, mqttMessage)
+	mb.bytes += int64(len(mqttMessage.Payload))
+
+	for (len(mb.buffer) > maxBufferedMessages || mb.bytes > maxBufferedBytes) && len(mb.buffer) > 0 {
+		oldest := mb.buffer[0]
+		mb.buffer = mb.buffer[1:]
+		mb.bytes -= int64(len(oldest.Payload))
+		mb.dropped++
+	}
 }
 
 func (mb *MessageBuffer) clearMessageBuffer() {
 	mb.mu.Lock()
 	defer mb.mu.Unlock()
 	mb.buffer = []MqttMessage{}
+	mb.bytes = 0
 }

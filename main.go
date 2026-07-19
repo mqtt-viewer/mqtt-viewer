@@ -49,18 +49,7 @@ func main() {
 		},
 	})
 
-	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "MQTT Viewer",
-		Width:            900,
-		Height:           700,
-		MinWidth:         825,
-		MinHeight:        660,
-		BackgroundColour: application.NewRGB(35, 33, 32),
-		Mac: application.MacWindow{
-			TitleBar: application.MacTitleBarHiddenInset,
-		},
-		URL: "/",
-	})
+	createMainWindow(wailsApp)
 
 	if err := wailsApp.Run(); err != nil {
 		slog.Error(err.Error())

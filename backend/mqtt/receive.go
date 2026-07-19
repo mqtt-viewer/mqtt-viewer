@@ -13,10 +13,8 @@ func (mm *MqttManager) receiveMessage(m *MqttMessage) error {
 		return fmt.Errorf("before add to history: %w", err)
 	}
 
-	go func() {
-		mm.MessageHistory.addMessageToHistory(*m)
-		mm.MessageBuffer.addMessageToBuffer(*m)
-	}()
+	mm.MessageHistory.addMessageToHistory(*m)
+	mm.MessageBuffer.addMessageToBuffer(*m)
 
 	mm.stats.ReceiveMessageToStats(*m)
 	err = handleReceiveMiddleware(m, mm.middleware.AfterAddToHistory)
