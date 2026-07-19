@@ -24,10 +24,17 @@
       } else {
         result = await ChooseDirectory(actionLabel);
       }
-      value = result.slice(1);
-      if (result !== undefined) {
-        onFileChosen(result);
+      // A cancelled picker resolves with an empty string; leave the current
+      // value untouched rather than clearing it. Previously this checked
+      // `result !== undefined` (always true, since the binding never
+      // resolves undefined) AFTER already slicing the first character off
+      // an empty/undefined result, which threw on cancel and silently wiped
+      // the shown value with `onFileChosen("")` when it didn't.
+      if (!result) {
+        return;
       }
+      value = result;
+      onFileChosen(result);
     } catch (e) {
       throw e;
     }

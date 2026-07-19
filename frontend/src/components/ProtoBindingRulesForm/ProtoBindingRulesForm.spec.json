@@ -1,0 +1,97 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "ProtoBindingRulesForm",
+  "tier": "component",
+  "description": "Per-connection protobuf topic-binding rules: add, edit, reorder, delete, and test topic matches against loaded message types.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "rules",
+      "type": "object",
+      "required": false,
+      "default": "[]",
+      "description": "ProtoBindingRuleView[] in priority order; the topmost wins ties on an equally specific filter."
+    },
+    {
+      "name": "descriptorNames",
+      "type": "object",
+      "required": false,
+      "default": "[]",
+      "description": "Full message-type names available from the loaded proto registry."
+    },
+    {
+      "name": "status",
+      "type": "object",
+      "required": false,
+      "description": "loadError/dirMissing/folderNotFound summary. dirMissing (no dir configured) picks the empty-state copy; loadError and folderNotFound gate the stale-type warning on rows. The section's own status line (file/type counts) is rendered by the container above this component and isn't passed down."
+    },
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "connected",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Shows the 'Bindings apply immediately' line when true."
+    },
+    {
+      "name": "onAdd",
+      "type": "function",
+      "required": false,
+      "default": "(rule) => void"
+    },
+    {
+      "name": "onUpdate",
+      "type": "function",
+      "required": false,
+      "default": "(id, changes) => void"
+    },
+    {
+      "name": "onDelete",
+      "type": "function",
+      "required": false,
+      "default": "(id) => void"
+    },
+    {
+      "name": "onMove",
+      "type": "function",
+      "required": false,
+      "default": "(id, direction) => void"
+    },
+    {
+      "name": "onTestTopic",
+      "type": "function",
+      "required": false,
+      "default": "(topic) => Promise<match|null>"
+    }
+  ],
+  "tokens": [
+    "white-text",
+    "secondary-text",
+    "error",
+    "warning",
+    "outline",
+    "divider"
+  ],
+  "dependencies": [
+    "BaseInput",
+    "Button",
+    "IconButton",
+    "AddFieldButton",
+    "DropdownMenu",
+    "DropdownMenuItem",
+    "Icon"
+  ],
+  "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The type picker (search input + DropdownMenuItem list, max-h-[320px] overflow-y-auto) is a single component-internal {#snippet}, shared by committed rows and the draft row, and mirrors the AddToCollectionMenu pattern; extracting a shared SearchableDropdownMenu primitive across components is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc)."
+}

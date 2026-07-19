@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
+import {Create as $Create} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -142,6 +142,13 @@ export class CollectionMessage {
     "createdAt": time$0.Time;
     "updatedAt": time$0.Time;
 
+    /**
+     * nil = auto (matcher decides), "" = raw (no protobuf), "<name>" = forced
+     * message type. Persisted so replaying a saved message honours the
+     * original choice.
+     */
+    "protoOverride": string | null;
+
     /** Creates a new CollectionMessage instance. */
     constructor($$source: Partial<CollectionMessage> = {}) {
         if (!("id" in $$source)) {
@@ -201,6 +208,9 @@ export class CollectionMessage {
         if (!("updatedAt" in $$source)) {
             this["updatedAt"] = null;
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -229,6 +239,7 @@ export class Connection {
     "username": string | null;
     "password": string | null;
     "isProtoEnabled": boolean | null;
+    "protoRegDir": string | null;
     "isCertsEnabled": boolean | null;
     "skipCertVerification": boolean | null;
     "certCa": string | null;
@@ -284,6 +295,9 @@ export class Connection {
         if (!("isProtoEnabled" in $$source)) {
             this["isProtoEnabled"] = null;
         }
+        if (!("protoRegDir" in $$source)) {
+            this["protoRegDir"] = null;
+        }
         if (!("isCertsEnabled" in $$source)) {
             this["isCertsEnabled"] = null;
         }
@@ -322,18 +336,18 @@ export class Connection {
      * Creates a new Connection instance from a string or object.
      */
     static createFrom($$source: any = {}): Connection {
-        const $$createField19_0 = $$createType3;
-        const $$createField22_0 = $$createType5;
-        const $$createField23_0 = $$createType7;
+        const $$createField20_0 = $$createType3;
+        const $$createField23_0 = $$createType5;
+        const $$createField24_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("subscriptions" in $$parsedSource) {
-            $$parsedSource["subscriptions"] = $$createField19_0($$parsedSource["subscriptions"]);
+            $$parsedSource["subscriptions"] = $$createField20_0($$parsedSource["subscriptions"]);
         }
         if ("filterHistories" in $$parsedSource) {
-            $$parsedSource["filterHistories"] = $$createField22_0($$parsedSource["filterHistories"]);
+            $$parsedSource["filterHistories"] = $$createField23_0($$parsedSource["filterHistories"]);
         }
         if ("publishHistories" in $$parsedSource) {
-            $$parsedSource["publishHistories"] = $$createField23_0($$parsedSource["publishHistories"]);
+            $$parsedSource["publishHistories"] = $$createField24_0($$parsedSource["publishHistories"]);
         }
         return new Connection($$parsedSource as Partial<Connection>);
     }
@@ -401,6 +415,57 @@ export class PanelSize {
     }
 }
 
+/**
+ * ProtoBindingRule is a per-connection rule mapping a topic filter to a
+ * protobuf message type name. The matcher (backend/topic-matching) resolves
+ * the most specific rule for a given topic; SortOrder breaks ties among
+ * equally specific rules.
+ */
+export class ProtoBindingRule {
+    "id": number;
+    "createdAt": time$0.Time;
+    "updatedAt": time$0.Time;
+    "connectionId": number;
+    "topicFilter": string;
+    "messageType": string;
+    "sortOrder": number;
+
+    /** Creates a new ProtoBindingRule instance. */
+    constructor($$source: Partial<ProtoBindingRule> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("createdAt" in $$source)) {
+            this["createdAt"] = null;
+        }
+        if (!("updatedAt" in $$source)) {
+            this["updatedAt"] = null;
+        }
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topicFilter" in $$source)) {
+            this["topicFilter"] = "";
+        }
+        if (!("messageType" in $$source)) {
+            this["messageType"] = "";
+        }
+        if (!("sortOrder" in $$source)) {
+            this["sortOrder"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProtoBindingRule instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProtoBindingRule {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProtoBindingRule($$parsedSource as Partial<ProtoBindingRule>);
+    }
+}
+
 export class PublishHistory {
     "id": number;
     "connectionId": number;
@@ -423,6 +488,12 @@ export class PublishHistory {
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
     "publishedAt": time$0.Time;
+
+    /**
+     * nil = auto (matcher decides), "" = raw (no protobuf), "<name>" = forced
+     * message type. Persisted so replaying history honours the original choice.
+     */
+    "protoOverride": string | null;
 
     /** Creates a new PublishHistory instance. */
     constructor($$source: Partial<PublishHistory> = {}) {
@@ -476,6 +547,9 @@ export class PublishHistory {
         }
         if (!("publishedAt" in $$source)) {
             this["publishedAt"] = null;
+        }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
         }
 
         Object.assign(this, $$source);

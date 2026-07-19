@@ -6,7 +6,6 @@ test("mqtt data is not filtered with empty search string", () => {
   const unfilteredData: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 0,
@@ -14,7 +13,6 @@ test("mqtt data is not filtered with empty search string", () => {
       children: {
         aaaaa: {
           topic: "aaaaa/aaaaa",
-          isDecodedProto: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 0,
@@ -22,7 +20,6 @@ test("mqtt data is not filtered with empty search string", () => {
           children: {
             hello: {
               topic: "aaaaa/aaaaa/hello",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -42,7 +39,6 @@ test("mqtt data is filtered completely with no matches", () => {
   const unfilteredData: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 0,
@@ -50,7 +46,6 @@ test("mqtt data is filtered completely with no matches", () => {
       children: {
         aaaaa: {
           topic: "aaaaa/aaaaa",
-          isDecodedProto: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 0,
@@ -58,7 +53,6 @@ test("mqtt data is filtered completely with no matches", () => {
           children: {
             hello: {
               topic: "aaaaa/aaaaa/hello",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -78,7 +72,6 @@ test("parents are kept when child matches", () => {
   const unfilteredData: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 1,
@@ -86,7 +79,6 @@ test("parents are kept when child matches", () => {
       children: {
         aaaaa: {
           topic: "aaaaa/aaaaa",
-          isDecodedProto: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -94,7 +86,6 @@ test("parents are kept when child matches", () => {
           children: {
             hello: {
               topic: "aaaaa/aaaaa/hello",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -115,7 +106,6 @@ test("non-matching children on the same level as a matching child are not kept",
   const unfilteredData: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 1,
@@ -123,7 +113,6 @@ test("non-matching children on the same level as a matching child are not kept",
       children: {
         aaaaa: {
           topic: "aaaaa/aaaaa",
-          isDecodedProto: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -131,7 +120,6 @@ test("non-matching children on the same level as a matching child are not kept",
           children: {
             hello: {
               topic: "aaaaa/aaaaa/hello",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -140,7 +128,6 @@ test("non-matching children on the same level as a matching child are not kept",
             },
             world: {
               topic: "aaaaa/aaaaa/world",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               messageCount: 1,
               subtopicCount: 0,
@@ -156,7 +143,6 @@ test("non-matching children on the same level as a matching child are not kept",
   const expectedResult: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 1,
@@ -164,7 +150,6 @@ test("non-matching children on the same level as a matching child are not kept",
       children: {
         aaaaa: {
           topic: "aaaaa/aaaaa",
-          isDecodedProto: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -172,7 +157,6 @@ test("non-matching children on the same level as a matching child are not kept",
           children: {
             hello: {
               topic: "aaaaa/aaaaa/hello",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -192,7 +176,6 @@ test("parent that matches is kept when no children match", () => {
   const unfilteredData: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 1,
@@ -200,7 +183,6 @@ test("parent that matches is kept when no children match", () => {
       children: {
         aaaaa: {
           topic: "aaaaa/aaaaa",
-          isDecodedProto: false,
           latestMessageTime: new Date(),
           message: "test-message",
           messageCount: 1,
@@ -208,7 +190,6 @@ test("parent that matches is kept when no children match", () => {
           children: {
             hello: {
               topic: "aaaaa/aaaaa/hello",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -217,7 +198,6 @@ test("parent that matches is kept when no children match", () => {
             },
             world: {
               topic: "aaaaa/aaaaa/world",
-              isDecodedProto: false,
               latestMessageTime: new Date(),
               messageCount: 1,
               subtopicCount: 0,
@@ -233,14 +213,12 @@ test("parent that matches is kept when no children match", () => {
   const expectedResult: MqttData = {
     aaaaa: {
       topic: "aaaaa",
-      isDecodedProto: false,
       latestMessageTime: new Date(),
       message: undefined,
       messageCount: 1,
       subtopicCount: 1,
       children: {
         aaaaa: {
-          isDecodedProto: false,
           topic: "aaaaa/aaaaa",
           latestMessageTime: new Date(),
           message: "test-message",

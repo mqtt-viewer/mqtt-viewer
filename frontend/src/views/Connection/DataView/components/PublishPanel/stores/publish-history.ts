@@ -63,6 +63,7 @@ export const createPublishHistoryStore = (
     format: string;
     properties?: app.PublishProperties;
     userProperties?: { [key: string]: string };
+    protoOverride?: string | null;
   }) => {
     try {
       console.log("saving publish entry", params);
@@ -93,6 +94,7 @@ export const createPublishHistoryStore = (
         headerSubscriptionIdentifier:
           params.properties?.subscriptionIdentifier ?? null,
         headerTopicAlias: params.properties?.topicAlias ?? null,
+        protoOverride: params.protoOverride ?? null,
       });
       console.log("saved publish history entry", entry);
       update((store) => {

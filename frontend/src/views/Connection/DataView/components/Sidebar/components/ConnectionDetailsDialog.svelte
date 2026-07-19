@@ -6,6 +6,7 @@
   import type { Connection } from "@/stores/connections";
   import ConnectionForm from "@/views/Connection/ConnectionDetailsView/components/ConnectionForm/ConnectionForm.svelte";
   import SubscriptionsForm from "@/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.svelte";
+  import ProtoSection from "@/views/Connection/ConnectionDetailsView/components/ProtoSection/ProtoSection.svelte";
 
   export let connection: Connection;
   export let isOpen: Writable<boolean>;
@@ -29,6 +30,7 @@
     <div class="flex flex-col gap-6">
       <ConnectionForm {connection} />
       <SubscriptionsForm {connection} />
+      <ProtoSection {connection} />
     </div>
   </div>
 </Dialog>

@@ -12,7 +12,8 @@ export type MqttData = {
     topic: string;
     latestMessageTime: Date;
     message?: string; // byte array
-    isDecodedProto: boolean;
+    protoDecode?: "ok" | "failed";
+    protoDescriptorName?: string;
     children: MqttData;
   };
 };
@@ -62,18 +63,40 @@ export const createMqttDataStore = (
       }
       const timestamp = new Date(message.timeMs);
       const decodedMessage = base64ToUtf8(message.payload as unknown as string);
-      const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
+      const { protoDecode, protoDescriptorName } =
+        readProtoDecodeStatus(message);
       update((mqttData) => {
         return insertMqttMessage(
           mqttData,
           topicLevels,
           0,
           decodedMessage,
-          isDecodedProto,
+          protoDecode,
+          protoDescriptorName,
           timestamp
         );
       });
     }
+  };
+
+  // Reads the middleware's decode marker, with a legacy fallback for
+  // messages recorded before ProtoDecode/ProtoDescriptorName existed.
+  const readProtoDecodeStatus = (
+    message: mqtt.MqttMessage
+  ): { protoDecode?: "ok" | "failed"; protoDescriptorName?: string } => {
+    const mw = message?.middlewareProperties as
+      | Record<string, unknown>
+      | undefined;
+    if (mw?.ProtoDecode === "ok" || mw?.ProtoDecode === "failed") {
+      return {
+        protoDecode: mw.ProtoDecode,
+        protoDescriptorName: mw.ProtoDescriptorName as string | undefined,
+      };
+    }
+    if (mw?.IsDecodedProto === true) {
+      return { protoDecode: "ok" };
+    }
+    return {};
   };
 
   const insertMqttMessage = (
@@ -81,7 +104,8 @@ export const createMqttDataStore = (
     topicLevels: string[],
     currentTopicLevel: number,
     message: string,
-    isDecodedProto: boolean,
+    protoDecode: "ok" | "failed" | undefined,
+    protoDescriptorName: string | undefined,
     timestamp: Date
   ) => {
     const topicLevel = topicLevels[currentTopicLevel];
@@ -89,7 +113,8 @@ export const createMqttDataStore = (
       if (currentTopicLevel === topicLevels.length - 1) {
         mqttData[topicLevel].messageCount += 1;
         mqttData[topicLevel].message = message;
-        mqttData[topicLevel].isDecodedProto = isDecodedProto;
+        mqttData[topicLevel].protoDecode = protoDecode;
+        mqttData[topicLevel].protoDescriptorName = protoDescriptorName;
         mqttData[topicLevel].latestMessageTime = timestamp;
 
         return mqttData;
@@ -99,10 +124,17 @@ export const createMqttDataStore = (
         topicLevels,
         currentTopicLevel + 1,
         message,
-        isDecodedProto,
+        protoDecode,
+        protoDescriptorName,
         timestamp
       );
-      mqttData[topicLevel].isDecodedProto = isDecodedProto;
+      // Ancestors only ever pick up "ok": a failed leaf below must not paint
+      // a warning over the whole subtree, and must not clobber an existing
+      // "ok" left by another message under this branch.
+      if (protoDecode === "ok") {
+        mqttData[topicLevel].protoDecode = "ok";
+        mqttData[topicLevel].protoDescriptorName = protoDescriptorName;
+      }
       mqttData[topicLevel].messageCount += 1;
       mqttData[topicLevel].children = children;
       mqttData[topicLevel].subtopicCount = getSubtopicCount(children);
@@ -116,7 +148,8 @@ export const createMqttDataStore = (
         subtopicCount: 0,
         messageCount: 1,
         topic,
-        isDecodedProto,
+        protoDecode,
+        protoDescriptorName,
         message,
         children: {},
         latestMessageTime: timestamp,
@@ -129,7 +162,8 @@ export const createMqttDataStore = (
       topicLevels,
       currentTopicLevel + 1,
       message,
-      false,
+      protoDecode,
+      protoDescriptorName,
       timestamp
     );
     const topic = topicLevels.slice(0, currentTopicLevel + 1).join("/");
@@ -138,7 +172,9 @@ export const createMqttDataStore = (
       messageCount: 1,
       topic,
       message: undefined,
-      isDecodedProto: false,
+      protoDecode: protoDecode === "ok" ? "ok" : undefined,
+      protoDescriptorName:
+        protoDecode === "ok" ? protoDescriptorName : undefined,
       children,
       latestMessageTime: timestamp,
     };

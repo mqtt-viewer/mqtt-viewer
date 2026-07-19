@@ -6,6 +6,7 @@ import {
   mockDisconnectedConnection,
   mockEventSet,
   mockHeaders,
+  mockLoadedProtoFiles,
   mockMqttMessages,
   mockPublishHistory,
   mockSubscriptions,
@@ -13,12 +14,222 @@ import {
 import * as app from "./models";
 import * as models from "../models/models";
 import * as update from "../update/models";
+import * as topicmatching from "../topic-matching/models";
 
 const appConnection = (connection: typeof mockConnection) => ({
   connectionDetails: connection.connectionDetails,
   isConnected: connection.isConnected,
   eventSet: connection.eventSet,
 });
+
+// Proto import state: mutable per-connection mock data so choosing a folder,
+// uploading files, re-importing and removing are all interactive in
+// Storybook. Matches ChooseDirectory's mock return value; any other chosen
+// dir "fails to compile" as folder-not-found.
+const MOCK_PROTO_SUCCESS_DIR = "/Users/sam/certs";
+
+// Not read from mockConnectionDetails.protoRegDir directly: fixtures.ts
+// pulls in stores/connections.ts, which imports this module (aliased in
+// place of the real bindings), so referencing another fixtures.ts export at
+// module-eval time here is a circular-import footgun. Kept in sync with
+// mockConnectionDetails.protoRegDir by hand instead.
+//
+// loadError lets a story simulate a connection whose internal import exists
+// but fails to compile (e.g. a broken .proto edited in place since the last
+// successful import).
+let mockProtoImportByConnectionId: Record<
+  number,
+  { imported: boolean; sourceDir: string; loadError?: string }
+> = {
+  1: { imported: true, sourceDir: "/Users/sam/certs" },
+  // Connection id 102: ProtoSection's "Compile error" story.
+  102: {
+    imported: true,
+    sourceDir: "/Users/sam/broken-protos",
+    loadError: 'broken.proto:12:3: syntax error: unexpected "}"',
+  },
+};
+
+let mockProtoRulesByConnectionId: Record<number, models.ProtoBindingRule[]> = {
+  1: [
+    new models.ProtoBindingRule({
+      id: 1,
+      connectionId: 1,
+      topicFilter: "sensors/+/telemetry",
+      messageType: "mqtt.viewer.DeviceState",
+      sortOrder: 0,
+    }),
+  ],
+};
+
+const buildMockProtoStateResult = (connectionId: number): app.ProtoStateResult => {
+  const rules = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const importState = mockProtoImportByConnectionId[connectionId];
+  if (!importState?.imported) {
+    return new app.ProtoStateResult({
+      dir: "",
+      loadError: "",
+      sourceDir: "",
+      hasImport: false,
+      rules,
+    });
+  }
+  if (importState.loadError) {
+    return new app.ProtoStateResult({
+      dir: `/mock/proto-imports/${connectionId}`,
+      loadError: importState.loadError,
+      sourceDir: importState.sourceDir,
+      hasImport: true,
+      rules,
+    });
+  }
+  const descriptorNames = Object.values(mockLoadedProtoFiles).flat().sort();
+  return new app.ProtoStateResult({
+    dir: `/mock/proto-imports/${connectionId}`,
+    loadError: "",
+    sourceDir: importState.sourceDir,
+    hasImport: true,
+    fileDescriptors: mockLoadedProtoFiles,
+    descriptorNames,
+    rules,
+  });
+};
+
+export async function GetProtoBindingRulesByConnectionId(
+  connectionId: number
+): Promise<models.ProtoBindingRule[]> {
+  return mockProtoRulesByConnectionId[connectionId] ?? [];
+}
+
+export async function AddProtoBindingRule(
+  connectionId: number,
+  rule: models.ProtoBindingRule
+): Promise<models.ProtoBindingRule> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const sortOrder = existing.reduce((max, r) => Math.max(max, r.sortOrder + 1), 0);
+  const created = new models.ProtoBindingRule({
+    ...rule,
+    id: Date.now(),
+    connectionId,
+    sortOrder,
+  });
+  mockProtoRulesByConnectionId[connectionId] = [...existing, created];
+  return created;
+}
+
+export async function UpdateProtoBindingRule(
+  connectionId: number,
+  rule: models.ProtoBindingRule
+): Promise<models.ProtoBindingRule> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  mockProtoRulesByConnectionId[connectionId] = existing.map((r) =>
+    r.id === rule.id ? new models.ProtoBindingRule({ ...r, ...rule }) : r
+  );
+  return rule;
+}
+
+export async function DeleteProtoBindingRule(
+  connectionId: number,
+  id: number
+): Promise<void> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  mockProtoRulesByConnectionId[connectionId] = existing.filter((r) => r.id !== id);
+}
+
+export async function ReorderProtoBindingRules(
+  connectionId: number,
+  orderedIds: number[]
+): Promise<void> {
+  const existing = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const byId = new Map(existing.map((r) => [r.id, r]));
+  mockProtoRulesByConnectionId[connectionId] = orderedIds
+    .map((id, index) => {
+      const rule = byId.get(id);
+      return rule ? new models.ProtoBindingRule({ ...rule, sortOrder: index }) : undefined;
+    })
+    .filter((r): r is models.ProtoBindingRule => !!r);
+}
+
+export async function LoadProtoRegistry(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ImportProtoDir(
+  connectionId: number,
+  sourceDir: string
+): Promise<app.ProtoStateResult> {
+  if (sourceDir !== MOCK_PROTO_SUCCESS_DIR) {
+    throw new Error("folder not found");
+  }
+  mockProtoImportByConnectionId[connectionId] = { imported: true, sourceDir };
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ImportProtoFiles(
+  connectionId: number,
+  files: app.ProtoUploadFile[]
+): Promise<app.ProtoStateResult> {
+  if (!files || files.length === 0) {
+    throw new Error("no files to import");
+  }
+  // Mirrors the backend's validateProtoUploadName so a story can exercise
+  // the rejected-upload path (e.g. an "action error" line) the same way a
+  // real non-.proto upload would.
+  const badName = files.find((f) => !f.name.endsWith(".proto"));
+  if (badName) {
+    throw new Error(`invalid file name: "${badName.name}" (must end in .proto)`);
+  }
+  mockProtoImportByConnectionId[connectionId] = { imported: true, sourceDir: "" };
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ReimportProto(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  const importState = mockProtoImportByConnectionId[connectionId];
+  if (!importState?.sourceDir) {
+    throw new Error("no source folder recorded");
+  }
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function ClearProtoImport(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  mockProtoImportByConnectionId[connectionId] = { imported: false, sourceDir: "" };
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function GetProtoState(
+  connectionId: number
+): Promise<app.ProtoStateResult> {
+  return buildMockProtoStateResult(connectionId);
+}
+
+export async function GetMatchingProtoTypeForTopic(
+  connectionId: number,
+  topic: string
+): Promise<topicmatching.ProtoBindingMatch> {
+  const rules = mockProtoRulesByConnectionId[connectionId] ?? [];
+  const rule = rules.find((r) => r.topicFilter === topic);
+  if (rule) {
+    return new topicmatching.ProtoBindingMatch({
+      MessageType: rule.messageType,
+      Filter: rule.topicFilter,
+      Source: "rule",
+    });
+  }
+  if (topic.startsWith("spBv1.0/")) {
+    return new topicmatching.ProtoBindingMatch({
+      MessageType: "SparkplugBPayload",
+      Filter: "spBv1.0/#",
+      Source: "sparkplug",
+    });
+  }
+  return new topicmatching.ProtoBindingMatch();
+}
 
 export async function AddSubscription(
   connectionId: number

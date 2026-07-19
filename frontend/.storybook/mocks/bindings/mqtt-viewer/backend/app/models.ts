@@ -33,6 +33,38 @@ export class Connections {
   }
 }
 
+export class ProtoStateResult {
+  dir = "";
+  loadError = "";
+  dirMissing = false;
+  sourceDir = "";
+  hasImport = false;
+  fileDescriptors: { [file: string]: string[] } = {};
+  descriptorNames: string[] = [];
+  rules: models.ProtoBindingRule[] = [];
+
+  static createFrom(source: any = {}) {
+    return new ProtoStateResult(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
+export class ProtoUploadFile {
+  name = "";
+  content = "";
+
+  static createFrom(source: any = {}) {
+    return new ProtoUploadFile(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class EnvInfo {
   isDev = true;
   serverAddress = "localhost";
@@ -88,6 +120,7 @@ export class PublishParams {
   payload = "";
   retain = false;
   properties = new PublishProperties();
+  protoOverride: string | null = null;
 
   static createFrom(source: any = {}) {
     return new PublishParams(source);
@@ -114,6 +147,7 @@ export class SavePublishHistoryEntryParams {
   headerTopicAlias: number | null = null;
   headerSubscriptionIdentifier: number | null = null;
   userProperties: string | null = null;
+  protoOverride: string | null = null;
 
   static createFrom(source: any = {}) {
     return new SavePublishHistoryEntryParams(source);
@@ -163,6 +197,7 @@ export class SaveCollectionMessageParams {
   headerTopicAlias: number | null = null;
   headerSubscriptionIdentifier: number | null = null;
   userProperties: string | null = null;
+  protoOverride: string | null = null;
 
   static createFrom(source: any = {}) {
     return new SaveCollectionMessageParams(source);
