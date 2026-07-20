@@ -8,16 +8,17 @@
     collapsed?: boolean;
     minSize: number;
     maxSize: number;
-    resizeEdge?: "left" | "right";
+    resizeEdge?: "left" | "right" | "top";
     size?: number;
     width?: number;
+    height?: number;
   }
 
   export let id: string;
   export let collapsed = false;
   export let minSize: number;
   export let maxSize: number;
-  export let resizeEdge: "left" | "right" = "right";
+  export let resizeEdge: "left" | "right" | "top" = "right";
 
   $: collapsed,
     (() => {
@@ -30,6 +31,8 @@
   let edgeHovered = false;
   let size = defaultSize;
 
+  $: isVertical = resizeEdge === "top";
+
   let resizing = false;
   let linuxFirstMovementX = -999;
   let linuxFirstSize = 0;
@@ -39,7 +42,10 @@
       event.preventDefault();
       if (resizing) {
         let newSize: number;
-        if (resizeEdge === "left") {
+        if (isVertical) {
+          // Dragging up (negative movementY) grows the panel.
+          newSize = size - event.movementY;
+        } else if (resizeEdge === "left") {
           newSize = size - event.movementX;
         } else {
           newSize = size + event.movementX;
@@ -52,15 +58,18 @@
     const onMouseMoveLinux = (event: MouseEvent) => {
       event.preventDefault();
       if (resizing) {
+        const clientPos = isVertical ? event.clientY : event.clientX;
         if (linuxFirstMovementX === -999) {
           linuxFirstSize = size;
-          linuxFirstMovementX = event.clientX;
+          linuxFirstMovementX = clientPos;
           console.log("first movement set to", linuxFirstMovementX);
         } else {
-          const diff = event.clientX - linuxFirstMovementX;
+          const diff = clientPos - linuxFirstMovementX;
           console.log("diff =", diff, "due to", event);
           let newSize: number;
-          if (resizeEdge === "left") {
+          if (isVertical) {
+            newSize = linuxFirstSize - diff;
+          } else if (resizeEdge === "left") {
             newSize = linuxFirstSize - diff;
           } else {
             newSize = linuxFirstSize + diff;
@@ -88,7 +97,9 @@
   };
 
   export let width: number = 0;
-  $: width = !collapsed ? size : 30;
+  export let height: number = 0;
+  $: if (!isVertical) width = !collapsed ? size : 30;
+  $: if (isVertical) height = !collapsed ? size : 30;
   $: minSize,
     maxSize,
     (() => {
@@ -106,34 +117,59 @@
   class={twMerge(
     $$restProps.class,
     "relative",
-    !resizing ? "transition-[width]" : ""
+    !resizing ? (isVertical ? "transition-[height]" : "transition-[width]") : ""
   )}
-  style:width={`${width}px`}
+  style:width={!isVertical ? `${width}px` : undefined}
+  style:height={isVertical ? `${height}px` : undefined}
 >
   <slot />
-  <div
-    class={`absolute top-0 h-full w-[2px] z-10 translate-x-1/2
-        bg-emphasis transition-opacity duration-500
-        ${resizeEdge === "right" ? "right-0" : "left-0"}
-        ${edgeHovered || resizing ? "opacity-100 delay-200" : "opacity-0 delay-0"}
-      `}
-    on:mouseenter={!collapsed ? () => (edgeHovered = true) : undefined}
-    on:mouseleave={!collapsed ? () => (edgeHovered = false) : undefined}
-  />
-  {#if !collapsed}
+  {#if isVertical}
     <div
-      class={twMerge(
-        `absolute top-0 h-full w-2 z-20 translate-x-1/2
-      cursor-col-resize
-      ${resizeEdge === "right" ? "right-0" : "-left-[8px]"}`,
-        resizeEdge === "left" && size === minSize ? "cursor-w-resize" : "",
-        resizeEdge === "left" && size === maxSize ? "cursor-e-resize" : "",
-        resizeEdge === "right" && size === minSize ? "cursor-e-resize" : "",
-        resizeEdge === "right" && size === maxSize ? "cursor-w-resize" : ""
-      )}
-      on:mouseenter={() => (edgeHovered = true)}
-      on:mouseleave={() => (edgeHovered = false)}
-      on:mousedown={onStartResize}
+      class={`absolute left-0 top-0 w-full h-[2px] z-10
+          bg-emphasis transition-opacity duration-500
+          ${edgeHovered || resizing ? "opacity-100 delay-200" : "opacity-0 delay-0"}
+        `}
+      on:mouseenter={!collapsed ? () => (edgeHovered = true) : undefined}
+      on:mouseleave={!collapsed ? () => (edgeHovered = false) : undefined}
     />
+    {#if !collapsed}
+      <div
+        class={twMerge(
+          `absolute left-0 -top-[8px] h-2 w-full z-20
+        cursor-row-resize`,
+          size === minSize ? "cursor-n-resize" : "",
+          size === maxSize ? "cursor-s-resize" : ""
+        )}
+        on:mouseenter={() => (edgeHovered = true)}
+        on:mouseleave={() => (edgeHovered = false)}
+        on:mousedown={onStartResize}
+      />
+    {/if}
+  {:else}
+    <div
+      class={`absolute top-0 h-full w-[2px] z-10 translate-x-1/2
+          bg-emphasis transition-opacity duration-500
+          ${resizeEdge === "right" ? "right-0" : "left-0"}
+          ${edgeHovered || resizing ? "opacity-100 delay-200" : "opacity-0 delay-0"}
+        `}
+      on:mouseenter={!collapsed ? () => (edgeHovered = true) : undefined}
+      on:mouseleave={!collapsed ? () => (edgeHovered = false) : undefined}
+    />
+    {#if !collapsed}
+      <div
+        class={twMerge(
+          `absolute top-0 h-full w-2 z-20 translate-x-1/2
+        cursor-col-resize
+        ${resizeEdge === "right" ? "right-0" : "-left-[8px]"}`,
+          resizeEdge === "left" && size === minSize ? "cursor-w-resize" : "",
+          resizeEdge === "left" && size === maxSize ? "cursor-e-resize" : "",
+          resizeEdge === "right" && size === minSize ? "cursor-e-resize" : "",
+          resizeEdge === "right" && size === maxSize ? "cursor-w-resize" : ""
+        )}
+        on:mouseenter={() => (edgeHovered = true)}
+        on:mouseleave={() => (edgeHovered = false)}
+        on:mousedown={onStartResize}
+      />
+    {/if}
   {/if}
 </div>

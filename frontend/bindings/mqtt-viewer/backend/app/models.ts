@@ -219,6 +219,39 @@ export class OpenChartWindowParams {
     }
 }
 
+/**
+ * OpenTopicWindowParams carries the state needed to pop the selected-topic
+ * panel out into its own window: which connection it follows, and the topic
+ * selected at the moment of opening. The topic rides along in the URL so a
+ * freshly created window can seed itself: a TopicWindowSelect event emitted
+ * right after creation would be dropped by a webview whose JS runtime has
+ * not mounted yet.
+ */
+export class OpenTopicWindowParams {
+    "connectionId": number;
+    "topic": string;
+
+    /** Creates a new OpenTopicWindowParams instance. */
+    constructor($$source: Partial<OpenTopicWindowParams> = {}) {
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new OpenTopicWindowParams instance from a string or object.
+     */
+    static createFrom($$source: any = {}): OpenTopicWindowParams {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new OpenTopicWindowParams($$parsedSource as Partial<OpenTopicWindowParams>);
+    }
+}
+
 export class PublishParams {
     "topic": string;
     "qos": number;

@@ -312,6 +312,15 @@ export function OpenChartWindow(params: $models.OpenChartWindowParams): $Cancell
     return $Call.ByID(1350566632, params);
 }
 
+/**
+ * OpenTopicWindow opens (or focuses) a separate window rendering the
+ * selected-topic panel for a connection, following topic selection in the
+ * main window like Chrome DevTools follows the page.
+ */
+export function OpenTopicWindow(params: $models.OpenTopicWindowParams): $CancellablePromise<void> {
+    return $Call.ByID(398361403, params);
+}
+
 export function PublishMqtt(connId: number, message: $models.PublishParams): $CancellablePromise<void> {
     return $Call.ByID(3575117605, connId, message);
 }
@@ -343,6 +352,19 @@ export function SaveFilterHistoryEntry(connectionId: number, text: string): $Can
 export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): $CancellablePromise<models$0.PublishHistory> {
     return $Call.ByID(3794014424, params).then(($result: any) => {
         return $$createType21($result);
+    });
+}
+
+/**
+ * SetTopicPanelDock validates and persists the dockable selected-topic
+ * panel's global dock state, then emits TopicPanelDockChanged so every
+ * window converges. If the new mode is no longer "window", any open topic
+ * pop-out windows are closed (their own WindowClosing handler sees the mode
+ * has already left "window" and so does not revert it again).
+ */
+export function SetTopicPanelDock(mode: string, lastDockedSide: string): $CancellablePromise<models$0.AppSettings> {
+    return $Call.ByID(4192099940, mode, lastDockedSide).then(($result: any) => {
+        return $$createType0($result);
     });
 }
 

@@ -1,4 +1,4 @@
-h1:Kal5bFF7dN9LWU+VmYG4gk0B68rg8WMAfQ0SwRWze5M=
+h1:XW2p6nJ8OCH/MWY9xPY6P5VTgiVLpmO0hKNuXNt9kQg=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -12,4 +12,5 @@ h1:Kal5bFF7dN9LWU+VmYG4gk0B68rg8WMAfQ0SwRWze5M=
 20260613000000_add-received-messages-and-settings.sql h1:d1KzWMXKevL+GkkBxEWeTOpCAGPzSqV+i6AGnQIsgI8=
 20260702032219_add-changelog-version.sql h1:ELFjvpUawUhnM7QIlqDMU2pc7j2Lm5708LKEGTJoyvg=
 20260704051603_add-star-prompt-tracking.sql h1:zG2yaLTFTUlZiFeCC0KePn6TMzT2TOpf7rl97xZBIXQ=
-20260716075440_add-sys-metric-mappings.sql h1:uClFzUq/SdPF8MNJBI9QbPKaAWESVQBMgCF2HOm26KQ=
+20260704061500_add-topic-panel-dock.sql h1:9DWwNHwMze/UWa2H00YePR2eqgcoMF0XMvjC5YaFIxM=
+20260716075440_add-sys-metric-mappings.sql h1:pDtdKEvU+p2dYU6BzD/fZ1rMHwqyftJHImJKltaTYLA=

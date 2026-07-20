@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Events } from "@wailsio/runtime";
+  import * as events from "bindings/mqtt-viewer/events/models";
   import Sidebar from "./components/Sidebar/Sidebar.svelte";
   import SelectedTopicDisplay from "./components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import MqttDataPanel from "./components/MqttDataPanel/MqttDataPanel.svelte";
@@ -7,20 +9,24 @@
   import ResizableContainer from "@/components/ResizableContainer/ResizableContainer.svelte";
   import { createMatchedTopicsStore } from "./stores/matched-topics";
   import panelSizes from "@/stores/panel-sizes";
+  import topicPanelDock from "@/stores/topic-panel-dock";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import connections from "@/stores/connections";
+  import tabs from "@/stores/tabs";
   import {
     DeleteRetainedMessage,
     ExportTopicMessages,
     OpenChartWindow,
+    OpenTopicWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
 
   const PUBLISH_PANEL_ID = "publish-panel";
   const SELECTED_TOPIC_PANEL_ID = "selected-topic-panel";
+  const SELECTED_TOPIC_PANEL_BOTTOM_ID = "selected-topic-panel-bottom";
 
   const selectedTopicStore = createSelectedTopicStore(
     connection.connectionDetails.id,
@@ -45,6 +51,19 @@
   let isPublishPanelOpen =
     $panelSizes.resizablePanelSizes["publish-panel"]?.isOpen ?? true;
   $: isSelectedTopicPanelOpen = $selectedTopicStore.selectedTopic !== null;
+  $: dockMode = $topicPanelDock.mode;
+  // Mutually exclusive by construction (derived from the same dockMode), so
+  // at most one SelectedTopicPanel instance ever mounts: the layout still
+  // needs two {#if} sites below because "right" and "bottom" live in
+  // different DOM parents (outer row vs. the middle column), but exactly one
+  // of these two flags - or neither, in "window" mode - can ever be true.
+  $: renderedDockSide = isSelectedTopicPanelOpen
+    ? dockMode === "right" || dockMode === "bottom"
+      ? dockMode
+      : null
+    : null;
+  $: isDockedRight = renderedDockSide === "right";
+  $: isDockedBottom = renderedDockSide === "bottom";
   $: isPublishDisabled = connection.connectionState !== "connected";
   $: isConnecting =
     connection.connectionState === "connecting" ||
@@ -72,14 +91,16 @@
 
   // Unfortunately I can't get the behaviour I'd like due
   // to fit-content/flex limitations, so I'm manually calculating the
-  // width of data view to make it behave correctly.
+  // width of data view to make it behave correctly. Only mode "right" takes
+  // width away from the data view; "bottom" only takes height, and "window"
+  // renders no docked panel in the main window at all.
   $: getDataViewWidth = (params: {
     rootAppWidth: number;
     publishPanelWidth: number;
-    isSelectedTopicPanelOpen: boolean;
+    isDockedRight: boolean;
     selectedTopicPanelWidth: number;
   }) => {
-    let selectedWidth = params.isSelectedTopicPanelOpen
+    let selectedWidth = params.isDockedRight
       ? params.selectedTopicPanelWidth
       : 0;
 
@@ -89,9 +110,54 @@
   $: dataViewWidth = getDataViewWidth({
     rootAppWidth: $panelSizes.rootWindowWidth,
     publishPanelWidth,
-    isSelectedTopicPanelOpen,
+    isDockedRight,
     selectedTopicPanelWidth,
   });
+
+  // Only the active tab drives the pop-out: background tabs keep their
+  // DataView mounted (display: none in Connection.svelte), so without this
+  // guard a global switch to "window" mode would spawn a pop-out for every
+  // tab that has a topic selected.
+  $: isActiveTab =
+    $tabs.selectedTab === connection.connectionDetails.id &&
+    !$tabs.isNewTabSelected;
+
+  // When docked in a separate window, the pop-out follows topic selection in
+  // this (main) window, like DevTools follows the page: open the window if
+  // needed and emit the topic (including empty, on deselect) whenever it
+  // changes while mode is "window". The topic also rides along in the open
+  // params so a freshly created window can seed itself from its URL; the
+  // event alone would be dropped by a webview that hasn't mounted yet.
+  let lastEmittedTopic: string | null | undefined = undefined;
+  $: if (dockMode === "window" && isActiveTab) {
+    const topic = $selectedTopicStore.selectedTopic;
+    if (topic !== lastEmittedTopic) {
+      lastEmittedTopic = topic;
+      OpenTopicWindow({
+        connectionId: connection.connectionDetails.id,
+        topic: topic ?? "",
+      })
+        .then(() => {
+          Events.Emit(events.GlobalEvent.TopicWindowSelect, {
+            connectionId: connection.connectionDetails.id,
+            topic: topic ?? "",
+          });
+        })
+        .catch((e) => {
+          addToast({
+            data: {
+              title: "Failed to open topic window",
+              description: e as string,
+              type: "error",
+            },
+          });
+        });
+    }
+  } else {
+    // Reset so switching back to "window" mode (or back to this tab) re-sends
+    // the current topic.
+    lastEmittedTopic = undefined;
+  }
 
   const deleteRetainedMessage = async (topic: string) => {
     try {
@@ -141,7 +207,7 @@
       resizeEdge="right"
       collapsed={!isPublishPanelOpen}
       minSize={275}
-      maxSize={isSelectedTopicPanelOpen
+      maxSize={isDockedRight
         ? $panelSizes.rootWindowWidth / 3
         : $panelSizes.rootWindowWidth / 2}
       bind:width={publishPanelWidth}
@@ -155,27 +221,60 @@
         close={() => (isPublishPanelOpen = false)}
       />
     </ResizableContainer>
-    <div
-      class="grow h-full max-h-full min-w-0 overflow-x-hidden overflow-y-auto"
-    >
-      {#if showNotConnectedState}
-        <div
-          class="size-full flex flex-col items-center justify-center gap-4 bg-elevation-0 text-secondary-text"
-        >
-          <Icon type="disconnected" size={32} />
-          <div class="text-lg text-emphasis">Not connected</div>
-          <div class="text-base max-w-[320px] text-center">
-            Connect to this broker to start browsing topics and messages.
+    <div class="flex flex-col grow min-w-0 min-h-0">
+      <div
+        class="grow min-h-0 max-w-full overflow-x-hidden overflow-y-auto"
+      >
+        {#if showNotConnectedState}
+          <div
+            class="size-full flex flex-col items-center justify-center gap-4 bg-elevation-0 text-secondary-text"
+          >
+            <Icon type="disconnected" size={32} />
+            <div class="text-lg text-emphasis">Not connected</div>
+            <div class="text-base max-w-[320px] text-center">
+              Connect to this broker to start browsing topics and messages.
+            </div>
+            <Button on:click={connect} disabled={isConnecting}>
+              {isConnecting ? "Connecting…" : "Connect"}
+            </Button>
           </div>
-          <Button on:click={connect} disabled={isConnecting}>
-            {isConnecting ? "Connecting…" : "Connect"}
-          </Button>
-        </div>
-      {:else}
-        <MqttDataPanel {connection} {selectedTopicStore} width={dataViewWidth} />
+        {:else}
+          <MqttDataPanel
+            {connection}
+            {selectedTopicStore}
+            width={dataViewWidth}
+          />
+        {/if}
+      </div>
+      {#if isDockedBottom}
+        <ResizableContainer
+          id={SELECTED_TOPIC_PANEL_BOTTOM_ID}
+          resizeEdge="top"
+          minSize={220}
+          maxSize={(2 * $panelSizes.rootWindowHeight) / 3}
+        >
+          <SelectedTopicDisplay
+            connectionId={connection.connectionDetails.id}
+            {selectedTopicStore}
+            {deleteRetainedMessage}
+            {exportTopicMessages}
+            firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
+            mqttVersion={connection.connectionDetails.mqttVersion === "3"
+              ? "3"
+              : "5"}
+            openChartWindow={(topic, fields) =>
+              OpenChartWindow({
+                connectionId: connection.connectionDetails.id,
+                topic,
+                fields,
+              })}
+            dockMode={$topicPanelDock.mode}
+            onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
+          />
+        </ResizableContainer>
       {/if}
     </div>
-    {#if isSelectedTopicPanelOpen}
+    {#if isDockedRight}
       <ResizableContainer
         id={SELECTED_TOPIC_PANEL_ID}
         resizeEdge="left"
@@ -200,6 +299,8 @@
               topic,
               fields,
             })}
+          dockMode={$topicPanelDock.mode}
+          onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
         />
       </ResizableContainer>
     {/if}

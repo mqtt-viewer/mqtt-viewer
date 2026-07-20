@@ -69,9 +69,17 @@ const updateAppWidth = (width: SizePx) => {
   });
 };
 
+const updateAppHeight = (height: SizePx) => {
+  update((store) => {
+    store.rootWindowHeight = height;
+    return store;
+  });
+};
+
 export default {
   subscribe,
   init,
   updatePanelSize,
   updateAppWidth,
+  updateAppHeight,
 };

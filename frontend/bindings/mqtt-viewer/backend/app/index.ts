@@ -13,6 +13,7 @@ export {
     EnvInfo,
     MqttStats,
     OpenChartWindowParams,
+    OpenTopicWindowParams,
     PublishParams,
     PublishProperties,
     SaveCollectionMessageParams,

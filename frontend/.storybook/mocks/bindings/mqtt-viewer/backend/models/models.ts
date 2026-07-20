@@ -12,6 +12,8 @@ export class AppSettings {
   lastSeenChangelogVersion = "";
   launchCount = 0;
   hasSeenStarPrompt = false;
+  topicPanelDockMode = "right";
+  topicPanelLastDockedSide = "right";
 
   static createFrom(source: any = {}) {
     return new AppSettings(source);

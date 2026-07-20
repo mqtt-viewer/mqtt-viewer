@@ -102,6 +102,16 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Put the topic panel where you want it",
+        body: "The selected-topic panel can now dock on the right as before, sit along the bottom under the message area, or pop out into its own window that follows whatever topic you select. Switch between them from the \"Dock side\" row in the panel's menu.",
+        thanks: [
+          {
+            name: "ElectronicBattle",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/46",
+          },
+        ],
+      },
+      {
         title: "Windows on ARM",
         body: "Releases now include a native Windows ARM64 build, installer and auto-updates included, so Snapdragon laptops no longer need emulation.",
         thanks: [
