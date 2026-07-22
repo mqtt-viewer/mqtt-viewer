@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"path/filepath"
+
 	db "mqtt-viewer/backend/db"
 	"mqtt-viewer/backend/env"
 	eventRuntime "mqtt-viewer/backend/event-runtime"
@@ -175,6 +177,16 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	}
 	mqttManager := mqtt.NewMqttManager(withMqttModule, onLatencyUpdate)
 	mqttManager.SetMessageMemoryBudget(a.memoryBudgetBytes())
+
+	// Wire per-connection client logs: capture MQTT-library output into a
+	// bounded ring + rotating text file, and emit batches to the frontend.
+	debugLogging := conn.DebugLoggingEnabled
+	logPath := filepath.Join(a.Paths.ResourcePath, "logs", "connections", fmt.Sprintf("conn-%d.txt", conn.ID))
+	mqttManager.InitLogging(conn.ID, logPath, debugLogging, func(entries []mqtt.LogEntry) {
+		if a.Mode != AppModes.Test {
+			a.EventRuntime.EventsEmit(connEvents.MqttLogs, entries)
+		}
+	})
 
 	appConnection := AppConnection{
 		ctx:          &withName,

@@ -115,8 +115,12 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 	connectErrChan := make(chan error)
 	var initialOnce sync.Once
 	config := autopaho.ClientConfig{
-		// Debug:                         NewMqttLogger(),
-		// PahoDebug:                     NewMqttLogger(),
+		// Library loggers feed this connection's client-log store. Debug-level
+		// lines are dropped at the sink when the per-connection debug toggle is
+		// off, so assigning them unconditionally is safe.
+		Debug:                         newPahoLogSink(mm.LogStore.Debug),
+		PahoDebug:                     newPahoLogSink(mm.LogStore.Debug),
+		PahoErrors:                    newPahoLogSink(mm.LogStore.Error),
 		CleanStartOnInitialConnection: true,
 		BrokerUrls:                    []*url.URL{broker},
 		KeepAlive:                     30,
@@ -191,6 +195,7 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 	select {
 	case err := <-connectErrChan:
 		if err != nil {
+			mm.LogStore.Error("connect failed: " + err.Error())
 			cm.Disconnect(ctx)
 			return nil, err
 		}
@@ -198,6 +203,7 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 		cm.Disconnect(ctx)
 		return nil, nil
 	case <-time.After(CONNECTION_TIMEOUT):
+		mm.LogStore.Error("timeout while connecting to broker")
 		return nil, fmt.Errorf("timeout while connecting to broker")
 	}
 
@@ -205,6 +211,11 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 }
 
 func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConnectionDetails, subscriptions []SubscribeParams) (*mqttV3.Client, error) {
+	// paho v3 loggers are process-global; install the broadcast dispatcher once
+	// and register this connection so its verbose lines are captured while its
+	// debug toggle is on (no-op when off — it's never registered).
+	installV3GlobalLoggers()
+
 	urlString := buildBrokerURL(connectionDetails.Protocol, connectionDetails.Host, connectionDetails.Port, connectionDetails.WebsocketPath)
 	opts := mqttV3.NewClientOptions()
 
@@ -268,15 +279,22 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 		client.Disconnect(500)
 		return nil, nil
 	case <-time.After(CONNECTION_TIMEOUT):
+		mm.LogStore.Error("timeout while connecting to broker")
 		return nil, fmt.Errorf("timeout while connecting to broker")
 	case err := <-subErrChan:
 		if err != nil {
+			mm.LogStore.Error("connect failed: " + err.Error())
 			client.Disconnect(500)
 			return nil, err
 		}
 	}
 	if token.Error() != nil {
+		mm.LogStore.Error("connect failed: " + token.Error().Error())
 		return nil, token.Error()
+	}
+	// Connected: capture verbose v3 debug for this connection if its toggle is on.
+	if mm.LogStore.DebugEnabled() {
+		v3Registry.register(mm.LogStore)
 	}
 	return &client, nil
 }

@@ -128,6 +128,42 @@ func (a *App) ClearConnectionHistory(connId uint) error {
 	return nil
 }
 
+// GetConnectionLogs returns the buffered client-log lines for a connection
+// (snapshot of the in-RAM ring that backs the logs dialog).
+func (a *App) GetConnectionLogs(connId uint) ([]mqtt.LogEntry, error) {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection.MqttManager.GetLogs(), nil
+}
+
+// ClearConnectionLogs empties a connection's client-log ring and truncates its
+// durable log file.
+func (a *App) ClearConnectionLogs(connId uint) error {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.MqttManager.ClearLogs()
+	return nil
+}
+
+// SetConnectionDebugLogging persists and applies the per-connection verbose
+// debug-logging toggle. Takes effect immediately for v5; for v3 it (de)registers
+// the process-global debug dispatcher.
+func (a *App) SetConnectionDebugLogging(connId uint, enabled bool) error {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	if err := a.Db.Model(&models.Connection{}).Where("id = ?", connId).Update("debug_logging_enabled", enabled).Error; err != nil {
+		return err
+	}
+	appConnection.MqttManager.SetDebugLoggingEnabled(enabled)
+	return nil
+}
+
 type PublishParams struct {
 	Topic      string            `json:"topic"`
 	QoS        int               `json:"qos"`

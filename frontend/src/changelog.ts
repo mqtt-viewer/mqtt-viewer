@@ -102,6 +102,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "See what your connection is doing",
+        body: "There's a \"View logs\" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.",
+      },
+      {
         title: "Windows on ARM",
         body: "Releases now include a native Windows ARM64 build, installer and auto-updates included, so Snapdragon laptops no longer need emulation.",
         thanks: [

@@ -24,6 +24,7 @@ export const mockEventSet = {
   mqttMessages: "storybook:mqttMessages",
   mqttLatency: "storybook:mqttLatency",
   mqttClearHistory: "storybook:mqttClearHistory",
+  mqttLogs: "storybook:mqttLogs",
 };
 
 export const mockSubscriptions = [

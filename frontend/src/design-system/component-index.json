@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-16T14:21:13.721Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -4364,6 +4364,49 @@
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.stories.svelte",
       "storyId": "Views/Connection/DataView/Sidebar/ConnectionDetailsDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionLogsDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionLogsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "connection",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "divider",
+        "error",
+        "warning",
+        "elevation-0",
+        "elevation-2"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConnectionLogsDialog",
       "specMissing": false
     },
     {
