@@ -28,14 +28,19 @@
   // Deterministic scatter of faint twinkling stars across the panel. Kept
   // small and dim so the copy stays readable over them. Derived from the index
   // (no randomness) so the layout is stable across renders and story snapshots.
-  const twinkles = Array.from({ length: 36 }, (_, i) => ({
+  // Candidates landing under the text and buttons (right of the sky panel and
+  // below the top strip) are skipped so no star reads as stray punctuation;
+  // extra candidates keep the count at 36.
+  const twinkles = Array.from({ length: 100 }, (_, i) => ({
     left: (i * 47 + 13) % 100,
     top: (i * 71 + 7) % 100,
     size: (i % 3) * 0.6 + 1,
     delay: ((i * 13) % 40) / 10,
     duration: 2.4 + ((i * 7) % 30) / 10,
     max: 0.5 + ((i * 5) % 5) / 10,
-  }));
+  }))
+    .filter((t) => !(t.left > 36 && t.top > 9))
+    .slice(0, 36);
 
   // Five shooting stars, staggered, confined to the sky panel on the left.
   const shootingStars = [0, 1, 2, 3, 4];
@@ -97,7 +102,15 @@
   };
 </script>
 
-<Dialog isOpen={starPromptOpen} startEmpty>
+<!-- openFocus lands initial focus on the dialog panel itself (melt gives it
+     tabindex="-1") so no focus ring shows on open; Tab still reaches the
+     close button and actions as normal. -->
+<Dialog
+  isOpen={starPromptOpen}
+  startEmpty
+  ariaLabel="Like the app?"
+  openFocus="[data-melt-dialog-content]"
+>
   <div class="star-prompt">
     <!-- Night sky: faint twinkling stars scattered across the panel. -->
     <div class="twinkles" aria-hidden="true">
@@ -117,7 +130,7 @@
       </div>
     </div>
 
-    <button class="close" aria-label="close" on:click={onLater}>
+    <button type="button" class="close" aria-label="close" on:click={onLater}>
       <Icon type="close" size={16} />
     </button>
 
@@ -130,16 +143,14 @@
       </p>
 
       <div class="actions">
-        <Button
-          variant="text"
-          class="!text-[rgba(226,228,245,0.72)] enabled:hover:!text-white"
-          on:click={onLater}>Maybe later</Button
+        <Button variant="text" class="later-button" on:click={onLater}
+          >Maybe later</Button
         >
         <Button
           variant="primary"
           iconType="github"
           iconSize={18}
-          class="!bg-white/10 !border-white/25 !text-white enabled:hover:!bg-white/20 enabled:hover:!text-white backdrop-blur-sm shadow-[0_0_18px_-6px_rgba(160,180,255,0.8)]"
+          class="star-button !bg-white/10 !border-white/25 !text-white enabled:hover:!bg-white/20 enabled:hover:!text-white backdrop-blur-sm"
           on:click={onStar}
         >
           Star on GitHub
@@ -311,6 +322,18 @@
     justify-content: flex-end;
     gap: 0.75rem;
   }
+  /* Button colour treatments live here with the rest of the night-sky
+     palette rather than as raw values in class attributes. !important is
+     needed to beat the Button component's own variant utilities. */
+  .star-prompt :global(.later-button) {
+    color: rgba(226, 228, 245, 0.72) !important;
+  }
+  .star-prompt :global(.later-button:enabled:hover) {
+    color: #ffffff !important;
+  }
+  .star-prompt :global(.star-button) {
+    box-shadow: 0 0 18px -6px rgba(160, 180, 255, 0.8);
+  }
   .close {
     position: absolute;
     top: 14px;
@@ -330,7 +353,10 @@
     background-color: rgba(255, 255, 255, 0.1);
   }
 
-  /* Respect reduced-motion: hold the scene still. */
+  /* Respect reduced-motion: hold the scene still rather than emptying it.
+     Twinkles freeze at their own peak brightness, and three streaks get a
+     faint static tail at staggered points along the diagonal so the left
+     side keeps its composition. */
   @media (prefers-reduced-motion: reduce) {
     .twinkles span,
     .shooting-star,
@@ -339,7 +365,14 @@
       animation: none;
     }
     .twinkles span {
-      opacity: 0.6;
+      opacity: var(--max);
+    }
+    .shooting-star:nth-child(1),
+    .shooting-star:nth-child(3),
+    .shooting-star:nth-child(5) {
+      width: 66px;
+      opacity: 0.5;
+      transform: translateX(calc(30px + var(--i) * 28px));
     }
   }
 </style>

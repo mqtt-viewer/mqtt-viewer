@@ -37,7 +37,13 @@
   name="Open"
   args={storyArgs}
   {template}
-  play={async () => {
+  beforeEach={() => {
     starPromptOpen.set(true);
+    // The store is module-level, so the cleanup (run when switching stories)
+    // puts it back so stories rendered after this one do not inherit an open
+    // dialog.
+    return () => {
+      starPromptOpen.set(false);
+    };
   }}
 />
