@@ -83,12 +83,10 @@
     const id = details.id;
     // Re-seed the toggle from the latest persisted value on each open.
     debugChecked.set(details.debugLoggingEnabled ?? false);
-    try {
-      await SetLogsStreaming(id, true);
-      streamingOn = true;
-    } catch (e) {
-      // Snapshot still works; only the live feed is lost.
-    }
+    // Snapshot first: it drains the server's pending queue, so every batch
+    // emitted after streaming starts contains only post-snapshot lines.
+    // Enabling streaming before the snapshot could put a batch on the wire
+    // whose lines the snapshot already includes.
     let snapshot: LogEntry[] = [];
     try {
       snapshot = await GetConnectionLogs(id);
@@ -97,10 +95,7 @@
     }
     // The dialog may have been closed (or the component destroyed) while the
     // snapshot was in flight; don't install a listener that would outlive it.
-    if (!$isOpen || destroyed) {
-      stopStreaming();
-      return;
-    }
+    if (!$isOpen || destroyed) return;
     entries = withUids(snapshot);
     autoScroll = true;
     off?.();
@@ -111,6 +106,18 @@
         if (!batch.length) return;
         appendBatch(batch);
       });
+    }
+    try {
+      await SetLogsStreaming(id, true);
+      streamingOn = true;
+    } catch (e) {
+      // Snapshot still works; only the live feed is lost.
+    }
+    if (!$isOpen || destroyed) {
+      stopStreaming();
+      off?.();
+      off = null;
+      return;
     }
     void scrollToBottom();
   };
@@ -152,23 +159,33 @@
   const PIN_THRESHOLD_PX = 40;
   const getViewport = (): HTMLElement | null =>
     listWrapEl?.querySelector("svelte-virtual-list-viewport") ?? null;
+  // The virtual list re-estimates row heights and fires scroll events of its
+  // own, so a scroll event alone can't distinguish the user from the library.
+  // Only a recent user gesture (wheel, touch, scrollbar drag, keys) may pause
+  // the tail; returning to the bottom always re-arms it.
+  let userScrollIntentAt = 0;
+  const markUserIntent = () => (userScrollIntentAt = performance.now());
   const onScrollCapture = () => {
     const vp = getViewport();
     if (!vp) return;
-    // Scrolling up pauses the tail; returning to the bottom re-arms it.
-    autoScroll =
-      vp.scrollHeight - vp.scrollTop - vp.clientHeight < PIN_THRESHOLD_PX;
+    const gap = vp.scrollHeight - vp.scrollTop - vp.clientHeight;
+    if (gap < PIN_THRESHOLD_PX) {
+      autoScroll = true;
+    } else if (performance.now() - userScrollIntentAt < 500) {
+      autoScroll = false;
+    }
   };
   const scrollToBottom = async () => {
-    // Two passes: the virtual list estimates unrendered row heights, so the
-    // first scroll can land short; the second corrects once the tail rendered.
-    for (let i = 0; i < 2; i++) {
+    // Multiple passes: the virtual list estimates unrendered row heights, so
+    // each scroll can land short until the tail is actually rendered.
+    for (let i = 0; i < 5; i++) {
       await tick();
       const vp = getViewport();
       if (!vp) return;
       vp.scrollTop = vp.scrollHeight;
+      if (vp.scrollHeight - vp.scrollTop - vp.clientHeight < PIN_THRESHOLD_PX)
+        break;
     }
-    autoScroll = true;
   };
 
   // --- actions ------------------------------------------------------------
@@ -313,9 +330,14 @@
     </div>
 
     <!-- Log body -->
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
       bind:this={listWrapEl}
       on:scroll|capture={onScrollCapture}
+      on:wheel|capture={markUserIntent}
+      on:touchstart|capture={markUserIntent}
+      on:mousedown|capture={markUserIntent}
+      on:keydown|capture={markUserIntent}
       class="grow min-h-0 overflow-hidden mx-4 mb-4 rounded bg-elevation-0 border border-divider py-1 font-mono text-sm leading-relaxed"
     >
       {#if filtered.length === 0}
