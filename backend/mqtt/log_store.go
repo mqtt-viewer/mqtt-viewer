@@ -237,13 +237,16 @@ func (s *LogStore) log(level LogLevel, msg string) {
 		return
 	}
 	msg = truncateLogLine(msg)
+
+	s.mu.Lock()
+	// Stamp inside the lock so append order matches timestamp order; a stamp
+	// taken before the lock can be appended late by a preempted goroutine and
+	// show up as a backwards jump in the dialog.
 	entry := LogEntry{
 		TimestampMs: time.Now().UnixMilli(),
 		Level:       string(level),
 		Message:     msg,
 	}
-
-	s.mu.Lock()
 	s.appendRingLocked(entry)
 	if len(s.pending) >= logPendingCap {
 		// Drop-oldest: the ring above still holds the line, but it will never
