@@ -81,7 +81,8 @@
   "tokens": [
     "secondary",
     "secondary-text",
-    "elevation-1"
+    "elevation-1",
+    "primary"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

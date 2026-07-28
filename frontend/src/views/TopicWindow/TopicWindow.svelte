@@ -29,7 +29,7 @@
 
   let selectedTopicStore: SelectedTopicStore | null = null;
   let selectedTopic: string | null = null;
-  let error = "";
+  let storesInitialised = false;
   let unlistenTopicSelect: (() => void) | null = null;
   let unsubscribeSelectedTopicStore: (() => void) | null = null;
 
@@ -72,9 +72,9 @@
 
   onMount(async () => {
     await Promise.all([connections.init(), topicPanelDock.init()]);
+    storesInitialised = true;
     const connection = get(connections).connections[connectionId];
     if (!connection) {
-      error = "Connection not found";
       return;
     }
     selectedTopicStore = createSelectedTopicStore(
@@ -115,6 +115,12 @@
   });
 
   $: connection = $connections.connections[connectionId];
+  // Reactive rather than computed once in onMount: if the connection is
+  // deleted while this window is open (the backend also closes the pop-out,
+  // but that is native-only), it flips to the not-found state instead of a
+  // frozen panel.
+  $: error =
+    storesInitialised && !connection ? "Connection not found" : "";
   $: mqttVersion = (
     connection?.connectionDetails.mqttVersion === "3" ? "3" : "5"
   ) as "3" | "5";

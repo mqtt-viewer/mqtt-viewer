@@ -26,5 +26,13 @@ func (a *App) UpdateOpenConnectionTabs(connIds []uint) error {
 		}
 		return nil
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// A topic pop-out only makes sense while its connection's tab is open:
+	// every tab close funnels through here with the remaining open list, so
+	// close pop-outs for anything no longer in it. Silent close - the dock
+	// mode must not revert when a tab takes its pop-out with it.
+	closeTopicWindowsNotIn(connIds)
+	return nil
 }

@@ -8,7 +8,6 @@ export enum GlobalEvent {
   ConnectionDeleted = "ConnectionDeleted",
   UpdateAvailable = "UpdateAvailable",
   TopicWindowSelect = "TopicWindowSelect",
-  TopicWindowClosed = "TopicWindowClosed",
   TopicPanelDockChanged = "TopicPanelDockChanged",
 }
 

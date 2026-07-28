@@ -148,6 +148,15 @@ export function ExportTopicMessages(connId: number, topic: string): $Cancellable
     return $Call.ByID(2895564909, connId, topic);
 }
 
+/**
+ * FocusTopicWindow focuses the connection's topic pop-out if one is open, and
+ * opens one otherwise. Used by the main window's "window" mode affordance;
+ * unlike OpenTopicWindow it always brings the pop-out to the front.
+ */
+export function FocusTopicWindow(params: $models.OpenTopicWindowParams): $CancellablePromise<void> {
+    return $Call.ByID(2936015555, params);
+}
+
 export function GetAllConnections(): $CancellablePromise<$models.Connections> {
     return $Call.ByID(3922339528).then(($result: any) => {
         return $$createType9($result);

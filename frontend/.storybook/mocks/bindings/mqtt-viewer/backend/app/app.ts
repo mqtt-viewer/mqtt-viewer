@@ -110,6 +110,10 @@ export async function OpenTopicWindow(_params: {
   connectionId: number;
 }): Promise<void> {}
 
+export async function FocusTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
+
 
 export async function GetDatabaseSizeBytes(): Promise<number> {
   return mockDatabaseSizeBytes;

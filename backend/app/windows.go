@@ -167,6 +167,11 @@ var (
 	// rather than opening duplicates; unlike chart windows, only one topic
 	// pop-out is meaningful per connection.
 	topicWindows = map[uint]*application.WebviewWindow{}
+	// Pop-outs being closed programmatically because their connection went
+	// away (deleted, or its tab closed). Their WindowClosing handler must
+	// skip the dock-mode revert: the user didn't close them, and "window"
+	// mode should keep applying to other connections.
+	topicWindowsSilentClose = map[*application.WebviewWindow]struct{}{}
 )
 
 // buildTopicWindowURL builds the route the detached topic window loads. Kept
@@ -206,8 +211,17 @@ func (a *App) OpenTopicWindow(params OpenTopicWindowParams) error {
 
 	windowURL := buildTopicWindowURL(params)
 
+	// Title by connection name, matching the broker-status window precedent,
+	// so pop-outs for different connections are tellable apart in the window
+	// list.
+	title := "Selected topic"
+	connection := models.Connection{}
+	if err := a.Db.First(&connection, params.ConnectionID).Error; err == nil && connection.Name != "" {
+		title = "Selected topic - " + connection.Name
+	}
+
 	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Selected topic",
+		Title:            title,
 		Width:            700,
 		Height:           600,
 		MinWidth:         400,
@@ -223,6 +237,8 @@ func (a *App) OpenTopicWindow(params OpenTopicWindowParams) error {
 	connectionID := params.ConnectionID
 	window.OnWindowEvent(events.Common.WindowClosing, func(_ *application.WindowEvent) {
 		topicWindowsMu.Lock()
+		_, silent := topicWindowsSilentClose[window]
+		delete(topicWindowsSilentClose, window)
 		// Only remove our own entry: if the user reopened the pop-out (a new
 		// window now occupies this key), deleting unconditionally would evict
 		// the live window and break focus-or-create.
@@ -231,8 +247,14 @@ func (a *App) OpenTopicWindow(params OpenTopicWindowParams) error {
 		}
 		topicWindowsMu.Unlock()
 
-		if a.EventRuntime != nil {
-			a.EventRuntime.EventsEmit(string(viewerEvents.TopicWindowClosed), connectionID)
+		// On quit Wails' cleanup closes every window; reverting there would
+		// wipe a deliberate "window" mode before the next launch (and the DB
+		// write would race shutdown). The OnShutdown hook flips the flag
+		// before cleanup closes any window, so this is a reliable quit
+		// signal. Silent closes (connection deleted, tab closed) skip the
+		// revert for the same reason: the user didn't close the window.
+		if silent || a.shuttingDown.Load() {
+			return
 		}
 
 		// If the window closed by the user's own hand (not because we're
@@ -243,6 +265,61 @@ func (a *App) OpenTopicWindow(params OpenTopicWindowParams) error {
 	})
 
 	return nil
+}
+
+// FocusTopicWindow focuses the connection's topic pop-out if one is open, and
+// opens one otherwise. Used by the main window's "window" mode affordance;
+// unlike OpenTopicWindow it always brings the pop-out to the front.
+func (a *App) FocusTopicWindow(params OpenTopicWindowParams) error {
+	topicWindowsMu.Lock()
+	existing := topicWindows[params.ConnectionID]
+	topicWindowsMu.Unlock()
+	if existing != nil {
+		existing.Focus()
+		return nil
+	}
+	return a.OpenTopicWindow(params)
+}
+
+// closeTopicWindowForConnection closes the connection's topic pop-out (if any)
+// without reverting the dock mode: used when the connection is deleted, where
+// "window" mode should keep applying to other connections. Safe to call when
+// no Wails app is running (the registry is empty in tests).
+func closeTopicWindowForConnection(connectionID uint) {
+	topicWindowsMu.Lock()
+	window := topicWindows[connectionID]
+	if window != nil {
+		topicWindowsSilentClose[window] = struct{}{}
+	}
+	topicWindowsMu.Unlock()
+	if window != nil {
+		window.Close()
+	}
+}
+
+// closeTopicWindowsNotIn closes pop-outs whose connection is not in the open
+// set. Called from UpdateOpenConnectionTabs so a closed tab takes its pop-out
+// with it, whichever UI path closed the tab; adds and reorders pass their
+// full open list and so close nothing.
+func closeTopicWindowsNotIn(openConnIds []uint) {
+	open := make(map[uint]struct{}, len(openConnIds))
+	for _, id := range openConnIds {
+		open[id] = struct{}{}
+	}
+
+	topicWindowsMu.Lock()
+	toClose := []*application.WebviewWindow{}
+	for connId, window := range topicWindows {
+		if _, isOpen := open[connId]; !isOpen && window != nil {
+			topicWindowsSilentClose[window] = struct{}{}
+			toClose = append(toClose, window)
+		}
+	}
+	topicWindowsMu.Unlock()
+
+	for _, window := range toClose {
+		window.Close()
+	}
 }
 
 // closeAllTopicWindows closes every open topic pop-out window. Called when

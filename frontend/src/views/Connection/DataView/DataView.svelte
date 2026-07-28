@@ -12,12 +12,14 @@
   import topicPanelDock from "@/stores/topic-panel-dock";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import Button from "@/components/Button/Button.svelte";
+  import IconButton from "@/components/Button/IconButton.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import connections from "@/stores/connections";
   import tabs from "@/stores/tabs";
   import {
     DeleteRetainedMessage,
     ExportTopicMessages,
+    FocusTopicWindow,
     OpenChartWindow,
     OpenTopicWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
@@ -64,6 +66,11 @@
     : null;
   $: isDockedRight = renderedDockSide === "right";
   $: isDockedBottom = renderedDockSide === "bottom";
+  // Escape hatch while the panel lives in its own window: without it the
+  // main window has no dock UI at all, and a lost pop-out would strand the
+  // user. Rendered where the panel would dock on the right.
+  $: showWindowModeHatch = dockMode === "window" && isSelectedTopicPanelOpen;
+  const WINDOW_MODE_HATCH_WIDTH = 36;
   $: isPublishDisabled = connection.connectionState !== "connected";
   $: isConnecting =
     connection.connectionState === "connecting" ||
@@ -99,10 +106,13 @@
     publishPanelWidth: number;
     isDockedRight: boolean;
     selectedTopicPanelWidth: number;
+    showWindowModeHatch: boolean;
   }) => {
     let selectedWidth = params.isDockedRight
       ? params.selectedTopicPanelWidth
-      : 0;
+      : params.showWindowModeHatch
+        ? WINDOW_MODE_HATCH_WIDTH
+        : 0;
 
     return params.rootAppWidth - params.publishPanelWidth - selectedWidth;
   };
@@ -112,6 +122,7 @@
     publishPanelWidth,
     isDockedRight,
     selectedTopicPanelWidth,
+    showWindowModeHatch,
   });
 
   // Only the active tab drives the pop-out: background tabs keep their
@@ -151,6 +162,9 @@
               type: "error",
             },
           });
+          // Never strand the user in "window" mode with no window: fall
+          // back to the last docked side so the panel comes back here.
+          topicPanelDock.setMode($topicPanelDock.lastDockedSide);
         });
     }
   } else {
@@ -158,6 +172,23 @@
     // the current topic.
     lastEmittedTopic = undefined;
   }
+
+  const focusTopicWindow = async () => {
+    try {
+      await FocusTopicWindow({
+        connectionId: connection.connectionDetails.id,
+        topic: $selectedTopicStore.selectedTopic ?? "",
+      });
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to focus topic window",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
 
   const deleteRetainedMessage = async (topic: string) => {
     try {
@@ -251,6 +282,7 @@
           id={SELECTED_TOPIC_PANEL_BOTTOM_ID}
           resizeEdge="top"
           minSize={220}
+          defaultSize={320}
           maxSize={(2 * $panelSizes.rootWindowHeight) / 3}
         >
           <SelectedTopicDisplay
@@ -303,6 +335,40 @@
           onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
         />
       </ResizableContainer>
+    {/if}
+    {#if showWindowModeHatch}
+      <div
+        class="flex flex-col items-center gap-1 py-2 shrink-0
+          border-l-[1px] border-l-outline bg-elevation-1"
+        style:width={`${WINDOW_MODE_HATCH_WIDTH}px`}
+      >
+        <IconButton
+          tooltipText="Focus window"
+          tooltipPlacement="left"
+          onClick={focusTopicWindow}
+        >
+          <Icon type="popOut" size={16} />
+        </IconButton>
+        <IconButton
+          tooltipText="Dock here"
+          tooltipPlacement="left"
+          onClick={() => topicPanelDock.setMode($topicPanelDock.lastDockedSide)}
+        >
+          <Icon
+            type={$topicPanelDock.lastDockedSide === "bottom"
+              ? "dockBottom"
+              : "dockRight"}
+            size={16}
+          />
+        </IconButton>
+        <div class="grow flex items-center justify-center min-h-0">
+          <span
+            class="text-xs text-secondary-text whitespace-nowrap [writing-mode:vertical-rl]"
+          >
+            Topic panel is in its own window
+          </span>
+        </div>
+      </div>
     {/if}
   </div>
 </div>

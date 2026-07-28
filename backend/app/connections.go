@@ -165,5 +165,9 @@ func (a *App) DeleteConnection(id uint) error {
 	}
 	delete(a.AppConnections, id)
 	a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
+	// A deleted connection's topic pop-out has nothing left to follow; close
+	// it here (backend-side) so it goes away even if no main window is
+	// listening. Silent: the dock mode must not revert on this close.
+	closeTopicWindowForConnection(id)
 	return nil
 }

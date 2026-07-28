@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T14:29:58.052Z",
+  "generatedAt": "2026-07-28T13:26:01.948Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2047,6 +2047,12 @@
           "default": "right"
         },
         {
+          "name": "defaultSize",
+          "type": "number",
+          "required": false,
+          "default": null
+        },
+        {
           "name": "width",
           "type": "number",
           "required": false,
@@ -3472,7 +3478,8 @@
       "tokens": [
         "secondary",
         "secondary-text",
-        "elevation-1"
+        "elevation-1",
+        "primary"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
