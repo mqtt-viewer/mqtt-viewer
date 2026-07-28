@@ -1,12 +1,31 @@
-// The in-app changelog. One entry per released version; the newest entry for
-// the running version is shown once in the "What's new" dialog (tracked via
-// app_settings.lastSeenChangelogVersion), and it stays reachable from
-// Settings. Keep the writing warm and plain: these notes are read by people
-// mid-task, not by a release pipeline. Follow docs/WRITING_STYLE.md. No emoji.
+// The in-app changelog. The "What's new" dialog shows released versions as
+// tabs, newest on the left, and can be opened any time from Settings or by
+// clicking the version in the bottom status bar. The newest released entry is
+// also shown once automatically after an update (tracked via
+// app_settings.lastSeenChangelogVersion).
+//
+// One entry sits at the top with released: false. It is the staging area for
+// the next release: new changes get added here as they land, and at release
+// time it is promoted to a real version + date (see the `release` and
+// `changelog` skills and docs/RELEASING.md). It never auto-shows and is only
+// visible in the dialog on dev builds, so users never read half-finished notes.
+//
+// Writing: keep it warm, plain, first person, British spelling, with NO em
+// dashes and NO emojis. The full brief is docs/WRITING_STYLE.md. These notes
+// are read by people mid-task, not by a release pipeline.
+
+// A credit for the person whose idea or report led to the change. Rendered as
+// "Thanks @name" after the section body; the link goes to the specific issue,
+// discussion, or comment where they raised it (not their profile).
+export interface ChangelogThanks {
+  name: string;
+  url: string;
+}
 
 export interface ChangelogSection {
   title: string;
   body: string;
+  thanks?: ChangelogThanks[];
 }
 
 export interface ChangelogEntry {
@@ -31,24 +50,116 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "See your topics as a graph",
+        body: "There's a new graph view of the topic tree, where each node is sized and coloured by how much traffic it carries, so the busy corners of a broker stand out at a glance. Switch between list and graph above the tree.",
+      },
+      {
         title: "Sort topics by how busy they are",
         body: "The topic list can now order itself by what matters in the moment: busiest first, most messages, newest first or silent first, alongside the usual A to Z. The graph view offers the same choices and remembers the one you pick per connection. Its filter box also understands MQTT wildcards now, like sensors/+/temperature, just as the list does, and whatever you type in the filter follows you when you switch between list and graph.",
       },
       {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
+        thanks: [
+          {
+            name: "m1dnight",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12598903",
+          },
+          {
+            name: "adamwoodland2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12601084",
+          },
+          {
+            name: "viktak",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12790493",
+          },
+        ],
       },
       {
         title: "Make the status page your own",
         body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic too, and you can pin one as a tile straight from it. Your tiles are saved per connection.",
+        thanks: [
+          {
+            name: "andyg2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12604380",
+          },
+        ],
       },
       {
         title: "Chart values that arrive as text",
-        body: 'Numeric readings often turn up wrapped in quotes, like "24.6". You can now chart those too, so a quoted number plots just like a plain one. Values that aren\'t really numbers stay out of the way.',
+        body: "Numeric readings often turn up wrapped in quotes, like \"24.6\". You can now chart those too, so a quoted number plots just like a plain one. Values that aren't really numbers stay out of the way.",
+        thanks: [
+          {
+            name: "andyg2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/77",
+          },
+          {
+            name: "Stefan-Pichler",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/109",
+          },
+        ],
       },
       {
         title: "Adding a value to a chart is clearer",
-        body: 'Choosing "Add value from payload" now opens the picker straight on the value, so it\'s obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.',
+        body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
+        thanks: [
+          {
+            name: "Daschi2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/78",
+          },
+        ],
+      },
+      {
+        title: "Windows on ARM",
+        body: "Releases now include a native Windows ARM64 build, installer and auto-updates included, so Snapdragon laptops no longer need emulation.",
+        thanks: [
+          {
+            name: "cbulock",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/107",
+          },
+        ],
+      },
+      {
+        title: "A Flatpak for Linux",
+        body: "MQTT Viewer now ships as a Flatpak with its own auto-updating repository, alongside the existing AppImage, deb and rpm.",
+        thanks: [
+          {
+            name: "maracuya-robotics",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/96",
+          },
+        ],
+      },
+      {
+        title: "WebSocket paths work again",
+        body: "Connections that use a WebSocket path (like /mqtt) failed to connect. The path is now handled properly when building the connection URL.",
+        thanks: [
+          {
+            name: "mfried40",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/102",
+          },
+        ],
+      },
+      {
+        title: "Light mode looks right everywhere",
+        body: "Charts, the message timeline and a few icons were keeping their dark colours in light mode. They all follow the theme properly now.",
+      },
+      {
+        title: "Chart and dropdown fixes",
+        body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
+        thanks: [
+          {
+            name: "viktak",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/95",
+          },
+          {
+            name: "Stefan-Pichler",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/108",
+          },
+        ],
+      },
+      {
+        title: "Updates that match your install",
+        body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
     ],
   },
@@ -58,35 +169,89 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "July 2026",
     headline: "MQTT Viewer 1.0 is here",
     intro:
-      "After years of betas, MQTT Viewer is officially 1.0. Thanks for sticking with it. Here's what's new.",
+      "After years of betas, MQTT Viewer is officially 1.0. The big new features (charting, collections, bounded memory, image previews) arrived in 0.7.0, so have a look at that tab too. Here's what 1.0 adds on top.",
     sections: [
       {
-        title: "Chart your data, live",
-        body: "Tick any numeric field in a payload and watch it plot over time. Charts pop out into their own window.",
-      },
-      {
-        title: "A message library",
-        body: "Save the messages you publish often into collections, per connection or global, and reuse them with a click. Search collections and publish history from the sidebar.",
-      },
-      {
-        title: "History that stays in budget",
-        body: "Message history keeps to a memory limit you set, so the app won't eat your RAM if you leave it running. Turn on recording and history survives restarts.",
-      },
-      {
-        title: "Images, decoded",
-        body: "PNG, JPEG, GIF, WebP and BMP payloads render as actual images, with the raw bytes one click away.",
-      },
-      {
-        title: "What's-new notes",
-        body: "After each update you'll see a short summary of what changed, like this one. You can reopen it any time from Settings.",
+        title: "Release notes",
+        body: "After each update you'll see a short summary of what changed, like this one. You can reopen it any time from Settings, or by clicking the version number at the bottom of the window.",
       },
       {
         title: "Linux fixes and auto-updates",
         body: "There are proper rpm and deb packages now, so Fedora no longer crashes at startup. AppImages render correctly again, and the app can update itself.",
+        thanks: [
+          {
+            name: "hobbes1069",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/36",
+          },
+        ],
       },
     ],
     outro:
-      "Found a bug or a rough edge? The Feedback button comes straight to me.",
+      "Found a bug or a rough edge? Use the Feedback button, I want to know.",
+  },
+  {
+    version: "0.7.0",
+    released: true,
+    date: "July 2026",
+    headline: "What's new in 0.7.0",
+    intro:
+      "A big one: charting, collections, bounded memory, image previews, and a new engine under the hood.",
+    sections: [
+      {
+        title: "Light mode",
+        body: "The app now has a proper light theme, with a toggle that remembers your choice.",
+        thanks: [
+          {
+            name: "oeed",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/18",
+          },
+          {
+            name: "juggledad",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/21",
+          },
+        ],
+      },
+      {
+        title: "Topic charting",
+        body: "Chart numeric payload fields over time, live, with a pop-out window.",
+        thanks: [
+          {
+            name: "edolis",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/43",
+          },
+        ],
+      },
+      {
+        title: "Message library",
+        body: "Collections of saved messages, publish history, and search, all in the new sidebar.",
+        thanks: [
+          {
+            name: "viktak",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/42",
+          },
+        ],
+      },
+      {
+        title: "Bounded memory and durable history",
+        body: "History stays within a configurable memory budget, with opt-in recording to disk.",
+        thanks: [
+          {
+            name: "m1dnight",
+            url: "https://github.com/m1dnight",
+          },
+        ],
+      },
+      {
+        title: "Image payload previews",
+        body: "Image payloads render as images, not noise.",
+        thanks: [
+          {
+            name: "jeeftor",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/35",
+          },
+        ],
+      },
+    ],
   },
 ];
 
