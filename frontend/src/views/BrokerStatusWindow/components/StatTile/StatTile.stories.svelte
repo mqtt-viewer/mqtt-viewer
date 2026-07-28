@@ -125,6 +125,21 @@
   {template}
 />
 <Story
+  name="DeltaCapped"
+  args={{
+    ...storyArgs,
+    label: "Store",
+    value: "4.2k",
+    unit: undefined,
+    // Growth from a near-zero baseline (a broker restart refilling its store):
+    // the exact figure is noise, so the tile prints its ceiling.
+    deltaPct: Number.POSITIVE_INFINITY,
+    exact: "4,204",
+    points: mockSparklinePoints,
+  }}
+  {template}
+/>
+<Story
   name="SmallDeltaNoArrow"
   args={{
     ...storyArgs,

@@ -89,8 +89,13 @@ export const LATEST_TOPIC_CAP = 2000;
  * may use samples again. A broker restart republishes its whole retained store,
  * which looks exactly like a rising trend; the effective floor is the larger of
  * this and three learned $SYS intervals.
+ *
+ * Set to the longest health rule window (the store chip's 120 s) so no rule can
+ * reach its verdict on a window that is still mostly repopulation. It is a
+ * heuristic, not a guarantee: a broker whose store takes longer than this to
+ * refill will still raise the chip once.
  */
-export const TREND_SETTLE_MIN_MS = 30_000;
+export const TREND_SETTLE_MIN_MS = 120_000;
 
 // --- Time-range constants ----------------------------------------------------
 export const DEFAULT_RANGE_MINUTES = 5;
