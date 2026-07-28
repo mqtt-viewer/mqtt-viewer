@@ -373,6 +373,16 @@ export function SetConnectionDebugLogging(connId: number, enabled: boolean): $Ca
     return $Call.ByID(1317832316, connId, enabled);
 }
 
+/**
+ * SetLogsStreaming starts or stops forwarding a connection's client-log
+ * batches to the frontend. The logs dialog switches this on while open; the
+ * ring and durable file keep capturing regardless, so nothing is lost while
+ * streaming is off.
+ */
+export function SetLogsStreaming(connId: number, streaming: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1857653305, connId, streaming);
+}
+
 export function StartUpdate(): $CancellablePromise<void> {
     return $Call.ByID(1435025345);
 }

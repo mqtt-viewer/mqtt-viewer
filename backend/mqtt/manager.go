@@ -93,6 +93,12 @@ func (m *MqttManager) SetDebugLoggingEnabled(enabled bool) {
 	}
 }
 
+// SetLogsStreaming starts or stops forwarding this connection's drained log
+// batches to the frontend. Capture (ring + file) runs regardless.
+func (m *MqttManager) SetLogsStreaming(streaming bool) {
+	m.LogStore.SetStreaming(streaming)
+}
+
 func (m *MqttManager) GetLogs() []LogEntry {
 	return m.LogStore.Snapshot()
 }

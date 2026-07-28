@@ -116,11 +116,11 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 	var initialOnce sync.Once
 	config := autopaho.ClientConfig{
 		// Library loggers feed this connection's client-log store. Debug-level
-		// lines are dropped at the sink when the per-connection debug toggle is
-		// off, so assigning them unconditionally is safe.
-		Debug:                         newPahoLogSink(mm.LogStore.Debug),
-		PahoDebug:                     newPahoLogSink(mm.LogStore.Debug),
-		PahoErrors:                    newPahoLogSink(mm.LogStore.Error),
+		// sinks bail out before formatting when the per-connection debug toggle
+		// is off, so assigning them unconditionally is safe and free.
+		Debug:                         newPahoLogSink(mm.LogStore, LogLevelDebug),
+		PahoDebug:                     newPahoLogSink(mm.LogStore, LogLevelDebug),
+		PahoErrors:                    newPahoLogSink(mm.LogStore, LogLevelError),
 		CleanStartOnInitialConnection: true,
 		BrokerUrls:                    []*url.URL{broker},
 		KeepAlive:                     30,
@@ -213,8 +213,20 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConnectionDetails, subscriptions []SubscribeParams) (*mqttV3.Client, error) {
 	// paho v3 loggers are process-global; install the broadcast dispatcher once
 	// and register this connection so its verbose lines are captured while its
-	// debug toggle is on (no-op when off — it's never registered).
+	// debug toggle is on (no-op when off — it's never registered). Register
+	// before dialling so handshake/dial debug lines are captured too, and
+	// unregister again on every failure path.
 	installV3GlobalLoggers()
+	debugRegistered := false
+	if mm.LogStore.DebugEnabled() {
+		v3Registry.register(mm.LogStore)
+		debugRegistered = true
+	}
+	unregisterOnFail := func() {
+		if debugRegistered {
+			v3Registry.unregister(mm.LogStore.connId)
+		}
+	}
 
 	urlString := buildBrokerURL(connectionDetails.Protocol, connectionDetails.Host, connectionDetails.Port, connectionDetails.WebsocketPath)
 	opts := mqttV3.NewClientOptions()
@@ -277,25 +289,27 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 	// Connection cancelled
 	case <-ctx.Done():
 		client.Disconnect(500)
+		unregisterOnFail()
 		return nil, nil
 	case <-time.After(CONNECTION_TIMEOUT):
 		mm.LogStore.Error("timeout while connecting to broker")
+		unregisterOnFail()
 		return nil, fmt.Errorf("timeout while connecting to broker")
 	case err := <-subErrChan:
 		if err != nil {
 			mm.LogStore.Error("connect failed: " + err.Error())
 			client.Disconnect(500)
+			unregisterOnFail()
 			return nil, err
 		}
 	}
 	if token.Error() != nil {
 		mm.LogStore.Error("connect failed: " + token.Error().Error())
+		unregisterOnFail()
 		return nil, token.Error()
 	}
-	// Connected: capture verbose v3 debug for this connection if its toggle is on.
-	if mm.LogStore.DebugEnabled() {
-		v3Registry.register(mm.LogStore)
-	}
+	// Connected: stay registered so verbose v3 debug keeps flowing; Disconnect
+	// and SetDebugLoggingEnabled(false) both unregister.
 	return &client, nil
 }
 

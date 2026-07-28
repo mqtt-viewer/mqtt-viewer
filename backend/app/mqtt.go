@@ -129,6 +129,19 @@ func (a *App) GetConnectionLogs(connId uint) ([]mqtt.LogEntry, error) {
 	return appConnection.MqttManager.GetLogs(), nil
 }
 
+// SetLogsStreaming starts or stops forwarding a connection's client-log
+// batches to the frontend. The logs dialog switches this on while open; the
+// ring and durable file keep capturing regardless, so nothing is lost while
+// streaming is off.
+func (a *App) SetLogsStreaming(connId uint, streaming bool) error {
+	appConnection, ok := a.AppConnections[connId]
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.MqttManager.SetLogsStreaming(streaming)
+	return nil
+}
+
 // ClearConnectionLogs empties a connection's client-log ring and truncates its
 // durable log file.
 func (a *App) ClearConnectionLogs(connId uint) error {
