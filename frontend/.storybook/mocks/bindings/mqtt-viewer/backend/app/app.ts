@@ -68,6 +68,11 @@ export async function SetConnectionDebugLogging(
   _enabled: boolean
 ): Promise<void> {}
 
+export async function SetLogsStreaming(
+  _connId: number,
+  _streaming: boolean
+): Promise<void> {}
+
 // App settings / message retention mocks.
 let mockAppSettings = new models.AppSettings({
   id: 1,

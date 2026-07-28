@@ -19,7 +19,7 @@
     },
     {
       "name": "connection",
-      "type": "string",
+      "type": "object",
       "required": true
     }
   ],

@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { afterUpdate, onDestroy } from "svelte";
-  import type { Writable } from "svelte/store";
+  import { onDestroy, tick } from "svelte";
+  import { writable, type Writable } from "svelte/store";
   import moment from "moment";
   import _ from "lodash";
   import { Events } from "@wailsio/runtime";
+  //@ts-ignore
+  import VirtualList from "@sveltejs/svelte-virtual-list";
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
@@ -17,6 +19,7 @@
     GetConnectionLogs,
     ClearConnectionLogs,
     SetConnectionDebugLogging,
+    SetLogsStreaming,
   } from "bindings/mqtt-viewer/backend/app/app";
   import type { LogEntry } from "bindings/mqtt-viewer/backend/mqtt/models";
 
@@ -24,18 +27,28 @@
   export let connection: Connection;
 
   // Client-side ceiling; the server ring is bounded at 2000, but live batches
-  // accumulate on top of the initial snapshot, so trim to keep the DOM light.
+  // accumulate on top of the initial snapshot, so trim to keep memory bounded.
   const MAX_ENTRIES = 5000;
 
   type Level = "debug" | "info" | "warn" | "error";
   const LEVELS: Level[] = ["debug", "info", "warn", "error"];
 
+  // Stable per-entry identity: a monotonic uid assigned on arrival, so list
+  // rows keep their identity as the window slides.
+  type UiLogEntry = LogEntry & { uid: number };
+  let nextUid = 0;
+  const withUids = (batch: LogEntry[]): UiLogEntry[] =>
+    batch.map((e) => ({ ...e, uid: nextUid++ }));
+
   $: details = connection?.connectionDetails;
 
-  let entries: LogEntry[] = [];
-  // Read straight from the prop — the reactive `details` hasn't been assigned
-  // yet when this top-level initialiser runs.
-  let debugEnabled = connection?.connectionDetails?.debugLoggingEnabled ?? false;
+  let entries: UiLogEntry[] = [];
+  // The Switch's checked state, shared with melt so a failed toggle can be
+  // rolled back programmatically. Read straight from the prop — the reactive
+  // `details` hasn't been assigned yet when this top-level initialiser runs.
+  const debugChecked = writable(
+    connection?.connectionDetails?.debugLoggingEnabled ?? false
+  );
 
   // Filters
   let filterText = "";
@@ -57,6 +70,7 @@
 
   // --- live subscription tied to open state -------------------------------
   let off: (() => void) | null = null;
+  let streamingOn = false;
   let lastOpen = false;
   $: if ($isOpen !== lastOpen) {
     lastOpen = $isOpen;
@@ -66,55 +80,110 @@
 
   const onOpen = async () => {
     if (!details) return;
+    const id = details.id;
     // Re-seed the toggle from the latest persisted value on each open.
-    debugEnabled = details.debugLoggingEnabled ?? false;
+    debugChecked.set(details.debugLoggingEnabled ?? false);
     try {
-      entries = await GetConnectionLogs(details.id);
+      await SetLogsStreaming(id, true);
+      streamingOn = true;
     } catch (e) {
-      entries = [];
+      // Snapshot still works; only the live feed is lost.
     }
+    let snapshot: LogEntry[] = [];
+    try {
+      snapshot = await GetConnectionLogs(id);
+    } catch (e) {
+      snapshot = [];
+    }
+    // The dialog may have been closed (or the component destroyed) while the
+    // snapshot was in flight; don't install a listener that would outlive it.
+    if (!$isOpen || destroyed) {
+      stopStreaming();
+      return;
+    }
+    entries = withUids(snapshot);
     autoScroll = true;
     off?.();
     const logsEvent = connection?.eventSet?.mqttLogs;
-    if (!logsEvent) return;
-    off = Events.On(logsEvent, (e: any) => {
-      const batch: LogEntry[] = e.data ?? [];
-      if (!batch.length) return;
-      const next = [...entries, ...batch];
-      entries = next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
-    });
+    if (logsEvent) {
+      off = Events.On(logsEvent, (e: any) => {
+        const batch: LogEntry[] = e.data ?? [];
+        if (!batch.length) return;
+        appendBatch(batch);
+      });
+    }
+    void scrollToBottom();
+  };
+
+  const appendBatch = (batch: LogEntry[]) => {
+    // Decide re-pin from the position BEFORE the append mutates the list.
+    const pinned = autoScroll;
+    const next = [...entries, ...withUids(batch)];
+    entries =
+      next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
+    if (pinned) void scrollToBottom();
+  };
+
+  const stopStreaming = () => {
+    if (!streamingOn || !details) return;
+    streamingOn = false;
+    SetLogsStreaming(details.id, false).catch(() => {});
   };
 
   const onClose = () => {
     off?.();
     off = null;
+    stopStreaming();
   };
 
-  // Ensure the live subscription is dropped if the dialog unmounts while open.
-  onDestroy(() => off?.());
+  // Ensure the live subscription and server-side streaming are dropped if the
+  // dialog unmounts while open.
+  let destroyed = false;
+  onDestroy(() => {
+    destroyed = true;
+    onClose();
+  });
 
   // --- auto-scroll --------------------------------------------------------
-  let scrollEl: HTMLDivElement | null = null;
+  // The virtual list owns its scroll container; find it inside our wrapper and
+  // listen with capture since scroll events don't bubble.
+  let listWrapEl: HTMLDivElement | null = null;
   let autoScroll = true;
-  const onScroll = () => {
-    if (!scrollEl) return;
+  const PIN_THRESHOLD_PX = 40;
+  const getViewport = (): HTMLElement | null =>
+    listWrapEl?.querySelector("svelte-virtual-list-viewport") ?? null;
+  const onScrollCapture = () => {
+    const vp = getViewport();
+    if (!vp) return;
+    // Scrolling up pauses the tail; returning to the bottom re-arms it.
     autoScroll =
-      scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 24;
+      vp.scrollHeight - vp.scrollTop - vp.clientHeight < PIN_THRESHOLD_PX;
   };
-  afterUpdate(() => {
-    if (autoScroll && scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
-  });
+  const scrollToBottom = async () => {
+    // Two passes: the virtual list estimates unrendered row heights, so the
+    // first scroll can land short; the second corrects once the tail rendered.
+    for (let i = 0; i < 2; i++) {
+      await tick();
+      const vp = getViewport();
+      if (!vp) return;
+      vp.scrollTop = vp.scrollHeight;
+    }
+    autoScroll = true;
+  };
 
   // --- actions ------------------------------------------------------------
   const onToggleDebug = async (next: boolean) => {
-    const prev = debugEnabled;
-    debugEnabled = next;
+    if (!details) {
+      debugChecked.set(!next);
+      return;
+    }
     try {
       await SetConnectionDebugLogging(details.id, next);
       // Keep the in-memory connection details in sync so a reopen is accurate.
       details.debugLoggingEnabled = next;
     } catch (e) {
-      debugEnabled = prev;
+      // Roll the switch back so its visual state matches reality.
+      debugChecked.set(!next);
       addToast({
         data: {
           title: "Failed to update debug logging",
@@ -129,7 +198,19 @@
     `[${moment(e.timestampMs).format("HH:mm:ss.SSS")}] ${(e.level ?? "").toUpperCase().padEnd(5)} ${e.message}`;
 
   const onCopy = async () => {
-    await copyToClipboard(filtered.map(formatLine).join("\n"));
+    if (filtered.length === 0) return;
+    try {
+      await copyToClipboard(filtered.map(formatLine).join("\n"));
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to copy logs",
+          description: e as string,
+          type: "error",
+        },
+      });
+      return;
+    }
     addToast({
       data: {
         title: "Logs copied",
@@ -140,6 +221,7 @@
   };
 
   const onClear = async () => {
+    if (!details) return;
     try {
       await ClearConnectionLogs(details.id);
       entries = [];
@@ -175,13 +257,15 @@
       <Icon type="bug" size={16} />
       <div class="flex flex-col min-w-0">
         <span class="text-lg text-emphasis truncate">Client logs</span>
-        <span class="text-sm text-secondary-text truncate">{details.name}</span>
+        <span class="text-sm text-secondary-text truncate"
+          >{details?.name ?? ""}</span
+        >
       </div>
       <div class="grow"></div>
       <Switch
         name="debug-logging"
         label="Debug logging"
-        defaultChecked={debugEnabled}
+        checked={debugChecked}
         onChange={onToggleDebug}
       />
       <IconButton onClick={() => isOpen.set(false)}>
@@ -230,9 +314,9 @@
 
     <!-- Log body -->
     <div
-      bind:this={scrollEl}
-      on:scroll={onScroll}
-      class="grow min-h-0 overflow-y-auto mx-4 mb-4 rounded bg-elevation-0 border border-divider p-3 font-mono text-sm leading-relaxed"
+      bind:this={listWrapEl}
+      on:scroll|capture={onScrollCapture}
+      class="grow min-h-0 overflow-hidden mx-4 mb-4 rounded bg-elevation-0 border border-divider py-1 font-mono text-sm leading-relaxed"
     >
       {#if filtered.length === 0}
         <div class="h-full flex items-center justify-center text-secondary-text">
@@ -241,17 +325,17 @@
             : "No logs match the current filter"}
         </div>
       {:else}
-        {#each filtered as entry, i (i)}
-          <div class="flex gap-2 whitespace-pre-wrap break-all">
+        <VirtualList items={filtered} let:item>
+          <div class="flex gap-2 whitespace-pre-wrap break-words px-3">
             <span class="text-secondary-text shrink-0"
-              >{moment(entry.timestampMs).format("HH:mm:ss.SSS")}</span
+              >{moment(item.timestampMs).format("HH:mm:ss.SSS")}</span
             >
-            <span class={`shrink-0 w-10 uppercase ${levelColor(entry.level)}`}
-              >{entry.level}</span
+            <span class={`shrink-0 w-10 uppercase ${levelColor(item.level)}`}
+              >{item.level}</span
             >
-            <span class="text-white-text">{entry.message}</span>
+            <span class="text-white-text">{item.message}</span>
           </div>
-        {/each}
+        </VirtualList>
       {/if}
     </div>
   </div>
