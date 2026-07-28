@@ -5,13 +5,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 )
 
 func TestLogStoreRingCapDropsOldest(t *testing.T) {
 	s := newLogStore(1)
 	total := logRingCap + 50
 	for i := 0; i < total; i++ {
-		s.Info(strings.Repeat("", 0) + itoa(i))
+		s.Info(itoa(i))
+		// Drain periodically so the pending cap never interferes with the
+		// ring-wraparound behaviour under test.
+		if i%1000 == 999 {
+			s.Snapshot()
+		}
 	}
 	snap := s.Snapshot()
 	if len(snap) != logRingCap {
@@ -25,6 +32,160 @@ func TestLogStoreRingCapDropsOldest(t *testing.T) {
 	wantLast := itoa(total - 1)
 	if snap[len(snap)-1].Message != wantLast {
 		t.Errorf("expected newest message %q, got %q", wantLast, snap[len(snap)-1].Message)
+	}
+	// Ordering must be strictly sequential across the wrap point.
+	for i := 1; i < len(snap); i++ {
+		if snap[i-1].TimestampMs > snap[i].TimestampMs {
+			t.Fatalf("snapshot out of order at index %d", i)
+		}
+	}
+}
+
+func TestLogStorePendingCapSynthesizesDroppedLine(t *testing.T) {
+	s := newLogStore(1)
+	over := 25
+	for i := 0; i < logPendingCap+over; i++ {
+		s.Info(itoa(i))
+	}
+
+	emitted := make(chan []LogEntry, 1)
+	s.StartEmitting(time.Millisecond, func(entries []LogEntry) {
+		select {
+		case emitted <- entries:
+		default:
+		}
+	})
+	s.SetStreaming(true)
+	var batch []LogEntry
+	select {
+	case batch = <-emitted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected a drained batch, got none")
+	}
+	s.Close()
+	// Capped batch plus one synthesized warn line.
+	if len(batch) != logPendingCap+1 {
+		t.Fatalf("expected %d entries in batch, got %d", logPendingCap+1, len(batch))
+	}
+	last := batch[len(batch)-1]
+	want := "dropped " + itoa(over) + " log lines"
+	if last.Level != string(LogLevelWarn) || last.Message != want {
+		t.Errorf("expected trailing warn %q, got %s %q", want, last.Level, last.Message)
+	}
+	// Oldest pending lines were dropped, so the batch starts at `over`.
+	if batch[0].Message != itoa(over) {
+		t.Errorf("expected batch to start at %q, got %q", itoa(over), batch[0].Message)
+	}
+}
+
+func TestLogStoreSnapshotDrainsPending(t *testing.T) {
+	s := newLogStore(1)
+	s.Info("before-snapshot")
+
+	emitted := make(chan []LogEntry, 10)
+	s.StartEmitting(time.Millisecond, func(entries []LogEntry) { emitted <- entries })
+	s.SetStreaming(true)
+
+	snap := s.Snapshot()
+	if len(snap) != 1 || snap[0].Message != "before-snapshot" {
+		t.Fatalf("expected snapshot to contain the line, got %+v", snap)
+	}
+
+	s.Info("after-snapshot")
+	select {
+	case batch := <-emitted:
+		// The first emitted batch after the snapshot must not repeat lines the
+		// snapshot already returned.
+		if len(batch) != 1 || batch[0].Message != "after-snapshot" {
+			t.Fatalf("expected batch to contain only post-snapshot lines, got %+v", batch)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected a drained batch, got none")
+	}
+	s.Close()
+}
+
+func TestLogStoreStreamingGatesEmission(t *testing.T) {
+	s := newLogStore(1)
+	emitted := make(chan []LogEntry, 10)
+	s.StartEmitting(time.Millisecond, func(entries []LogEntry) { emitted <- entries })
+
+	// Streaming off (default): drained lines must not reach onBatch.
+	s.Info("while-off")
+	select {
+	case batch := <-emitted:
+		t.Fatalf("expected no emission while streaming off, got %+v", batch)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// But the ring still captured the line.
+	if snap := s.Snapshot(); len(snap) != 1 {
+		t.Fatalf("expected ring capture while streaming off, got %+v", snap)
+	}
+
+	s.SetStreaming(true)
+	s.Info("while-on")
+	select {
+	case batch := <-emitted:
+		if len(batch) != 1 || batch[0].Message != "while-on" {
+			t.Fatalf("expected the streamed line, got %+v", batch)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected emission while streaming on, got none")
+	}
+	s.Close()
+}
+
+func TestLogStoreCloseMakesLoggingNoOp(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "conn-1.txt")
+	s := newLogStore(1)
+	if err := s.InitFile(path); err != nil {
+		t.Fatalf("InitFile: %v", err)
+	}
+	s.Info("kept")
+	s.Close()
+
+	// A still-live client logging after Close must not buffer anything...
+	s.Info("after-close")
+	if snap := s.Snapshot(); len(snap) != 1 || snap[0].Message != "kept" {
+		t.Fatalf("expected only pre-close entries, got %+v", snap)
+	}
+
+	// ...nor recreate the (deleted) file.
+	os.Remove(path)
+	if err := s.InitFile(path); err != nil {
+		t.Fatalf("InitFile after close: %v", err)
+	}
+	s.Info("still-no-op")
+	s.Snapshot()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("expected no file to be recreated after Close, stat err: %v", err)
+	}
+}
+
+func TestLogStoreTruncatesLongLines(t *testing.T) {
+	s := newLogStore(1)
+	s.Info(strings.Repeat("x", logMaxLineLen+100))
+	snap := s.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(snap))
+	}
+	msg := snap[0].Message
+	if !strings.HasSuffix(msg, logTruncationSuffix) {
+		t.Errorf("expected truncation suffix, got tail %q", msg[len(msg)-30:])
+	}
+	if len(msg) != logMaxLineLen+len(logTruncationSuffix) {
+		t.Errorf("expected message capped at %d bytes plus suffix, got %d", logMaxLineLen, len(msg))
+	}
+	// Short lines pass through untouched.
+	if got := truncateLogLine("short"); got != "short" {
+		t.Errorf("expected short line untouched, got %q", got)
+	}
+	// Cuts land on a rune boundary.
+	long := strings.Repeat("é", logMaxLineLen) // 2 bytes each
+	if !utf8.ValidString(truncateLogLine(long)) {
+		t.Error("expected truncation to preserve utf8 validity")
 	}
 }
 
