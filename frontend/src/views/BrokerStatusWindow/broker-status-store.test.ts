@@ -36,8 +36,10 @@ vi.mock("bindings/mqtt-viewer/backend/app/app", () => ({
 
 import {
   createBrokerStatusStore,
+  LATEST_TOPIC_CAP,
   OBSERVED_MSG_KEY,
   OBSERVED_BYTE_KEY,
+  SPARKLINE_CAP,
   type BrokerStatusState,
   type BrokerTileView,
 } from "./broker-status-store";
@@ -642,7 +644,8 @@ describe("createBrokerStatusStore — loudest topics", () => {
     const loud = get(store).loudest;
     expect(loud.rows).toHaveLength(6);
     expect(loud.rows[0].msgPerSec).toBe(1);
-    // 16 captured topics − 6 shown = 10 (a lower bound, rendered with "+").
+    // 16 captured topics − 6 shown = 10 (a lower bound; the table renders the
+    // exact overflow RATE rather than this count).
     expect(loud.overflowTopics).toBe(10);
     // Exact: (16 captured + 88 other − 6 shown) msgs over 1 s.
     expect(loud.overflowMsgPerSec).toBe(98);
@@ -800,6 +803,152 @@ describe("createBrokerStatusStore — setRange & reset", () => {
     expect(state.observedSeries).toHaveLength(0);
     expect(state.learnedIntervalMs).toBe(10_000); // back to the seed
     expect(store.topicRingSize()).toBe(0);
+    store.destroy();
+  });
+});
+
+// --- v2: connection-loss contract --------------------------------------------
+
+describe("createBrokerStatusStore — connection loss", () => {
+  it("treats mqttReconnecting as a connection loss", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    expect(vi.getTimerCount()).toBe(1);
+
+    // An unexpected outage emits reconnecting, never disconnected.
+    emit("reconnecting");
+    expect(get(store).connected).toBe(false);
+    expect(vi.getTimerCount()).toBe(0); // ticker frozen, no fabricated samples
+
+    emit("conn");
+    expect(get(store).connected).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
+    store.destroy();
+  });
+
+  it("greys every rendered health chip when the connection drops", async () => {
+    mocks.getSys.mockResolvedValue([
+      msg("$SYS/broker/store/messages/count", "10", BASE_MS - 1000),
+    ]);
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    vi.advanceTimersByTime(1000); // tick evaluates health
+
+    const before = get(store).health.filter((c) => c.render);
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.some((c) => !c.stale)).toBe(true);
+
+    emit("reconnecting");
+    const after = get(store).health.filter((c) => c.render);
+    expect(after.every((c) => c.stale)).toBe(true);
+    expect(after.every((c) => c.qualifier === "")).toBe(true);
+    store.destroy();
+  });
+
+  it("does not backfill zeros across an outage", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    vi.advanceTimersByTime(1000);
+    emit("msgs", Array.from({ length: 4 }, () => msg("t", "hi", Date.now())));
+    vi.advanceTimersByTime(3000);
+    const beforeLen = get(store).observedSeries.length;
+    expect(beforeLen).toBeGreaterThan(0);
+
+    // 10 minutes offline. The ticker is stopped, so nothing is sampled; the
+    // resumed series must not invent one zero per silent second either.
+    emit("reconnecting");
+    vi.advanceTimersByTime(600_000);
+    emit("conn");
+    vi.advanceTimersByTime(3000);
+
+    const series = get(store).observedSeries;
+    // At most one sample per resumed tick: no 600-sample zero run.
+    expect(series.length).toBeLessThanOrEqual(beforeLen + 3);
+    // The outage shows as a time jump the view renders as a line break.
+    let maxGapMs = 0;
+    for (let i = 1; i < series.length; i++) {
+      maxGapMs = Math.max(maxGapMs, series[i].t - series[i - 1].t);
+    }
+    expect(maxGapMs).toBeGreaterThan(500_000);
+    store.destroy();
+  });
+
+  it("clamps the catch-up after a long suspend to the sparkline cap", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    vi.advanceTimersByTime(1000);
+
+    // Simulate a suspended machine: the clock jumps hours while the connection
+    // stays nominally up, so one tick has to catch up ~28,800 seconds.
+    vi.setSystemTime(new Date(BASE_MS + 8 * 60 * 60_000));
+    vi.advanceTimersByTime(1000);
+
+    expect(get(store).observedSeries.length).toBeLessThanOrEqual(SPARKLINE_CAP);
+    store.destroy();
+  });
+});
+
+// --- v2: loudest-topics honesty ----------------------------------------------
+
+describe("createBrokerStatusStore — loudest topics honesty", () => {
+  it("age-gates the merge so a frozen ring cannot fabricate a live rate", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit("msgs", [msg("plant/a", "x", Date.now())]);
+    vi.advanceTimersByTime(1000);
+    expect(get(store).loudest.rows.length).toBe(1);
+
+    // 20 minutes offline, well past the default 5 m window, then back.
+    emit("reconnecting");
+    vi.advanceTimersByTime(1_200_000);
+    emit("conn");
+    vi.advanceTimersByTime(1000);
+
+    const loud = get(store).loudest;
+    expect(loud.rows).toHaveLength(0);
+    expect(loud.overflowMsgPerSec).toBe(0);
+    store.destroy();
+  });
+
+  it("keeps $SYS out of the loudest table", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit("msgs", [
+      ...Array.from({ length: 20 }, () =>
+        msg("$SYS/broker/uptime", "1", Date.now())
+      ),
+      msg("plant/a", "x", Date.now()),
+    ]);
+    vi.advanceTimersByTime(1000);
+
+    const loud = get(store).loudest;
+    expect(loud.rows.map((r) => r.topic)).toEqual(["plant/a"]);
+    expect(loud.overflowMsgPerSec).toBe(0);
+    store.destroy();
+  });
+});
+
+// --- v2: browsed-topic cap ----------------------------------------------------
+
+describe("createBrokerStatusStore — browsed topic cap", () => {
+  it("stops admitting new topics past the cap", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit(
+      "msgs",
+      Array.from({ length: LATEST_TOPIC_CAP + 100 }, (_, i) =>
+        msg(`$SYS/broker/clients/c${i}/count`, String(i), Date.now())
+      )
+    );
+
+    expect(get(store).latestByTopic.size).toBe(LATEST_TOPIC_CAP);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
     store.destroy();
   });
 });

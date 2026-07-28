@@ -36,7 +36,7 @@
   const SYS_TOPIC = "$SYS/#";
   const EMPTY_GRACE_MS = 10_000;
   const MAX_RAW_ROWS = 500;
-  // Tile sparklines always span 15 m, so the delta arrow and hover panel name it.
+  // Fallback window name for a tile with too few samples to measure a span.
   const TILE_WINDOW = "15m";
   // Minimum gap before a null break is inserted in a hero line (across a
   // disconnect the ticker stops, so consecutive samples jump in time).
@@ -93,9 +93,15 @@
   // $SYS has EVER been seen (a broker with $SYS but no health signals gets
   // neither strip nor notice, and a healthy broker's chip warm-up must not
   // flash a false "no $SYS" claim) and the empty card is not already showing.
+  // It also needs the connection to have been up at least once: claiming a
+  // broker publishes no $SYS before ever reaching it is a guess, not a finding.
   $: hasHealth = $store.health.some((c) => c.render);
   $: showCapabilityNotice =
-    graceElapsed && !hasHealth && !showEmptyState && !$store.sysEverSeen;
+    graceElapsed &&
+    !hasHealth &&
+    !showEmptyState &&
+    !$store.sysEverSeen &&
+    $store.everConnected;
 
   // In the empty state (no $SYS ever seen, grace elapsed) the builtin tiles can
   // never populate, so hide the ones with no data and show only tiles that
@@ -195,19 +201,47 @@
   // --- Gauge tiles: delta arrow + hover-panel inputs -------------------------
   // Percentage change across the visible sparkline window (last vs first). A
   // zero baseline makes a percentage meaningless, so growth from zero returns
-  // Infinity and the tile shows the direction glyph without a number.
-  const deltaPctFor = (tile: BrokerTileView): number | undefined => {
+  // Infinity, which the tile prints as its ">999%" ceiling.
+  //
+  // Samples from before the store's trend floor are skipped: after a reconnect
+  // a delta measured against the pre-outage baseline is an artefact of the gap,
+  // not a change in the broker.
+  const deltaPctFor = (
+    tile: BrokerTileView,
+    floorMs: number
+  ): number | undefined => {
     // Custom tiles with a unit can be interval scales (temperature and the
     // like) where percent change is meaningless; skip the delta for those.
     if (tile.key.startsWith("custom:") && tile.unit) return undefined;
     const s = tile.samples;
     if (!s || s.length < 2) return undefined;
-    const first = s[0].v;
+    // Samples are time-ordered, so a forward scan finds the window start.
+    let i = 0;
+    while (i < s.length && s[i].t < floorMs) i++;
+    if (s.length - i < 2) return undefined;
+    const first = s[i].v;
     const last = s[s.length - 1].v;
     if (first === 0) {
       return last === 0 ? undefined : Number.POSITIVE_INFINITY;
     }
     return ((last - first) / Math.abs(first)) * 100;
+  };
+
+  // The sparkline buffer is capped by COUNT, not by time: at mosquitto's ~10 s
+  // $SYS cadence 900 samples span 2.5 h, not the 15 m the observed (1 Hz) tiles
+  // span. Name the window the samples actually cover.
+  const formatSpan = (ms: number): string => {
+    const minutes = ms / 60_000;
+    if (minutes < 1.5) return `${Math.max(1, Math.round(ms / 1000))}s`;
+    if (minutes < 90) return `${Math.round(minutes)}m`;
+    const hours = minutes / 60;
+    return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
+  };
+
+  const windowNameFor = (tile: BrokerTileView): string => {
+    const s = tile.samples;
+    if (!s || s.length < 2) return TILE_WINDOW;
+    return formatSpan(s[s.length - 1].t - s[0].t);
   };
 
   // Exact, unabbreviated value string for the tile's hover panel.
@@ -319,10 +353,10 @@
         kind={tile.valueKind === "text" ? "text" : "number"}
         points={tile.samples}
         noData={tile.valueKind === "empty"}
-        deltaPct={deltaPctFor(tile)}
+        deltaPct={deltaPctFor(tile, $store.trendFloorMs)}
         exact={exactFor(tile)}
         description={tile.tooltip}
-        windowName={TILE_WINDOW}
+        windowName={windowNameFor(tile)}
       />
     {/each}
 

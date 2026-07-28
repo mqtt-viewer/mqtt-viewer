@@ -50,7 +50,7 @@
     </span>
     {#if showQualifier}
       <span
-        class="text-[11px] leading-none {level === 'problem'
+        class="text-sm leading-none {level === 'problem'
           ? 'text-error'
           : level === 'attention'
             ? 'text-warning'

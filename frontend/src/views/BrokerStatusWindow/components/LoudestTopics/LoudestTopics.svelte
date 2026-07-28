@@ -35,7 +35,10 @@
     return `${parts[0]}/…/${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
   };
 
-  $: hasOverflow = loudest.overflowTopics > 0;
+  // The footer names the exact unattributed rate, never a topic count: the
+  // per-second top-K capture and the admission cap both discard topics without
+  // counting them, so no honest total is available here.
+  $: hasOverflow = loudest.overflowTopics > 0 || loudest.overflowMsgPerSec > 0;
 </script>
 
 <div
@@ -85,9 +88,7 @@
 
     {#if hasOverflow}
       <span class="text-sm text-secondary-text opacity-70">
-        {loudest.overflowTopics}+ more topics, {formatMetricValue(
-          loudest.overflowMsgPerSec
-        )} msg/s
+        Other topics, {formatMetricValue(loudest.overflowMsgPerSec)} msg/s
       </span>
     {/if}
   {/if}

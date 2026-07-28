@@ -31,6 +31,7 @@ import {
   formatMetricValue,
   humanizeDuration,
   type MetricTile,
+  type SelectedCandidate,
   type SysMetricMappingRow,
 } from "./sys-metrics";
 import {
@@ -74,6 +75,22 @@ export const TOPIC_TOP_K = 16;
 export const TOPIC_RING_CAP = 900;
 /** Rows shown in the loudest-topics table. */
 export const LOUDEST_ROWS = 6;
+
+/**
+ * Cap on distinct topics held in the raw-browser map. Brokers that publish a
+ * $SYS subtree per connected client (EMQX) would otherwise grow `latest`
+ * without bound on a busy broker. Past the cap, new topics are dropped (the
+ * ones already bound to tiles keep updating) and a single warning is logged.
+ */
+export const LATEST_TOPIC_CAP = 2000;
+
+/**
+ * Minimum settle time after a (re)connect before trend clauses and tile deltas
+ * may use samples again. A broker restart republishes its whole retained store,
+ * which looks exactly like a rising trend; the effective floor is the larger of
+ * this and three learned $SYS intervals.
+ */
+export const TREND_SETTLE_MIN_MS = 30_000;
 
 // --- Time-range constants ----------------------------------------------------
 export const DEFAULT_RANGE_MINUTES = 5;
@@ -148,9 +165,11 @@ export interface LoudestTopic {
 export interface LoudestState {
   rows: LoudestTopic[];
   /**
-   * Distinct topics beyond the shown rows. A LOWER BOUND (rendered with a
-   * trailing "+") because the per-second other-bucket hides an unknown number
-   * of distinct topics.
+   * Distinct topics beyond the shown rows that survived the per-second top-K
+   * capture. NOT a usable total: both the per-second top-K and the admission
+   * cap discard topics without counting them, so the true figure is unknowable
+   * from here. Treated as a boolean "there is unlisted traffic" by the table,
+   * which names the exact msg/s instead of a topic count.
    */
   overflowTopics: number;
   /** Exact msg/s not attributed to a shown row (merged tail + other-bucket). */
@@ -172,8 +191,23 @@ export interface BrokerStatusState {
   metricByKey: Map<string, MetricSnapshot>;
   /** Raw browser data: newest decoded value per $SYS/* or mapped topic. */
   latestByTopic: Map<string, LatestTopicEntry>;
-  /** Broker connection up/down, driven by the connection's Wails events. */
+  /**
+   * Broker connection up/down, driven by the connection's Wails events. The
+   * automatic reconnect loop counts as down: an unexpected outage emits
+   * `mqttReconnecting`, not `mqttDisconnected`.
+   */
   connected: boolean;
+  /**
+   * True once this store has seen the connection up. Lets the view tell "never
+   * connected" apart from "was connected, now frozen".
+   */
+  everConnected: boolean;
+  /**
+   * Samples older than this are excluded from trend rules and tile deltas, so
+   * a reconnect's retained-store repopulation is not reported as a rising
+   * broker. 0 = no floor. May sit in the future during the settle period.
+   */
+  trendFloorMs: number;
   /** True once any $SYS/* message has been seen (backfill or live). */
   sysEverSeen: boolean;
   /** Epoch ms the window/store opened — the view's 10 s empty-state grace. */
@@ -266,8 +300,17 @@ export const createBrokerStatusStore = (
   // and browsable alongside $SYS/*.
   let trackedTopics = new Set<string>();
 
-  // Raw-browser data: newest decoded value per browsed topic.
+  // Raw-browser data: newest decoded value per browsed topic. Capped at
+  // LATEST_TOPIC_CAP distinct topics; `latestCapWarned` keeps the console
+  // warning to one per cap event.
   const latest = new Map<string, LatestTopicEntry>();
+  let latestCapWarned = false;
+  // Bumped whenever `latest` gains a KEY (not on a value update). Candidate
+  // selection only depends on the key set, so recomputeTiles re-runs the
+  // pattern matching when this changes and reuses the cached winners otherwise.
+  let topicSetVersion = 0;
+  let selectionVersion = -1;
+  const selectionByTile = new Map<string, SelectedCandidate | null>();
 
   // Last {value,timeMs} per cumulative tile, for deriving a /s rate.
   const cumPrev = new Map<string, { value: number; timeMs: number }>();
@@ -330,6 +373,8 @@ export const createBrokerStatusStore = (
   let sysEverSeen = false;
   let sysLastSeenMs = -1;
   let connected = opts.connected ?? true;
+  let everConnected = connected;
+  let trendFloorMs = 0;
   const windowOpenedAt = Date.now();
   let openedAt = windowOpenedAt;
 
@@ -395,6 +440,8 @@ export const createBrokerStatusStore = (
     metricByKey: buildMetricByKey(),
     latestByTopic: latest,
     connected,
+    everConnected,
+    trendFloorMs,
     sysEverSeen,
     windowOpenedAt: openedAt,
     rangeMinutes,
@@ -413,16 +460,31 @@ export const createBrokerStatusStore = (
     if (rt.samples.length > SPARKLINE_CAP) rt.samples.shift();
   };
 
+  // Recomputes each tile's winning candidate. Pattern matching costs
+  // O(tiles × candidates × topics), so it only re-runs when the topic KEY set
+  // changed (or the mappings did) — on a broker with thousands of $SYS topics
+  // that turns a per-batch scan into a rare one.
+  const refreshSelections = () => {
+    if (selectionVersion === topicSetVersion) return;
+    const topics = Array.from(latest.keys());
+    selectionByTile.clear();
+    for (const tile of effectiveTiles) {
+      if (tile.computed) continue;
+      selectionByTile.set(tile.key, selectCandidate(tile, topics));
+    }
+    selectionVersion = topicSetVersion;
+  };
+
   // Re-evaluates every non-computed tile against the current `latest` topics.
   // Cheap (≈ a dozen tiles); the per-tile timeMs guard makes repeat calls no-op
   // when nothing new arrived, so calling it once per batch is enough.
   const recomputeTiles = () => {
-    const topics = Array.from(latest.keys());
+    refreshSelections();
     for (const tile of effectiveTiles) {
       if (tile.computed) continue;
       const rt = runtime.get(tile.key);
       if (!rt) continue;
-      const sel = selectCandidate(tile, topics);
+      const sel = selectionByTile.get(tile.key);
       if (!sel) continue;
       const entry = latest.get(sel.topic);
       if (!entry) continue;
@@ -506,21 +568,33 @@ export const createBrokerStatusStore = (
   // Pushes the settled per-second observed msgs/s (sec(now)-2, fully arrived at
   // the ~300 ms batch lag) into observedSeries, backfilling any skipped seconds
   // from the ring and skipping the partial first second after window-open.
+  //
+  // The cursor is dropped to -1 whenever the connection goes down, so a resumed
+  // series starts at "now" instead of inventing a zero for every second of the
+  // outage. The catch-up is clamped anyway: a suspended laptop can wake with
+  // hours of skipped seconds, and only the newest SPARKLINE_CAP of them could
+  // survive the trim.
   const pushObservedSeries = (nowSec: number) => {
     const target = nowSec - 2;
     if (lastObservedSec < 0) {
-      // First tick: the window-open second is partial, so start pushing the
-      // second AFTER it. Never backfill before the window opened.
+      // First tick (or the first after an outage): the current second is
+      // partial, so start pushing the second AFTER it. Never backfill before
+      // the window opened.
       lastObservedSec = Math.max(
         Math.floor(openedAt / 1000),
         target - 1
       );
     }
-    for (let sec = lastObservedSec + 1; sec <= target; sec++) {
+    if (target <= lastObservedSec) return;
+    const from = Math.max(lastObservedSec + 1, target - SPARKLINE_CAP + 1);
+    for (let sec = from; sec <= target; sec++) {
       observedSeries.push({ t: sec * 1000, v: bucketCountForSec(sec) });
-      if (observedSeries.length > SPARKLINE_CAP) observedSeries.shift();
     }
-    if (target > lastObservedSec) lastObservedSec = target;
+    // One splice, not a shift per pushed sample.
+    if (observedSeries.length > SPARKLINE_CAP) {
+      observedSeries.splice(0, observedSeries.length - SPARKLINE_CAP);
+    }
+    lastObservedSec = target;
   };
 
   // --- Per-topic engine ------------------------------------------------------
@@ -541,9 +615,48 @@ export const createBrokerStatusStore = (
     }
   };
 
+  // Folds `add` into `base`, keeping the strongest TOPIC_TOP_K topics and
+  // collapsing everything it drops into the other-scalars. Used when two ticks
+  // land in the same wall second: replacing the head record would discard the
+  // first tick's counts outright.
+  const mergeRingRecords = (
+    base: TopicRingRecord,
+    add: TopicRingRecord
+  ): TopicRingRecord => {
+    const byTopic = new Map<string, TopicRingEntry>();
+    for (const e of base.entries) {
+      byTopic.set(e.topic, { topic: e.topic, count: e.count, bytes: e.bytes });
+    }
+    for (const e of add.entries) {
+      const cur = byTopic.get(e.topic);
+      if (cur) {
+        cur.count += e.count;
+        cur.bytes += e.bytes;
+      } else {
+        byTopic.set(e.topic, { topic: e.topic, count: e.count, bytes: e.bytes });
+      }
+    }
+    // At most 2 × TOPIC_TOP_K entries, so a plain sort is cheap and exact.
+    const all = Array.from(byTopic.values()).sort((a, b) => b.count - a.count);
+    const entries = all.slice(0, TOPIC_TOP_K);
+    let dropCount = base.otherCount + add.otherCount;
+    let dropBytes = base.otherBytes + add.otherBytes;
+    for (let i = TOPIC_TOP_K; i < all.length; i++) {
+      dropCount += all[i].count;
+      dropBytes += all[i].bytes;
+    }
+    return {
+      sec: base.sec,
+      entries,
+      otherCount: dropCount,
+      otherBytes: dropBytes,
+    };
+  };
+
   // Partial-select the interval's top-K topics by count (O(cap × K)), freeze
   // them plus the other-bucket into a ring record, then reset the interval.
-  // Deduped by sec: a second tick landing in the same wall second overwrites.
+  // Deduped by sec: a second tick landing in the same wall second merges into
+  // the head record rather than replacing it.
   const rotateTopicInterval = (sec: number) => {
     const top: TopicRingEntry[] = [];
     for (const [topic, count] of curCount) {
@@ -563,8 +676,9 @@ export const createBrokerStatusStore = (
       otherCount,
       otherBytes,
     };
-    if (topicRingHead >= 0 && topicRing[topicRingHead]?.sec === sec) {
-      topicRing[topicRingHead] = record; // same-second dedupe
+    const head = topicRingHead >= 0 ? topicRing[topicRingHead] : null;
+    if (head && head.sec === sec) {
+      topicRing[topicRingHead] = mergeRingRecords(head, record);
     } else {
       topicRingHead = (topicRingHead + 1) % TOPIC_RING_CAP;
       topicRing[topicRingHead] = record;
@@ -581,6 +695,10 @@ export const createBrokerStatusStore = (
   // case at 15 m), never on the batch path.
   const mergeLoudest = (windowMinutes: number, now: number): LoudestState => {
     const windowSec = windowMinutes * 60;
+    // Records are pushed newest-first, so the first out-of-window record ends
+    // the scan. Without this age gate a ring frozen by an outage keeps feeding
+    // "over the last 5m" rates from traffic that stopped long ago.
+    const oldestSec = Math.floor(now / 1000) - windowSec;
     const merged = new Map<string, { count: number; bytes: number }>();
     let mergedOtherCount = 0;
     let seen = 0;
@@ -590,6 +708,7 @@ export const createBrokerStatusStore = (
         TOPIC_RING_CAP;
       const rec = topicRing[idx];
       if (!rec) break;
+      if (rec.sec <= oldestSec) break;
       seen++;
       for (const e of rec.entries) {
         const cur = merged.get(e.topic);
@@ -689,8 +808,10 @@ export const createBrokerStatusStore = (
         // base64 decodes to ~3/4 of its length — reused for both rate counters.
         const bytes = Math.floor((b64.length * 3) / 4);
         addObserved(m.timeMs, b64.length);
-        // Loudest topics track every received message (this client's subs).
-        addTopicCount(topic, bytes);
+        // Loudest topics are about USER traffic: $SYS is this window's own
+        // instrumentation and would otherwise fill the whole table on a quiet
+        // broker with $SYS/# subscribed.
+        if (!isSys) addTopicCount(topic, bytes);
         // The learned interval runs off LIVE $SYS bursts only.
         if (isSys) foldInterval(Math.floor(m.timeMs / 1000));
       }
@@ -698,13 +819,24 @@ export const createBrokerStatusStore = (
       if (isSys && m.timeMs > sysLastSeenMs) sysLastSeenMs = m.timeMs;
 
       if (!isSys && !trackedTopics.has(topic)) continue;
-
-      const decoded = base64ToUtf8(b64);
-      const prev = latest.get(topic);
-      if (!prev || m.timeMs >= prev.timeMs) {
-        latest.set(topic, { value: decoded, timeMs: m.timeMs });
-      }
       if (isSys) sysEverSeen = true;
+
+      const prev = latest.get(topic);
+      if (prev === undefined) {
+        if (latest.size >= LATEST_TOPIC_CAP) {
+          if (!latestCapWarned) {
+            latestCapWarned = true;
+            console.warn(
+              `broker-status: browsing at most ${LATEST_TOPIC_CAP} topics; further new topics are ignored`
+            );
+          }
+          continue;
+        }
+        latest.set(topic, { value: base64ToUtf8(b64), timeMs: m.timeMs });
+        topicSetVersion++;
+      } else if (m.timeMs >= prev.timeMs) {
+        latest.set(topic, { value: base64ToUtf8(b64), timeMs: m.timeMs });
+      }
       if (perMessageRecompute) recomputeTiles();
     }
     if (!perMessageRecompute) recomputeTiles();
@@ -791,10 +923,20 @@ export const createBrokerStatusStore = (
       },
       healthStates,
       now,
-      learnedIntervalMs
+      learnedIntervalMs,
+      trendFloorMs
     );
     healthStates = result.states;
     healthChips = result.chips;
+  };
+
+  // Greys every rendered chip. Called when the connection drops: the tick that
+  // would have recomputed staleness has just been stopped, so without this the
+  // strip keeps showing a confident green dot on a dead connection.
+  const freezeHealthChips = () => {
+    healthChips = healthChips.map((c) =>
+      c.render && !c.stale ? { ...c, stale: true, qualifier: "" } : c
+    );
   };
 
   const tick = () => {
@@ -844,9 +986,14 @@ export const createBrokerStatusStore = (
   let offClear: (() => void) | null = null;
   let offConnected: (() => void) | null = null;
   let offDisconnected: (() => void) | null = null;
+  let offReconnecting: (() => void) | null = null;
 
   const resetData = () => {
     latest.clear();
+    latestCapWarned = false;
+    topicSetVersion++;
+    selectionVersion = -1;
+    selectionByTile.clear();
     cumPrev.clear();
     for (const b of buckets) {
       b.sec = -1;
@@ -896,6 +1043,36 @@ export const createBrokerStatusStore = (
     dataEpoch++;
   };
 
+  // Connection came up (or back up). Trends and tile deltas are held off for a
+  // settle period: a restarted broker republishes its retained store, which is
+  // a genuine rise that says nothing about broker health.
+  const onConnectionUp = () => {
+    connected = true;
+    everConnected = true;
+    trendFloorMs =
+      Date.now() +
+      Math.max(TREND_SETTLE_MIN_MS, 3 * learnedIntervalSec * 1000);
+    startTicker();
+    flush();
+  };
+
+  // Connection went down, by an explicit disconnect or an outage. Freezes every
+  // live surface: rates stop, the observed series breaks rather than drawing
+  // zeros, and the chips grey.
+  const onConnectionDown = () => {
+    connected = false;
+    stopTicker(); // freeze observed rates while the broker is unreachable
+    // The next $SYS burst's gap spans the down period — exclude it from the
+    // learned interval EMA.
+    intervalGapBroken = true;
+    // Drop the settled-second cursor so the resumed series starts at "now"
+    // instead of backfilling one fabricated zero per second of the outage.
+    // The view turns the resulting time jump into a line break.
+    lastObservedSec = -1;
+    freezeHealthChips();
+    flush();
+  };
+
   const bindListeners = () => {
     offMessages = Events.On(eventSet.mqttMessages, (e: any) => {
       const messages: mqtt.MqttMessage[] = e.data ?? [];
@@ -906,19 +1083,14 @@ export const createBrokerStatusStore = (
       resetData();
       flush();
     });
-    offConnected = Events.On(eventSet.mqttConnected, () => {
-      connected = true;
-      startTicker();
-      flush();
-    });
-    offDisconnected = Events.On(eventSet.mqttDisconnected, () => {
-      connected = false;
-      stopTicker(); // freeze observed rates while disconnected
-      // The next $SYS burst's gap spans the disconnected period — exclude it
-      // from the learned interval EMA.
-      intervalGapBroken = true;
-      flush();
-    });
+    offConnected = Events.On(eventSet.mqttConnected, onConnectionUp);
+    offDisconnected = Events.On(eventSet.mqttDisconnected, onConnectionDown);
+    // An UNEXPECTED outage emits mqttReconnecting, never mqttDisconnected: the
+    // backend keeps the connection object alive while its retry loop runs. To
+    // this window that is the same thing as being down, so it takes the same
+    // path — otherwise the ticker keeps drawing a fabricated zero trace and the
+    // chips stay green for the whole outage.
+    offReconnecting = Events.On(eventSet.mqttReconnecting, onConnectionDown);
   };
 
   const applyMappings = (rows: SysMetricMappingRow[]) => {
@@ -931,6 +1103,9 @@ export const createBrokerStatusStore = (
     runtime = nextRuntime;
     effectiveTiles = tiles;
     trackedTopics = new Set(rows.map((r) => r.topic).filter((t) => t !== ""));
+    // The tile set changed, so the cached candidate winners are stale.
+    selectionVersion = -1;
+    selectionByTile.clear();
   };
 
   // Binding rows satisfy SysMetricMappingRow structurally (id + all fields), so
@@ -1012,7 +1187,9 @@ export const createBrokerStatusStore = (
     offClear?.();
     offConnected?.();
     offDisconnected?.();
-    offMessages = offClear = offConnected = offDisconnected = null;
+    offReconnecting?.();
+    offMessages = offClear = offConnected = null;
+    offDisconnected = offReconnecting = null;
     stopTicker();
   };
 

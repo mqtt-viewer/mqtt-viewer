@@ -77,6 +77,27 @@ const fmtTime = (ms: number): string => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+/**
+ * Trims a series to the points the sliding window can actually show, keeping
+ * the last point before the left edge so the line still reaches it. The
+ * buffers hold up to 900 points each; at a 1 m range that is 15x more data
+ * than the canvas can use, and every point is copied into the option on every
+ * redraw.
+ */
+const visiblePoints = (
+  points: HeroSeriesPoint[],
+  minTime: number
+): HeroSeriesPoint[] => {
+  let start = 0;
+  for (let i = points.length - 1; i >= 0; i--) {
+    if (points[i].t < minTime) {
+      start = i;
+      break;
+    }
+  }
+  return start === 0 ? points : points.slice(start);
+};
+
 export const buildHeroChartOption = ({
   series,
   windowMinutes,
@@ -85,6 +106,7 @@ export const buildHeroChartOption = ({
 }: HeroChartOptionParams): EChartsOption => {
   const chrome = CHROME_COLORS[theme];
   const total = series.length;
+  const minTime = now - windowMinutes * 60_000;
   return {
     animation: false,
     grid: { left: 44, right: 14, top: 10, bottom: 22 },
@@ -129,7 +151,7 @@ export const buildHeroChartOption = ({
       // Always anchored to the sliding window: echarts merges the xAxis on
       // setOption, so the min/max must be emitted every render or the window
       // stops sliding when no fresh data arrives.
-      min: now - windowMinutes * 60_000,
+      min: minTime,
       max: now,
       axisLine: { lineStyle: { color: chrome.axis } },
       axisLabel: { color: chrome.label, fontSize: 10, hideOverlap: true },
@@ -162,7 +184,9 @@ export const buildHeroChartOption = ({
           opacity: s.dashed ? 0.55 : 1,
         },
         itemStyle: { color },
-        data: s.points.map((p) => [p.t, p.v] as [number, number | null]),
+        data: visiblePoints(s.points, minTime).map(
+          (p) => [p.t, p.v] as [number, number | null]
+        ),
       };
     }),
   };

@@ -12,14 +12,21 @@
 
   $: chips = health.filter((c) => c.render);
 
+  // A positive value that rounds to "0" is shown as "<0.1" instead: a chip
+  // reading "Drops 0/s present" contradicts itself and reads as a glitch.
+  const displayValue = (value: number): string => {
+    const text = formatMetricValue(value);
+    return value > 0 && text === "0" ? "<0.1" : text;
+  };
+
   // Composes the monospaced value string for a chip. Heap folds in its peak;
   // rate-like chips carry a "/s" suffix; everything else is a plain count.
   const valueTextFor = (chip: HealthChipData): string => {
     if (chip.value === null) return "";
-    const v = formatMetricValue(chip.value);
+    const v = displayValue(chip.value);
     if (chip.id === "heap") {
       return chip.detail !== null
-        ? `${v} (peak ${formatMetricValue(chip.detail)})`
+        ? `${v} (peak ${displayValue(chip.detail)})`
         : v;
     }
     if (chip.id === "drops" || chip.id === "churn") return `${v}/s`;

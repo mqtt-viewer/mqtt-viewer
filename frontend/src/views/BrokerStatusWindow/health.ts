@@ -17,7 +17,9 @@
 //     republishers like mosquitto only re-emit changed values, so silence is
 //     signal, not a gap);
 //   - a chip renders nothing until it has a sample (cumulative sources only
-//     produce their first, rate, sample after two raw counter readings).
+//     produce their first, rate, sample after two raw counter readings);
+//   - `trendFloorMs` excludes samples from before a reconnect, so a restarted
+//     broker refilling its retained store never reads as "rising".
 //
 // See the health table in docs/broker-status-v2-spec.md.
 
@@ -104,10 +106,14 @@ export function isRising(
   samples: readonly TrendSample[],
   now: number,
   ruleWindowMs: number,
-  learnedIntervalMs: number
+  learnedIntervalMs: number,
+  trendFloorMs = 0
 ): boolean {
   const effectiveWindow = Math.max(ruleWindowMs, 3 * learnedIntervalMs);
-  const cutoff = now - effectiveWindow;
+  // The floor excludes samples from before a reconnect (and, while it sits in
+  // the future, every sample) so a restarted broker's retained-store
+  // repopulation is not read as a rising trend.
+  const cutoff = Math.max(now - effectiveWindow, trendFloorMs);
   // Samples are appended in time order, so a linear tail scan is enough.
   const win: TrendSample[] = [];
   for (const s of samples) if (s.t >= cutoff) win.push(s);
@@ -274,9 +280,12 @@ export function evaluateHealth(
   inputs: Partial<HealthInputs>,
   prev: Map<HealthChipId, HealthChipState>,
   now: number,
-  learnedIntervalMs: number
+  learnedIntervalMs: number,
+  trendFloorMs = 0
 ): { chips: HealthChip[]; states: Map<HealthChipId, HealthChipState> } {
   const next = new Map<HealthChipId, HealthChipState>();
+  const rising = (samples: readonly TrendSample[], ruleWindowMs: number) =>
+    isRising(samples, now, ruleWindowMs, learnedIntervalMs, trendFloorMs);
 
   const drops = empty(inputs.msgs_dropped);
   const inbound = empty(inputs.msg_rate_in);
@@ -289,7 +298,7 @@ export function evaluateHealth(
 
   // --- Drops -----------------------------------------------------------------
   const dropRate = drops.value ?? 0;
-  const dropsRising = isRising(drops.samples, now, DROPS_RISE_MS, learnedIntervalMs);
+  const dropsRising = rising(drops.samples, DROPS_RISE_MS);
   const inboundRate = inbound.value;
   const dropsRelativeHigh =
     inboundRate !== null &&
@@ -313,8 +322,8 @@ export function evaluateHealth(
 
   // --- Delivery backlog ------------------------------------------------------
   // A longer sustained rise is worse: test the 120 s window first.
-  const backlogProblem = isRising(backlog.samples, now, BACKLOG_PROBLEM_MS, learnedIntervalMs);
-  const backlogAttention = isRising(backlog.samples, now, BACKLOG_ATTENTION_MS, learnedIntervalMs);
+  const backlogProblem = rising(backlog.samples, BACKLOG_PROBLEM_MS);
+  const backlogAttention = rising(backlog.samples, BACKLOG_ATTENTION_MS);
   const backlogRaw: HealthLevel = backlogProblem
     ? "problem"
     : backlogAttention
@@ -334,8 +343,8 @@ export function evaluateHealth(
 
   // --- Store (never red) -----------------------------------------------------
   const storeRising =
-    isRising(storeMsgs.samples, now, STORE_RISE_MS, learnedIntervalMs) ||
-    isRising(storeBytes.samples, now, STORE_RISE_MS, learnedIntervalMs);
+    rising(storeMsgs.samples, STORE_RISE_MS) ||
+    rising(storeBytes.samples, STORE_RISE_MS);
   // Drive rendering off whichever series has the deeper trail.
   const storeMetric: HealthMetric =
     storeMsgs.samples.length >= storeBytes.samples.length ? storeMsgs : storeBytes;

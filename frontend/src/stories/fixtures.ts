@@ -407,6 +407,8 @@ type MockBrokerState = {
   tiles: ReturnType<typeof brokerTile>[];
   latestByTopic: Map<string, { value: string; timeMs: number }>;
   connected: boolean;
+  everConnected: boolean;
+  trendFloorMs: number;
   sysEverSeen: boolean;
   windowOpenedAt: number;
   // v2 state fields consumed by the hero, health strip, loudest topics and
@@ -428,6 +430,8 @@ export const createMockBrokerStatusStore = (
     tiles: mockBrokerTilesPopulated,
     latestByTopic: mockBrokerLatestByTopic(),
     connected: true,
+    everConnected: true,
+    trendFloorMs: 0,
     sysEverSeen: true,
     windowOpenedAt: now,
     metricByKey: mockMetricByKey(),

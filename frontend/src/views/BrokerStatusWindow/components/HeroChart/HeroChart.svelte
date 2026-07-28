@@ -37,8 +37,11 @@
     );
   };
 
-  // Re-render on new series or a window change.
-  $: series, windowMinutes, render();
+  // The store flushes several times a second, so re-rendering on every `series`
+  // change would rebuild the whole option (hundreds of points, replaceMerge)
+  // at batch cadence on top of the 1 Hz window tick, which already picks the
+  // new data up. Only a window or theme change needs an immediate redraw.
+  $: windowMinutes, render();
   // A theme flip must restyle the axis/tooltip chrome immediately.
   $: $theme, render();
 

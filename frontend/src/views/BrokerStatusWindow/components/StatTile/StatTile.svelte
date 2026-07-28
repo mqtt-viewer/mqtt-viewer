@@ -14,7 +14,8 @@
   export let kind: "number" | "text" = "number";
   // Percentage change across the visible window (last vs first sample), supplied
   // by the caller. A small direction glyph shows only when |delta| >= 2 %, so
-  // steady tiles carry no ambient flicker.
+  // steady tiles carry no ambient flicker. Anything past 999 % (including
+  // Infinity, from a zero baseline) prints as ">999%".
   export let deltaPct: number | undefined = undefined;
   // Exact, unabbreviated value string for the hover panel (falls back to the
   // display `value` when absent).
@@ -22,25 +23,49 @@
   // One-line description shown at the top of the hover panel (e.g. the observed
   // tiles' "measured by this client" note — this tile owns that hover now).
   export let description: string | undefined = undefined;
-  // Window the sparkline and delta span, named in the hover panel.
+  // Window the sparkline and delta span, named in the hover panel. The caller
+  // derives it from the samples actually held, not a fixed constant.
   export let windowName = "15m";
 
   const DELTA_THRESHOLD = 2; // percent
+  // Ceiling on the printed percentage. Past this the exact figure carries no
+  // information ("up 12,364%" reads as a bug), and a near-zero baseline can
+  // make it arbitrarily large or infinite.
+  const DELTA_MAX_PCT = 999;
 
   $: isText = kind === "text";
-  // Infinity means "grew from a zero baseline": always worth showing, but as a
-  // bare direction glyph (a percentage against zero is meaningless).
-  $: deltaUnbounded = deltaPct !== undefined && !Number.isFinite(deltaPct);
+  // Growth from a zero (or vanishing) baseline: a percentage against it is
+  // meaningless, so it shares the ">999%" ceiling rather than printing a bare
+  // arrow with no number.
+  $: deltaCapped =
+    deltaPct !== undefined &&
+    (!Number.isFinite(deltaPct) || Math.abs(deltaPct) > DELTA_MAX_PCT);
   $: showDelta =
     !noData &&
     deltaPct !== undefined &&
-    (deltaUnbounded || Math.abs(deltaPct) >= DELTA_THRESHOLD);
+    (deltaCapped || Math.abs(deltaPct) >= DELTA_THRESHOLD);
   $: deltaUp = (deltaPct ?? 0) >= 0;
+  $: deltaText = deltaCapped
+    ? `>${DELTA_MAX_PCT}%`
+    : `${Math.abs(deltaPct ?? 0).toFixed(0)}%`;
 
-  // Min/max over the visible samples, for the hover panel.
-  $: hasSamples = !!points && points.length >= 2;
-  $: sampleMin = hasSamples ? Math.min(...points!.map((p) => p.v)) : null;
-  $: sampleMax = hasSamples ? Math.max(...points!.map((p) => p.v)) : null;
+  // Min/max over the visible samples, for the hover panel. One pass, no spread:
+  // this recomputes on every store flush, for every tile.
+  const extent = (
+    pts: { t: number; v: number }[] | undefined
+  ): { min: number; max: number } | null => {
+    if (!pts || pts.length < 2) return null;
+    let min = pts[0].v;
+    let max = pts[0].v;
+    for (let i = 1; i < pts.length; i++) {
+      const v = pts[i].v;
+      if (v < min) min = v;
+      else if (v > max) max = v;
+    }
+    return { min, max };
+  };
+
+  $: sampleExtent = extent(points);
 
   // One number format for the whole panel (exact value and min/max): grouped,
   // at most two decimals.
@@ -62,16 +87,12 @@
     >
     {#if showDelta}
       <span
-        class="shrink-0 font-mono text-[10px] tabular-nums leading-none text-secondary-text"
-        aria-label={deltaUnbounded
-          ? `up from zero over ${windowName}`
-          : `${deltaUp ? "up" : "down"} ${Math.abs(deltaPct ?? 0).toFixed(0)} percent over ${windowName}`}
+        class="shrink-0 font-mono text-xs tabular-nums leading-none text-secondary-text"
+        aria-label={`${deltaUp ? "up" : "down"} ${
+          deltaCapped ? "more than 999" : Math.abs(deltaPct ?? 0).toFixed(0)
+        } percent over ${windowName}`}
       >
-        {#if deltaUnbounded}
-          ▲
-        {:else}
-          {deltaUp ? "▲" : "▼"} {Math.abs(deltaPct ?? 0).toFixed(0)}%
-        {/if}
+        {deltaUp ? "▲" : "▼"} {deltaText}
       </span>
     {/if}
   </div>
@@ -114,9 +135,9 @@
       <span class="text-secondary-text">{description}</span>
     {/if}
     <span class="font-mono tabular-nums text-emphasis">{exact ?? value}</span>
-    {#if sampleMin !== null && sampleMax !== null}
+    {#if sampleExtent}
       <span class="font-mono tabular-nums text-secondary-text">
-        min {fmtPanelNumber(sampleMin)}, max {fmtPanelNumber(sampleMax)}
+        min {fmtPanelNumber(sampleExtent.min)}, max {fmtPanelNumber(sampleExtent.max)}
       </span>
     {/if}
     <span class="text-secondary-text">over {windowName}</span>

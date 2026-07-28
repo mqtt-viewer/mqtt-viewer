@@ -349,3 +349,28 @@ describe("evaluateHealth — hysteresis across ticks", () => {
     expect(chipsById(third.chips).drops.level).toBe("ok");
   });
 });
+
+describe("trend floor", () => {
+  it("ignores samples from before the floor", () => {
+    const rising = series([1, 2, 3, 4], 10_000);
+    expect(isRising(rising, NOW, 60_000, 10_000)).toBe(true);
+    // Floor set just past the second-oldest sample: only two samples remain,
+    // which is under the three-sample minimum.
+    expect(isRising(rising, NOW, 60_000, 10_000, NOW - 15_000)).toBe(false);
+  });
+
+  it("suppresses every trend while the floor is in the future", () => {
+    const climbing = series([10, 20, 30, 40], 10_000);
+    const { chips } = evaluateHealth(
+      { store_msgs: metric(40, climbing) },
+      new Map<HealthChipId, HealthChipState>(),
+      NOW,
+      10_000,
+      NOW + 30_000 // settle period after a reconnect
+    );
+    const store = chipsById(chips).store;
+    expect(store.render).toBe(true);
+    expect(store.level).toBe("ok");
+    expect(store.qualifier).toBe("");
+  });
+});

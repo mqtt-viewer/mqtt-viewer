@@ -177,3 +177,24 @@ describe("buildHeroChartOption empty series", () => {
     expect(ax.max).toBe(NOW);
   });
 });
+
+describe("buildHeroChartOption — visible window", () => {
+  it("only sends points inside the window, plus the one anchoring the left edge", () => {
+    const now = 1_700_000_000_000;
+    // 600 seconds of 1 Hz samples ending now; a 1 m window can show 60 of them.
+    const points = Array.from({ length: 600 }, (_, i) => ({
+      t: now - (599 - i) * 1000,
+      v: i,
+    }));
+    const option = buildHeroChartOption({
+      series: [{ id: "observed", label: "Observed", points, dashed: false }],
+      windowMinutes: 1,
+      now,
+    }) as any;
+    const data = option.series[0].data as [number, number | null][];
+    expect(data.length).toBeLessThanOrEqual(62);
+    // The newest point survives and the series still starts left of the edge.
+    expect(data[data.length - 1][0]).toBe(now);
+    expect(data[0][0]).toBeLessThanOrEqual(now - 60_000);
+  });
+});

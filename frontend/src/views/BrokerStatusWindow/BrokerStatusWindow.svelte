@@ -64,11 +64,26 @@
     });
   };
 
-  // Live connection state for the header dot + disconnected banner. Driven by
-  // the connections store, which the backend keeps up to date via events.
+  // Live connection state for the header dot + banner. Driven by the
+  // connections store, which the backend keeps up to date via events.
   $: connectionState =
     $connections.connections[connectionId]?.connectionState ?? "disconnected";
-  $: isDisconnected = connectionState === "disconnected";
+  // A connection that has never been up this session has nothing frozen to
+  // warn about, so it gets a neutral note rather than a warning banner.
+  $: everConnected =
+    !!$connections.connections[connectionId]?.firstConnectedThisSessionAtMs;
+  // An unexpected outage sits in "reconnecting", not "disconnected"; both mean
+  // the values on screen are frozen.
+  $: banner =
+    connectionState === "connected"
+      ? null
+      : connectionState === "reconnecting"
+        ? { text: "Reconnecting. Values frozen.", warn: true }
+        : connectionState === "connecting"
+          ? { text: "Connecting…", warn: false }
+          : everConnected
+            ? { text: "Disconnected. Values frozen.", warn: true }
+            : { text: "Not connected.", warn: false };
 
   // Staleness pill: "waiting for $SYS" until the first message, then
   // "$SYS <age> ago" (greyed once the age exceeds 2x the learned interval).
@@ -157,12 +172,14 @@
       {/if}
     </header>
 
-    {#if isDisconnected && !error}
+    {#if banner && !error}
       <div
-        class="px-4 py-1 text-sm text-warning border-y border-warning truncate"
+        class="px-4 py-1 text-sm truncate border-y {banner.warn
+          ? 'text-warning border-warning'
+          : 'text-secondary-text border-divider'}"
         style="--wails-draggable:false"
       >
-        Disconnected. Values frozen.
+        {banner.text}
       </div>
     {/if}
 
