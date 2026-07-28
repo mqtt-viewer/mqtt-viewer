@@ -51,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         title: "Peek at messages on the timeline",
-        body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained. Handy for skimming across recent messages to compare values, and it doesn't change which message is selected. Clicking and the arrow keys work exactly as before.",
+        body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
         thanks: [
           {
             name: "Daschi2",
