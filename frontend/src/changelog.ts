@@ -153,6 +153,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Updates that match your install",
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
+      {
+        title: "Deleting a connection works again",
+        body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
+      },
     ],
   },
   {
