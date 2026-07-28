@@ -103,7 +103,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Pick your own chart time window",
-        body: "The chart's time window now goes beyond an hour: 3, 6 and 12 hours, a full day, or any custom interval in seconds, minutes, hours or days. Your choice is remembered per connection, and the pop-out chart follows along.",
+        body: "The chart's time window now goes beyond an hour: 3, 6 and 12 hours, a full day, or any custom interval in seconds, minutes, hours or days, remembered per connection.",
         thanks: [
           {
             name: "viktak",

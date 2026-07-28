@@ -33,12 +33,14 @@ const get = (connectionId: number | string): number => {
   return cache.get(String(connectionId)) ?? 0;
 };
 
-// Writes through to the backend and updates the cache. Call only from a
-// genuine user action (see ChartView.svelte) -- never reactively.
-const set = (connectionId: number | string, seconds: number) => {
+// Writes through to the backend, updating the cache only once the write is
+// confirmed so a failed save can't leave the cache claiming a value the DB
+// never got. Call only from a genuine user action (see ChartView.svelte) --
+// never reactively. Callers must handle rejection.
+const set = async (connectionId: number | string, seconds: number) => {
   const id = String(connectionId);
+  await UpdateChartWindow(id, seconds);
   cache.set(id, seconds);
-  return UpdateChartWindow(id, seconds);
 };
 
 export default {

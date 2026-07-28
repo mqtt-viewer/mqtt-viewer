@@ -13,6 +13,10 @@
   export let showPoints = true;
   // 0 = all history; otherwise show only the last N seconds.
   export let windowSeconds = 0;
+  // False while the chart is rendered but off screen (an inactive tab slot).
+  // Gates the 1 Hz ticker so a hidden chart doesn't re-parse history every
+  // second from launch.
+  export let visible = true;
 
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
@@ -52,17 +56,20 @@
 
   $: $theme, render(true);
 
-  // Keep the ticker running only while a finite, unpaused window is shown.
+  // Keep the ticker running only while a finite, unpaused window is actually
+  // on screen. On becoming visible again, render once immediately so the
+  // window is current rather than up to a second stale.
   const syncWindowTick = () => {
-    const wantTick = windowSeconds > 0 && !paused;
+    const wantTick = windowSeconds > 0 && !paused && visible;
     if (wantTick && windowTick === null) {
+      render();
       windowTick = setInterval(render, 1000);
     } else if (!wantTick && windowTick !== null) {
       clearInterval(windowTick);
       windowTick = null;
     }
   };
-  $: windowSeconds, paused, syncWindowTick();
+  $: windowSeconds, paused, visible, syncWindowTick();
 
   onMount(() => {
     chart = echarts.init(container, undefined, { renderer: "canvas" });

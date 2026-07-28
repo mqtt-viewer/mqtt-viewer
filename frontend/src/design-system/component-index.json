@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T14:17:19.984Z",
+  "generatedAt": "2026-07-28T07:23:29.306Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3699,6 +3699,12 @@
           "type": "number",
           "required": false,
           "default": 0
+        },
+        {
+          "name": "visible",
+          "type": "boolean",
+          "required": false,
+          "default": true
         }
       ],
       "tokens": [

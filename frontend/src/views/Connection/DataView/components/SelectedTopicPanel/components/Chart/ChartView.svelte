@@ -4,6 +4,7 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import { addToast } from "@/components/Toast/Toast.svelte";
   import chartWindows from "@/stores/chart-windows";
   import type { SelectedTopicStore } from "../../../../stores/selected-topic-store";
   import type { ChartSeriesStore } from "./chart-series-store";
@@ -17,6 +18,10 @@
   export let onAddFromPayload: (() => void) | null = null;
   // Pop-out control (shown in the docked panel, hidden in a popped-out window).
   export let onPopOut: (() => void) | null = null;
+  // Whether the chart is actually on screen (the docked panel renders every
+  // tab slot, hidden or not). Gates TopicChart's 1 Hz window ticker. The
+  // pop-out window never passes it, so it defaults to visible there.
+  export let visible = true;
 
   let paused = false;
   let style: "line" | "area" = "line";
@@ -51,7 +56,18 @@
   // write here: that would also fire on the seed assignment and clobber a
   // saved value with 0, and could loop.
   const onWindowSecondsChange = (seconds: number) => {
-    chartWindows.set(get(selectedTopicStore).connectionId, seconds);
+    // The chart itself already shows the new window (local state); only the
+    // persistence write can fail, so surface that without touching the view.
+    chartWindows.set(get(selectedTopicStore).connectionId, seconds).catch((e) => {
+      console.error("Failed to save chart window preference", e);
+      addToast({
+        data: {
+          title: "Chart time window",
+          description: "Could not save the time window. It will reset on restart.",
+          type: "error",
+        },
+      });
+    });
   };
 </script>
 
@@ -96,6 +112,7 @@
         {style}
         {showPoints}
         {windowSeconds}
+        {visible}
       />
     {/if}
   </div>

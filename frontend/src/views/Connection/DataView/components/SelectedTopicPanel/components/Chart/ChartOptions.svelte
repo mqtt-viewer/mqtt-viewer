@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { twMerge } from "tailwind-merge";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
@@ -7,6 +7,13 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
   import BaseNumberInput from "@/components/InputFields/BaseNumberInput.svelte";
+  import {
+    customWindowSeconds,
+    maxValueForUnit,
+    parseCustomValue,
+    reverseMap,
+    type Unit,
+  } from "./chart-custom-window";
 
   export let style: "line" | "area" = "line";
   export let showPoints = true;
@@ -28,22 +35,26 @@
     { label: "Last 12 hours", value: 43200 },
     { label: "Last 1 day", value: 86400 },
   ];
-  $: windowLabel =
-    windowOptions.find((o) => o.value === windowSeconds)?.label ?? "Custom";
   $: isCustomSelected = !windowOptions.some((o) => o.value === windowSeconds);
+  // Announced label for the current window. For a custom interval, name the
+  // actual interval ("Last 2 hours") rather than a bare "Custom".
+  $: windowLabel =
+    windowOptions.find((o) => o.value === windowSeconds)?.label ??
+    `Last ${customValue} ${
+      customValue === 1 ? customUnit.slice(0, -1) : customUnit
+    }`;
 
   const selectPreset = (seconds: number) => {
+    // Drop any in-flight custom edit: without this, the custom field's blur
+    // (fired when the menu closes on preset click) would re-commit the stale
+    // custom value over the preset.
+    cancelPendingCommit();
+    customEdited = false;
+    customError = undefined;
     windowSeconds = seconds;
     onWindowSecondsChange(seconds);
   };
 
-  type Unit = "seconds" | "minutes" | "hours" | "days";
-  const unitFactors: Record<Unit, number> = {
-    seconds: 1,
-    minutes: 60,
-    hours: 3600,
-    days: 86400,
-  };
   const unitOptions: { label: string; value: Unit }[] = [
     { label: "sec", value: "seconds" },
     { label: "min", value: "minutes" },
@@ -51,21 +62,13 @@
     { label: "day", value: "days" },
   ];
 
-  // Reverse-map a non-preset seconds value to a {value, unit} pair, using the
-  // largest unit that divides it evenly, so the custom field can be seeded
-  // from a persisted value.
-  const reverseMap = (s: number): { value: number; unit: Unit } => {
-    if (s % 86400 === 0) return { value: s / 86400, unit: "days" };
-    if (s % 3600 === 0) return { value: s / 3600, unit: "hours" };
-    if (s % 60 === 0) return { value: s / 60, unit: "minutes" };
-    return { value: s, unit: "seconds" };
-  };
-
-  // Last valid custom value/unit. Seeded once on mount from windowSeconds if
+  // Last applied custom value/unit. Seeded once on mount from windowSeconds if
   // it doesn't match a preset; otherwise defaults, per the edge case that a
   // preset match leaves the custom field at its default.
   let customValue = 1;
   let customUnit: Unit = "seconds";
+  let customError: string | undefined = undefined;
+  let customInputEl: HTMLInputElement | undefined = undefined;
 
   onMount(() => {
     if (isCustomSelected) {
@@ -75,27 +78,99 @@
     }
   });
 
-  const applyCustom = () => {
-    const seconds = customValue * unitFactors[customUnit];
-    windowSeconds = seconds;
-    onWindowSecondsChange(seconds);
+  // Typing must not apply-and-persist per keystroke (typing 3600 would sweep
+  // the chart through windows 3/36/360 and write each to the DB). Edits are
+  // debounced; Enter, blur and a unit click commit immediately.
+  const COMMIT_DEBOUNCE_MS = 400;
+  let commitTimer: ReturnType<typeof setTimeout> | null = null;
+  // True while the field holds an edit that hasn't been committed. Gates the
+  // blur commit: blur must never re-commit an already-applied value (the
+  // field also blurs when the menu closes, e.g. right after a preset click).
+  let customEdited = false;
+
+  const cancelPendingCommit = () => {
+    if (commitTimer !== null) {
+      clearTimeout(commitTimer);
+      commitTimer = null;
+    }
   };
 
-  // BaseNumberInput does not validate or emit a number -- it forwards `min`
-  // as a plain HTML attribute and passes the raw input string through
-  // unchanged. Parse and validate here; reject empty/NaN/<1 and keep the
-  // last valid value rather than ever feeding a bad value into windowSeconds.
-  const onCustomValueChange = (raw: string | undefined) => {
-    if (raw === undefined || raw === "") return;
-    const parsed = parseInt(raw, 10);
-    if (Number.isNaN(parsed) || parsed < 1) return;
+  onDestroy(cancelPendingCommit);
+
+  // Parse whatever is in the field, clamp it, write the clamped value back so
+  // the box always shows the value actually applied, then apply and persist.
+  // Unusable text (empty/non-numeric) leaves the previous window untouched and
+  // shows an error until the text becomes usable or blur restores it.
+  const commitCustom = () => {
+    cancelPendingCommit();
+    const raw = customInputEl ? customInputEl.value : String(customValue);
+    const parsed = parseCustomValue(raw, customUnit);
+    if (parsed === null) {
+      customError = "Enter a number";
+      return;
+    }
+    customEdited = false;
+    customError = undefined;
     customValue = parsed;
-    applyCustom();
+    // The prop alone can't correct the field when the parsed value equals the
+    // previous one (e.g. 1.5 rounding back to an already-applied 2), so sync
+    // the input element directly.
+    if (customInputEl && customInputEl.value !== String(parsed)) {
+      customInputEl.value = String(parsed);
+    }
+    const seconds = customWindowSeconds(parsed, customUnit);
+    if (seconds !== windowSeconds) {
+      windowSeconds = seconds;
+      onWindowSecondsChange(seconds);
+    }
+  };
+
+  // BaseNumberInput does not validate or emit a number -- it forwards
+  // min/max as plain HTML attributes and passes the raw input string through
+  // unchanged, so all parsing happens at commit time.
+  const onCustomValueChange = (raw: string | undefined) => {
+    cancelPendingCommit();
+    customEdited = true;
+    if (raw === undefined || raw.trim() === "") {
+      customError = "Enter a number";
+      return;
+    }
+    customError = undefined;
+    commitTimer = setTimeout(commitCustom, COMMIT_DEBOUNCE_MS);
+  };
+
+  const onCustomBlur = () => {
+    // Nothing pending: leave the applied window alone (this blur also fires
+    // when the menu unmounts).
+    if (!customEdited) return;
+    const parsed = parseCustomValue(customInputEl?.value, customUnit);
+    if (parsed === null) {
+      // Don't leave an unusable field behind: restore the last applied value.
+      cancelPendingCommit();
+      customEdited = false;
+      customError = undefined;
+      if (customInputEl) customInputEl.value = String(customValue);
+      return;
+    }
+    commitCustom();
   };
 
   const onCustomUnitChange = (unit: Unit) => {
     customUnit = unit;
-    applyCustom();
+    commitCustom();
+  };
+
+  // The custom row lives inside a melt dropdown menu: letting keys bubble
+  // would trigger the menu's typeahead/navigation while typing digits. Stop
+  // everything except Escape (so the menu stays keyboard-closable from the
+  // field) and commit immediately on Enter.
+  const onCustomRowKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") return;
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitCustom();
+    }
   };
 </script>
 
@@ -125,21 +200,25 @@
       <div
         class={twMerge(
           "flex items-center gap-2 mt-1 p-1 rounded",
-          isCustomSelected ? "border-primary border-[1px]" : ""
+          isCustomSelected ? "border-primary border" : ""
         )}
       >
         <span class="text-sm text-secondary-text whitespace-nowrap">Custom</span>
         <div
           class="w-[64px]"
           role="presentation"
-          on:keydown|stopPropagation
+          on:keydown={onCustomRowKeydown}
           on:click|stopPropagation
         >
           <BaseNumberInput
             name="ChartCustomWindowValue"
             min={1}
+            max={maxValueForUnit(customUnit)}
             value={customValue}
+            hasError={!!customError}
             onChange={onCustomValueChange}
+            onBlur={onCustomBlur}
+            bind:inputEl={customInputEl}
           />
         </div>
         <!-- Plain buttons, not DropdownMenuItem: a melt menu item dismisses the
@@ -148,7 +227,7 @@
         <div
           class="flex gap-1"
           role="presentation"
-          on:keydown|stopPropagation
+          on:keydown={onCustomRowKeydown}
           on:click|stopPropagation
         >
           {#each unitOptions as u (u.value)}
@@ -156,13 +235,18 @@
               type="button"
               class={twMerge(
                 "cursor-pointer rounded px-2 py-1 text-sm text-white-text hover:bg-elevation-2-hover hover:text-emphasis",
-                customUnit === u.value ? "border-primary border-[1px]" : ""
+                customUnit === u.value ? "border-primary border" : ""
               )}
               on:click={() => onCustomUnitChange(u.value)}>{u.label}</button
             >
           {/each}
         </div>
       </div>
+      {#if customError}
+        <!-- Rendered at row level, not via BaseNumberInput's errorMessage:
+             that span absolutely positions inside the 64px field and clips. -->
+        <div class="mt-1 px-1 text-sm text-error">{customError}</div>
+      {/if}
     </div>
 
     <div>
