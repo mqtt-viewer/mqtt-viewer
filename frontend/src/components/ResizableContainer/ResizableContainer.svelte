@@ -9,7 +9,7 @@
     minSize: number;
     maxSize: number;
     resizeEdge?: "left" | "right" | "top";
-    size?: number;
+    defaultSize?: number;
     width?: number;
     height?: number;
   }
@@ -19,17 +19,28 @@
   export let minSize: number;
   export let maxSize: number;
   export let resizeEdge: "left" | "right" | "top" = "right";
+  // First-run size when nothing is persisted for this id yet; falls back to
+  // minSize when unset.
+  export let defaultSize: number | undefined = undefined;
 
-  $: collapsed,
-    (() => {
-      panelSizes.updatePanelSize(id, size, !collapsed);
-    })();
-
-  let defaultSize = $panelSizes.resizablePanelSizes[id]?.size || minSize;
-  if (defaultSize < minSize) defaultSize = minSize;
-  if (defaultSize > maxSize) defaultSize = maxSize;
+  const storedSize =
+    $panelSizes.resizablePanelSizes[id]?.size || defaultSize || minSize;
+  let initialSize = storedSize;
+  if (initialSize < minSize) initialSize = minSize;
+  if (initialSize > maxSize) initialSize = maxSize;
   let edgeHovered = false;
-  let size = defaultSize;
+  let size = initialSize;
+
+  // Persist only deliberate user actions: collapse/expand here, drag end in
+  // onMouseUp. Never persist from a plain reactive on `size`: the clamp
+  // below rewrites size programmatically (dock switches, or a mount while
+  // the root window size is still unknown), and persisting those writes
+  // would permanently overwrite the user's saved size.
+  let lastPersistedCollapsed = collapsed;
+  $: if (collapsed !== lastPersistedCollapsed) {
+    lastPersistedCollapsed = collapsed;
+    panelSizes.updatePanelSize(id, size, !collapsed);
+  }
 
   $: isVertical = resizeEdge === "top";
 
@@ -62,10 +73,8 @@
         if (linuxFirstMovementX === -999) {
           linuxFirstSize = size;
           linuxFirstMovementX = clientPos;
-          console.log("first movement set to", linuxFirstMovementX);
         } else {
           const diff = clientPos - linuxFirstMovementX;
-          console.log("diff =", diff, "due to", event);
           let newSize: number;
           if (isVertical) {
             newSize = linuxFirstSize - diff;
@@ -74,7 +83,6 @@
           } else {
             newSize = linuxFirstSize + diff;
           }
-          console.log("new size =", newSize);
           if (newSize >= minSize && newSize <= maxSize) {
             size = newSize;
           }
@@ -85,7 +93,12 @@
     const onMouseUp = () => {
       resizing = false;
       window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mousemove", onMouseMoveLinux);
       window.removeEventListener("mouseup", onMouseUp);
+      // Reset the sentinel so the next Linux drag re-anchors from its own
+      // starting position instead of the previous drag's.
+      linuxFirstMovementX = -999;
+      preferredSize = size;
       panelSizes.updatePanelSize(id, size, true);
     };
     if ($os.isLinux) {
@@ -100,15 +113,20 @@
   export let height: number = 0;
   $: if (!isVertical) width = !collapsed ? size : 30;
   $: if (isVertical) height = !collapsed ? size : 30;
+  // The user's chosen size, tracked separately from the displayed size: a
+  // dock switch (or small window) can shrink maxSize temporarily, and the
+  // display should clamp without forgetting the choice, so the panel
+  // springs back once the bound relaxes. Seeded from the unclamped stored
+  // preference so degenerate mount-time bounds can't corrupt it. Never
+  // persisted from here - see the note above the collapse persist.
+  let preferredSize = storedSize;
   $: minSize,
     maxSize,
     (() => {
-      if (size < minSize) {
-        size = minSize;
-      }
-      if (size > maxSize) {
-        size = maxSize;
-      }
+      let next = preferredSize;
+      if (next < minSize) next = minSize;
+      if (next > maxSize) next = maxSize;
+      size = next;
     })();
 </script>
 

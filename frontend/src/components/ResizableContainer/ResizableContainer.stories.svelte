@@ -6,7 +6,7 @@
 
   const componentName = "ResizableContainer";
   const storyId = "Primitives/ResizableContainer";
-  const props: string[] = ["id","collapsed","minSize","maxSize","resizeEdge","width","height"];
+  const props: string[] = ["id","collapsed","minSize","maxSize","resizeEdge","defaultSize","width","height"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -26,9 +26,12 @@
 
 <!-- Vertical (bottom-dock) example: sizes height instead of width, drag
      handle along the top edge. Mirrors the dockable topic panel's
-     resizeEdge="top" usage in DataView. -->
+     resizeEdge="top" usage in DataView. defaultSize sets the rendered
+     height (the height prop is an output binding, not an input), and the id
+     is story-local so the story never reads or writes a production panel's
+     persisted size. -->
 <Story
   name="Vertical"
-  args={{ ...storyArgs, id: "selected-topic-panel-bottom", resizeEdge: "top", minSize: 220, maxSize: 480, height: 280 }}
+  args={{ ...storyArgs, id: "story-resizable-vertical", resizeEdge: "top", minSize: 220, maxSize: 480, defaultSize: 280 }}
   {template}
 />
