@@ -23,9 +23,9 @@ const (
 )
 
 type ProtoBindingMatch struct {
-	MessageType string
-	Filter      string
-	Source      string
+	MessageType string `json:"messageType"`
+	Filter      string `json:"filter"`
+	Source      string `json:"source"`
 }
 
 type ProtoBindingMatcher struct {
@@ -118,6 +118,13 @@ func (m *ProtoBindingMatcher) resolve(topic string) ProtoBindingMatch {
 
 	for i := range m.rules {
 		r := &m.rules[i]
+		// The API now rejects an empty MessageType on write, but old rows
+		// created before that check existed may still have one. Skip them
+		// here too so a legacy/typeless row can never rank above (and thus
+		// shadow) a lower rule or the implicit Sparkplug candidates.
+		if r.MessageType == "" {
+			continue
+		}
 		c := candidate{filter: r.TopicFilter, messageType: r.MessageType, source: SourceRule, sortOrder: r.SortOrder, id: r.ID}
 		if !candidateMatches(c, topic) {
 			continue

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/protobuf"
@@ -71,6 +72,9 @@ func (a *App) AddProtoBindingRule(connId uint, rule models.ProtoBindingRule) (*m
 	if err := topicmatching.ValidateTopicFilter(rule.TopicFilter); err != nil {
 		return nil, err
 	}
+	if rule.MessageType == "" {
+		return nil, errors.New("message type can't be empty")
+	}
 
 	existing, err := a.GetProtoBindingRulesByConnectionId(connId)
 	if err != nil {
@@ -109,6 +113,9 @@ func (a *App) UpdateProtoBindingRule(connId uint, rule models.ProtoBindingRule) 
 	}
 	if err := topicmatching.ValidateTopicFilter(rule.TopicFilter); err != nil {
 		return nil, err
+	}
+	if rule.MessageType == "" {
+		return nil, errors.New("message type can't be empty")
 	}
 
 	existingRule := models.ProtoBindingRule{}

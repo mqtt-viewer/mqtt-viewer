@@ -170,6 +170,37 @@ func TestMatchSpecificity(t *testing.T) {
 	}
 }
 
+// TestMatchTypelessRuleDoesNotShadowLowerRule covers a legacy row saved
+// before the API started rejecting an empty MessageType: even though it's
+// more specific, it must not win over a lower, less specific typed rule.
+func TestMatchTypelessRuleDoesNotShadowLowerRule(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "sensors/room1/telemetry", "", 0),
+		rule(2, "sensors/+/telemetry", "TypePlus", 1),
+	})
+
+	got := m.Match("sensors/room1/telemetry")
+	want := ProtoBindingMatch{MessageType: "TypePlus", Filter: "sensors/+/telemetry", Source: SourceRule}
+	if got != want {
+		t.Errorf("Match(sensors/room1/telemetry) = %+v, want %+v", got, want)
+	}
+}
+
+// TestMatchTypelessHashRuleDoesNotShadowImplicitSparkplug covers the same
+// legacy case for a bare "#" rule: it must not beat the implicit Sparkplug
+// candidates just because it has no type to lose on.
+func TestMatchTypelessHashRuleDoesNotShadowImplicitSparkplug(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "#", "", 0),
+	})
+
+	got := m.Match("spBv1.0/G/NBIRTH/N")
+	want := ProtoBindingMatch{MessageType: sparkplugBMessageType, Filter: sparkplugBFilter, Source: SourceSparkplug}
+	if got != want {
+		t.Errorf("Match(spBv1.0/...) = %+v, want %+v", got, want)
+	}
+}
+
 func TestMatchImplicitSparkplugRankingNoUserRules(t *testing.T) {
 	m := NewProtoBindingMatcher(nil)
 

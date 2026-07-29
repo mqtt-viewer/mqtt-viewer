@@ -216,16 +216,16 @@ export async function GetMatchingProtoTypeForTopic(
   const rule = rules.find((r) => r.topicFilter === topic);
   if (rule) {
     return new topicmatching.ProtoBindingMatch({
-      MessageType: rule.messageType,
-      Filter: rule.topicFilter,
-      Source: "rule",
+      messageType: rule.messageType,
+      filter: rule.topicFilter,
+      source: "rule",
     });
   }
   if (topic.startsWith("spBv1.0/")) {
     return new topicmatching.ProtoBindingMatch({
-      MessageType: "SparkplugBPayload",
-      Filter: "spBv1.0/#",
-      Source: "sparkplug",
+      messageType: "SparkplugBPayload",
+      filter: "spBv1.0/#",
+      source: "sparkplug",
     });
   }
   return new topicmatching.ProtoBindingMatch();

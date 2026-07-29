@@ -6,20 +6,20 @@
 import {Create as $Create} from "@wailsio/runtime";
 
 export class ProtoBindingMatch {
-    "MessageType": string;
-    "Filter": string;
-    "Source": string;
+    "messageType": string;
+    "filter": string;
+    "source": string;
 
     /** Creates a new ProtoBindingMatch instance. */
     constructor($$source: Partial<ProtoBindingMatch> = {}) {
-        if (!("MessageType" in $$source)) {
-            this["MessageType"] = "";
+        if (!("messageType" in $$source)) {
+            this["messageType"] = "";
         }
-        if (!("Filter" in $$source)) {
-            this["Filter"] = "";
+        if (!("filter" in $$source)) {
+            this["filter"] = "";
         }
-        if (!("Source" in $$source)) {
-            this["Source"] = "";
+        if (!("source" in $$source)) {
+            this["source"] = "";
         }
 
         Object.assign(this, $$source);

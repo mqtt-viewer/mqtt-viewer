@@ -77,6 +77,23 @@ func TestAddProtoBindingRuleRejectsInvalidFilter(t *testing.T) {
 	}
 }
 
+func TestAddProtoBindingRuleRejectsEmptyMessageType(t *testing.T) {
+	app, connId := getTestAppWithConnection(t)
+
+	_, err := app.AddProtoBindingRule(connId, models.ProtoBindingRule{TopicFilter: "a/b", MessageType: ""})
+	if err == nil {
+		t.Fatal("Expected an error for an empty message type")
+	}
+
+	rules, err := app.GetProtoBindingRulesByConnectionId(connId)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(rules) != 0 {
+		t.Errorf("Expected no rule to be created for a rejected message type, got %v", len(rules))
+	}
+}
+
 func TestUpdateProtoBindingRule(t *testing.T) {
 	app, connId := getTestAppWithConnection(t)
 
@@ -122,6 +139,28 @@ func TestUpdateProtoBindingRuleRejectsInvalidFilter(t *testing.T) {
 	}
 	if rules[0].TopicFilter != "a/b" {
 		t.Errorf("Expected the original filter to survive a rejected update, got %v", rules[0].TopicFilter)
+	}
+}
+
+func TestUpdateProtoBindingRuleRejectsEmptyMessageType(t *testing.T) {
+	app, connId := getTestAppWithConnection(t)
+
+	added, err := app.AddProtoBindingRule(connId, models.ProtoBindingRule{TopicFilter: "a/b", MessageType: "TypeA"})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	added.MessageType = ""
+	if _, err := app.UpdateProtoBindingRule(connId, *added); err == nil {
+		t.Fatal("Expected an error for an empty message type")
+	}
+
+	rules, err := app.GetProtoBindingRulesByConnectionId(connId)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if rules[0].MessageType != "TypeA" {
+		t.Errorf("Expected the original message type to survive a rejected update, got %v", rules[0].MessageType)
 	}
 }
 

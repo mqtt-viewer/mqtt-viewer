@@ -15,6 +15,29 @@ func DecodeFromProtoBytes(protoBytes []byte, descriptor protoreflect.MessageDesc
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling proto bytes: %w", err)
 	}
+
+	// Wire format isn't self-describing: unmarshalling bytes of message type
+	// X against descriptor Y "succeeds" whenever every field number/wire-type
+	// pair happens not to collide with a known field, and everything lands in
+	// unknown fields instead. Left alone that reports a confident "decoded"
+	// result with an empty {} payload. Treat non-empty input that populated
+	// none of the descriptor's known fields but did populate unknown fields
+	// as a failed decode. This is conservative, not exact: a partial
+	// collision (some fields happen to line up on number + wire type) still
+	// reports success, and a payload from a newer .proto that only adds
+	// fields this descriptor doesn't know about would now be reported as a
+	// failed decode even though the message type is technically "the same".
+	if len(protoBytes) > 0 && len(msg.GetUnknown()) > 0 {
+		hasKnownField := false
+		msg.Range(func(protoreflect.FieldDescriptor, protoreflect.Value) bool {
+			hasKnownField = true
+			return false
+		})
+		if !hasKnownField {
+			return nil, fmt.Errorf("no fields of %s matched the payload", descriptor.FullName())
+		}
+	}
+
 	jsonBytes, err := protojson.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling json bytes: %w", err)
