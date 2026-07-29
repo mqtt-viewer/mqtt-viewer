@@ -153,6 +153,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Updates that match your install",
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
+      {
+        title: "Reconnecting when the network drops out",
+        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+      },
     ],
   },
   {
