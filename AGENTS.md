@@ -85,9 +85,19 @@ Caveats:
   the shipping app is always the native webview build.
 
 To test the app behind a path-prefixing reverse proxy (Home Assistant ingress),
-run `scripts/ingress-sim.go` in front of the server-mode app: it serves
+put `scripts/ingress-sim.go` in front of the server-mode app: it serves
 everything under `/prefix/` and strips the prefix before forwarding, mirroring
-how ingress mounts an add-on (see the file's header for usage).
+how ingress mounts an add-on.
+
+```sh
+go build -o bin/ingress-sim ./scripts && bin/ingress-sim   # then open :9600/prefix/
+bin/ingress-sim -listen :9601 -redirect=false              # no trailing-slash redirect
+```
+
+Build the binary, don't `go run` it: `go run`'s temp binaries have been seen to
+die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
+mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
+trailing-slash self-heal (see the file's header for the rest).
 
 ### Fallback for human/visual verification
 

@@ -11,7 +11,15 @@
 //	go build -o bin/ingress-sim ./scripts && bin/ingress-sim
 //	open http://localhost:9600/prefix/
 //
-// Flags: -listen :9600, -prefix /prefix, -upstream http://127.0.0.1:9500.
+// Flags: -listen :9600, -prefix /prefix, -upstream http://127.0.0.1:9500,
+// -redirect (default true).
+//
+// -redirect=false drops the 302 from /prefix to /prefix/, which is what nginx
+// and Caddy strip_prefix setups do. Use it to check the page still heals
+// itself when the prefix is entered without its trailing slash:
+//
+//	bin/ingress-sim -listen :9601 -redirect=false
+//	open http://localhost:9601/prefix
 //
 // Build the binary somewhere under the repo tree (bin/ is gitignored), not a
 // sandboxed scratchpad or temp dir: on macOS, Go binaries written outside the
@@ -32,6 +40,7 @@ func main() {
 	listen := flag.String("listen", ":9600", "address to listen on")
 	prefix := flag.String("prefix", "/prefix", "path prefix to serve the app under")
 	upstreamFlag := flag.String("upstream", "http://127.0.0.1:9500", "server-mode app to proxy to")
+	redirect := flag.Bool("redirect", true, "redirect the prefix root to its trailing-slash form, as HA ingress does; -redirect=false mirrors a bare nginx/Caddy strip_prefix")
 	flag.Parse()
 
 	upstream, err := url.Parse(*upstreamFlag)
@@ -44,11 +53,11 @@ func main() {
 	p := strings.TrimSuffix(*prefix, "/")
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == p {
+		if r.URL.Path == p && *redirect {
 			http.Redirect(w, r, p+"/", http.StatusFound)
 			return
 		}
-		if !strings.HasPrefix(r.URL.Path, p+"/") {
+		if r.URL.Path != p && !strings.HasPrefix(r.URL.Path, p+"/") {
 			// Anything outside the prefix 404s, like ingress: a root-absolute
 			// URL that escapes the prefix must visibly fail here.
 			http.Error(w, "not found (app is served under "+p+"/)", http.StatusNotFound)
@@ -63,6 +72,10 @@ func main() {
 		rp.ServeHTTP(w, r)
 	}
 
-	log.Printf("ingress-sim: http://localhost%s%s/ -> %s", *listen, p, upstream)
+	if *redirect {
+		log.Printf("ingress-sim: http://localhost%s%s/ -> %s", *listen, p, upstream)
+	} else {
+		log.Printf("ingress-sim: http://localhost%s%s/ -> %s (no trailing-slash redirect)", *listen, p, upstream)
+	}
 	log.Fatal(http.ListenAndServe(*listen, http.HandlerFunc(handler)))
 }
