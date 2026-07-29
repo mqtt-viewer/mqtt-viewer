@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-29T05:18:41.001Z",
+  "generatedAt": "2026-07-29T06:01:05.703Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2317,7 +2317,12 @@
         "lastSyncedAt": null
       },
       "props": [],
-      "tokens": [],
+      "tokens": [
+        "outline",
+        "elevation-2",
+        "secondary-text",
+        "emphasis"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",

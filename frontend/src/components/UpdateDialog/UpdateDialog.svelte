@@ -70,6 +70,14 @@
         The updater will guide you through the download and restart once it's
         ready.
       </div>
+      {#if availableUpdate.release_notes}
+        <p class="mb-1 text-sm text-secondary-text">What's new</p>
+        <div
+          class="mb-6 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-outline bg-elevation-2 px-3 py-2 text-sm"
+        >
+          {availableUpdate.release_notes}
+        </div>
+      {/if}
       <DialogActionBar
         ><Button on:click={onClose} variant="secondary">Close</Button><Button
           variant="primary"
@@ -83,19 +91,31 @@
       </div>
       <div class="my-6">{availableUpdate.instructions}</div>
       {#if availableUpdate.update_command}
-        <div class="mb-6 flex items-center gap-2">
+        <div class="mb-6">
           <code
-            class="flex-1 select-all overflow-x-auto rounded border border-outline bg-elevation-2 px-3 py-2 font-mono text-sm text-emphasis"
+            class="block select-all overflow-x-auto rounded border border-outline bg-elevation-2 px-3 py-2 font-mono text-sm text-emphasis"
             >{availableUpdate.update_command}</code
           >
-          <Button on:click={onCopyCommand} variant="secondary">Copy</Button>
+        </div>
+      {/if}
+      {#if availableUpdate.release_notes}
+        <p class="mb-1 text-sm text-secondary-text">What's new</p>
+        <div
+          class="mb-6 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-outline bg-elevation-2 px-3 py-2 text-sm"
+        >
+          {availableUpdate.release_notes}
         </div>
       {/if}
       <DialogActionBar>
         <Button on:click={onClose} variant="secondary">Close</Button>
         {#if availableUpdate.releases_url}
-          <Button variant="primary" on:click={onOpenReleases}
+          <Button variant="secondary" on:click={onOpenReleases}
             >Open releases page</Button
+          >
+        {/if}
+        {#if availableUpdate.update_command}
+          <Button variant="primary" on:click={onCopyCommand}
+            >Copy command</Button
           >
         {/if}
       </DialogActionBar>
