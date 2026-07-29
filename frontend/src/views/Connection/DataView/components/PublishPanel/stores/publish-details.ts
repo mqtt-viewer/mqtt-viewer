@@ -240,12 +240,20 @@ export const createPublishStore = (connId: number) => {
     console.log("new store values", get({ subscribe }));
   };
 
-  // Topic EDITS reset the override to auto (the old choice may not make
-  // sense for the new topic). Loads of saved/history messages must NOT use
-  // this: they restore topic and protoOverrideChoice together via
-  // setPartial/setSource, so the persisted choice survives the load.
+  // Topic EDITS reset a FORCED type back to auto (the old type may not suit
+  // the new topic), but preserve an explicit 'none': the user said "don't
+  // encode this", and silently protobuf-encoding the next publish because
+  // they corrected a typo in the topic is a footgun. Loads of saved/history
+  // messages must NOT use this: they restore topic and protoOverrideChoice
+  // together via setPartial/setSource, so the persisted choice survives the
+  // load.
   const setTopic = (topic: string) => {
-    update((store) => ({ ...store, topic, protoOverrideChoice: "auto" }));
+    update((store) => ({
+      ...store,
+      topic,
+      protoOverrideChoice:
+        store.protoOverrideChoice === "none" ? "none" : "auto",
+    }));
   };
 
   const formatPayload = () => {
