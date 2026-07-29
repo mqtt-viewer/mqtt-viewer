@@ -155,6 +155,8 @@ Caddy, which is the point.
 | `WAILS_SERVER_PORT` | `8080` | Port the HTTP server listens on inside the container. |
 | `WAILS_SERVER_HOST` | `0.0.0.0` | Bind address. Leave it alone in Docker. |
 | `MQTT_VIEWER_DATA_DIR` | `/data` | Where the SQLite database and Sparkplug proto files live. Leave it alone in Docker, see below. |
+| `MQTT_VIEWER_DISABLE_UPDATE_CHECK` | unset | Set to `1` and the app never contacts the portal. See [Update checks](#update-checks). |
+| `MQTT_VIEWER_INSTALL_TYPE` | `docker` | How this deployment updates, which decides the instructions the app shows. The image sets `docker`; set `home-assistant` if you package it as an add-on. |
 
 Do not change `MQTT_VIEWER_DATA_DIR` in the container. The machine id that
 saved broker passwords are encrypted with lives at `/data/machine-id`, and
@@ -195,10 +197,12 @@ connection settings.
 
 - Exports download through the browser instead of a save dialog.
 - Pop-out chart and broker status windows open as browser tabs.
-- No self-update. The app still tells you when a newer image is available and
-  shows the pull command, but it never replaces itself. You update by pulling a
-  new image: `docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest` and recreating
-  the container. Your data survives in the volume.
+- No self-update. The app tells you when a newer image is available and shows
+  the pull command, but it never replaces itself. You update by pulling a new
+  image: `docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest` and recreating the
+  container. Your data survives in the volume. The check that spots a new
+  version talks to my portal; see [Update checks](#update-checks) for what it
+  sends and how to switch it off.
 - Certificate paths are typed, not picked (see above).
 - **Every browser tab shares one session.** There is a single backend, so
   connecting or disconnecting in one tab does it for all of them, and panel
@@ -225,6 +229,47 @@ Or `docker compose pull && docker compose up -d` if you use compose. The
 database schema migrates forward automatically on start. Downgrading to an
 older image after a migration is not supported, same as the desktop app.
 
+The in-app notification always names the tag `:latest`. If you pin a version,
+mirror the image or run it through compose, substitute your own tag or command.
+
+## Update checks
+
+The container asks my portal whether a newer version exists. It checks a couple
+of seconds after the first browser client connects and every ten minutes while
+one is open; the answer is cached for five minutes, so extra tabs and reloads
+cost nothing.
+
+Each check is one HTTPS POST to `cloud.mqttviewer.app` carrying four fields:
+
+```json
+{
+  "machine_id": "3f0c...",
+  "current_version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64"
+}
+```
+
+The machine id is a hash of the id in `/data/machine-id`, generated on first
+start. It is pseudonymous and stable for the life of the volume: it tells me
+one install checked in, and nothing about you, your host or your network. No
+broker address, topic, payload or credential ever leaves the container, and
+there is no other telemetry.
+
+To turn the check off entirely:
+
+```sh
+docker run -d \
+  -e MQTT_VIEWER_DISABLE_UPDATE_CHECK=1 \
+  -p 127.0.0.1:8080:8080 \
+  -v mqtt-viewer-data:/data \
+  ghcr.io/mqtt-viewer/mqtt-viewer:latest
+```
+
+The app then makes no outbound calls of its own and logs one line at startup
+saying so. You will not be told when a new image lands, so watch the
+[releases page](https://github.com/mqtt-viewer/mqtt-viewer/releases) instead.
+
 ## Building the image yourself
 
 ```sh
@@ -242,11 +287,18 @@ demands the signing and portal secrets only the release workflow has.
 
 The image is a normal web app on a single port with a single `/data` volume,
 which is the shape Home Assistant add-ons, Unraid templates, Portainer
-templates and similar app stores expect. A Home Assistant add-on needs
-ingress support (serving the UI under a path prefix), which the app does not
-handle yet. If you want this, say so in
-[issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119) so I know
-to prioritise it.
+templates and similar app stores expect.
+
+I have not published a Home Assistant add-on. If you package one yourself, set
+`MQTT_VIEWER_INSTALL_TYPE=home-assistant` (that exact literal) in the add-on
+config. The app then drops the `docker pull` guidance and tells the user to
+update from the add-on store, which is the only route that works under the
+supervisor. Leave it unset and your users are told to pull an image they cannot
+reach.
+
+If you want an official add-on, say so in
+[issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119) so I know to
+prioritise it.
 
 ## App store templates
 
