@@ -21,6 +21,7 @@
   import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
   import { writable } from "svelte/store";
   import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
 
   export let connection: Connection;
 
@@ -68,7 +69,7 @@
       addToast({
         data: {
           title: "Failed to connect",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -107,6 +108,10 @@
   let clearRetainedTopics: string[] = [];
   // 0 means the single-topic case; a branch shows its count.
   let clearRetainedCount = 0;
+  let clearRetainedBusy = false;
+  // The panel owns the topic tree and the graph, so it is what has to be told
+  // a marker is stale. Absent while the "not connected" state is showing.
+  let dataPanel: MqttDataPanel | undefined;
 
   const requestClearRetained = (topic: string) => {
     clearRetainedTopic = topic;
@@ -126,7 +131,7 @@
       addToast({
         data: {
           title: "Failed to find retained messages",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -136,7 +141,20 @@
     // action for what is below, so clearing the branch must not silently take
     // the topic you right-clicked with it.
     const below = topics.filter((t) => t !== prefix);
-    if (below.length === 0) return;
+    // The count on the menu item was fetched when the menu opened, so another
+    // client can clear the lot in between. Say so: asking for three things and
+    // getting silence reads as a broken button.
+    if (below.length === 0) {
+      addToast({
+        data: {
+          title: "Nothing left to clear",
+          description: prefix,
+          descriptionStyle: "code",
+          type: "info",
+        },
+      });
+      return;
+    }
     clearRetainedTopic = prefix;
     // Capture the exact list now. The dialog's number is a promise about what
     // gets cleared, so it must not be re-resolved after the user agrees to it.
@@ -147,30 +165,65 @@
 
   const confirmClearRetained = async () => {
     const topics = clearRetainedTopics;
+    const prefix = clearRetainedTopic;
+    clearRetainedBusy = true;
     try {
-      if (topics.length === 1) {
+      if (clearRetainedCount === 0) {
         await DeleteRetainedMessage(connection.connectionDetails.id, topics[0]);
+        // Only the backend index self-heals; the tree and the graph hold their
+        // own copies, and on MQTT 3 no arriving message will ever correct them.
+        dataPanel?.markRetainedCleared(topics);
+        addToast({
+          data: {
+            title: "Retained message cleared",
+            description: topics[0],
+            descriptionStyle: "code",
+            type: "success",
+          },
+        });
       } else {
-        await DeleteRetainedMessages(connection.connectionDetails.id, topics);
+        // The counts come back from attempted publishes, not from the length
+        // of the list I handed over, so the number reported is the number that
+        // actually went.
+        const result = await DeleteRetainedMessages(
+          connection.connectionDetails.id,
+          topics
+        );
+        if (result.cleared > 0) dataPanel?.markRetainedCleared(topics);
+        const attempted = result.cleared + result.failed;
+        if (result.failed === 0) {
+          addToast({
+            data: {
+              title: `${result.cleared} retained ${
+                result.cleared === 1 ? "message" : "messages"
+              } cleared`,
+              description: prefix,
+              descriptionStyle: "code",
+              type: "success",
+            },
+          });
+        } else {
+          addToast({
+            data: {
+              title: `Cleared ${result.cleared} of ${attempted} retained messages`,
+              description: result.firstError,
+              descriptionStyle: "code",
+              type: "error",
+            },
+          });
+        }
       }
-      addToast({
-        data: {
-          title:
-            topics.length === 1
-              ? "Retained message cleared"
-              : `${topics.length} retained messages cleared`,
-          description: clearRetainedTopic,
-          type: "success",
-        },
-      });
     } catch (e) {
       addToast({
         data: {
           title: "Failed to clear retained messages",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
+    } finally {
+      clearRetainedBusy = false;
+      isClearRetainedOpen.set(false);
     }
   };
 
@@ -181,7 +234,7 @@
       addToast({
         data: {
           title: "Failed to copy topic path",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -199,6 +252,7 @@
           data: {
             title: "Messages exported",
             description: path,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -207,7 +261,7 @@
       addToast({
         data: {
           title: "Failed to export messages",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -254,6 +308,7 @@
         </div>
       {:else}
         <MqttDataPanel
+          bind:this={dataPanel}
           {connection}
           {selectedTopicStore}
           width={dataViewWidth}
@@ -304,5 +359,7 @@
   isOpen={isClearRetainedOpen}
   topic={clearRetainedTopic}
   count={clearRetainedCount}
+  topics={clearRetainedTopics}
+  busy={clearRetainedBusy}
   onConfirm={confirmClearRetained}
 />

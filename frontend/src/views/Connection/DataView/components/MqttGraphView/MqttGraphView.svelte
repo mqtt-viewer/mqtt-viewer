@@ -387,6 +387,10 @@
   let menuHasPayload = false;
   let menuIsRetained = false;
   let menuRetainedBelowCount = 0;
+  // True while the context menu is open, so the hover tooltip can hide
+  // itself (see the `hover` render guard below and the WHY comment on the
+  // window listeners that clear this in onMount).
+  let menuOpen = false;
 
   /**
    * Resolve the node under a right-click, and set up what the menu renders.
@@ -406,6 +410,11 @@
     const topic = renderer.topicAt(x, y);
     if (topic === null) return false;
 
+    // The tooltip would otherwise sit underneath/behind the menu that's
+    // about to open over the same node.
+    hover = null;
+    menuOpen = true;
+
     const node = findNode(topic);
     menuTopic = topic;
     menuIsRetained = node?.ownRetained ?? false;
@@ -418,12 +427,53 @@
       .then((topics) => {
         if (menuTopic === topic) {
           menuRetainedBelowCount = topics.filter((t) => t !== topic).length;
+          // The model's own value is the optimistic immediate paint; the
+          // backend's retained index is the truth. The frontend message
+          // stream is a capped drop-oldest buffer, so under flood the
+          // message that would have set ownRetained can be lost, and this
+          // call is already in flight to get the below-count anyway.
+          menuIsRetained = topics.includes(topic);
         }
       })
-      .catch(() => {
-        // no count means the bulk action stays hidden; the rest still works
+      .catch((e) => {
+        // A silently missing bulk-clear item is indistinguishable from a
+        // logic bug from the user's side, so this is worth a warning even
+        // though the menu still works without the count.
+        console.warn(
+          `failed to fetch retained topics under "${topic}"`,
+          e
+        );
       });
     return true;
+  };
+
+  // ContextMenu exposes no "closed" callback, only `open`/`close`, so
+  // menuOpen is reset heuristically instead of tracked precisely: a
+  // pointerdown anywhere covers dismiss-by-click-away and dismiss-by-picking
+  // an item, and Escape covers melt's own keyboard dismissal. Both fire
+  // before or as the menu is closing, which is early enough that the
+  // tooltip reappearing a beat before the menu's close transition finishes
+  // is not perceptible.
+  const clearMenuOpen = () => {
+    menuOpen = false;
+  };
+  const onWindowKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") clearMenuOpen();
+  };
+
+  // Invalidate the retained marker on already-known nodes after a clear
+  // succeeds. The tombstone does come back as a message, but only MQTT 5
+  // keeps its Retain flag set, so under MQTT 3 the ingest() carrying it says
+  // nothing about retained state and the marker would survive. The clear call
+  // resolving is the only signal the graph gets. Repaints once, immediately,
+  // rather than waiting for the next ~10Hz slow tick that would otherwise
+  // pick up the model change on its own.
+  export const clearRetainedMarks = (topics: string[]) => {
+    let changed = false;
+    for (const topic of topics) {
+      if (model.clearRetained(topic)) changed = true;
+    }
+    if (changed) renderer?.requestRepaint();
   };
 
   const findNode = (topic: string): TopicNode | null => {
@@ -754,10 +804,14 @@
     io.observe(containerEl);
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("pointerdown", clearMenuOpen, true);
+    window.addEventListener("keydown", onWindowKeydown, true);
   });
 
   onDestroy(() => {
     destroyed = true;
+    window.removeEventListener("pointerdown", clearMenuOpen, true);
+    window.removeEventListener("keydown", onWindowKeydown, true);
     // hand the current expansion to the next mount of this connection
     if (renderer) {
       expansionByConnection.set(connectionKey(), renderer.expandedTopics());
@@ -1049,7 +1103,7 @@
         Sorting paused
       </div>
     {/if}
-    {#if hover}
+    {#if hover && !menuOpen}
       <div
         class="pointer-events-none absolute z-20 max-w-[290px] rounded bg-elevation-2 px-2.5 py-1.5 text-xs shadow"
         style:left={`${tipLeft}px`}

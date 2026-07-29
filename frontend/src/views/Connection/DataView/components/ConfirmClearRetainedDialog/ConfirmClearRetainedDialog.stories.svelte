@@ -5,7 +5,7 @@
   import { writable } from "svelte/store";
 
   const componentName = "ConfirmClearRetainedDialog";
-  const props: string[] = ["topic", "count"];
+  const props: string[] = ["topic", "count", "busy"];
 
   const { Story } = defineMeta({
     title: "Components/Connection/DataView/ConfirmClearRetainedDialog",
@@ -14,12 +14,23 @@
     argTypes: getStoryArgTypes(componentName, props) as any,
     parameters: { design: { type: "figma", url: "" } },
   });
+
+  const threeTopics = [
+    "factory/line1/sensor1/temperature",
+    "factory/line1/sensor2/temperature",
+    "factory/line1/sensor3/temperature",
+  ];
+
+  const twentyFiveTopics = Array.from(
+    { length: 25 },
+    (_, i) => `factory/line1/sensor${i + 1}/temperature`
+  );
 </script>
 
 {#snippet template(args: any)}
   <!-- Open by default so the story shows the dialog itself rather than a
        trigger. isOpen is a store, matching Dialog's contract. -->
-  <Component {...args} isOpen={writable(true)} onConfirm={() => {}} />
+  <Component {...args} isOpen={writable(true)} onConfirm={async () => {}} />
 {/snippet}
 
 <Story
@@ -28,10 +39,25 @@
   {template}
 />
 
-<Story name="Branch" args={{ topic: "factory/line1", count: 12 }} {template} />
+<Story
+  name="Branch with 3 topics"
+  args={{ topic: "factory/line1", count: 3, topics: threeTopics }}
+  {template}
+/>
 
 <Story
-  name="Branch with one message"
-  args={{ topic: "factory/line1", count: 1 }}
+  name="Branch with 25 topics"
+  args={{ topic: "factory/line1", count: 25, topics: twentyFiveTopics }}
+  {template}
+/>
+
+<Story
+  name="Busy"
+  args={{
+    topic: "factory/line1",
+    count: 3,
+    topics: threeTopics,
+    busy: true,
+  }}
   {template}
 />

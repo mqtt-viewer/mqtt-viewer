@@ -250,6 +250,22 @@ export class TopicModel {
     node.agg = { score: rate.score, lastMs: rate.lastMs };
   }
 
+  // Clear ownRetained on an already-known topic, without creating it. Used
+  // after a clear-retained action succeeds: the tombstone comes back as a
+  // message, but only MQTT 5 keeps its Retain flag set, so under MQTT 3 the
+  // ingest() that carries it says nothing about retained state and the marker
+  // would survive. Returns whether the topic was found; a missing path is a
+  // silent no-op.
+  clearRetained(topic: string): boolean {
+    let node: TopicNode | undefined = this.root;
+    for (const seg of topic.split("/")) {
+      node = node.children.get(seg);
+      if (!node) return false;
+    }
+    node.ownRetained = false;
+    return true;
+  }
+
   // current subtree rate-score, decayed to now
   aggScore(node: TopicNode, nowMs: number): number {
     return decayScore(node.agg, nowMs, this.tauMs);
