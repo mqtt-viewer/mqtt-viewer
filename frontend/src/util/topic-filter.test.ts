@@ -10,17 +10,28 @@ test("valid filters pass", () => {
   expect(validateTopicFilter("$SYS/#")).toBeNull();
 });
 
-test("empty or whitespace-only filter", () => {
+test("empty filter", () => {
   expect(validateTopicFilter("")).toBe("Enter a topic filter");
-  expect(validateTopicFilter("   ")).toBe("Enter a topic filter");
-  expect(validateTopicFilter(" sensors/#")).toBe("Enter a topic filter");
-  expect(validateTopicFilter("sensors/# ")).toBe("Enter a topic filter");
 });
 
-test("NUL byte is rejected", () => {
-  expect(validateTopicFilter("sensors/\0/telemetry")).toBe(
-    "Enter a topic filter"
+test("leading or trailing whitespace", () => {
+  expect(validateTopicFilter("   ")).toBe("No leading or trailing spaces");
+  expect(validateTopicFilter(" sensors/#")).toBe(
+    "No leading or trailing spaces"
   );
+  expect(validateTopicFilter("sensors/# ")).toBe(
+    "No leading or trailing spaces"
+  );
+  expect(validateTopicFilter("sensors/temp ")).toBe(
+    "No leading or trailing spaces"
+  );
+});
+
+test("NUL byte is rejected, and takes precedence over whitespace", () => {
+  expect(validateTopicFilter("sensors/\0/telemetry")).toBe(
+    "No NUL bytes allowed"
+  );
+  expect(validateTopicFilter(" sensors/\0 ")).toBe("No NUL bytes allowed");
 });
 
 test("shared subscription filters are rejected", () => {

@@ -28,14 +28,12 @@
   import { onDestroy, tick } from "svelte";
   import { debounce } from "lodash";
   import type { DebouncedFunc } from "lodash";
-  import { twMerge } from "tailwind-merge";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
   import Button from "@/components/Button/Button.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import AddFieldButton from "@/components/Button/AddFieldButton.svelte";
-  import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
-  import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
+  import ProtoTypePicker from "./ProtoTypePicker.svelte";
   import { validateTopicFilter } from "@/util/topic-filter";
 
   export let rules: ProtoBindingRuleView[] = [];
@@ -62,6 +60,15 @@
   ) => Promise<ProtoBindingMatchView | null> = async () => null;
 
   $: showReorder = rules.length >= 2;
+
+  // With nothing loaded there's no type to pick, and a typeless draft can
+  // never commit, so don't offer the draft row at all.
+  $: noTypesLoaded = descriptorNames.length === 0;
+
+  // The "import first" empty state already says it; don't repeat the same
+  // instruction under the disabled "Add binding" button.
+  $: showDirMissingEmptyState =
+    status.dirMissing && rules.length === 0 && draft === null;
 
   // Exact-duplicate topic filters: the first occurrence in list order wins
   // ties (matches ProtoBindingMatcher's SortOrder tie-break), so only the
@@ -109,20 +116,46 @@
   const rowFilterValue = (rule: ProtoBindingRuleView) =>
     editStateByRuleId[rule.id]?.value ?? rule.topicFilter;
 
-  const rowError = (rule: ProtoBindingRuleView, index: number) => {
-    const validationError = validateTopicFilter(rowFilterValue(rule));
-    if (validationError) return validationError;
+  // Derived array rather than a per-row helper function called from the
+  // markup: the legacy compiler can't see that such a function reads
+  // `editStateByRuleId`, so a row's note only recomputed when `rules`
+  // changed and an invalid filter typed into a saved row showed no error at
+  // all. Everything the note depends on (edit state, duplicates,
+  // descriptorNames, status) is read directly here so it's tracked.
+  //
+  // Precedence: validation error, then duplicate filter, then stale type.
+  // Only the first (level "error") blocks the commit; the other two are
+  // amber notes about a binding that is still saved and still valid.
+  //
+  // Deliberate trade-off: an invalid edit to a saved row is never persisted
+  // (commitRowEdit no-ops while invalid), so closing the dialog reverts the
+  // text to the last valid value. That's accepted now that the error is
+  // visible while the user types.
+  $: rowNotes = rules.map((rule, index) => {
+    const value = editStateByRuleId[rule.id]?.value ?? rule.topicFilter;
+    const validationError = validateTopicFilter(value);
+    if (validationError) {
+      return { level: "error" as const, message: validationError };
+    }
     if (duplicateFlags[index]) {
-      return "Same filter as another binding. The higher one wins.";
+      return {
+        level: "warning" as const,
+        message: "Same filter as another binding. The higher one wins.",
+      };
+    }
+    const isStaleType =
+      !!rule.messageType &&
+      !descriptorNames.includes(rule.messageType) &&
+      !status.loadError &&
+      !status.folderNotFound;
+    if (isStaleType) {
+      return {
+        level: "warning" as const,
+        message: `${rule.messageType} is not in the loaded files`,
+      };
     }
     return null;
-  };
-
-  const isStaleType = (messageType: string) =>
-    !!messageType &&
-    !descriptorNames.includes(messageType) &&
-    !status.loadError &&
-    !status.folderNotFound;
+  });
 
   // Commits a real row's locally-edited topic filter, if it's valid and
   // different from the last-known committed value. No-ops while invalid
@@ -181,16 +214,6 @@
     Object.values(debouncedCommitByRuleId).forEach((fn) => fn.flush());
   });
 
-  // Per-row type-picker search text, keyed by rule id. The draft row (no
-  // rule id yet) uses the "draft" sentinel key.
-  let typeSearchByRuleId: Partial<Record<number | "draft", string>> = {};
-
-  const filteredTypes = (key: number | "draft") => {
-    const query = (typeSearchByRuleId[key] ?? "").trim().toLowerCase();
-    if (!query) return descriptorNames;
-    return descriptorNames.filter((name) => name.toLowerCase().includes(query));
-  };
-
   // Draft row: "Add binding" opens this instead of writing to the backend
   // immediately. Unlike the real rows above, the draft never auto-commits
   // while typing: a typeless binding does nothing, so committing on every
@@ -248,8 +271,12 @@
     draft = { ...draft, topicFilter: value };
   };
 
+  // Blur only marks the field touched once there's something to complain
+  // about: tabbing straight from an untouched filter to the type picker
+  // shouldn't flash "Enter a topic filter" at someone who hasn't typed yet.
+  // Enter and a real commit attempt still set it.
   const onDraftFilterBlur = () => {
-    draftTouched = true;
+    if (draft && draft.topicFilter !== "") draftTouched = true;
     commitDraft();
   };
 
@@ -300,64 +327,6 @@
   $: rules, descriptorNames, debouncedRunTest(testTopic);
 </script>
 
-{#snippet typePicker(
-  key: number | "draft",
-  value: string,
-  onPick: (name: string) => void
-)}
-  <DropdownMenu {disabled} placement="bottom-end">
-    <div
-      slot="trigger"
-      class={twMerge(
-        "h-[30px] w-[180px] flex items-center justify-between gap-1 rounded border border-outline px-2 text-base bg-elevation-0 transition-colors",
-        disabled ? "opacity-60" : "cursor-pointer hover:border-hovered",
-        value ? "text-white-text" : "text-secondary-text"
-      )}
-    >
-      <span class="truncate min-w-0" style:direction="rtl"
-        ><bdi>{value || "Choose a type"}</bdi></span
-      >
-      <Icon type="down" size={12} />
-    </div>
-    <div class="flex flex-col min-w-[220px]" slot="menu-content">
-      <!-- svelte-ignore a11y_autofocus -->
-      <input
-        class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"
-        autofocus
-        placeholder="Filter types..."
-        bind:value={typeSearchByRuleId[key]}
-        on:keydown|stopPropagation={() => {}}
-      />
-      <div class="flex flex-col max-h-[320px] overflow-y-auto">
-        {#each filteredTypes(key) as name (name)}
-          <DropdownMenuItem
-            onClick={() => {
-              onPick(name);
-              typeSearchByRuleId = { ...typeSearchByRuleId, [key]: "" };
-            }}
-          >
-            <div class="flex items-center gap-2 w-full">
-              <span class="truncate grow">{name}</span>
-              {#if name === value}
-                <Icon type="tick" size={14} />
-              {/if}
-            </div>
-          </DropdownMenuItem>
-        {/each}
-        {#if descriptorNames.length === 0}
-          <div class="px-2 py-1 text-base text-secondary-text">
-            No types loaded
-          </div>
-        {:else if filteredTypes(key).length === 0}
-          <div class="px-2 py-1 text-base text-secondary-text">
-            No matching types
-          </div>
-        {/if}
-      </div>
-    </div>
-  </DropdownMenu>
-{/snippet}
-
 <div>
   <span class="text-base text-white-text">Topic bindings</span>
   <div class="text-secondary-text text-sm mt-1">
@@ -365,20 +334,20 @@
   </div>
   {#if connected}
     <div class="text-secondary-text text-sm mt-1">
-      Bindings apply immediately.
+      Bindings apply to new messages.
     </div>
   {/if}
 
   <div class="mt-4 space-y-4">
     {#if rules.length === 0 && draft === null}
       <div class="text-secondary-text text-sm">
-        {status.dirMissing
+        {showDirMissingEmptyState
           ? "Import your .proto files first."
           : "No bindings yet. Sparkplug topics still decode."}
       </div>
     {/if}
     {#each rules as rule, index (rule.id)}
-      {@const error = rowError(rule, index)}
+      {@const note = rowNotes[index]}
       <div>
         <div class="flex gap-3 items-center">
           {#if showReorder}
@@ -405,14 +374,17 @@
               name={`proto-binding-filter-${rule.id}`}
               placeholder="sensors/+/telemetry"
               value={rowFilterValue(rule)}
-              hasError={!!error}
+              hasError={note?.level === "error"}
               onChange={(value) => onRowFilterChange(rule, value ?? "")}
               onBlur={() => onRowFilterBlur(rule)}
             />
           </div>
-          {@render typePicker(rule.id, rule.messageType, (name) =>
-            onUpdate(rule.id, { messageType: name })
-          )}
+          <ProtoTypePicker
+            {disabled}
+            {descriptorNames}
+            value={rule.messageType}
+            onPick={(name) => onUpdate(rule.id, { messageType: name })}
+          />
           <Button
             {disabled}
             variant="text"
@@ -421,11 +393,13 @@
             on:click={() => onDelete(rule.id)}
           />
         </div>
-        {#if error}
-          <div class="text-error text-sm mt-1">{error}</div>
-        {:else if isStaleType(rule.messageType)}
-          <div class="text-warning text-sm mt-1">
-            {rule.messageType} is not in the loaded files
+        {#if note}
+          <div
+            class={`text-sm mt-1 ${
+              note.level === "error" ? "text-error" : "text-warning"
+            }`}
+          >
+            {note.message}
           </div>
         {/if}
       </div>
@@ -461,7 +435,12 @@
               onBlur={onDraftFilterBlur}
             />
           </div>
-          {@render typePicker("draft", draft.messageType, onDraftTypePicked)}
+          <ProtoTypePicker
+            {disabled}
+            {descriptorNames}
+            value={draft.messageType}
+            onPick={onDraftTypePicked}
+          />
           <Button
             disabled={disabled || draftSubmitting}
             variant="text"
@@ -480,9 +459,14 @@
   <AddFieldButton
     class="mt-4"
     text="Add binding"
-    disabled={disabled || draft !== null}
+    disabled={disabled || draft !== null || noTypesLoaded}
     onClick={onAddClicked}
   />
+  {#if noTypesLoaded && !showDirMissingEmptyState}
+    <div class="text-secondary-text text-sm mt-1">
+      Import your .proto files to add a binding.
+    </div>
+  {/if}
 
   <div class="mt-8">
     <BaseInput

@@ -43,7 +43,7 @@
       "type": "boolean",
       "required": false,
       "default": false,
-      "description": "Shows the 'Bindings apply immediately' line when true."
+      "description": "Shows the 'Bindings apply to new messages' line when true."
     },
     {
       "name": "onAdd",
@@ -80,18 +80,14 @@
     "white-text",
     "secondary-text",
     "error",
-    "warning",
-    "outline",
-    "divider"
+    "warning"
   ],
   "dependencies": [
     "BaseInput",
     "Button",
     "IconButton",
     "AddFieldButton",
-    "DropdownMenu",
-    "DropdownMenuItem",
     "Icon"
   ],
-  "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The type picker (search input + DropdownMenuItem list, max-h-[320px] overflow-y-auto) is a single component-internal {#snippet}, shared by committed rows and the draft row, and mirrors the AddToCollectionMenu pattern; extracting a shared SearchableDropdownMenu primitive across components is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc)."
+  "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The type picker lives in the sibling ProtoTypePicker component (shared by committed rows and the draft row); it isn't listed in dependencies[] because both are tier 'component' and the validator only allows component -> primitive edges. Extracting a shared SearchableDropdownMenu primitive across components is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc). Row notes are a single derived array (rowNotes) with precedence validation error > duplicate filter > stale type; only the error level blocks the commit and reddens the input, the rest are amber."
 }

@@ -11,9 +11,11 @@
   import protoState from "@/stores/proto-state";
   import Switch from "@/components/InputFields/Switch.svelte";
   import Button from "@/components/Button/Button.svelte";
+  import Dialog from "@/components/Dialog/Dialog.svelte";
   import ProtoBindingRulesForm, {
     type ProtoBindingMatchView,
   } from "@/components/ProtoBindingRulesForm/ProtoBindingRulesForm.svelte";
+  import { errorMessage } from "@/util/error-message";
 
   export let connection: Connection;
 
@@ -113,8 +115,6 @@
   // action that just failed).
   let importActionError = "";
 
-  const errorMessage = (e: unknown): string =>
-    e instanceof Error ? e.message : String(e);
 
   onMount(async () => {
     protoState.ensureConnection(connectionId, connection.eventSet);
@@ -196,7 +196,19 @@
     }
   };
 
+  // Removing wipes the import and leaves every binding pointing at a type
+  // that no longer loads, so it goes through a confirmation step (same
+  // shape as ConfirmDeleteConnectionDialog, inlined here to avoid a
+  // single-use component).
+  const confirmRemoveOpen = writable(false);
+
+  const onRemoveClicked = () => {
+    if (busy) return;
+    confirmRemoveOpen.set(true);
+  };
+
   const onRemove = async () => {
+    confirmRemoveOpen.set(false);
     try {
       importActionError = "";
       await protoState.clearImport(connectionId);
@@ -266,11 +278,11 @@
     topic: string
   ): Promise<ProtoBindingMatchView | null> => {
     const match = await GetMatchingProtoTypeForTopic(connectionId, topic);
-    if (!match?.Source) return null;
+    if (!match?.source) return null;
     return {
-      filter: match.Filter,
-      messageType: match.MessageType,
-      source: match.Source as "rule" | "sparkplug",
+      filter: match.filter,
+      messageType: match.messageType,
+      source: match.source as "rule" | "sparkplug",
     };
   };
 </script>
@@ -332,7 +344,7 @@
               Re-import
             </Button>
           {/if}
-          <Button variant="text" disabled={busy} on:click={onRemove}>
+          <Button variant="text" disabled={busy} on:click={onRemoveClicked}>
             Remove
           </Button>
         </div>
@@ -367,3 +379,24 @@
     />
   {/if}
 </div>
+
+<Dialog
+  isOpen={confirmRemoveOpen}
+  title="Remove the imported .proto files?"
+>
+  <div class="flex flex-col gap-3 mt-3">
+    <p>Your bindings stay, but nothing will decode until you import again.</p>
+    <div class="flex gap-3 justify-end items-center">
+      <Button variant="text" on:click={() => confirmRemoveOpen.set(false)}>
+        Cancel
+      </Button>
+      <Button
+        iconType="delete"
+        class="text-error enabled:hover:text-error-light enabled:group-hover:text-error-light"
+        iconPlacement="left"
+        iconSize={16}
+        on:click={onRemove}>Remove</Button
+      >
+    </div>
+  </div>
+</Dialog>
