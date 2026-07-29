@@ -30,7 +30,28 @@
 
   const defaultSortState = $defaultSorts[DEFAULT_SORT_PERSIST_KEY];
 
-  let view: "list" | "graph" = "list";
+  // Which of the two views you last used, kept per connection alongside the
+  // graph's own preferences, so a connection you work on in the graph opens in
+  // the graph next time.
+  const viewKey = `mqtt-viewer-topicpanel-view:${connection.connectionDetails.id}`;
+  const loadView = (): "list" | "graph" => {
+    try {
+      return localStorage.getItem(viewKey) === "graph" ? "graph" : "list";
+    } catch (e) {
+      console.error("topic panel view load failed", e);
+      return "list";
+    }
+  };
+  const setView = (v: "list" | "graph") => {
+    view = v;
+    try {
+      localStorage.setItem(viewKey, v);
+    } catch (e) {
+      console.error("topic panel view save failed", e);
+    }
+  };
+
+  let view: "list" | "graph" = loadView();
 
   const expandedTopicsStore = createExpandedTopicsStore();
   const searchStore = createSearchStore();
@@ -52,7 +73,7 @@
       {expandedTopicsStore}
       {sortStore}
     >
-      <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
+      <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
     </SearchActionBar>
     <div
       class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
@@ -84,7 +105,7 @@
         initialData={$mqttDataStore}
         {searchStore}
       >
-        <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
+        <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
       </MqttGraphView>
     </div>
   {/if}

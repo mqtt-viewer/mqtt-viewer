@@ -74,6 +74,26 @@ export class TopicModel {
     return this.nodeCount;
   }
 
+  // Change the smoothing time-constant, rescaling every accumulated score.
+  //
+  // A score is a leaky integrator that converges to `rate x tau`, so a raw
+  // score carried across a tau change misreports the rate (and the node radius
+  // derived from it) by tauOld/tauNew until it re-converges — switching Smooth
+  // (40s) to Responsive (5s) made every hover read 8x the real msg/s for the
+  // best part of a minute. Multiplying by tauNew/tauOld keeps the implied rate
+  // (score / tau) invariant, so only the smoothing changes, not the numbers.
+  setTau(tauMs: number): void {
+    if (!(tauMs > 0) || tauMs === this.tauMs) return;
+    const factor = tauMs / this.tauMs;
+    this.tauMs = tauMs;
+    const walk = (n: TopicNode) => {
+      n.own.score *= factor;
+      n.agg.score *= factor;
+      n.children.forEach(walk);
+    };
+    this.root.children.forEach(walk);
+  }
+
   clear(): void {
     this.root = new TopicNode("", "", -1, null);
     this.nodeCount = 0;

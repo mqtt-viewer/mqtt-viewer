@@ -7,6 +7,12 @@
       onClear: () => void
     ) => () => void;
   }
+
+  // Which namespaces the user has drilled into is a property of the
+  // connection, not of this component instance: the panel swaps components on
+  // every List <-> Graph toggle, so without this the graph collapsed back to
+  // the roots every time you looked at the list. Keyed by connection id.
+  const expansionByConnection = new Map<string, Set<string>>();
 </script>
 
 <script lang="ts">
@@ -60,8 +66,20 @@
   let unsubSource: (() => void) | null = null;
   let unsubSearch: (() => void) | null = null;
   let ro: ResizeObserver | null = null;
+  let io: IntersectionObserver | null = null;
   let liveTimer: number | null = null;
   let everSized = false;
+  let resizeDebounce: number | null = null;
+  // set by onDestroy; the async mount below checks it after every await so a
+  // teardown that lands mid-init can't register anything that outlives it
+  let destroyed = false;
+  let onScreen = true;
+  // true when the mount revealed an inbound selection, so the first-size
+  // handler doesn't immediately fit the whole tree back over it
+  let revealedOnMount = false;
+  // node counts behind the empty-state overlay, refreshed on every relayout
+  let placedNodes = 0;
+  let topicCount = 0;
 
   // Seed from the shared store (when present) BEFORE the reactive push below
   // runs, so switching in from the List doesn't clobber existing filter text.
@@ -87,8 +105,8 @@
   };
 
   // persisted view preferences (scoped per connection)
-  const settingsKey = () =>
-    `mqtt-viewer-topicgraph-settings:${connection.connectionDetails.id}`;
+  const connectionKey = () => String(connection.connectionDetails.id);
+  const settingsKey = () => `mqtt-viewer-topicgraph-settings:${connectionKey()}`;
   let minimapOn = true;
   let followHottest = false;
   let cvdSafe = false;
@@ -175,7 +193,7 @@
     renderer.setCooldownMs(cooldownMs);
     renderer.setMaxNodeSize(maxNodeR);
     renderer.setSort(sortKey); // reflect the persisted sort into the renderer
-    model.tauMs = tauMs;
+    model.setTau(tauMs);
   };
 
   const seed = (data: MqttData) => {
@@ -237,28 +255,66 @@
     walkAgg(data);
   };
 
+  // Canvas colours have to be plain numbers, so the design tokens (CSS
+  // variables behind the Tailwind colours) are resolved off the document root
+  // and packed to 0xRRGGBB. The theme store flips the class on <html> before
+  // it notifies subscribers, so this always reads the theme being applied.
+  const parseCssColor = (value: string): number | null => {
+    if (!value) return null;
+    if (value.startsWith("#")) {
+      const hex = value.slice(1);
+      const full =
+        hex.length === 3
+          ? hex
+              .split("")
+              .map((c) => c + c)
+              .join("")
+          : hex;
+      const n = parseInt(full.slice(0, 6), 16);
+      return Number.isNaN(n) ? null : n;
+    }
+    // rgb()/rgba()/bare "r g b" triplets (the -rgb tokens used with Tailwind
+    // opacity modifiers); alpha, if present, is ignored
+    const parts = value.match(/[\d.]+/g);
+    if (!parts || parts.length < 3) return null;
+    const [r, g, b] = parts
+      .slice(0, 3)
+      .map((p) => Math.max(0, Math.min(255, Math.round(parseFloat(p)))));
+    return (r << 16) | (g << 8) | b;
+  };
+
+  // `fallback` covers environments with no document styles to read (storybook
+  // snapshots, jsdom) — it is never a design decision, always the token's own
+  // value for that theme.
+  const tokenHex = (token: string, fallback: number): number => {
+    try {
+      const raw = untypedColors[token]?.["DEFAULT"] ?? "";
+      const varName = raw.match(/--[\w-]+/)?.[0];
+      const value = varName
+        ? getComputedStyle(document.documentElement)
+            .getPropertyValue(varName)
+            .trim()
+        : raw.trim();
+      return parseCssColor(value) ?? fallback;
+    } catch (e) {
+      return fallback;
+    }
+  };
+
   const applyTheme = (t: "dark" | "light") => {
     if (!renderer) return;
-    renderer.setEndpoint(t === "light" ? COLD_ENDPOINT_LIGHT : COLD_ENDPOINT_DARK);
-    renderer.setThemeUi(
-      t === "light"
-        ? {
-            text: 0x4a4641,
-            accent: 0x5e6ce0,
-            minimapBg: 0xffffff,
-            minimapBgAlpha: 0.7,
-            minimapBorder: 0xb8b8c0,
-            pulse: 0x2a2a33,
-          }
-        : {
-            text: 0xbdb7b0,
-            accent: 0x7c8cff,
-            minimapBg: 0x000000,
-            minimapBgAlpha: 0.32,
-            minimapBorder: 0x8a8a8a,
-            pulse: 0xffffff,
-          }
-    );
+    const light = t === "light";
+    renderer.setEndpoint(light ? COLD_ENDPOINT_LIGHT : COLD_ENDPOINT_DARK);
+    renderer.setThemeUi({
+      text: tokenHex("secondary-text", light ? 0x5f5f69 : 0xa1a1aa),
+      accent: tokenHex("primary", light ? 0x5e6ce0 : 0x7c8cff),
+      minimapBg: tokenHex("elevation-0", light ? 0xffffff : 0x020202),
+      // no token carries an alpha for this: the minimap floats over the graph,
+      // so it stays translucent enough to read nodes through
+      minimapBgAlpha: light ? 0.7 : 0.32,
+      minimapBorder: tokenHex("divider", light ? 0xb8b8c0 : 0x505050),
+      pulse: tokenHex("emphasis", light ? 0x131316 : 0xffffff),
+    });
   };
   $: applyTheme($theme);
 
@@ -372,6 +428,9 @@
 
   const startStatsTimer = () => {
     if (statsTimer !== null) return;
+    // the counter has been accumulating since mount; without this the first
+    // sample reports everything received since then as one second's traffic
+    ingestCounter = 0;
     statsTimer = window.setInterval(() => {
       if (!renderer) return;
       const p = renderer.getPerfStats();
@@ -430,52 +489,14 @@
   $: if (searchStore && get(searchStore).text !== filterText)
     searchStore.setSearchText(filterText);
 
-  onMount(async () => {
-    loadSettings();
-    const w = containerEl.clientWidth || width || 800;
-    const h = containerEl.clientHeight || 600;
-    renderer = new TopicGraphRenderer(model, {
-      onSelect: (topic) => {
-        renderer?.setSelected(topic);
-        lastSyncedTopic = topic;
-        if (topic === null) {
-          selectedTopicStore.deselectTopic();
-        } else if ($selectedTopicStore.selectedTopic !== topic) {
-          selectedTopicStore.selectTopic(topic);
-        }
-      },
-      onHover: (topic, x, y) => {
-        hover = topic ? buildHover(topic, x, y) : null;
-      },
-    });
-    await renderer.init(canvasEl, w, h);
-    applyTheme($theme);
-    applySettings();
-    seed(initialData);
-    renderer.expandToDepth(0);
-    renderer.setSelected($selectedTopicStore.selectedTopic);
-    // seed the "already synced" state so the reactive sync below doesn't treat
-    // this initial mount value as an external change and zoom on load
-    lastSyncedTopic = $selectedTopicStore.selectedTopic;
-    // skip the whole-tree fit if the seed was already big enough to trigger
-    // the one-shot initial view (top rows of sort order) — fitView() here
-    // would otherwise immediately zoom back out to the illegible whole tree
-    if (!renderer.hasAppliedInitialView()) renderer.fitView();
-
-    unsubSource = (messageSource ?? wailsSource).subscribe(
-      (msgs) => {
-        ingestCounter += msgs.length;
-        totalIngested += msgs.length;
-        for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
-      },
-      () => {
-        model.clear();
-        renderer?.relayout();
-      }
-    );
-
-    let liveTick = 0;
-    let lastTickIngest = 0;
+  // ---- live re-sort tick ----
+  // Paused whenever the canvas is off screen (see setOnScreen): a hidden
+  // connection tab keeps this component mounted, and a full re-sort relayout
+  // every 1.2s per hidden connection is pure waste.
+  let liveTick = 0;
+  let lastTickIngest = 0;
+  const startLiveTimer = () => {
+    if (liveTimer !== null || destroyed) return;
     liveTimer = window.setInterval(() => {
       if (!renderer) return;
       renderer.notifyData();
@@ -505,15 +526,109 @@
           renderer.relayout();
         }
       }
+      // topic count drives the "no topics yet" state; it can grow without a
+      // relayout when arrivals land under collapsed nodes
+      topicCount = model.topicCount;
       // keep the hover inspector's numbers live while the pointer rests
       if (hover) hover = buildHover(hover.topic, hover.x, hover.y);
     }, 1200);
+  };
+  const stopLiveTimer = () => {
+    if (liveTimer !== null) {
+      window.clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  };
+
+  // Mounted is not the same as on screen: connection tabs hide with
+  // display:none, and the List <-> Graph toggle swaps this component out
+  // without the browser telling the renderer anything. An IntersectionObserver
+  // on the canvas container covers both, so a background connection stops
+  // paying for a ticker and a 1.2s relayout it can't be seen doing.
+  const setOnScreen = (on: boolean) => {
+    if (on === onScreen) return;
+    onScreen = on;
+    renderer?.setOffscreen(!on);
+    if (on) startLiveTimer();
+    else stopLiveTimer();
+  };
+
+  onMount(async () => {
+    loadSettings();
+    const w = containerEl.clientWidth || width || 800;
+    const h = containerEl.clientHeight || 600;
+    const r = new TopicGraphRenderer(model, {
+      onSelect: (topic) => {
+        renderer?.setSelected(topic);
+        lastSyncedTopic = topic;
+        if (topic === null) {
+          selectedTopicStore.deselectTopic();
+        } else if ($selectedTopicStore.selectedTopic !== topic) {
+          selectedTopicStore.selectTopic(topic);
+        }
+      },
+      onHover: (topic, x, y) => {
+        hover = topic ? buildHover(topic, x, y) : null;
+      },
+      onLayout: (n) => {
+        placedNodes = n;
+        topicCount = model.topicCount;
+      },
+    });
+    renderer = r;
+    await r.init(canvasEl, w, h);
+    // A fast List <-> Graph toggle can unmount this component while init() is
+    // still resolving. Everything below outlives the component if it runs
+    // after that: the message subscription in particular would leave an orphan
+    // model ingesting every message for the rest of the session.
+    if (destroyed) {
+      r.destroy();
+      renderer = null;
+      return;
+    }
+    applyTheme($theme);
+    applySettings();
+    seed(initialData);
+
+    // pick up where the user left off before the last toggle; a first visit
+    // (nothing saved) starts fully collapsed at the roots
+    const saved = expansionByConnection.get(connectionKey());
+    if (saved && saved.size > 0) r.restoreExpansion(saved);
+    else r.expandToDepth(0);
+
+    const selected = $selectedTopicStore.selectedTopic;
+    r.setSelected(selected);
+    // seed the "already synced" state so the reactive sync below doesn't treat
+    // this initial mount value as an external change and zoom a second time
+    lastSyncedTopic = selected;
+    // Arriving with a topic already selected (picked it in the List, then
+    // switched here) should reveal it: expand its ancestors and ease onto it,
+    // once. With nothing selected there's nothing to reveal, so the cold-start
+    // framing stands.
+    revealedOnMount = selected ? r.focusTopic(selected) : false;
+    // skip the whole-tree fit if the seed was already big enough to trigger
+    // the one-shot initial view (top rows of sort order) — fitView() here
+    // would otherwise immediately zoom back out to the illegible whole tree
+    if (!revealedOnMount && !r.hasAppliedInitialView()) r.fitView();
+
+    unsubSource = (messageSource ?? wailsSource).subscribe(
+      (msgs) => {
+        ingestCounter += msgs.length;
+        totalIngested += msgs.length;
+        for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
+      },
+      () => {
+        model.clear();
+        renderer?.relayout();
+      }
+    );
+
+    startLiveTimer();
 
     // Panel-drag resize: a ResizeObserver can fire many times per drag frame.
     // Pause the ticker immediately on every event (beginResize), but only
     // reallocate the canvas backing store once, on the trailing edge of a
     // ~150ms debounce, using the latest observed dimensions.
-    let resizeDebounce: number | null = null;
     ro = new ResizeObserver(() => {
       const cw = containerEl.clientWidth;
       const ch = containerEl.clientHeight;
@@ -526,24 +641,53 @@
         renderer.endResize(cw, ch);
         if (!everSized) {
           everSized = true;
-          if (!renderer.hasAppliedInitialView()) renderer.fitView();
+          if (!revealedOnMount && !renderer.hasAppliedInitialView())
+            renderer.fitView();
         }
       }, 150);
     });
     ro.observe(containerEl);
+
+    io = new IntersectionObserver(
+      (entries) => {
+        // A document the browser isn't rendering at all (window minimised,
+        // page backgrounded) stops computing intersections and reports every
+        // element as not intersecting. Taking that at face value would park
+        // the graph and never hear a correction, since no further intersection
+        // change is reported until rendering resumes. document.hidden already
+        // stops the ticker for that case, so ignore the observer here.
+        if (document.hidden) return;
+        setOnScreen(entries.some((e) => e.isIntersecting));
+      },
+      { threshold: 0 }
+    );
+    io.observe(containerEl);
+
     document.addEventListener("fullscreenchange", onFullscreenChange);
   });
 
   onDestroy(() => {
+    destroyed = true;
+    // hand the current expansion to the next mount of this connection
+    if (renderer) {
+      expansionByConnection.set(connectionKey(), renderer.expandedTopics());
+    }
     unsubSource?.();
     unsubSearch?.();
     ro?.disconnect();
+    io?.disconnect();
     document.removeEventListener("fullscreenchange", onFullscreenChange);
-    if (liveTimer) clearInterval(liveTimer);
+    stopLiveTimer();
     stopStatsTimer();
+    // a pending trailing resize would otherwise fire into a destroyed renderer
+    if (resizeDebounce !== null) {
+      window.clearTimeout(resizeDebounce);
+      resizeDebounce = null;
+    }
     // cancel the trailing 150ms filter call so it can't touch a destroyed renderer
     applyFilter.cancel();
     renderer?.destroy();
+    renderer = null;
   });
 
   // debounced filter (matches the list view's search behaviour)
@@ -604,7 +748,10 @@
   };
   const setSmoothing = (ms: number) => {
     tauMs = ms;
-    model.tauMs = ms;
+    // rescales the accumulated scores, so the reported rates and the node
+    // radii stay put and only the smoothing changes
+    model.setTau(ms);
+    renderer?.requestRepaint();
     saveSettings();
   };
   const setMaxNodeSize = (r: number) => {
@@ -630,6 +777,14 @@
   };
 
   const filterFieldColor = untypedColors["outline"]["DEFAULT"];
+
+  // A blank canvas reads as broken. Say which kind of nothing it is instead.
+  $: emptyMessage =
+    topicCount === 0
+      ? "No topics yet"
+      : placedNodes === 0 && filterText.trim() !== ""
+        ? "No topics match"
+        : null;
 </script>
 
 <div class="flex h-full w-full min-w-0 flex-col bg-elevation-0">
@@ -766,6 +921,13 @@
     class="relative min-h-0 w-full grow bg-elevation-0"
   >
     <canvas bind:this={canvasEl} class="block h-full w-full"></canvas>
+    {#if emptyMessage}
+      <div
+        class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-secondary-text"
+      >
+        {emptyMessage}
+      </div>
+    {/if}
     {#if paused}
       <div
         class="pointer-events-none absolute top-1 rounded border border-outline bg-elevation-1 px-1.5 py-0.5 text-xs text-secondary-text"

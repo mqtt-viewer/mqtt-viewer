@@ -32,6 +32,9 @@ export interface GraphCallbacks {
   onToggle?: (node: TopicNode) => void;
   /** hover enters/moves over a node (screen coords), or leaves (topic = null) */
   onHover?: (topic: string | null, x: number, y: number) => void;
+  /** every relayout, with the number of nodes actually placed (0 = nothing to
+   *  draw, which the wrapper turns into an empty state over the canvas) */
+  onLayout?: (placedNodes: number) => void;
 }
 
 export interface ThemeUi {
@@ -191,10 +194,40 @@ export class TopicGraphRenderer {
   private fpsWindowFrames = 0;
   private lastFps = 0;
 
+  // The whole panel can be mounted but not on screen: connection tabs hide with
+  // display:none, so a graph on a background tab would otherwise keep its
+  // ticker and its periodic relayout running for nothing. The wrapper watches
+  // the canvas with an IntersectionObserver and parks the renderer here.
+  private offscreen = false;
+
+  // true once init() has finished; destroy() must not tear down a Pixi
+  // Application that was never initialised (a fast mount/unmount can land
+  // between the constructor and the end of the async init).
+  private inited = false;
+
+  private shouldRun(): boolean {
+    return this.inited && !this.offscreen && !document.hidden;
+  }
+
   private visibilityHandler = () => {
-    if (document.hidden) this.app.ticker.stop();
-    else this.app.ticker.start();
+    if (this.shouldRun()) this.app.ticker.start();
+    else this.app.ticker.stop();
   };
+
+  // Park (or un-park) the renderer when the canvas leaves/enters the screen.
+  // Un-parking forces a full refresh pass: culling and the ~10Hz detail tick
+  // both went stale while stopped.
+  setOffscreen(off: boolean): void {
+    if (off === this.offscreen) return;
+    this.offscreen = off;
+    if (this.shouldRun()) {
+      this.viewportDirty = true;
+      this.forceSlowTick = true;
+      this.app.ticker.start();
+    } else {
+      this.app.ticker.stop();
+    }
+  }
 
   // ---- resize pause ----
   private resizePending: { w: number; h: number } | null = null;
@@ -210,7 +243,6 @@ export class TopicGraphRenderer {
   private viewAnim: { x: number; y: number; scale: number } | null = null;
   private relayoutQueued = false;
   private relayoutTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastTopicCount = -1;
   // topology signature from the previous relayout (see relayout()); starts as
   // a value no real signature can equal so the very first relayout always
   // rebuilds the edge array
@@ -272,6 +304,7 @@ export class TopicGraphRenderer {
     this.app.ticker.maxFPS = this.currentMaxFps;
 
     document.addEventListener("visibilitychange", this.visibilityHandler);
+    this.inited = true;
   }
 
   private positionMinimap(): void {
@@ -351,6 +384,22 @@ export class TopicGraphRenderer {
     this.minimapBgAlpha = ui.minimapBgAlpha;
     this.minimapBorderColor = ui.minimapBorder;
     this.pulseColor = ui.pulse;
+    this.requestRepaint();
+  }
+
+  // Redraw everything once, now. The per-frame work is incremental (tints and
+  // labels refresh on the ~10Hz slow tick, edges only when something moved),
+  // so a change that comes from outside the ticker — a theme swap — leaves the
+  // last frame on screen until something else happens to move. On an idle
+  // graph that meant a black canvas after switching to light mode.
+  requestRepaint(): void {
+    if (!this.inited) return;
+    this.forceSlowTick = true;
+    this.viewportDirty = true;
+    this.edgesDirty = true;
+    this.lastMinimapDrawMs = 0;
+    this.frame();
+    this.app.renderer.render(this.app.stage);
   }
   setSort(key: SortKey): void {
     this.sortKey = key;
@@ -359,6 +408,11 @@ export class TopicGraphRenderer {
   setFilter(q: string): void {
     this.filter = q;
     this.relayout();
+    // A filter re-lays out the whole tree, so the old viewport frames an
+    // arbitrary slice of a completely different layout. Refit onto the (much
+    // smaller) result, mirroring what setDepth does. Clearing the filter keeps
+    // the current view: the user is going back to what they were looking at.
+    if (q.trim() !== "" && this.visuals.size > 0) this.fitView();
   }
   setSelected(topic: string | null): void {
     this.selected = topic;
@@ -385,6 +439,33 @@ export class TopicGraphRenderer {
     this.model.autoExpandDepth = depth;
     const walk = (n: TopicNode) => {
       if (n !== this.model.root) n.expanded = n.depth < depth;
+      n.children.forEach(walk);
+    };
+    this.model.root.children.forEach(walk);
+    this.model.markExpansionChanged();
+    this.relayout();
+  }
+
+  // Topic paths of every expanded node. The component remounts on each
+  // List <-> Graph toggle, so it hands this to the next mount (see
+  // restoreExpansion) instead of dropping the user back to the root every time.
+  expandedTopics(): Set<string> {
+    const out = new Set<string>();
+    const walk = (n: TopicNode) => {
+      if (n.expanded) out.add(n.topic);
+      n.children.forEach(walk);
+    };
+    this.model.root.children.forEach(walk);
+    return out;
+  }
+
+  // Re-apply a previously captured expansion set. Paths that no longer exist
+  // are ignored; anything not in the set collapses, which matches the
+  // fully-collapsed default for a first mount with an empty set.
+  restoreExpansion(topics: Set<string>): void {
+    this.model.autoExpandDepth = 0;
+    const walk = (n: TopicNode) => {
+      n.expanded = topics.has(n.topic);
       n.children.forEach(walk);
     };
     this.model.root.children.forEach(walk);
@@ -496,7 +577,10 @@ export class TopicGraphRenderer {
 
   endResize(width: number, height: number): void {
     this.resize(width, height);
-    this.app.ticker.start();
+    // don't undo a stop that wasn't ours: a resize landing while the window is
+    // in the background or the graph is parked off-screen must leave the
+    // ticker where it is
+    if (this.shouldRun()) this.app.ticker.start();
   }
 
   // Snapshot for the dev harness FPS overlay / perf instrumentation.
@@ -535,22 +619,32 @@ export class TopicGraphRenderer {
     return this.initialViewApplied;
   }
 
+  // World-space room the leftmost column needs to the LEFT of a node's centre:
+  // the node itself at full size, its collapsed-subtree ring, and the expand
+  // caret, which sits at -(r + 10) and is ~6 wide. Without reserving it the fit
+  // put world x = 0 hard against the canvas edge, halving the leftmost circles
+  // and pushing their carets off-screen entirely.
+  private leftExtent(): number {
+    return this.rMax + 2.5 + 16;
+  }
+
   // Fit the current content into the viewport, top-aligned below `topMargin`.
   fitView(topMargin = 16): void {
     const vw = this.app.screen.width;
     const vh = this.app.screen.height;
     if (vw <= 0 || vh <= 0) return;
-    const cw = Math.max(1, this.contentW + this.colW); // room for labels on the last column
+    const left = this.leftExtent();
+    // room for labels on the last column, and for the left-hand overhang
+    const cw = Math.max(1, this.contentW + this.colW + left);
     const ch = Math.max(1, this.contentH + this.rMax * 2);
     const scale = Math.max(0.12, Math.min(1.4, Math.min((vw - 80) / cw, (vh - topMargin - 40) / ch)));
     this.world.scale.set(scale);
-    this.world.position.set(40, topMargin + this.rMax * scale);
+    this.world.position.set(16 + left * scale, topMargin + this.rMax * scale);
     this.viewportDirty = true;
   }
 
   relayout(): void {
     const nowMs = Date.now();
-    this.lastTopicCount = this.model.topicCount;
     // consumed: this relayout is the response to whatever made the visible
     // tree dirty, so clear it before running (an arrival during layoutTopicTree
     // itself, e.g. from another tab of the same event loop tick, would still
@@ -657,6 +751,7 @@ export class TopicGraphRenderer {
     }
 
     this.applyInitialView(res);
+    this.cb.onLayout?.(res.nodes.length);
   }
 
   // One-shot: on the first relayout where the tree has grown past a trivial
@@ -690,7 +785,7 @@ export class TopicGraphRenderer {
       if (pn.y > maxY) maxY = pn.y;
     }
 
-    const marginLeft = 40;
+    const marginLeft = this.leftExtent() + 16;
     const marginRight = this.colW; // room for the last column's label
     const marginTop = this.rowH;
     const marginBottom = this.rowH;
@@ -736,7 +831,7 @@ export class TopicGraphRenderer {
 
     if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
 
-    const marginLeft = 40;
+    const marginLeft = this.leftExtent() + 16;
     const marginRight = this.colW;
     const marginTop = this.rowH;
     const marginBottom = this.rowH;
@@ -756,15 +851,16 @@ export class TopicGraphRenderer {
   }
 
   // Sidebar-driven selection: expand every ancestor of `topic` (not the topic
-  // itself), relayout, then zoom the subtree into view. No-op if the topic
-  // isn't in the model (e.g. it hasn't arrived yet).
-  focusTopic(topic: string): void {
+  // itself), relayout, then zoom the subtree into view. Returns false (and does
+  // nothing) if the topic isn't in the model, e.g. it hasn't arrived yet, so
+  // callers can fall back to their own framing.
+  focusTopic(topic: string): boolean {
     const segs = topic.split("/");
     let n = this.model.root;
     const path: TopicNode[] = [];
     for (const seg of segs) {
       const child = n.children.get(seg);
-      if (!child) return;
+      if (!child) return false;
       path.push(child);
       n = child;
     }
@@ -773,6 +869,7 @@ export class TopicGraphRenderer {
     this.model.markExpansionChanged();
     this.relayout();
     this.zoomToSubtree(target);
+    return true;
   }
 
   private createVisual(node: TopicNode): NodeVisual {
@@ -1075,8 +1172,10 @@ export class TopicGraphRenderer {
     const workStart = performance.now();
     this.updateFpsCounter(nowMs);
 
-    const showLabels = this.world.scale.x >= this.LABEL_ZOOM_THRESHOLD;
+    // one threshold drives both: labels/badges and the finer detail (carets,
+    // rings, ripples) all disappear together once zoomed out past legibility
     const lodDetail = this.world.scale.x >= this.LABEL_ZOOM_THRESHOLD;
+    const showLabels = lodDetail;
 
     this.frameCount++;
     const runSlowTick = this.forceSlowTick || this.frameCount % this.SLOW_TICK_EVERY === 0;
@@ -1446,7 +1545,10 @@ export class TopicGraphRenderer {
     for (const t of this.badgePool) t.destroy();
     this.labelPool = [];
     this.badgePool = [];
-    this.app.destroy(true, { children: true });
+    // an unmount can land mid-init (init() is async), and destroying an
+    // Application that never initialised throws
+    if (this.inited) this.app.destroy(true, { children: true });
+    this.inited = false;
     this.visuals.clear();
     this.aggRingCandidates.clear();
     this.movingVisuals.clear();
