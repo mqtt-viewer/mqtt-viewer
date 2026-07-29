@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-07-29T12:34:01.861Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -4357,7 +4357,10 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text",
+        "divider"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.svelte",

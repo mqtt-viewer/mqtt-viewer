@@ -46,12 +46,22 @@ const addNewConnectionSubRecords = (
   });
 };
 
+// connections.ts imports this store, so a static import back would create a
+// cycle; load it lazily instead. Stamps connectionDetails.updatedAt so the
+// connection dialog's "last saved" label reflects subscription saves too.
+const markConnectionSaved = (connId: number) => {
+  import("./connections")
+    .then((connections) => connections.default.markConnectionSaved(connId))
+    .catch((e) => console.error(e));
+};
+
 const addSubscription = async (
   connId: number,
   beforeStoreUpdate?: () => void
 ) => {
   try {
     const newSub = (await AddSubscription(connId)) as Subscription;
+    markConnectionSaved(connId);
     const existingSubs =
       get({ subscribe }).subscriptionsByConnectionId[connId] ?? [];
     const newSubs = [...existingSubs, newSub];
@@ -71,6 +81,7 @@ const addSubscription = async (
 const deleteSubscription = async (connId: number, subId: number) => {
   try {
     await DeleteSubscription(connId, subId);
+    markConnectionSaved(connId);
     const existingSubs = get({ subscribe }).subscriptionsByConnectionId[connId];
     const newSubs = existingSubs.filter((sub) => sub.id !== subId);
     update((store) => {
@@ -93,7 +104,19 @@ const removeConnection = async (connId: number) => {
   }
 };
 
-const debouncedUpdateSubscription = debounce(UpdateSubscription, 400);
+// Mark the save once the debounced call actually fires and succeeds, not
+// when it is scheduled.
+const debouncedUpdateSubscription = debounce(
+  async (connId: number, subscription: models.Subscription) => {
+    try {
+      await UpdateSubscription(connId, subscription);
+      markConnectionSaved(connId);
+    } catch (e) {
+      console.error(e);
+    }
+  },
+  400
+);
 
 const updateSubscription = async (
   connId: number,

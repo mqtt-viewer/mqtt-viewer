@@ -116,7 +116,7 @@
 | Views/Connection/DataView/Sidebar/CollectionFolder | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [ ] |
+| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
