@@ -1,0 +1,14 @@
+[15:28:24.857] #22 POST /api/cv1/updates/v3/check mode=update auth="Basic ZGV2LXVzZXJuYW1lOmRldi1wYXNzd29yZA==" ua="go-resty/2.14.0 (https://github.com/go-resty/resty)" body={"machine_id":"b2d9dac7c61290a83e86dac6063472cfbc5a17bb092eaee876eb522c2c57be9f","current_version":"0.0.1-dev","os":"darwin","arch":"arm64"}
+[15:28:46.242] #23 POST /api/cv1/updates/v3/check mode=update auth="Basic ZGV2LXVzZXJuYW1lOmRldi1wYXNzd29yZA==" ua="go-resty/2.14.0 (https://github.com/go-resty/resty)" body={"machine_id":"b2d9dac7c61290a83e86dac6063472cfbc5a17bb092eaee876eb522c2c57be9f","current_version":"0.0.1-dev","os":"darwin","arch":"arm64"}
+[15:29:47.040] #24 POST /api/cv1/updates/v3/check mode=update auth="Basic ZGV2LXVzZXJuYW1lOmRldi1wYXNzd29yZA==" ua="go-resty/2.14.0 (https://github.com/go-resty/resty)" body={"machine_id":"b2d9dac7c61290a83e86dac6063472cfbc5a17bb092eaee876eb522c2c57be9f","current_version":"0.0.1-dev","os":"darwin","arch":"arm64"}
+[15:30:00.039] #25 POST /api/cv1/updates/v3/check mode=uptodate auth="Basic ZGV2LXVzZXJuYW1lOmRldi1wYXNzd29yZA==" ua="go-resty/2.14.0 (https://github.com/go-resty/resty)" body={"machine_id":"b2d9dac7c61290a83e86dac6063472cfbc5a17bb092eaee876eb522c2c57be9f","current_version":"0.0.1-dev","os":"darwin","arch":"arm64"}
+[15:30:15.039] #26 POST /api/cv1/updates/v3/check mode=uptodate auth="Basic ZGV2LXVzZXJuYW1lOmRldi1wYXNzd29yZA==" ua="go-resty/2.14.0 (https://github.com/go-resty/resty)" body={"machine_id":"b2d9dac7c61290a83e86dac6063472cfbc5a17bb092eaee876eb522c2c57be9f","current_version":"0.0.1-dev","os":"darwin","arch":"arm64"}
+[15:30:30.039] #27 POST /api/cv1/updates/v3/check mode=uptodate auth="Basic ZGV2LXVzZXJuYW1lOmRldi1wYXNzd29yZA==" ua="go-resty/2.14.0 (https://github.com/go-resty/resty)" body={"machine_id":"b2d9dac7c61290a83e86dac6063472cfbc5a17bb092eaee876eb522c2c57be9f","current_version":"0.0.1-dev","os":"darwin","arch":"arm64"}
+[15:23:52.673] #8 HANGING (pending=7)
+[15:24:14.627] #2 client gone after hang (pending=6): context canceled
+[15:26:42.323] #8 client gone after hang (pending=5): context canceled
+[15:28:33.192] #6 client gone after hang (pending=3): context canceled
+[15:28:33.192] #5 client gone after hang (pending=4): context canceled
+[15:28:33.192] #4 client gone after hang (pending=0): context canceled
+[15:28:33.192] #3 client gone after hang (pending=1): context canceled
+[15:28:33.192] #7 client gone after hang (pending=2): context canceled
