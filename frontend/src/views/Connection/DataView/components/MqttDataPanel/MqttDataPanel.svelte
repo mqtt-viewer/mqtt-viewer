@@ -53,6 +53,9 @@
   $: if (!$sparkplugStore.hasSparkplug && dataMode === "sparkplug") {
     dataMode = "list";
   }
+  // The store defers its history backfill; opening the view is one of the
+  // triggers for it. activate() is idempotent.
+  $: if (dataMode === "sparkplug") sparkplugStore.activate();
 
   const onRequestRebirth = async (group: string, node: string) => {
     try {

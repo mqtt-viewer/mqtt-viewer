@@ -28,6 +28,10 @@ import {
   STALE_AFTER_MS,
   WARNING_CAP,
   TICKER_MS,
+  BACKFILL_IDLE_MS,
+  MAX_TRACKED_NODES,
+  MAX_TRACKED_DEVICES,
+  MAX_PLACEHOLDER_METRICS,
   type SparkplugTreeState,
   type SparkplugNode,
 } from "./sparkplug-tree-store";
@@ -197,9 +201,12 @@ const findNode = (
 
 const BASE_MS = 1_000_000_000;
 
+// The backfill is deferred and single-shot; most tests want it already
+// settled so live emits fold in synchronously.
 const makeStore = async () => {
   const store = createSparkplugTreeStore(CONN, eventSet);
-  await store.init();
+  store.init();
+  await store.activate();
   return store;
 };
 
@@ -580,7 +587,7 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     store.destroy();
   });
 
-  it("replays Sparkplug history on init", async () => {
+  it("replays Sparkplug history once the backfill is triggered", async () => {
     mocks.getSparkplugHistory.mockResolvedValue([
       nbirth(BASE_MS - 10_000, { bdSeq: 1 }),
       ndata(BASE_MS - 5000),
@@ -601,13 +608,69 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     store.destroy();
   });
 
-  it("keeps init alive when the backfill rejects", async () => {
+  it("keeps the store alive when the backfill rejects", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.getSparkplugHistory.mockRejectedValue(new Error("backend boom"));
     const store = createSparkplugTreeStore(CONN, eventSet);
-    await expect(store.init()).resolves.toBeUndefined();
+    store.init();
+    await expect(store.activate()).resolves.toBeUndefined();
+    // Live traffic is still folded in after a failed backfill.
+    emit("msgs", [nbirth(BASE_MS)]);
+    expect(get(store).hasSparkplug).toBe(true);
     store.destroy();
     errSpy.mockRestore();
+  });
+
+  it("does not fetch history on init alone, and fetches once per store", async () => {
+    const store = createSparkplugTreeStore(CONN, eventSet);
+    store.init();
+    expect(mocks.getSparkplugHistory).not.toHaveBeenCalled();
+
+    await store.activate();
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledWith(CONN);
+
+    // Idempotent: a second activate and later live traffic never refetch.
+    await store.activate();
+    emit("msgs", [nbirth(BASE_MS)]);
+    await vi.advanceTimersByTimeAsync(BACKFILL_IDLE_MS * 2);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+    store.destroy();
+  });
+
+  it("triggers the backfill on the first live Sparkplug message", async () => {
+    const store = createSparkplugTreeStore(CONN, eventSet);
+    store.init();
+
+    emit("msgs", [msg("factory/line0/temp", "21.4", BASE_MS)]);
+    expect(mocks.getSparkplugHistory).not.toHaveBeenCalled();
+
+    emit("msgs", [nbirth(BASE_MS)]);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+
+    await store.activate(); // settle the in-flight fetch
+    // The triggering batch was queued, not dropped.
+    expect(findNode(get(store), "EnergyCo", "substation-7").hasBirth).toBe(true);
+    store.destroy();
+  });
+
+  it("falls back to an idle backfill when no Sparkplug traffic arrives", async () => {
+    const store = createSparkplugTreeStore(CONN, eventSet);
+    store.init();
+    expect(mocks.getSparkplugHistory).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(BACKFILL_IDLE_MS + 10);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+    store.destroy();
+  });
+
+  it("drops the idle backfill timer on destroy", async () => {
+    const store = createSparkplugTreeStore(CONN, eventSet);
+    store.init();
+    store.destroy();
+    await vi.advanceTimersByTimeAsync(BACKFILL_IDLE_MS * 2);
+    expect(mocks.getSparkplugHistory).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("resets everything on the clear-history event", async () => {
@@ -638,12 +701,13 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     });
 
     const store = createSparkplugTreeStore(CONN, eventSet);
-    const initPromise = store.init();
+    store.init();
+    const backfillPromise = store.activate();
     await called; // fetch in flight; epoch captured
 
     emit("clear");
     resolveHist([nbirth(BASE_MS)]);
-    await initPromise;
+    await backfillPromise;
 
     const state = get(store);
     expect(state.hasSparkplug).toBe(false);
@@ -661,12 +725,13 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     });
 
     const store = createSparkplugTreeStore(CONN, eventSet);
-    const initPromise = store.init();
+    store.init();
+    const backfillPromise = store.activate();
     await called; // fetch in flight
 
     store.destroy(); // torn down before the backfill resolves
     resolveHist([nbirth(BASE_MS)]);
-    await initPromise;
+    await backfillPromise;
 
     expect(vi.getTimerCount()).toBe(0); // no leaked ticker interval
 
@@ -685,7 +750,8 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     });
 
     const store = createSparkplugTreeStore(CONN, eventSet);
-    const initPromise = store.init();
+    store.init();
+    const backfillPromise = store.activate();
     await called; // fetch in flight; epoch captured
 
     // Same message object arrives live AND will be in the resolved history.
@@ -695,7 +761,7 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     emit("msgs", [shared, liveOnly]);
 
     resolveHist([shared]);
-    await initPromise;
+    await backfillPromise;
 
     const state = get(store);
     const dupNode = findNode(state, "EnergyCo", "dup-node");
@@ -715,11 +781,239 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     expect(vi.getTimerCount()).toBe(1);
     store.destroy();
     expect(vi.getTimerCount()).toBe(0);
-    for (const name of ["msgs", "clear", "conn", "disc"]) {
+    for (const name of ["msgs", "clear", "conn", "disc", "reconnecting"]) {
       expect(mocks.handlers.get(name)?.size ?? 0).toBe(0);
     }
     const snapshot = get(store);
     emit("msgs", [nbirth(BASE_MS + 1000)]);
     expect(get(store)).toBe(snapshot);
+  });
+});
+
+describe("createSparkplugTreeStore — reconnect", () => {
+  it("clears the tree and freezes staleness on mqttReconnecting, keeping the toggle", async () => {
+    const store = await makeStore();
+    emit("msgs", [
+      nbirth(BASE_MS),
+      dbirth(BASE_MS + 100),
+      ndata(BASE_MS + 200, { seqGap: { expected: 1, got: 3 } }),
+      msg(
+        "spBv1.0/STATE/scada-primary",
+        JSON.stringify({ online: true, timestamp: BASE_MS }),
+        BASE_MS,
+        { msgType: "STATE", hostId: "scada-primary" }
+      ),
+    ]);
+    expect(get(store).groups).toHaveLength(1);
+
+    vi.advanceTimersByTime(1000);
+    emit("reconnecting");
+
+    const state = get(store);
+    // The backend session store resets too, so nothing pre-drop stays live.
+    expect(state.groups).toHaveLength(0);
+    expect(state.hosts).toHaveLength(0);
+    expect(state.warnings).toHaveLength(0);
+    expect(state.warningCount).toBe(0);
+    // ...but the toggle must not vanish under the user.
+    expect(state.hasSparkplug).toBe(true);
+
+    // Staleness is frozen at the drop, and no fresh backfill is kicked off.
+    const frozen = state.nowMs;
+    vi.advanceTimersByTime(60_000);
+    emit("msgs", [nbirth(BASE_MS + 61_000)]);
+    expect(get(store).nowMs).toBe(frozen);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+    store.destroy();
+  });
+
+  it("resumes ticking once reconnected", async () => {
+    const store = await makeStore();
+    emit("reconnecting");
+    expect(vi.getTimerCount()).toBe(0);
+    emit("conn");
+    emit("msgs", [nbirth(BASE_MS)]);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(STALE_AFTER_MS + 2000);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics.every((m) => m.stale)).toBe(true);
+    store.destroy();
+  });
+});
+
+describe("createSparkplugTreeStore — stale deaths", () => {
+  it("ignores an NDEATH from a superseded session", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS, { bdSeq: 5 }), dbirth(BASE_MS + 100)]);
+
+    const stale = ndeath(BASE_MS + 200, "substation-7", 4);
+    (stale.middlewareProperties as any).sparkplug.staleDeath = true;
+    emit("msgs", [stale]);
+
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.online).toBe(true);
+    expect(node.deathAtMs).toBeUndefined();
+    expect(node.bdSeq).toBe(5); // untouched by the stale death
+    expect(node.devices[0].online).toBe(true);
+    store.destroy();
+  });
+});
+
+describe("createSparkplugTreeStore — caps", () => {
+  it("drops new edge nodes past MAX_TRACKED_NODES, warning once", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = await makeStore();
+    const batch: any[] = [];
+    for (let i = 0; i < MAX_TRACKED_NODES + 5; i++) {
+      batch.push(nbirth(BASE_MS, { node: `node-${i}` }));
+    }
+    expect(() => emit("msgs", batch)).not.toThrow();
+
+    const state = get(store);
+    const count = state.groups.reduce((a, g) => a + g.nodes.length, 0);
+    expect(count).toBe(MAX_TRACKED_NODES);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0][0])).toContain("node cap reached");
+
+    // Tracked nodes keep updating after the cap is hit.
+    emit("msgs", [ndata(BASE_MS + 1000, { node: "node-0" })]);
+    const first = findNode(get(store), "EnergyCo", "node-0");
+    expect(first.metrics.find((m) => m.name === "Volts/L1")!.value).toBe("240.1");
+    warnSpy.mockRestore();
+    store.destroy();
+  });
+
+  it("drops new devices past MAX_TRACKED_DEVICES, warning once", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS)]);
+    const batch: any[] = [];
+    for (let i = 0; i < MAX_TRACKED_DEVICES + 3; i++) {
+      batch.push(dbirth(BASE_MS + 1 + i, `device-${i}`));
+    }
+    expect(() => emit("msgs", batch)).not.toThrow();
+
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.devices).toHaveLength(MAX_TRACKED_DEVICES);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0][0])).toContain("device cap reached");
+    warnSpy.mockRestore();
+    store.destroy();
+  });
+
+  it("caps placeholder alias metrics per scope but not real ones", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = await makeStore();
+    // An unbirthed publisher cycling aliases: unbounded distinct keys.
+    const metrics = [];
+    for (let i = 0; i < MAX_PLACEHOLDER_METRICS + 50; i++) {
+      metrics.push({ alias: String(i), floatValue: i, timestamp: String(BASE_MS) });
+    }
+    emit("msgs", [ndata(BASE_MS, { resolution: "unresolved", metrics })]);
+
+    let node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics).toHaveLength(MAX_PLACEHOLDER_METRICS);
+    expect(node.metrics.every((m) => m.placeholder)).toBe(true);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0][0])).toContain(
+      "placeholder metric cap reached"
+    );
+
+    // A named metric is still accepted at the placeholder cap.
+    emit("msgs", [ndata(BASE_MS + 1000)]);
+    node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics).toHaveLength(MAX_PLACEHOLDER_METRICS + 1);
+
+    // A birth resets the placeholder budget along with the metric map.
+    emit("msgs", [nbirth(BASE_MS + 2000)]);
+    node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics).toHaveLength(2);
+    warnSpy.mockRestore();
+    store.destroy();
+  });
+});
+
+describe("createSparkplugTreeStore — duplicate delivery", () => {
+  it("counts a seq-gap message once however often it is delivered", async () => {
+    const store = await makeStore();
+    const gapMsg = ndata(BASE_MS, { seqGap: { expected: 41, got: 44 } });
+    emit("msgs", [gapMsg]);
+    // A different gap in between clears the content dedupe...
+    emit("msgs", [ndata(BASE_MS + 1000, { seqGap: { expected: 50, got: 52 } })]);
+    expect(get(store).warnings).toHaveLength(2);
+    // ...so only the message-id dedupe can catch this redelivery.
+    emit("msgs", [gapMsg]);
+    expect(get(store).warnings).toHaveLength(2);
+    store.destroy();
+  });
+
+  it("does not inflate the rebirth count when one NBIRTH is redelivered", async () => {
+    const store = await makeStore();
+    const birth = nbirth(BASE_MS);
+    for (let i = 0; i < 6; i++) emit("msgs", [birth]);
+    const state = get(store);
+    expect(findNode(state, "EnergyCo", "substation-7").rebirthCount90s).toBe(1);
+    expect(state.warnings).toHaveLength(0);
+    store.destroy();
+  });
+});
+
+describe("createSparkplugTreeStore — out-of-order replay", () => {
+  it("never overwrites a metric with an older arrival", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS)]);
+    emit("msgs", [
+      ndata(BASE_MS + 5000, {
+        metrics: [
+          { name: "Volts/L1", floatValue: 250, timestamp: String(BASE_MS + 5000) },
+        ],
+      }),
+    ]);
+    emit("msgs", [
+      ndata(BASE_MS + 1000, {
+        metrics: [
+          { name: "Volts/L1", floatValue: 100, timestamp: String(BASE_MS + 1000) },
+        ],
+      }),
+    ]);
+    const volts = findNode(get(store), "EnergyCo", "substation-7").metrics.find(
+      (m) => m.name === "Volts/L1"
+    )!;
+    expect(volts.value).toBe("250");
+    expect(volts.lastSeenMs).toBe(BASE_MS + 5000);
+    store.destroy();
+  });
+
+  it("ignores a birth older than the one already recorded for the scope", async () => {
+    const store = await makeStore();
+    emit("msgs", [
+      nbirth(BASE_MS + 5000, {
+        metrics: [
+          { name: "New", datatype: 9, floatValue: 1, timestamp: String(BASE_MS + 5000) },
+        ],
+      }),
+    ]);
+    emit("msgs", [
+      nbirth(BASE_MS, {
+        metrics: [
+          { name: "Old", datatype: 9, floatValue: 2, timestamp: String(BASE_MS) },
+        ],
+      }),
+    ]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics.map((m) => m.name)).toEqual(["New"]);
+    expect(node.birthAtMs).toBe(BASE_MS + 5000);
+    expect(node.rebirthCount90s).toBe(1);
+    store.destroy();
+  });
+
+  it("accepts an old birth for a scope that has none yet", async () => {
+    const store = await makeStore();
+    emit("msgs", [ndata(BASE_MS + 5000)]);
+    emit("msgs", [nbirth(BASE_MS)]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.hasBirth).toBe(true);
+    expect(node.birthAtMs).toBe(BASE_MS);
+    store.destroy();
   });
 });

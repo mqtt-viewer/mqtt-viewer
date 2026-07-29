@@ -10,9 +10,16 @@
 //     without sparkplug middleware meta costs one property read, no allocs.
 //   - Svelte store writes are coalesced: at most one `set` per incoming batch
 //     event and one per 1 s ticker tick — never per message.
-//   - State is bounded: metric/node maps are bounded by distinct names in the
-//     traffic, warnings are capped at WARNING_CAP, the per-node birth ring at
-//     BIRTH_RING_CAP.
+//   - State is bounded by hard caps, not by traffic: MAX_TRACKED_NODES nodes,
+//     MAX_TRACKED_DEVICES devices per node, MAX_PLACEHOLDER_METRICS
+//     alias placeholders per scope (these mirror the backend session caps),
+//     warnings at WARNING_CAP and the per-node birth ring at BIRTH_RING_CAP.
+//     Over-cap keys are dropped, with one console.warn per store per cap kind.
+//   - The history backfill is deferred and single-shot: it runs on the first
+//     live Sparkplug message, on activate() (the user opening the view), or on
+//     an idle fallback timer — never unconditionally on every panel mount.
+//     Because live traffic can therefore be folded in before the replay, every
+//     fold is order-safe (an older arrival never overwrites a newer one).
 
 import { get, writable } from "svelte/store";
 import { Events } from "@wailsio/runtime";
@@ -63,6 +70,20 @@ export const REBIRTH_STORM_WINDOW_MS = 90_000;
 export const SEQ_GAP_DEDUPE_MS = 5_000;
 /** Ticker cadence for recomputing stale flags / relative last-seen labels. */
 export const TICKER_MS = 1000;
+/** Total edge nodes tracked across all groups (mirrors the backend cap). */
+export const MAX_TRACKED_NODES = 4096;
+/** Devices tracked per edge node (mirrors the backend cap). */
+export const MAX_TRACKED_DEVICES = 1024;
+/**
+ * `alias_<n>` placeholder metrics kept per scope. Real (birth-named) metrics
+ * are bounded by the birth payload; placeholders are minted by an unbirthed
+ * publisher cycling aliases, so they need their own cap.
+ */
+export const MAX_PLACEHOLDER_METRICS = 256;
+/** Message ids remembered for warning de-duplication (FIFO). */
+export const WARNED_ID_CAP = 256;
+/** Fallback delay for the deferred backfill when no trigger fires first. */
+export const BACKFILL_IDLE_MS = 2000;
 
 /** Sparkplug B datatype codes -> human names (others render "Type <n>"). */
 const DATATYPE_NAMES: Record<number, string> = {
@@ -187,16 +208,24 @@ interface MetricRt {
   isTransient?: boolean;
 }
 
-interface DeviceRt {
+/** The part of a node/device runtime that holds metrics (see upsertMetric). */
+interface MetricScope {
+  metrics: Map<string, MetricRt>;
+  /** Placeholder (`alias_<n>`) metrics currently in `metrics`. */
+  placeholderCount: number;
+  /** Arrival time of the newest birth folded into this scope. */
+  birthAtMs?: number;
+}
+
+interface DeviceRt extends MetricScope {
   name: string;
   online: boolean;
   hasBirth: boolean;
   lastSeenMs: number;
   deathAtMs?: number;
-  metrics: Map<string, MetricRt>;
 }
 
-interface NodeRt {
+interface NodeRt extends MetricScope {
   group: string;
   name: string;
   online: boolean;
@@ -204,11 +233,10 @@ interface NodeRt {
   bdSeq?: number;
   seqOk: boolean;
   lastSeqGap?: { expected: number; got: number };
-  birthAtMs?: number;
   lastSeenMs: number;
   deathAtMs?: number;
-  /** Ring of NBIRTH arrival times (capped) for rebirth-storm detection. */
-  birthRing: number[];
+  /** Ring of NBIRTH arrivals (capped) for rebirth-storm detection. */
+  birthRing: { id?: string; timeMs: number }[];
   /** The storm warning currently attached to this node, if a storm is live. */
   stormWarning: SparkplugWarning | null;
   lastSeqGapWarning: { expected: number; got: number; timeMs: number } | null;
@@ -227,6 +255,12 @@ interface SparkplugMeta {
   birthAtMs?: number;
   seqGap?: { expected: number; got: number };
   bdSeq?: number;
+  /**
+   * Set by the backend when an NDEATH's bdSeq does not match the live
+   * session's birth: a late death from a superseded session, which must not
+   * take the current session offline.
+   */
+  staleDeath?: boolean;
 }
 
 // Protojson metric shape (names already injected by the backend middleware).
@@ -338,15 +372,27 @@ export const createSparkplugTreeStore = (
   // (and leaking a ticker) after the store has been torn down.
   let destroyed = false;
 
-  // True while GetSparkplugMessageHistory is in flight. Live batches that
-  // arrive during that window are queued (not ingested) so a message present
-  // in both the backfill result and a live batch isn't double-processed.
-  let backfillInFlight = false;
-  let pendingLiveBatches: mqtt.MqttMessage[][] = [];
+  // Single-shot guard for the deferred backfill, plus its idle fallback timer.
+  let backfillStarted = false;
+  let backfillPromise: Promise<void> | null = null;
+  let idleBackfillTimer: ReturnType<typeof setTimeout> | null = null;
 
   const refNowMs = () => disconnectedAtMs ?? Date.now();
 
-  const ensureNode = (group: string, name: string): NodeRt => {
+  // Total nodes across all groups, kept as a counter so the cap check never
+  // walks the group maps on the hot path.
+  let nodeCount = 0;
+
+  // One warning per store per cap kind: a flood must never warn per message.
+  const capWarned = { node: false, device: false, placeholder: false };
+  const warnCapOnce = (kind: keyof typeof capWarned, text: string) => {
+    if (capWarned[kind]) return;
+    capWarned[kind] = true;
+    console.warn(text);
+  };
+
+  /** Returns null when the node is new and the tracking cap is reached. */
+  const ensureNode = (group: string, name: string): NodeRt | null => {
     let nodes = groups.get(group);
     if (!nodes) {
       nodes = new Map();
@@ -354,6 +400,13 @@ export const createSparkplugTreeStore = (
     }
     let node = nodes.get(name);
     if (!node) {
+      if (nodeCount >= MAX_TRACKED_NODES) {
+        warnCapOnce(
+          "node",
+          `sparkplug-tree: node cap reached (${MAX_TRACKED_NODES}), ignoring new edge nodes`
+        );
+        return null;
+      }
       node = {
         group,
         name,
@@ -365,22 +418,33 @@ export const createSparkplugTreeStore = (
         stormWarning: null,
         lastSeqGapWarning: null,
         metrics: new Map(),
+        placeholderCount: 0,
         devices: new Map(),
       };
       nodes.set(name, node);
+      nodeCount++;
     }
     return node;
   };
 
-  const ensureDevice = (node: NodeRt, name: string): DeviceRt => {
+  /** Returns null when the device is new and the per-node cap is reached. */
+  const ensureDevice = (node: NodeRt, name: string): DeviceRt | null => {
     let device = node.devices.get(name);
     if (!device) {
+      if (node.devices.size >= MAX_TRACKED_DEVICES) {
+        warnCapOnce(
+          "device",
+          `sparkplug-tree: device cap reached (${MAX_TRACKED_DEVICES}) on an edge node, ignoring new devices`
+        );
+        return null;
+      }
       device = {
         name,
         online: false,
         hasBirth: false,
         lastSeenMs: 0,
         metrics: new Map(),
+        placeholderCount: 0,
       };
       node.devices.set(name, device);
     }
@@ -390,6 +454,19 @@ export const createSparkplugTreeStore = (
   const pushWarning = (w: SparkplugWarning) => {
     warnings.push(w);
     if (warnings.length > WARNING_CAP) warnings.shift();
+  };
+
+  // Message ids already counted towards a warning. Warning counting is
+  // frontend-side, so a duplicate delivery (browser server mode, a replay
+  // overlapping live traffic) would otherwise double count. Insertion-ordered
+  // Set used as a bounded FIFO.
+  const warnedIds = new Set<string>();
+  const rememberWarnedId = (id: string) => {
+    warnedIds.add(id);
+    if (warnedIds.size > WARNED_ID_CAP) {
+      const oldest = warnedIds.values().next().value;
+      if (oldest !== undefined) warnedIds.delete(oldest);
+    }
   };
 
   // --- Snapshot ---------------------------------------------------------------
@@ -438,8 +515,8 @@ export const createSparkplugTreeStore = (
           });
         }
         let rebirthCount90s = 0;
-        for (const t of n.birthRing) {
-          if (nowMs - t <= REBIRTH_STORM_WINDOW_MS) rebirthCount90s++;
+        for (const b of n.birthRing) {
+          if (nowMs - b.timeMs <= REBIRTH_STORM_WINDOW_MS) rebirthCount90s++;
         }
         outNodes.push({
           group: n.group,
@@ -491,15 +568,18 @@ export const createSparkplugTreeStore = (
   };
 
   const upsertMetric = (
-    metrics: Map<string, MetricRt>,
+    scope: MetricScope,
     pm: PayloadMetric,
     arrivalMs: number,
     payloadTs: string | number | undefined
   ) => {
     const name = metricDisplayName(pm);
-    const { value, valueRaw } = extractMetricValue(pm);
-    const existing = metrics.get(name);
+    const existing = scope.metrics.get(name);
     if (existing) {
+      // Order safety: the deferred backfill can replay a message older than
+      // one already folded in live. Never walk a metric backwards.
+      if (arrivalMs < existing.lastSeenMs) return;
+      const { value, valueRaw } = extractMetricValue(pm);
       // Update in place — no new object per message.
       if (pm.datatype !== undefined) existing.typeName = datatypeName(pm.datatype);
       existing.value = value;
@@ -511,9 +591,20 @@ export const createSparkplugTreeStore = (
       existing.isTransient = pm.isTransient;
       return;
     }
-    metrics.set(name, {
+    const placeholder = pm.name === undefined || pm.name === "";
+    if (placeholder && scope.placeholderCount >= MAX_PLACEHOLDER_METRICS) {
+      // An unbirthed publisher cycling aliases would otherwise mint keys
+      // without limit.
+      warnCapOnce(
+        "placeholder",
+        `sparkplug-tree: placeholder metric cap reached (${MAX_PLACEHOLDER_METRICS}), ignoring new unresolved aliases`
+      );
+      return;
+    }
+    const { value, valueRaw } = extractMetricValue(pm);
+    scope.metrics.set(name, {
       name,
-      placeholder: pm.name === undefined || pm.name === "",
+      placeholder,
       typeName: datatypeName(pm.datatype),
       value,
       valueRaw,
@@ -523,31 +614,38 @@ export const createSparkplugTreeStore = (
       isHistorical: pm.isHistorical,
       isTransient: pm.isTransient,
     });
+    if (placeholder) scope.placeholderCount++;
   };
 
   const handleBirth = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
-    const payload = parsePayload(m);
-    const payloadMetrics: PayloadMetric[] = payload?.metrics ?? [];
+    if (!node) return;
     const isDevice = meta.device !== undefined;
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
+    if (!scope) return;
+    // Order safety: a replayed birth older than the one already recorded for
+    // this scope would resurrect a dead metric set.
+    if (scope.birthAtMs !== undefined && m.timeMs < scope.birthAtMs) return;
+    const payload = parsePayload(m);
+    const payloadMetrics: PayloadMetric[] = payload?.metrics ?? [];
 
     // Replace, never merge — stale mappings resolve silently to wrong names.
     scope.metrics = new Map();
+    scope.placeholderCount = 0;
     for (const pm of payloadMetrics) {
       // bdSeq is session plumbing; it is surfaced on the node row instead of
       // polluting the metric list.
       if (pm.name === "bdSeq") continue;
-      upsertMetric(scope.metrics, pm, m.timeMs, payload?.timestamp);
+      upsertMetric(scope, pm, m.timeMs, payload?.timestamp);
     }
     scope.online = true;
     scope.hasBirth = true;
     scope.deathAtMs = undefined;
-    scope.lastSeenMs = m.timeMs;
-    node.lastSeenMs = m.timeMs;
+    if (m.timeMs > scope.lastSeenMs) scope.lastSeenMs = m.timeMs;
+    scope.birthAtMs = m.timeMs;
+    if (m.timeMs > node.lastSeenMs) node.lastSeenMs = m.timeMs;
 
     if (!isDevice) {
-      node.birthAtMs = m.timeMs;
       if (meta.bdSeq !== undefined) node.bdSeq = meta.bdSeq;
       // A birth restarts the seq cycle: clear any earlier gap flag.
       node.seqOk = true;
@@ -555,12 +653,15 @@ export const createSparkplugTreeStore = (
 
       // Rebirth-storm detection: only NBIRTHs count (a node birthing its
       // devices at connect is normal; repeated NBIRTHs are the classic
-      // duplicate-client-id symptom).
-      node.birthRing.push(m.timeMs);
+      // duplicate-client-id symptom). Ring entries carry the message id so a
+      // duplicate delivery of the same NBIRTH cannot inflate the count.
+      const id = m.id as string | undefined;
+      if (id !== undefined && node.birthRing.some((b) => b.id === id)) return;
+      node.birthRing.push({ id, timeMs: m.timeMs });
       if (node.birthRing.length > BIRTH_RING_CAP) node.birthRing.shift();
       let recent = 0;
-      for (const t of node.birthRing) {
-        if (m.timeMs - t <= REBIRTH_STORM_WINDOW_MS) recent++;
+      for (const b of node.birthRing) {
+        if (m.timeMs - b.timeMs <= REBIRTH_STORM_WINDOW_MS) recent++;
       }
       if (recent >= REBIRTH_STORM_COUNT) {
         const text = `${recent} rebirths in 90s, possible duplicate client id`;
@@ -589,26 +690,34 @@ export const createSparkplugTreeStore = (
 
   const handleData = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
+    if (!node) return;
     const isDevice = meta.device !== undefined;
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
+    if (!scope) return;
     const payload = parsePayload(m);
     const payloadMetrics: PayloadMetric[] = payload?.metrics ?? [];
     for (const pm of payloadMetrics) {
-      upsertMetric(scope.metrics, pm, m.timeMs, payload?.timestamp);
+      upsertMetric(scope, pm, m.timeMs, payload?.timestamp);
     }
-    scope.lastSeenMs = m.timeMs;
-    node.lastSeenMs = m.timeMs;
+    if (m.timeMs > scope.lastSeenMs) scope.lastSeenMs = m.timeMs;
+    if (m.timeMs > node.lastSeenMs) node.lastSeenMs = m.timeMs;
 
     const gap = meta.seqGap;
     if (gap) {
       node.seqOk = false;
       node.lastSeqGap = { expected: gap.expected, got: gap.got };
       const prev = node.lastSeqGapWarning;
+      // Two dedupes: by message id (the same message delivered twice, e.g. a
+      // replay overlapping live traffic) and by content within a short window
+      // (a publisher repeating the same gap).
+      const id = m.id as string | undefined;
       const isDuplicate =
-        prev !== null &&
-        prev.expected === gap.expected &&
-        prev.got === gap.got &&
-        m.timeMs - prev.timeMs <= SEQ_GAP_DEDUPE_MS;
+        (id !== undefined && warnedIds.has(id)) ||
+        (prev !== null &&
+          prev.expected === gap.expected &&
+          prev.got === gap.got &&
+          m.timeMs - prev.timeMs <= SEQ_GAP_DEDUPE_MS);
+      if (id !== undefined) rememberWarnedId(id);
       if (!isDuplicate) {
         pushWarning({
           node: node.name,
@@ -626,9 +735,14 @@ export const createSparkplugTreeStore = (
   };
 
   const handleDeath = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
+    // A death whose bdSeq does not match the live birth belongs to a
+    // superseded session: it says nothing about the session on screen.
+    if (meta.staleDeath) return;
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
+    if (!node) return;
     if (meta.device !== undefined) {
       const device = ensureDevice(node, meta.device);
+      if (!device) return;
       device.online = false;
       device.deathAtMs = m.timeMs;
       return;
@@ -737,6 +851,8 @@ export const createSparkplugTreeStore = (
     groups.clear();
     hosts.clear();
     warnings = [];
+    warnedIds.clear();
+    nodeCount = 0;
     hasSparkplug = false;
     dataEpoch++;
   };
@@ -745,20 +861,20 @@ export const createSparkplugTreeStore = (
   let offClear: (() => void) | null = null;
   let offConnected: (() => void) | null = null;
   let offDisconnected: (() => void) | null = null;
+  let offReconnecting: (() => void) | null = null;
 
   const bindListeners = () => {
     offMessages = Events.On(eventSet.mqttMessages, (e: any) => {
       const messages: mqtt.MqttMessage[] = e.data ?? [];
-      if (backfillInFlight) {
-        // Backend history already contains anything committed before the
-        // fetch started; queue live batches until we know which ids the
-        // history already covered, so they aren't double-processed.
-        pendingLiveBatches.push(messages);
-        return;
-      }
       // One coalesced store write per batch, and none at all for batches with
-      // no Sparkplug traffic.
-      if (ingest(messages)) flush();
+      // no Sparkplug traffic. Live traffic is never held back for the
+      // backfill: folding is order-safe and warning counters dedupe by
+      // message id, so the replay can land before or after this batch.
+      if (!ingest(messages)) return;
+      flush();
+      // Sparkplug traffic on this connection is the signal that the retained
+      // history is worth fetching. Single-shot.
+      if (!backfillStarted) void startBackfill();
     });
     offClear = Events.On(eventSet.mqttClearHistory, () => {
       resetData();
@@ -778,37 +894,76 @@ export const createSparkplugTreeStore = (
       stopTicker();
       flush();
     });
+    offReconnecting = Events.On(eventSet.mqttReconnecting, () => {
+      connected = false;
+      disconnectedAtMs = Date.now();
+      stopTicker();
+      // A reconnect resets the backend's session store too, and retained
+      // births replay within seconds of the link coming back. Dropping the
+      // pre-drop tree stops stale births being presented as live. hasSparkplug
+      // survives so the List/Sparkplug toggle (and an open Sparkplug view)
+      // does not vanish under the user. resetData bumps dataEpoch, so an
+      // in-flight backfill cannot resurrect the old state; no new fetch is
+      // started here.
+      const hadSparkplug = hasSparkplug;
+      resetData();
+      hasSparkplug = hadSparkplug;
+      flush();
+    });
   };
 
   // Replays the connection's retained Sparkplug history (already enriched by
   // the backend middleware) so births seen earlier in the session resolve
-  // immediately. Guarded by dataEpoch against a clear racing the fetch.
+  // immediately. The backend narrows this to births, host STATE and the latest
+  // message per topic, so it stays small however long the session has run.
+  // Live traffic keeps flowing while it is in flight: an older replayed
+  // message never walks a metric backwards, births older than the recorded one
+  // are ignored, and warning counters dedupe by message id. Guarded by
+  // dataEpoch against a clear or a reconnect racing the fetch.
   const backfill = async () => {
     const epoch = dataEpoch;
-    backfillInFlight = true;
     try {
       const history = (await GetSparkplugMessageHistory(connectionId)) ?? [];
-      if (epoch !== dataEpoch) return; // cleared mid-fetch → discard
-      const historyIds = new Set(history.map((m) => m.id));
-      ingest(history);
-      for (const batch of pendingLiveBatches) {
-        ingest(batch.filter((m) => !historyIds.has(m.id)));
-      }
+      if (destroyed || epoch !== dataEpoch) return; // torn down / cleared → discard
+      if (ingest(history)) flush();
     } catch (e) {
       console.error("sparkplug-tree: history backfill failed", e);
-    } finally {
-      backfillInFlight = false;
-      pendingLiveBatches = [];
     }
   };
 
-  // Opens the store: binds live listeners first (so nothing is missed during
-  // the async backfill), then replays history.
-  const init = async () => {
+  const clearIdleBackfillTimer = () => {
+    if (idleBackfillTimer !== null) {
+      clearTimeout(idleBackfillTimer);
+      idleBackfillTimer = null;
+    }
+  };
+
+  /** Runs the backfill at most once per store, whatever triggered it. */
+  const startBackfill = (): Promise<void> => {
+    if (backfillStarted) return backfillPromise ?? Promise.resolve();
+    backfillStarted = true;
+    clearIdleBackfillTimer();
+    backfillPromise = backfill();
+    return backfillPromise;
+  };
+
+  /**
+   * Called when the user opens the Sparkplug view. Idempotent: it only forces
+   * the one-shot history backfill if no live message has triggered it yet.
+   */
+  const activate = (): Promise<void> => startBackfill();
+
+  // Opens the store: binds the live listeners only. The history fetch is
+  // deferred (see startBackfill) so mounting a connection panel costs nothing
+  // on the backend; the idle timer is the fallback for a dormant connection
+  // whose Sparkplug traffic stopped before this mount.
+  const init = () => {
     bindListeners();
-    await backfill();
-    if (destroyed) return;
     if (connected) startTicker();
+    idleBackfillTimer = setTimeout(() => {
+      idleBackfillTimer = null;
+      void startBackfill();
+    }, BACKFILL_IDLE_MS);
     flush();
   };
 
@@ -818,13 +973,17 @@ export const createSparkplugTreeStore = (
     offClear?.();
     offConnected?.();
     offDisconnected?.();
+    offReconnecting?.();
     offMessages = offClear = offConnected = offDisconnected = null;
+    offReconnecting = null;
+    clearIdleBackfillTimer();
     stopTicker();
   };
 
   return {
     subscribe,
     init,
+    activate,
     destroy,
     /** Test/inspection helper: current state snapshot. */
     snapshot: () => get({ subscribe }),

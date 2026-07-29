@@ -40,6 +40,14 @@
     filter,
   });
   $: isEmpty = treeState.groups.length === 0 && treeState.hosts.length === 0;
+  // The store keeps warnings newest last; the strip is short and scrolls, so
+  // show the newest first to keep the most urgent one above the fold. Sorted
+  // by time rather than reversed: a live storm warning refreshes in place, so
+  // its position in the store's array no longer matches its timestamp. Copy of
+  // the array only, so that refresh-in-place still lands.
+  $: warningsNewestFirst = [...treeState.warnings].sort(
+    (a, b) => b.timeMs - a.timeMs
+  );
 </script>
 
 <div class="h-full w-full min-w-0 flex flex-col overflow-hidden">
@@ -94,7 +102,7 @@
     <div
       class="shrink-0 border-t border-divider max-h-24 overflow-y-auto px-2 py-0.5"
     >
-      {#each treeState.warnings as warning}
+      {#each warningsNewestFirst as warning}
         <div
           class="flex items-center gap-1.5 text-sm text-warning font-mono whitespace-nowrap overflow-hidden"
         >
