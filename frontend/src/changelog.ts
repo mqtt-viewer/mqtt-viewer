@@ -154,6 +154,14 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Dropdowns inside dialogs are clickable",
+        body: "Every dropdown in the connection form, including Version, Protocol and QoS, opened underneath the dialog, so clicking an option did nothing. They now sit on top where you can reach them.",
+      },
+      {
+        title: "Publish errors tell you what went wrong",
+        body: "A failed publish showed nothing at all. You now get a message explaining why, which matters most when a payload doesn't match the message type you picked.",
+      },
+      {
         title: "Updates that match your install",
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
