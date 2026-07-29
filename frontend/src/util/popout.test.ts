@@ -17,6 +17,11 @@ vi.mock("@/stores/env", () => ({
   },
 }));
 
+const addToast = vi.fn();
+vi.mock("@/components/Toast/Toast.svelte", () => ({
+  addToast: (...args: unknown[]) => addToast(...args),
+}));
+
 import {
   buildChartWindowURL,
   buildStatusWindowURL,
@@ -82,6 +87,7 @@ describe("open helpers", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    windowOpen.mockReturnValue({} as Window);
     (globalThis as any).window = { open: windowOpen };
   });
 
@@ -116,5 +122,19 @@ describe("open helpers", () => {
     openBrokerStatusWindow(4);
     expect(OpenBrokerStatusWindow).not.toHaveBeenCalled();
     expect(windowOpen).toHaveBeenCalledWith("?conn=4&view=status", "mv-status-4");
+    expect(addToast).not.toHaveBeenCalled();
+  });
+
+  it("toasts when the tab is blocked instead of failing silently", () => {
+    // A pop-up blocker, or an iframe without allow-popups, returns null.
+    mockEnv.set({ isServerMode: true });
+    windowOpen.mockReturnValue(null);
+
+    openBrokerStatusWindow(4);
+    expect(addToast).toHaveBeenCalledTimes(1);
+    expect(addToast.mock.calls[0][0].data.type).toBe("error");
+
+    openChartWindow({ connectionId: 4, topic: "a/b", fields: [] });
+    expect(addToast).toHaveBeenCalledTimes(2);
   });
 });

@@ -4,6 +4,23 @@ import {
   OpenBrokerStatusWindow,
 } from "bindings/mqtt-viewer/backend/app/app";
 import envStore from "@/stores/env";
+import { addToast } from "@/components/Toast/Toast.svelte";
+
+// openTab wraps window.open so a blocked pop-up says so. A pop-up blocker, or
+// an embedding iframe without allow-popups (Home Assistant ingress frames the
+// app), returns null and the click otherwise does nothing at all.
+const openTab = (url: string, name: string) => {
+  const opened = window.open(url, name);
+  if (opened) return;
+  addToast({
+    data: {
+      title: "Could not open the view",
+      description:
+        "Pop-ups are blocked. Allow pop-ups for this site to open the view.",
+      type: "error",
+    },
+  });
+};
 
 // buildChartWindowURL mirrors backend/app/windows.go buildChartWindowURL so the
 // browser build routes to the same standalone chart view (App.svelte reads
@@ -49,7 +66,7 @@ export const openChartWindow = (params: {
   fields: string[];
 }) => {
   if (get(envStore).isServerMode) {
-    window.open(
+    openTab(
       buildChartWindowURL(params),
       `mv-chart-${params.connectionId}-${params.topic}`
     );
@@ -65,7 +82,7 @@ export const openChartWindow = (params: {
 // openBrokerStatusWindow opens (or focuses) the detached broker-status window.
 export const openBrokerStatusWindow = (connectionId: number) => {
   if (get(envStore).isServerMode) {
-    window.open(buildStatusWindowURL(connectionId), `mv-status-${connectionId}`);
+    openTab(buildStatusWindowURL(connectionId), `mv-status-${connectionId}`);
     return;
   }
   OpenBrokerStatusWindow(connectionId);
