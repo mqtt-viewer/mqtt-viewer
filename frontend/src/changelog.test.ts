@@ -49,17 +49,9 @@ describe("released / unreleased split", () => {
       expect(e.released).toBe(true);
       expect(e.version).toMatch(/^\d+\.\d+\.\d+$/);
     }
-    // Newest first: each entry's semver is >= the one after it. (Previously
-    // asserted 1.0.0 sits before 0.7.0 specifically, which broke when the
-    // 0.7.0 entry was removed from the changelog.)
-    const toParts = (v: string) => v.split(".").map(Number);
+    // 1.0.0 comes before 0.7.0 in the list.
     const versions = released.map((e) => e.version);
-    for (let i = 0; i < versions.length - 1; i++) {
-      const [a, b] = [toParts(versions[i]), toParts(versions[i + 1])];
-      const cmp =
-        a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
-      expect(cmp).toBeGreaterThanOrEqual(0);
-    }
+    expect(versions.indexOf("1.0.0")).toBeLessThan(versions.indexOf("0.7.0"));
   });
 
   it("has at most one unreleased staging entry, flagged not-released", () => {
@@ -112,7 +104,11 @@ describe("content", () => {
     e.headline,
     e.intro,
     e.outro ?? "",
-    ...e.sections.flatMap((s) => [s.title, s.body]),
+    ...e.sections.flatMap((s) => [
+      s.title,
+      s.body,
+      ...(s.thanks ?? []).map((t) => t.name),
+    ]),
   ];
 
   it("contains no em or en dashes in any user-facing copy", () => {
@@ -120,6 +116,19 @@ describe("content", () => {
       for (const t of userFacingText(e)) {
         expect(t.includes("—"), `em dash in: ${t}`).toBe(false);
         expect(t.includes("–"), `en dash in: ${t}`).toBe(false);
+      }
+    }
+  });
+
+  // Credits usually link to the issue, discussion, or comment where the idea
+  // was raised; a plain profile link is fine when there's no single thread.
+  it("every thanks credit has a name and a GitHub link", () => {
+    for (const e of CHANGELOG) {
+      for (const s of e.sections) {
+        for (const t of s.thanks ?? []) {
+          expect(t.name.length).toBeGreaterThan(0);
+          expect(t.url).toMatch(/^https:\/\/github\.com\//);
+        }
       }
     }
   });

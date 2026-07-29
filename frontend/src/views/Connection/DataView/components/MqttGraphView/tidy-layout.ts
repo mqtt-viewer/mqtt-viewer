@@ -107,7 +107,11 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
         // stop publishing?"); never-seen (0) sorts first of all
         return n.aggLastMsg;
       case "count":
-        return -(n.descendantCount + n.ownCount);
+        // biggest namespace first: how many TOPICS the subtree holds, this
+        // node included. ownCount is a MESSAGE counter and must not be added
+        // in — doing so let one chatty leaf outrank a namespace of hundreds
+        // of topics under a sort labelled "Topic count".
+        return -(n.descendantCount + 1);
       case "alpha":
       default:
         return n.name;

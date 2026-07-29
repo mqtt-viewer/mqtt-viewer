@@ -137,7 +137,7 @@
         />
       </div>
 
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1 mt-3">
         <BaseNumberInput
           name="prompt-disk-budget"
           label="Disk budget (GB)"

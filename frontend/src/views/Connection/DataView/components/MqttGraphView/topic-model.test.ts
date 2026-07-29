@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { rateFromScore } from "@/util/decay-score";
 import { TopicModel } from "./topic-model";
 
 test("ingest of a brand-new top-level topic marks visibleDirty", () => {
@@ -269,4 +270,40 @@ test("seedTopic does not copy the subtree rate into own for a non-leaf publisher
   // counts stay exact regardless
   expect(parent.ownCount).toBe(3);
   expect(parent.aggCount).toBe(5); // 3 own + 2 from child
+});
+
+test("setTau rescales scores so the implied rate survives a smoothing change", () => {
+  const model = new TopicModel(40000);
+  // steady 10 msg/s for long enough to converge (score -> rate x tau)
+  const start = SEED_T;
+  for (let i = 0; i < 2000; i++) {
+    model.ingest("plant/line1/temp", start + i * 100);
+  }
+  // read at the last arrival: past it the two taus decay at different speeds,
+  // which is the point of the setting. What must not change is the reading at
+  // the moment the smoothing is switched.
+  const now = start + 1999 * 100;
+  const node = model.root.children.get("plant")!;
+  const before = rateFromScore(model.peekAggScore(node, now), model.tauMs);
+
+  model.setTau(5000);
+  const after = rateFromScore(model.peekAggScore(node, now), model.tauMs);
+
+  // the reported rate is what the user sees in the hover inspector: it must
+  // not jump 8x just because they picked a different smoothing
+  expect(after).toBeCloseTo(before, 6);
+  // and the raw score (which drives node radius) is rescaled, not left alone
+  expect(node.agg.score).toBeCloseTo((before * 5000) / 1000, 6);
+});
+
+test("setTau ignores a no-op or invalid tau", () => {
+  const model = new TopicModel(14000);
+  model.ingest("a", SEED_T);
+  const score = model.root.children.get("a")!.agg.score;
+
+  model.setTau(14000);
+  expect(model.root.children.get("a")!.agg.score).toBe(score);
+  model.setTau(0);
+  expect(model.tauMs).toBe(14000);
+  expect(model.root.children.get("a")!.agg.score).toBe(score);
 });
