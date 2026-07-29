@@ -65,6 +65,7 @@
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/ProtoBindingRulesForm | [x] | [ ] | [x] | [x] |
+| Components/ProtoBindingRulesForm/ProtoTypePicker | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
@@ -86,9 +87,6 @@
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ProtoSection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [ ] |
-| Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog | [x] | [ ] | [x] | [x] |
-| Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree | [x] | [ ] | [x] | [ ] |
-| Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/MqttDataPanel | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree | [x] | [ ] | [x] | [ ] |
@@ -142,7 +140,7 @@
 
 ## Summary
 
-- Components scanned: 116
-- Story present: 116
+- Components scanned: 114
+- Story present: 114
 - Figma-linked: 0
 - Missing specs: 0
