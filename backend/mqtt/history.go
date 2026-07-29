@@ -278,7 +278,8 @@ func (m *MessageHistory) IsRetained(topic string) bool {
 
 // RetainedUnderPrefix returns the known-retained topics at or below prefix, in
 // sorted order so a confirmation dialog lists them stably. An empty prefix
-// matches every retained topic.
+// matches every retained topic. Broker-reserved ($) topics are always
+// excluded, so a bulk clear can never be offered over broker internals.
 //
 // Matching is on topic-level boundaries, not raw string prefix: "a/b" matches
 // "a/b" and "a/b/c", but never "a/bc".
@@ -287,12 +288,39 @@ func (m *MessageHistory) RetainedUnderPrefix(prefix string) []string {
 	defer m.mutex.Unlock()
 	result := make([]string, 0, 16)
 	for topic := range m.retained {
+		if isBrokerReservedTopic(topic) {
+			// $SYS/... and friends are the broker's own namespace, never ours
+			// to retain or clear.
+			continue
+		}
 		if matchesTopicPrefix(topic, prefix) {
 			result = append(result, topic)
 		}
 	}
 	sort.Strings(result)
 	return result
+}
+
+// UnmarkRetained drops topics from the retained index. Clearing a retained
+// message is only echoed back to us on MQTT 5 (RetainAsPublished), so under
+// MQTT 3 the index would stay marked forever unless the clear updates it
+// directly.
+func (m *MessageHistory) UnmarkRetained(topics ...string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	for _, topic := range topics {
+		delete(m.retained, topic)
+	}
+}
+
+// ClearRetainedIndex empties the retained index without touching message
+// history. Called when a connection (re)subscribes: the broker replays its
+// current retained set immediately afterwards, so rebuilding from that replay
+// is the only way to drop topics tombstoned while we were away.
+func (m *MessageHistory) ClearRetainedIndex() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.retained = make(map[string]struct{})
 }
 
 // matchesTopicPrefix reports whether topic is at or below prefix, respecting
@@ -303,6 +331,13 @@ func matchesTopicPrefix(topic string, prefix string) bool {
 		return true
 	}
 	return topic == prefix || strings.HasPrefix(topic, prefix+"/")
+}
+
+// isBrokerReservedTopic reports whether a topic sits in the broker's own
+// namespace. Topic names beginning with $ are reserved for the server
+// ($SYS/... on most brokers), and are never ours to retain or clear.
+func isBrokerReservedTopic(topic string) bool {
+	return strings.HasPrefix(topic, "$")
 }
 
 // getMessageByIdLocked implements the per-id lookup. Caller holds mutex.

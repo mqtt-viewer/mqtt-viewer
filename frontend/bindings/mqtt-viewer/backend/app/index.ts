@@ -7,6 +7,7 @@ export {
 };
 
 export {
+    ClearRetainedResult,
     Connection,
     Connections,
     CreateCollectionParams,

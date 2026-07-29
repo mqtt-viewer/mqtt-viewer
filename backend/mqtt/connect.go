@@ -123,6 +123,11 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 		ConnectRetryDelay:             3 * time.Second,
 		ConnectTimeout:                CONNECTION_TIMEOUT,
 		OnConnectionUp: func(cm *autopaho.ConnectionManager, c *paho.Connack) {
+			// Both callbacks fire on every reconnect, not just the first connect. The
+			// broker replays its retained set on subscribe, so dropping the index here
+			// means it is rebuilt from broker truth rather than accumulating topics that
+			// were tombstoned while we were disconnected.
+			mm.ResetRetainedIndex()
 			err := subscribeV5(ctx, mm.ctx, cm, subscriptions)
 			if err != nil {
 				slog.ErrorContext(mm.ctx, err.Error())
@@ -233,6 +238,11 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 	subErrChan := make(chan error)
 	var initialOnce sync.Once
 	opts.SetOnConnectHandler(func(c mqttV3.Client) {
+		// Both callbacks fire on every reconnect, not just the first connect. The
+		// broker replays its retained set on subscribe, so dropping the index here
+		// means it is rebuilt from broker truth rather than accumulating topics that
+		// were tombstoned while we were disconnected.
+		mm.ResetRetainedIndex()
 		err := subscribeV3(mm.ctx, c, subscriptions)
 		if err != nil {
 			slog.Error(err.Error())

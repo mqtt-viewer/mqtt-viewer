@@ -60,6 +60,12 @@ func (m *MqttManager) ClearConnectionHistory() {
 	m.MessageHistory.Clear()
 }
 
+// ResetRetainedIndex clears what we believe is retained, leaving message
+// history alone. See MessageHistory.ClearRetainedIndex.
+func (m *MqttManager) ResetRetainedIndex() {
+	m.MessageHistory.ClearRetainedIndex()
+}
+
 // SetMessageMemoryBudget bounds the in-RAM message history for this connection.
 func (m *MqttManager) SetMessageMemoryBudget(budgetBytes int64) {
 	m.MessageHistory.SetBudgetBytes(budgetBytes)
