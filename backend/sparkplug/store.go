@@ -32,16 +32,13 @@ type nodeKey struct {
 }
 
 type deviceState struct {
-	Online   bool
 	Aliases  map[uint64]string // DEVICE alias space, separate from the node's
 	BirthAt  time.Time
 	hasBirth bool
 }
 
 type nodeState struct {
-	Online   bool
-	BdSeq    uint64
-	hasBdSeq bool
+	BdSeq    *uint64           // nil until an NBIRTH carried one
 	LastSeq  int16             // -1 until a seq has been observed
 	Aliases  map[uint64]string // NODE alias space only
 	Devices  map[string]*deviceState
@@ -73,91 +70,82 @@ func (s *SessionStore) Reset() {
 // returns the meta map to attach to middleware properties. msg is the
 // already-unmarshalled payload for protobuf types (nil for STATE, and
 // tolerated nil for empty NDEATH payloads); for data messages it is mutated
-// in place to inject birth-established metric names.
+// in place to inject birth-established metric names. Returns nil when the
+// message belongs to a node the store refused to track (see maxTrackedNodes),
+// so the frontend never builds tree state for a node we can't follow.
 func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arrival time.Time) map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	meta := map[string]any{"msgType": string(info.Type)}
 	if info.Type == MessageTypeState {
-		meta["hostId"] = info.HostID
-		return meta
+		return map[string]any{"msgType": string(info.Type), "hostId": info.HostID}
 	}
-	meta["group"] = info.Group
-	meta["edgeNode"] = info.EdgeNode
+
+	// Resolve node state before building any meta so a node rejected by the
+	// tracking cap produces no meta at all. NCMD/DCMD deliberately stay out of
+	// this list: a command is addressed to a node, not evidence of one, so it
+	// must never create an entry.
+	var node *nodeState
+	switch info.Type {
+	case MessageTypeNBirth, MessageTypeDBirth, MessageTypeNData,
+		MessageTypeDData, MessageTypeNDeath, MessageTypeDDeath:
+		node = s.ensureNode(info)
+		if node == nil {
+			return nil
+		}
+	}
+
+	meta := map[string]any{
+		"msgType":  string(info.Type),
+		"group":    info.Group,
+		"edgeNode": info.EdgeNode,
+	}
 	if info.Device != "" {
 		meta["device"] = info.Device
 	}
 
 	switch info.Type {
 	case MessageTypeNBirth:
-		node := s.ensureNode(info)
-		if node == nil {
-			// At the tracking cap for a node we've never seen — passthrough,
-			// no alias/seq state to keep.
-			break
-		}
-		node.Online = true
 		node.BirthAt = arrival
 		node.hasBirth = true
-		// Flush + rebuild, never merge — stale mappings resolve silently to
+		// Flush + rebuild, never merge: stale mappings resolve silently to
 		// wrong names.
 		node.Aliases = buildAliasMap(msg)
+		// An NBIRTH restarts the sequence at 0. Anything else is a publisher
+		// bug worth reporting, but adopt it anyway so every following message
+		// isn't flagged against a counter the publisher isn't using.
 		if seq, ok := payloadSeq(msg); ok {
-			node.LastSeq = int16(seq % 256)
+			got := int16(seq % 256)
+			if got != 0 {
+				meta["seqGap"] = map[string]any{"expected": 0, "got": int(got)}
+			}
+			node.LastSeq = got
 		} else {
 			node.LastSeq = -1
 		}
 		if bdSeq, ok := findBdSeq(msg); ok {
-			node.BdSeq = bdSeq
-			node.hasBdSeq = true
+			node.BdSeq = &bdSeq
 			meta["bdSeq"] = bdSeq
 		}
 
 	case MessageTypeDBirth:
-		node := s.ensureNode(info)
-		if node == nil {
-			break
-		}
 		if device := node.ensureDevice(info.Device); device != nil {
-			device.Online = true
 			device.BirthAt = arrival
 			device.hasBirth = true
 			device.Aliases = buildAliasMap(msg)
 		}
 		// All messages from an edge node share one seq counter, so a DBIRTH
-		// advances the node's seq too — independent of the device cap above.
-		if seq, ok := payloadSeq(msg); ok {
-			node.LastSeq = int16(seq % 256)
-		}
+		// advances the node's seq too, independent of the device cap above.
+		trackSeq(node, msg, meta)
 
 	case MessageTypeNData, MessageTypeDData:
-		node := s.ensureNode(info)
-		if node != nil {
-			if seq, ok := payloadSeq(msg); ok {
-				got := int16(seq % 256)
-				if node.LastSeq >= 0 {
-					expected := (node.LastSeq + 1) % 256
-					if got != expected {
-						meta["seqGap"] = map[string]any{"expected": int(expected), "got": int(got)}
-					}
-				}
-				node.LastSeq = got
-			}
-		}
+		trackSeq(node, msg, meta)
 
-		// A capped (nil) node has no aliases or birth on record, so this
-		// falls through to the same "unresolved" path as data before birth.
-		var aliases map[uint64]string
-		var birthAt time.Time
-		var hasBirth bool
-		if node != nil {
-			aliases, birthAt, hasBirth = node.Aliases, node.BirthAt, node.hasBirth
-			if info.Type == MessageTypeDData {
-				aliases, birthAt, hasBirth = nil, time.Time{}, false
-				if device, ok := node.Devices[info.Device]; ok {
-					aliases, birthAt, hasBirth = device.Aliases, device.BirthAt, device.hasBirth
-				}
+		aliases, birthAt, hasBirth := node.Aliases, node.BirthAt, node.hasBirth
+		if info.Type == MessageTypeDData {
+			aliases, birthAt, hasBirth = nil, time.Time{}, false
+			if device, ok := node.Devices[info.Device]; ok {
+				aliases, birthAt, hasBirth = device.Aliases, device.BirthAt, device.hasBirth
 			}
 		}
 		needed, resolved := resolveMetricNames(msg, aliases)
@@ -177,27 +165,54 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arr
 
 	case MessageTypeNDeath:
 		// The broker delivers NDEATH as the will, often with a nil payload.
-		if node := s.ensureNode(info); node != nil {
-			node.Online = false
-			for _, device := range node.Devices {
-				device.Online = false
-			}
+		// NDEATH is the one edge-node message that doesn't consume the seq
+		// counter, so no trackSeq here.
+		deathBdSeq, hasDeathBdSeq := findBdSeq(msg)
+		if hasDeathBdSeq {
+			meta["bdSeq"] = deathBdSeq
 		}
-		if bdSeq, ok := findBdSeq(msg); ok {
-			meta["bdSeq"] = bdSeq
+		if node.BdSeq != nil && hasDeathBdSeq && *node.BdSeq != deathBdSeq {
+			// A retained will from a previous session, replayed after the node
+			// has already rebirthed. Killing the live session's aliases here
+			// would blank a node that is plainly still publishing.
+			meta["staleDeath"] = true
+			break
+		}
+		// LastSeq survives: the next NBIRTH is what resets it.
+		node.hasBirth = false
+		node.Aliases = map[uint64]string{}
+		node.BirthAt = time.Time{}
+		for _, device := range node.Devices {
+			device.hasBirth = false
+			device.Aliases = map[uint64]string{}
+			device.BirthAt = time.Time{}
 		}
 
 	case MessageTypeDDeath:
-		if node, ok := s.nodes[nodeKey{info.Group, info.EdgeNode}]; ok {
-			if device, ok := node.Devices[info.Device]; ok {
-				device.Online = false
-			}
-		}
+		trackSeq(node, msg, meta)
 
 	case MessageTypeNCmd, MessageTypeDCmd:
-		// Passthrough — commands don't alter session state.
+		// Passthrough: commands don't alter session state.
 	}
 	return meta
+}
+
+// trackSeq advances the node's seq counter and records a gap in meta when the
+// observed seq is not the expected successor. Every edge-node message except
+// NDEATH consumes the node's single shared counter.
+func trackSeq(node *nodeState, msg *dynamicpb.Message, meta map[string]any) {
+	seq, ok := payloadSeq(msg)
+	if !ok {
+		return
+	}
+	got := int16(seq % 256)
+	if node.LastSeq >= 0 {
+		expected := (node.LastSeq + 1) % 256
+		if got != expected {
+			meta["seqGap"] = map[string]any{"expected": int(expected), "got": int(got)}
+		}
+	}
+	node.LastSeq = got
 }
 
 // ensureNode returns nil, without inserting, if key is new and the store is

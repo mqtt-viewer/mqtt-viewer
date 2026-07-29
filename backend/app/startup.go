@@ -232,6 +232,12 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnReconnecting: func(reason *error) {
+				// A transient drop still ends the MQTT session, so the old
+				// aliases and seq counters are dead. Reset here rather than on
+				// reconnect: the link is already down, so no receive goroutine
+				// can race this, whereas resetting on connection up would race
+				// the retained births that arrive straight after resubscribe.
+				appConnection.SparkplugStore.Reset()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("starting reconnect due to: %v", (*reason).Error()))
 					if a.Mode != AppModes.Test {

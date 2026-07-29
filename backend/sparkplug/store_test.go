@@ -91,6 +91,7 @@ var (
 	ndeathInfo = TopicInfo{Group: "G", Type: MessageTypeNDeath, EdgeNode: "N"}
 	dbirthInfo = TopicInfo{Group: "G", Type: MessageTypeDBirth, EdgeNode: "N", Device: "D"}
 	ddataInfo  = TopicInfo{Group: "G", Type: MessageTypeDData, EdgeNode: "N", Device: "D"}
+	ddeathInfo = TopicInfo{Group: "G", Type: MessageTypeDDeath, EdgeNode: "N", Device: "D"}
 )
 
 func TestBirthThenDataResolves(t *testing.T) {
@@ -241,25 +242,169 @@ func TestSeqWraparoundIsNotAGap(t *testing.T) {
 	}
 }
 
-func TestNDeathMarksOfflineAndCarriesBdSeq(t *testing.T) {
+// The spec-compliant order every edge node follows: one shared counter,
+// consumed by every message except NDEATH. DDEATH skipping the counter was the
+// live bug behind spurious gap warnings on the next NDATA.
+func TestSpecCompliantSequenceHasNoSeqGaps(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	store := NewSessionStore()
 
-	birth := buildPayload(t, descriptor, 0, testMetric{name: "bdSeq", alias: u64(1), longValue: u64(3)})
+	steps := []struct {
+		name string
+		info TopicInfo
+		seq  int64
+	}{
+		{"NBIRTH", nbirthInfo, 0},
+		{"DBIRTH", dbirthInfo, 1},
+		{"DDATA", ddataInfo, 2},
+		{"DDEATH", ddeathInfo, 3},
+		{"NDATA", ndataInfo, 4},
+	}
+	for _, step := range steps {
+		meta := store.HandleMessage(step.info, buildPayload(t, descriptor, step.seq), time.UnixMilli(1000+step.seq))
+		if meta == nil {
+			t.Fatalf("%s: expected meta, got nil", step.name)
+		}
+		if gap, ok := meta["seqGap"]; ok {
+			t.Errorf("%s (seq %d): expected no seqGap, got %v", step.name, step.seq, gap)
+		}
+	}
+}
+
+func TestNBirthNonZeroSeqReportsGapAndIsAccepted(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+
+	birth := buildPayload(t, descriptor, 7, testMetric{name: "Volts/L1", alias: u64(3)})
+	meta := store.HandleMessage(nbirthInfo, birth, time.UnixMilli(1000))
+	gap, ok := meta["seqGap"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected seqGap on an NBIRTH with a non-zero seq, got %v", meta["seqGap"])
+	}
+	if gap["expected"] != 0 || gap["got"] != 7 {
+		t.Errorf("expected gap {expected:0 got:7}, got %v", gap)
+	}
+
+	// Still accepted: the birth's aliases apply and seq 8 follows cleanly.
+	data := buildPayload(t, descriptor, 8, testMetric{alias: u64(3), doubleValue: f64(1.0)})
+	meta = store.HandleMessage(ndataInfo, data, time.UnixMilli(2000))
+	if meta["resolution"] != ResolutionResolved {
+		t.Errorf("expected the non-zero birth to still resolve aliases, got %v", meta["resolution"])
+	}
+	if _, ok := meta["seqGap"]; ok {
+		t.Errorf("expected no seqGap at seq 8, got %v", meta["seqGap"])
+	}
+}
+
+func TestDBirthOutOfOrderSeqReportsGap(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), time.UnixMilli(1000))
+
+	meta := store.HandleMessage(dbirthInfo, buildPayload(t, descriptor, 5, testMetric{name: "Device/Metric", alias: u64(3)}), time.UnixMilli(1100))
+	gap, ok := meta["seqGap"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected seqGap on an out-of-order DBIRTH, got %v", meta["seqGap"])
+	}
+	if gap["expected"] != 1 || gap["got"] != 5 {
+		t.Errorf("expected gap {expected:1 got:5}, got %v", gap)
+	}
+
+	meta = store.HandleMessage(ddataInfo, buildPayload(t, descriptor, 6, testMetric{alias: u64(3), doubleValue: f64(1.0)}), time.UnixMilli(1200))
+	if _, ok := meta["seqGap"]; ok {
+		t.Errorf("expected no seqGap at seq 6, got %v", meta["seqGap"])
+	}
+}
+
+func TestNDeathInvalidatesAliasesAndCarriesBdSeq(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+
+	birth := buildPayload(t, descriptor, 0,
+		testMetric{name: "bdSeq", longValue: u64(3)},
+		testMetric{name: "Node/Metric", alias: u64(3)},
+	)
 	meta := store.HandleMessage(nbirthInfo, birth, time.UnixMilli(1000))
 	if meta["bdSeq"] != uint64(3) {
 		t.Errorf("expected birth bdSeq 3, got %v", meta["bdSeq"])
 	}
+	store.HandleMessage(dbirthInfo, buildPayload(t, descriptor, 1, testMetric{name: "Device/Metric", alias: u64(3)}), time.UnixMilli(1100))
 
 	death := buildPayload(t, descriptor, -1, testMetric{name: "bdSeq", longValue: u64(3)})
 	meta = store.HandleMessage(ndeathInfo, death, time.UnixMilli(2000))
 	if meta["bdSeq"] != uint64(3) {
 		t.Errorf("expected death bdSeq 3, got %v", meta["bdSeq"])
 	}
+	if _, ok := meta["staleDeath"]; ok {
+		t.Errorf("expected a matching bdSeq to be accepted, got staleDeath %v", meta["staleDeath"])
+	}
 
-	node := store.nodes[nodeKey{"G", "N"}]
-	if node == nil || node.Online {
-		t.Errorf("expected node offline after NDEATH")
+	ndata := buildPayload(t, descriptor, 2, testMetric{alias: u64(3), doubleValue: f64(1.0)})
+	meta = store.HandleMessage(ndataInfo, ndata, time.UnixMilli(3000))
+	if meta["resolution"] != ResolutionUnresolved {
+		t.Errorf("expected node aliases dropped by NDEATH, got %v", meta["resolution"])
+	}
+
+	// The death takes the node's devices with it.
+	ddata := buildPayload(t, descriptor, 3, testMetric{alias: u64(3), doubleValue: f64(1.0)})
+	meta = store.HandleMessage(ddataInfo, ddata, time.UnixMilli(3100))
+	if meta["resolution"] != ResolutionUnresolved {
+		t.Errorf("expected device aliases dropped by NDEATH, got %v", meta["resolution"])
+	}
+}
+
+func TestNDeathWithoutBdSeqIsAccepted(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+
+	birth := buildPayload(t, descriptor, 0,
+		testMetric{name: "bdSeq", longValue: u64(3)},
+		testMetric{name: "Node/Metric", alias: u64(3)},
+	)
+	store.HandleMessage(nbirthInfo, birth, time.UnixMilli(1000))
+
+	// A will with no bdSeq metric can't be attributed to an older session, so
+	// it has to be treated as the current one dying.
+	meta := store.HandleMessage(ndeathInfo, buildPayload(t, descriptor, -1), time.UnixMilli(2000))
+	if _, ok := meta["staleDeath"]; ok {
+		t.Errorf("expected a bdSeq-less death to be accepted, got staleDeath %v", meta["staleDeath"])
+	}
+
+	data := buildPayload(t, descriptor, 1, testMetric{alias: u64(3), doubleValue: f64(1.0)})
+	meta = store.HandleMessage(ndataInfo, data, time.UnixMilli(3000))
+	if meta["resolution"] != ResolutionUnresolved {
+		t.Errorf("expected aliases dropped by NDEATH, got %v", meta["resolution"])
+	}
+}
+
+func TestStaleNDeathIsIgnored(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+
+	birth := buildPayload(t, descriptor, 0,
+		testMetric{name: "bdSeq", longValue: u64(3)},
+		testMetric{name: "Node/Metric", alias: u64(3)},
+	)
+	store.HandleMessage(nbirthInfo, birth, time.UnixMilli(1000))
+
+	// Retained will from the session before this one.
+	death := buildPayload(t, descriptor, -1, testMetric{name: "bdSeq", longValue: u64(2)})
+	meta := store.HandleMessage(ndeathInfo, death, time.UnixMilli(2000))
+	if meta["staleDeath"] != true {
+		t.Errorf("expected staleDeath true for a mismatched bdSeq, got %v", meta["staleDeath"])
+	}
+	if meta["bdSeq"] != uint64(2) {
+		t.Errorf("expected the death's own bdSeq 2 in meta, got %v", meta["bdSeq"])
+	}
+
+	data := buildPayload(t, descriptor, 1, testMetric{alias: u64(3), doubleValue: f64(1.0)})
+	meta = store.HandleMessage(ndataInfo, data, time.UnixMilli(3000))
+	if meta["resolution"] != ResolutionResolved {
+		t.Errorf("expected the live birth to keep resolving, got %v", meta["resolution"])
+	}
+	if names := payloadMetricNames(data); names[0] != "Node/Metric" {
+		t.Errorf("expected Node/Metric after a stale death, got %v", names)
 	}
 }
 
@@ -359,15 +504,16 @@ func TestSessionStoreCapsNodeTracking(t *testing.T) {
 		t.Errorf("expected existing node to keep resolving, got %v", meta["resolution"])
 	}
 
-	// A brand-new node past the cap passes through instead of panicking.
+	// A brand-new node past the cap gets no meta at all, so the frontend never
+	// builds tree state for a node the store isn't following.
 	newNodeInfo := TopicInfo{Group: "G", Type: MessageTypeNData, EdgeNode: "new-node"}
 	data := buildPayload(t, descriptor, 5, testMetric{alias: u64(3), doubleValue: f64(2.0)})
 	meta = store.HandleMessage(newNodeInfo, data, time.UnixMilli(4000))
-	if meta["resolution"] != ResolutionUnresolved {
-		t.Errorf("expected unresolved resolution for capped node, got %v", meta["resolution"])
+	if meta != nil {
+		t.Errorf("expected nil meta for capped node, got %v", meta)
 	}
-	if _, ok := meta["seqGap"]; ok {
-		t.Errorf("expected no seqGap tracking for capped node, got %v", meta["seqGap"])
+	if names := payloadMetricNames(data); names[0] != "" {
+		t.Errorf("expected no name injected for capped node, got %v", names)
 	}
 	if len(store.nodes) != maxTrackedNodes {
 		t.Errorf("expected node count to stay capped at %d, got %d", maxTrackedNodes, len(store.nodes))
@@ -384,8 +530,13 @@ func TestSessionStoreCapsDeviceTracking(t *testing.T) {
 		store.HandleMessage(info, buildPayload(t, descriptor, 0, testMetric{name: "M", alias: u64(1)}), time.UnixMilli(1000))
 	}
 
+	// Unlike the node cap this still yields meta: the node itself is tracked,
+	// only the extra device is dropped.
 	newDeviceInfo := TopicInfo{Group: "G", Type: MessageTypeDData, EdgeNode: "N", Device: "new-device"}
 	meta := store.HandleMessage(newDeviceInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(1), doubleValue: f64(1.0)}), time.UnixMilli(2000))
+	if meta == nil {
+		t.Fatal("expected meta for a capped device under a tracked node")
+	}
 	if meta["resolution"] != ResolutionUnresolved {
 		t.Errorf("expected unresolved resolution for capped device, got %v", meta["resolution"])
 	}

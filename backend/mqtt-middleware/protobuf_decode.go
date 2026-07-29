@@ -44,8 +44,7 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 	if info.Type == sparkplug.MessageTypeState {
 		// STATE payloads are JSON (3.0) or plain text (legacy 2.2), never
 		// protobuf — attach meta and leave the payload untouched.
-		meta := store.HandleMessage(info, nil, params.Time)
-		setMiddlewareProperty(params, "sparkplug", meta)
+		setSparkplugMeta(params, store.HandleMessage(info, nil, params.Time))
 		return nil
 	}
 
@@ -72,13 +71,24 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 		// can't be shown decoded — e.g. a metric name with invalid UTF-8,
 		// which proto2 lets through Unmarshal but protojson.Marshal rejects.
 		slog.Debug(fmt.Sprintf("sparkplug decode middleware error: %s", err.Error()))
-		setMiddlewareProperty(params, "sparkplug", meta)
+		setSparkplugMeta(params, meta)
 		return nil
 	}
 	params.Payload = decodedPayload
 	setMiddlewareProperty(params, "IsDecodedProto", true)
-	setMiddlewareProperty(params, "sparkplug", meta)
+	setSparkplugMeta(params, meta)
 	return nil
+}
+
+// setSparkplugMeta attaches the session store's meta, skipping it entirely when
+// the store declined to track the message (a node past the tracking cap). The
+// payload still decodes; it just carries no Sparkplug meta, so the frontend
+// doesn't allocate tree state for a node we can't follow.
+func setSparkplugMeta(params *mqtt.MqttMessage, meta map[string]any) {
+	if meta == nil {
+		return
+	}
+	setMiddlewareProperty(params, "sparkplug", meta)
 }
 
 func decodeStateless(protoRegistry *protobuf.ProtoRegistry, params *mqtt.MqttMessage) error {
