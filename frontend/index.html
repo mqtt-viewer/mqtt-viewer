@@ -97,6 +97,10 @@
          both the probe and the injected src resolve under a reverse-proxy
          prefix. The native webview has no such route, so the probe 404s and
          is a no-op there. See AGENTS.md "Driving the app from a browser". -->
+    <!-- Served from Vite's public dir. The browser tab is the main handle on
+         the app in web mode, and pop-outs mean several tabs at once. Kept
+         document-relative so it resolves under a reverse-proxy prefix. -->
+    <link href="./favicon.png" rel="icon" type="image/png" />
     <link href="./src/style.css" rel="stylesheet" />
     <title>MQTT Viewer</title>
   </head>

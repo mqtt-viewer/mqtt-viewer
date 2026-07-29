@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-17T12:15:15.385Z",
+  "generatedAt": "2026-07-29T05:18:41.001Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1716,6 +1716,12 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "serverPlaceholder",
+          "type": "string",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
@@ -3475,6 +3481,12 @@
           "name": "onClearRetainedBelow",
           "type": "function",
           "required": false
+        },
+        {
+          "name": "searchStore",
+          "type": "object",
+          "required": false,
+          "description": "Shared filter text store from the List view, so filter survives the List/Graph toggle. Absent in storybook/dev: falls back to local state."
         }
       ],
       "tokens": [

@@ -20,11 +20,13 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { Events } from "@wailsio/runtime";
+  import { get } from "svelte/store";
   import _ from "lodash";
   import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { MqttData } from "../MqttDataPanel/stores/mqtt-data";
+  import type { SearchStore } from "../MqttDataPanel/stores/search";
   import theme from "@/stores/theme";
   import PanelHeader from "@/components/PanelHeader/PanelHeader.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
@@ -34,6 +36,7 @@
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { untypedColors } from "@/util/resolvedTailwindConfig";
+  import { LIST_RATE_TAU_MS, type DecayScore } from "@/util/decay-score";
   import { TopicModel, type TopicNode } from "./topic-model";
   import { TopicGraphRenderer } from "./pixi-graph";
   import {
@@ -43,7 +46,7 @@
     rampCssGradient,
     rateFromScore,
   } from "./cooldown";
-  import type { SortKey } from "./tidy-layout";
+  import { coerceSortKey, type SortKey } from "./tidy-layout";
   import ContextMenu from "@/components/ContextMenu/ContextMenu.svelte";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
   import { retainedStateOf } from "../MqttDataPanel/stores/mqtt-data";
@@ -71,6 +74,9 @@
   export let exportTopicMessages: (topic: string) => void = () => {};
   export let onClearRetained: (topic: string) => void = () => {};
   export let onClearRetainedBelow: (prefix: string) => void = () => {};
+  /** shared filter text store from the List view, so filter survives the
+   *  List<->Graph toggle. Absent in storybook/dev: falls back to local state. */
+  export let searchStore: SearchStore | undefined = undefined;
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
@@ -82,11 +88,14 @@
   const model = new TopicModel();
   let renderer: TopicGraphRenderer | null = null;
   let unsubSource: (() => void) | null = null;
+  let unsubSearch: (() => void) | null = null;
   let ro: ResizeObserver | null = null;
   let liveTimer: number | null = null;
   let everSized = false;
 
-  let filterText = "";
+  // Seed from the shared store (when present) BEFORE the reactive push below
+  // runs, so switching in from the List doesn't clobber existing filter text.
+  let filterText = searchStore ? get(searchStore).text : "";
   let sortKey: SortKey = "rate";
   let paused = false;
   let allExpanded = false;
@@ -100,9 +109,10 @@
 
   const SORT_LABELS: Record<SortKey, string> = {
     rate: "Busiest first",
-    recency: "Recent first",
+    msgs: "Most messages",
+    recency: "Newest first",
     stale: "Silent first",
-    alpha: "Name",
+    alpha: "Topic A → Z",
     count: "Topic count",
   };
 
@@ -159,6 +169,10 @@
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
       if (typeof s.maxNodeR === "number") maxNodeR = s.maxNodeR;
+      // validate against the full key union; unknown/missing coerces to the
+      // "rate" default so an older blob (no sortKey) or garbage never reaches
+      // the sort comparators
+      sortKey = coerceSortKey(s.sortKey);
     } catch (e) {
       console.error("topic-graph settings load failed", e);
     }
@@ -176,6 +190,7 @@
           cooldownMs,
           tauMs,
           maxNodeR,
+          sortKey,
         })
       );
     } catch (e) {
@@ -189,28 +204,68 @@
     renderer.setCvdSafe(cvdSafe);
     renderer.setCooldownMs(cooldownMs);
     renderer.setMaxNodeSize(maxNodeR);
+    renderer.setSort(sortKey); // reflect the persisted sort into the renderer
     model.tauMs = tauMs;
   };
 
   const seed = (data: MqttData) => {
+    // The List accumulated its rate scores at LIST_RATE_TAU_MS, but the graph's
+    // tau is user-configurable. At steady state score = rate x tau, so a score
+    // transplanted across taus misreports rate magnitude by tauGraph/tauList;
+    // scale every seeded score by this factor so both views agree on busyness.
+    const tauScale = tauMs / LIST_RATE_TAU_MS;
+    const scaleRate = (r: DecayScore): DecayScore => ({
+      score: r.score * tauScale,
+      lastMs: r.lastMs,
+    });
+
+    // Pass 1 (post-order): recurse into children FIRST so that when seedTopic
+    // runs for a topic that both publishes and has subtopics, its child nodes
+    // already exist and it is correctly treated as a non-leaf (its own rate
+    // isn't over-seeded from the subtree aggregate).
     const walk = (d: MqttData) => {
       for (const key of Object.keys(d)) {
         const n = d[key];
-        // Only nodes that actually published get ingested (same structural
-        // check as the list view). Parents carry latestMessageTime propagated
-        // from children, so ingesting them too would record a phantom own
-        // message on every ancestor. ingest() still creates the ancestor
-        // nodes from the leaf's path.
+        walk(n.children);
+        // Only nodes that actually published get their own count/rate; parents
+        // carry a propagated latestMessageTime but no own message. seedTopic
+        // still creates the ancestor path and folds this topic's own count into
+        // every ancestor's aggCount, so each level ends equal to the List's
+        // subtree-cumulative messageCount.
         if (n.message !== undefined) {
-          const t = n.latestMessageTime
+          let childMsgs = 0;
+          for (const ck of Object.keys(n.children)) {
+            childMsgs += n.children[ck].messageCount;
+          }
+          const ownMsgs = n.messageCount - childMsgs;
+          const lastMs = n.latestMessageTime
             ? new Date(n.latestMessageTime).getTime()
             : Date.now();
-          model.ingest(n.topic, t, n.isRetained);
+          model.seedTopic(
+            n.topic,
+            ownMsgs,
+            lastMs,
+            n.rate ? scaleRate(n.rate) : undefined,
+            n.isRetained
+          );
         }
-        walk(n.children);
       }
     };
     walk(data);
+
+    // Pass 2: seed EVERY node's subtree-aggregate rate onto model.agg, not just
+    // publisher leaves. The List bumps ancestors too, so each node's rate field
+    // is already its subtree aggregate; without this, interior non-publisher
+    // nodes keep agg score 0 and the default "Busiest first" sort ranks
+    // collapsed namespaces last for ~1 tau after a List -> Graph toggle.
+    const walkAgg = (d: MqttData) => {
+      for (const key of Object.keys(d)) {
+        const n = d[key];
+        if (n.rate) model.seedAggRate(n.topic, scaleRate(n.rate));
+        walkAgg(n.children);
+      }
+    };
+    walkAgg(data);
   };
 
   const applyTheme = (t: "dark" | "light") => {
@@ -394,6 +449,10 @@
   let stats: StatsInfo | null = null;
   let statsTimer: number | null = null;
   let ingestCounter = 0;
+  // Monotonic arrival count for the live-tick re-sort gate. Deliberately
+  // separate from ingestCounter, which the stats HUD zeroes every second and
+  // so cannot signal "anything arrived since the last eligible tick".
+  let totalIngested = 0;
 
   const startStatsTimer = () => {
     if (statsTimer !== null) return;
@@ -447,6 +506,22 @@
     },
   };
 
+  // Mirror the shared List search store into filterText (external edits, e.g.
+  // typing in the List then toggling here). Guarded so the store->local sync
+  // and the local->store push below don't loop.
+  onMount(() => {
+    if (!searchStore) return;
+    unsubSearch = searchStore.subscribe((s) => {
+      if (s.text !== filterText) filterText = s.text;
+    });
+  });
+  // Push local edits back out so the List picks them up on the return toggle.
+  // Guarded symmetrically with the subscribe above: only push when the value
+  // genuinely originated here, else a store-driven filterText change would
+  // bounce straight back into the store.
+  $: if (searchStore && get(searchStore).text !== filterText)
+    searchStore.setSearchText(filterText);
+
   onMount(async () => {
     loadSettings();
     const w = containerEl.clientWidth || width || 800;
@@ -482,6 +557,7 @@
     unsubSource = (messageSource ?? wailsSource).subscribe(
       (msgs) => {
         ingestCounter += msgs.length;
+        totalIngested += msgs.length;
         for (const m of msgs)
           model.ingest(m.topic, m.timeMs || Date.now(), m.retained);
       },
@@ -492,6 +568,7 @@
     );
 
     let liveTick = 0;
+    let lastTickIngest = 0;
     liveTimer = window.setInterval(() => {
       if (!renderer) return;
       renderer.notifyData();
@@ -500,8 +577,26 @@
       // visual reconciliation) is too expensive to run every 1.2s tick, so it
       // only runs every 4th tick (~5s) once the tree crosses 2000 topics.
       const dueThisTick = model.topicCount <= 2000 || liveTick % 4 === 0;
-      if (!paused && dueThisTick && (sortKey === "rate" || sortKey === "recency")) {
-        renderer.relayout();
+      // rate/recency drift continuously between arrivals via decay-driven node
+      // sizing, so their sibling order always needs the periodic relayout to
+      // track the List. stale/msgs only change when a message actually arrives,
+      // so skip their relayout on idle ticks (no batch since the last tick).
+      // alpha/count don't drift at all: alpha never reorders existing nodes, and
+      // topic-count changes bump structureGen -> visibleDirty -> notifyData
+      // relayouts on their own.
+      // Only consume the arrival signal on ticks where a relayout could
+      // actually run: on throttled big trees (or while paused) arrivals must
+      // stay pending until the next eligible tick, not be forgotten.
+      if (!paused && dueThisTick) {
+        const ingestedSinceLastTick = totalIngested !== lastTickIngest;
+        lastTickIngest = totalIngested;
+        const needsRelayout =
+          sortKey === "rate" ||
+          sortKey === "recency" ||
+          ((sortKey === "stale" || sortKey === "msgs") && ingestedSinceLastTick);
+        if (needsRelayout) {
+          renderer.relayout();
+        }
       }
       // keep the hover inspector's numbers live while the pointer rests
       if (hover) hover = buildHover(hover.topic, hover.x, hover.y);
@@ -534,6 +629,7 @@
 
   onDestroy(() => {
     unsubSource?.();
+    unsubSearch?.();
     ro?.disconnect();
     document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (liveTimer) clearInterval(liveTimer);
@@ -557,6 +653,7 @@
   const setSort = (key: SortKey) => {
     sortKey = key;
     renderer?.setSort(key);
+    saveSettings();
   };
   const setDepth = (d: number) => {
     renderer?.expandToDepth(d);

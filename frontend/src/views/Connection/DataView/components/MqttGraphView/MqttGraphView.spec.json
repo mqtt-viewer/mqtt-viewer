@@ -68,6 +68,12 @@
       "name": "onClearRetainedBelow",
       "type": "function",
       "required": false
+    },
+    {
+      "name": "searchStore",
+      "type": "object",
+      "required": false,
+      "description": "Shared filter text store from the List view, so filter survives the List/Graph toggle. Absent in storybook/dev: falls back to local state."
     }
   ],
   "tokens": [

@@ -14,6 +14,10 @@
   export let value = defaultValue ?? "";
   export let onFileChosen: (filePath: string) => void;
   export let onFileRemoved: () => void;
+  // Server-mode placeholder. Each field wants its own hint (/certs/ca.pem vs
+  // /certs/client.key), so the caller supplies it; the fallback covers the
+  // generic case.
+  export let serverPlaceholder: string | undefined = undefined;
 
   // In server mode the native picker returns "" (there is no OS file dialog
   // behind HTTP), so the user types a path that exists inside the container
@@ -22,9 +26,13 @@
 
   const onManualPathCommit = () => {
     const trimmed = value.trim();
-    if (trimmed !== "") {
-      onFileChosen(trimmed);
+    if (trimmed === "") {
+      // Clearing the box has to clear the saved path too, otherwise the old
+      // certificate stays in use with nothing on screen to say so.
+      onFileRemoved();
+      return;
     }
+    onFileChosen(trimmed);
   };
 
   $: onAddClick = async () => {
@@ -69,30 +77,25 @@
 </script>
 
 {#if isServerMode}
-  <div class={`flex flex-col gap-1 w-full ${disabled ? "opacity-60" : ""}`}>
-    <div class="flex items-center gap-2 w-full">
-      <BaseInput
-        name="file-path"
-        label={actionLabel}
-        placeholder={variant === "certificate" ? "/certs/ca.pem" : "/data"}
-        bind:value
+  <div class={`flex items-center gap-2 w-full ${disabled ? "opacity-60" : ""}`}>
+    <BaseInput
+      name="file-path"
+      label={actionLabel}
+      placeholder={serverPlaceholder ??
+        (variant === "certificate" ? "/certs/ca.pem" : "/data")}
+      bind:value
+      {disabled}
+      onChange={() => onManualPathCommit()}
+      onBlur={onManualPathCommit}
+    />
+    {#if value}
+      <Button
         {disabled}
-        onChange={() => onManualPathCommit()}
-        onBlur={onManualPathCommit}
-      />
-      {#if value}
-        <Button
-          {disabled}
-          variant="text"
-          iconType="closeCircle"
-          on:click={onRemoveClick}
-        ></Button>
-      {/if}
-    </div>
-    <span class="text-sm text-secondary-text">
-      Type a path inside the container. Certificates must be mounted in (see
-      docs/DOCKER.md).
-    </span>
+        variant="text"
+        iconType="closeCircle"
+        on:click={onRemoveClick}
+      ></Button>
+    {/if}
   </div>
 {:else}
   <div class={`flex items-center gap-3 w-full ${disabled ? "opacity-60" : ""}`}>

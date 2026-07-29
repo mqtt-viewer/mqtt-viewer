@@ -1,0 +1,42 @@
+# Umbrel app manifest for MQTT Viewer.
+#
+# Schema and field order followed: the current umbrel-package-app skill in
+# getumbrel/umbrel-apps (.claude/skills/umbrel-package-app/SKILL.md, fetched
+# July 2026), which is the app store's own packaging guidance.
+#
+# `port` below is a placeholder. Umbrel host ports must be unique across the
+# whole App Store; pick a free one and confirm it does not collide before
+# opening a PR. `submission` is filled in with the PR URL once one exists.
+# See docker/templates/README.md for the submission flow.
+manifestVersion: 1
+id: mqtt-viewer
+category: networking
+name: MQTT Viewer
+version: "1.0.0"
+tagline: Watch MQTT traffic live in your browser
+description: >-
+  MQTT Viewer connects to one or more MQTT brokers and shows you the topic
+  tree, live message history and charts as data arrives. It is the same Go
+  backend and Svelte frontend as the desktop app, running headless.
+
+
+  There is no login screen built into the app itself. Umbrel's own sign-in
+  protects this page, so nobody else on your network can see your broker
+  connections or credentials without your Umbrel login.
+releaseNotes: ""
+
+developer: Sam Webster
+website: https://mqttviewer.app
+dependencies: []
+repo: https://github.com/mqtt-viewer/mqtt-viewer
+support: https://github.com/mqtt-viewer/mqtt-viewer/issues
+
+port: 3495
+gallery: []
+path: ""
+
+defaultUsername: ""
+defaultPassword: ""
+
+submitter: Sam Webster
+submission: ""

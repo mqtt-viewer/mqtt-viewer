@@ -95,7 +95,13 @@
         {error}
       </div>
     {:else if store}
-      <div class="grow min-h-0" style="--wails-draggable:false">
+      <!-- Inset to match the header and scrolling on its own axis. A browser
+           tab is much wider than the desktop pop-out window, and without this
+           the tile grid ran flush to both edges with the last tile clipped. -->
+      <div
+        class="grow min-h-0 overflow-y-auto overflow-x-hidden px-4 pb-4"
+        style="--wails-draggable:false"
+      >
         <BrokerStatusView bind:this={viewRef} {store} {connectionId} />
       </div>
     {:else}

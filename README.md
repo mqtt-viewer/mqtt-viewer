@@ -42,14 +42,18 @@ ships as a Docker image:
 
 ```sh
 docker run -d --name mqtt-viewer \
-  -p 8080:8080 \
+  -p 127.0.0.1:8080:8080 \
   -v mqtt-viewer-data:/data \
   ghcr.io/mqtt-viewer/mqtt-viewer:latest
 ```
 
 Open http://localhost:8080. It is the full app served over HTTP: same backend,
-same features, live updates included. There is no built-in login, so keep it
-on a trusted network or behind an authenticating reverse proxy. Setup,
+same features, live updates included.
+
+That command publishes the port to this machine only. There is no built-in
+login, and anyone who can load the page can read your saved broker passwords,
+so to reach it from other devices drop the `127.0.0.1:` and only do it on a
+network you trust, or put an authenticating reverse proxy in front. Setup,
 configuration and the few differences from the desktop app are covered in
 [docs/DOCKER.md](docs/DOCKER.md).
 
