@@ -1,10 +1,142 @@
 package update
 
 import (
+	"context"
 	"mqtt-viewer/backend/env"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
+
+// stubFetch replaces the portal call for the duration of a test and counts how
+// often it ran.
+func stubFetch(t *testing.T, res *portalCheckResponse, err error) *int {
+	t.Helper()
+	calls := 0
+	prev := fetchUpdate
+	fetchUpdate = func(currentVersion string) (*portalCheckResponse, error) {
+		calls++
+		return res, err
+	}
+	t.Cleanup(func() { fetchUpdate = prev })
+	return &calls
+}
+
+func testUpdater() *Updater {
+	return &Updater{logCtx: context.Background()}
+}
+
+func TestCheckForUpdate_CachesPortalResult(t *testing.T) {
+	calls := stubFetch(t, &portalCheckResponse{LatestVersion: "9.9.9", ReleaseNotes: "notes"}, nil)
+	u := testUpdater()
+
+	for i := 0; i < 3; i++ {
+		res, err := u.CheckForUpdate()
+		if err != nil {
+			t.Fatalf("check %d failed: %v", i, err)
+		}
+		if res == nil || res.LatestVersion != "9.9.9" {
+			t.Fatalf("check %d: expected 9.9.9, got %+v", i, res)
+		}
+	}
+	if *calls != 1 {
+		t.Fatalf("expected one portal request for three checks, got %d", *calls)
+	}
+
+	// An expired cache goes back to the portal.
+	u.cacheMu.Lock()
+	u.cachedAt = time.Now().Add(-checkCacheTTL - time.Second)
+	u.cacheMu.Unlock()
+	if _, err := u.CheckForUpdate(); err != nil {
+		t.Fatalf("check after expiry failed: %v", err)
+	}
+	if *calls != 2 {
+		t.Fatalf("expected a second portal request once the cache expired, got %d", *calls)
+	}
+}
+
+// "Up to date" must cache too, otherwise the common case is uncached.
+func TestCheckForUpdate_CachesUpToDate(t *testing.T) {
+	calls := stubFetch(t, &portalCheckResponse{UpToDate: true}, nil)
+	u := testUpdater()
+
+	for i := 0; i < 2; i++ {
+		res, err := u.CheckForUpdate()
+		if err != nil {
+			t.Fatalf("check %d failed: %v", i, err)
+		}
+		if res != nil {
+			t.Fatalf("check %d: expected no update, got %+v", i, res)
+		}
+	}
+	if *calls != 1 {
+		t.Fatalf("expected one portal request, got %d", *calls)
+	}
+}
+
+// Several tabs polling at once must still cost one portal request: the fetch
+// is serialised and the losers read the cache the winner filled.
+func TestCheckForUpdate_ConcurrentCallersShareOneRequest(t *testing.T) {
+	var mu sync.Mutex
+	calls := 0
+	prev := fetchUpdate
+	fetchUpdate = func(currentVersion string) (*portalCheckResponse, error) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		time.Sleep(10 * time.Millisecond)
+		return &portalCheckResponse{LatestVersion: "9.9.9"}, nil
+	}
+	t.Cleanup(func() { fetchUpdate = prev })
+
+	u := testUpdater()
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, err := u.CheckForUpdate()
+			if err != nil {
+				t.Errorf("concurrent check failed: %v", err)
+			}
+			if res == nil || res.LatestVersion != "9.9.9" {
+				t.Errorf("concurrent check returned %+v", res)
+			}
+		}()
+	}
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("expected one portal request for 20 concurrent checks, got %d", calls)
+	}
+}
+
+func TestCheckForUpdate_DisabledByEnv(t *testing.T) {
+	calls := stubFetch(t, &portalCheckResponse{LatestVersion: "9.9.9"}, nil)
+	u := testUpdater()
+
+	for _, value := range []string{"1", "true", "YES", " 1 "} {
+		t.Setenv(disableCheckEnv, value)
+		res, err := u.CheckForUpdate()
+		if err != nil || res != nil {
+			t.Fatalf("%q should disable the check, got res=%+v err=%v", value, res, err)
+		}
+	}
+	if *calls != 0 {
+		t.Fatalf("a disabled check must not contact the portal, got %d requests", *calls)
+	}
+
+	t.Setenv(disableCheckEnv, "0")
+	if _, err := u.CheckForUpdate(); err != nil {
+		t.Fatalf("check should run when the opt-out is off: %v", err)
+	}
+	if *calls != 1 {
+		t.Fatalf("expected one portal request once re-enabled, got %d", *calls)
+	}
+}
 
 // withServerBuild sets env.IsServerBuild for the duration of a test and
 // restores it afterwards. env.IsServerBuild is a package variable, not an
@@ -35,6 +167,20 @@ func TestResolveInstallType_ServerBuilds(t *testing.T) {
 	t.Setenv("MQTT_VIEWER_INSTALL_TYPE", "something-else")
 	if got := resolveInstallType(); got != installDocker {
 		t.Fatalf("expected docker for unknown install type, got %q", got)
+	}
+}
+
+// The value is typed by hand into an add-on config or a compose file, and the
+// constant name (home-assistant-addon) differs from the documented literal, so
+// both spellings and sloppy whitespace or capitals must classify.
+func TestResolveInstallType_HomeAssistantIsMatchedLoosely(t *testing.T) {
+	withServerBuild(t, true)
+
+	for _, value := range []string{"home-assistant", " Home-Assistant ", "HOME-ASSISTANT", "home-assistant-addon"} {
+		t.Setenv("MQTT_VIEWER_INSTALL_TYPE", value)
+		if got := resolveInstallType(); got != installHomeAssistant {
+			t.Fatalf("%q should classify as home-assistant-addon, got %q", value, got)
+		}
 	}
 }
 
