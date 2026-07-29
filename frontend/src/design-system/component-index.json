@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-29T12:34:01.861Z",
+  "generatedAt": "2026-07-29T12:54:26.569Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2939,7 +2939,9 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.svelte",

@@ -8,6 +8,7 @@ import { get, writable } from "svelte/store";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import type { DeepOmit } from "@/util/types";
 import { debounce } from "lodash";
+import { markSaved } from "./last-saved";
 
 type SubscriptionWithOptionalQos = DeepOmit<
   models.Subscription,
@@ -46,22 +47,13 @@ const addNewConnectionSubRecords = (
   });
 };
 
-// connections.ts imports this store, so a static import back would create a
-// cycle; load it lazily instead. Stamps connectionDetails.updatedAt so the
-// connection dialog's "last saved" label reflects subscription saves too.
-const markConnectionSaved = (connId: number) => {
-  import("./connections")
-    .then((connections) => connections.default.markConnectionSaved(connId))
-    .catch((e) => console.error(e));
-};
-
 const addSubscription = async (
   connId: number,
   beforeStoreUpdate?: () => void
 ) => {
   try {
     const newSub = (await AddSubscription(connId)) as Subscription;
-    markConnectionSaved(connId);
+    markSaved(connId);
     const existingSubs =
       get({ subscribe }).subscriptionsByConnectionId[connId] ?? [];
     const newSubs = [...existingSubs, newSub];
@@ -81,7 +73,7 @@ const addSubscription = async (
 const deleteSubscription = async (connId: number, subId: number) => {
   try {
     await DeleteSubscription(connId, subId);
-    markConnectionSaved(connId);
+    markSaved(connId);
     const existingSubs = get({ subscribe }).subscriptionsByConnectionId[connId];
     const newSubs = existingSubs.filter((sub) => sub.id !== subId);
     update((store) => {
@@ -110,7 +102,7 @@ const debouncedUpdateSubscription = debounce(
   async (connId: number, subscription: models.Subscription) => {
     try {
       await UpdateSubscription(connId, subscription);
-      markConnectionSaved(connId);
+      markSaved(connId);
     } catch (e) {
       console.error(e);
     }

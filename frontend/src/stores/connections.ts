@@ -12,6 +12,7 @@ import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import { Events } from "@wailsio/runtime";
 import tabsStore from "@/stores/tabs";
 import subscriptionsStore, { type Subscription } from "./subscriptions";
+import { markSaved } from "./last-saved";
 import type { DeepOmit } from "@/util/types";
 //@ts-ignore - unsure why this is throwing type errors
 import { addToast } from "@/components/Toast/Toast.svelte";
@@ -247,16 +248,12 @@ const updateConnectionDetails = async (
       const existingConnection = store.connections[connectionDetails.id];
       store.connections[connectionDetails.id] = {
         ...existingConnection,
-        connectionDetails: {
-          ...connectionDetails,
-          // Stamp the save locally so "last saved" labels advance without a
-          // refetch. The backend sets the real updatedAt on the same call.
-          updatedAt: new Date().toISOString(),
-        },
+        connectionDetails: connectionDetails,
         connectionString,
       };
       return store;
     });
+    markSaved(connectionDetails.id);
   } catch (e) {
     console.error(e);
     throw e;
@@ -332,24 +329,6 @@ const acknowledgeConnectionCreated = (connectionId: number) => {
   });
 };
 
-// Stamps a connection's connectionDetails.updatedAt so "last saved" labels
-// advance after saves that don't go through updateConnectionDetails (e.g.
-// subscription add/update/delete).
-const markConnectionSaved = (connectionId: number) => {
-  update((store) => {
-    const existingConnection = store.connections[connectionId];
-    if (!existingConnection) return store;
-    store.connections[connectionId] = {
-      ...existingConnection,
-      connectionDetails: {
-        ...existingConnection.connectionDetails,
-        updatedAt: new Date().toISOString(),
-      },
-    };
-    return store;
-  });
-};
-
 const toggleShowDataPageWhileDisconnected = (
   connectionId: number,
   on: boolean
@@ -369,7 +348,6 @@ export default {
   init,
   addConnection,
   updateConnectionDetails,
-  markConnectionSaved,
   deleteConnection,
   toggleShowDataPageWhileDisconnected,
   acknowledgeConnectionCreated,

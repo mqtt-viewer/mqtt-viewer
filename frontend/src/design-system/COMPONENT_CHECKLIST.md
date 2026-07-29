@@ -83,7 +83,7 @@
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
-| Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [ ] |
+| Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem | [x] | [ ] | [x] | [x] |
