@@ -61,6 +61,12 @@
       "type": "function",
       "required": false,
       "default": "> void"
+    },
+    {
+      "name": "serverPlaceholder",
+      "type": "string",
+      "required": false,
+      "default": null
     }
   ],
   "tokens": [

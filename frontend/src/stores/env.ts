@@ -46,6 +46,17 @@ const debouncedCheckFullscreen = _.debounce(async () => {
   });
 }, 100);
 
+// In server mode System.Environment() reports the container's GOOS, which is
+// always linux and says nothing about the machine the browser is running on.
+// The platform booleans drive OS-specific UI (macOS traffic-light padding, a
+// GTK resize workaround), so in the browser they have to come from the browser.
+const platformFromNavigator = (): string => {
+  const hint = `${navigator.userAgent} ${navigator.platform ?? ""}`;
+  if (/Mac|iPhone|iPad|iPod/i.test(hint)) return "darwin";
+  if (/Win/i.test(hint)) return "windows";
+  return "linux";
+};
+
 const init = async () => {
   window.addEventListener("resize", debouncedCheckFullscreen, true);
 
@@ -66,11 +77,23 @@ const init = async () => {
     console.error(e);
   }
 
+  // In the browser the platform booleans are settled here and the native probe
+  // below is not allowed to overwrite them.
+  const browserPlatform = isServerMode ? platformFromNavigator() : "";
+  if (isServerMode) {
+    update((store) => ({
+      ...store,
+      isMac: browserPlatform === "darwin",
+      isWindows: browserPlatform === "windows",
+      isLinux: browserPlatform === "linux",
+    }));
+  }
+
   // Native environment probing. Headless in server mode these are no-ops that
   // reject, so keep them in their own try/catch with sensible fallbacks.
   try {
     const info = await System.Environment();
-    const platform = info.OS;
+    const platform = isServerMode ? browserPlatform : info.OS;
     const isFullscreen = await Window.IsFullscreen();
     update((store) => ({
       ...store,

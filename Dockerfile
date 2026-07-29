@@ -6,7 +6,11 @@
 #
 # Build:
 #   docker build -t mqtt-viewer:local .
-#   docker build --build-arg VERSION=1.2.3 -t mqtt-viewer:1.2.3 .
+#   docker build --build-arg VERSION=1.2.3-dev -t mqtt-viewer:local .
+#
+# Stamping a release VERSION (one containing neither "-dev" nor
+# "-docker-local") requires the three BuildKit secrets the release workflow
+# passes; see the ldflags step below.
 #
 # See docs/DOCKER.md for run instructions and docker/docker-compose.example.yml
 # for a ready-made compose service.
@@ -42,7 +46,7 @@ FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=0.0.0-docker
+ARG VERSION=0.0.0-docker-local
 
 WORKDIR /src
 
@@ -68,14 +72,29 @@ COPY --from=frontend /src/frontend/dist ./frontend/dist
 # `production` is a real Wails build tag too (disables dev asset/logger
 # middleware), matching the desktop release build's code paths.
 #
-# Version ldflags mirror .github/workflows/release-linux.yaml. Secrets are
-# only appended when BuildKit secret mounts are present, so a plain
-# `docker build .` with no secrets still produces a working binary using the
-# checked-in dev defaults in backend/env/env.go.
+# Version ldflags mirror .github/workflows/release-linux.yaml.
+#
+# A VERSION containing "-dev" or "-docker-local" (the default) is a local
+# build: secrets are optional and the binary falls back to the checked-in dev
+# values in backend/env/env.go, with env.IsDev true so it never talks to the
+# production portal. Any other VERSION is a release build, and a missing
+# secret there would ship those same dev values with IsDev false, silently
+# pointing at production. Fail the build instead.
 RUN --mount=type=secret,id=machine_id_secret \
     --mount=type=secret,id=cloud_username \
     --mount=type=secret,id=cloud_password \
     set -eu; \
+    case "${VERSION}" in \
+        *-dev*|*-docker-local*) ;; \
+        *) \
+            for s in machine_id_secret cloud_username cloud_password; do \
+                if [ ! -s "/run/secrets/$s" ]; then \
+                    echo "ERROR: VERSION=${VERSION} is a release build but the BuildKit secret '$s' is missing or empty." >&2; \
+                    echo "Pass all three (machine_id_secret, cloud_username, cloud_password), or stamp a VERSION containing -dev to build without them." >&2; \
+                    exit 1; \
+                fi; \
+            done ;; \
+    esac; \
     LDFLAGS="-s -w -X mqtt-viewer/backend/env.Version=${VERSION}"; \
     if [ -s /run/secrets/machine_id_secret ]; then \
         LDFLAGS="${LDFLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=$(cat /run/secrets/machine_id_secret)"; \

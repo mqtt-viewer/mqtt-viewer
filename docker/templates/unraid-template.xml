@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Community Applications template for MQTT Viewer.
+
+  Schema followed: Unraid's Container version="2" template XML, cross-checked
+  against ca.unraid.net/submit/help/repository-xml and current community
+  templates (cross-seed/unraid-template, ibracorp/unraid-templates) in
+  July 2026. Config tag attributes (Name, Target, Default, Mode, Description,
+  Type, Display, Required, Mask) follow the same reference.
+
+  See docker/templates/README.md for where a human submits this.
+-->
+<Container version="2">
+  <Name>mqtt-viewer</Name>
+  <Repository>ghcr.io/mqtt-viewer/mqtt-viewer:latest</Repository>
+  <Registry>https://github.com/mqtt-viewer/mqtt-viewer/pkgs/container/mqtt-viewer</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/mqtt-viewer/mqtt-viewer/issues</Support>
+  <Project>https://mqttviewer.app</Project>
+  <Overview>MQTT Viewer connects to one or more MQTT brokers and shows you the topic tree, live message history and charts as data arrives. It is the same Go backend and Svelte frontend as the desktop app, running headless. There is no login screen built into the app: anyone who can reach this port can use your saved broker connections, so keep it on a trusted network or put an authenticating reverse proxy in front of it.</Overview>
+  <Category>Network:Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/mqtt-viewer/mqtt-viewer/main/docker/templates/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/mqtt-viewer/mqtt-viewer/main/build/appicon.png</Icon>
+  <ExtraParams/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="Port the web UI listens on. Maps to WAILS_SERVER_PORT inside the container." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/mqtt-viewer" Mode="rw" Description="All persistent state: the SQLite database, machine id and Sparkplug proto files. Mount this or your connections vanish with the container." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/mqtt-viewer</Config>
+</Container>

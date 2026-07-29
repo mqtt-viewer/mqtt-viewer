@@ -281,3 +281,77 @@ describe("retained tracking", () => {
     unsub();
   });
 });
+
+describe("rate score bumps", () => {
+  it("initialises and bumps rate on the leaf and every ancestor by the batch count", () => {
+    const highlightStore = createHighlightedMqttTopicsStore();
+    const store = createMqttDataStore(highlightStore, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const t = 1000;
+    fireMessages([
+      makeMessage("1", "home/sensors/a", "x", t),
+      makeMessage("2", "home/sensors/a", "y", t),
+      makeMessage("3", "home/sensors/a", "z", t),
+    ]);
+
+    const data = get(store);
+    const leaf = data.home.children.sensors.children.a;
+
+    // A fresh node's score equals the batch count (decay is a no-op on the
+    // very first bump), and lastMs is the batch timestamp.
+    expect(leaf.rate?.score).toBe(3);
+    expect(leaf.rate?.lastMs).toBe(t);
+    // Every ancestor carries the same subtree-aggregate score.
+    expect(data.home.children.sensors.rate?.score).toBe(3);
+    expect(data.home.rate?.score).toBe(3);
+
+    unsub();
+  });
+
+  it("aggregates sibling counts into shared ancestors within one batch", () => {
+    const highlightStore = createHighlightedMqttTopicsStore();
+    const store = createMqttDataStore(highlightStore, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const t = 2000;
+    fireMessages([
+      makeMessage("1", "home/sensors/a", "x", t),
+      makeMessage("2", "home/sensors/a", "y", t),
+      makeMessage("3", "home/sensors/a", "z", t), // a: 3
+      makeMessage("4", "home/sensors/b", "p", t),
+      makeMessage("5", "home/sensors/b", "q", t), // b: 2
+    ]);
+
+    const data = get(store);
+    const sensors = data.home.children.sensors;
+
+    expect(sensors.children.a.rate?.score).toBe(3);
+    expect(sensors.children.b.rate?.score).toBe(2);
+    // Ancestor rate is the subtree aggregate: 3 + 2.
+    expect(sensors.rate?.score).toBe(5);
+    expect(data.home.rate?.score).toBe(5);
+
+    unsub();
+  });
+
+  it("decays a topic's rate score across batches at later timestamps", () => {
+    const highlightStore = createHighlightedMqttTopicsStore();
+    const store = createMqttDataStore(highlightStore, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    // First batch seeds score 1. (Uses a realistic non-zero timestamp: the
+    // shared decay engine treats lastMs === 0 as "uninitialised", so an epoch-0
+    // timestamp would skip the first decay — a non-issue for real MQTT stamps.)
+    fireMessages([makeMessage("1", "a/b", "first", 1_000)]);
+    // Second batch 14000ms later (one tau) decays the old score by e^-1
+    // (~0.368) then adds 1.
+    fireMessages([makeMessage("2", "a/b", "second", 15_000)]);
+
+    const data = get(store);
+    const score = data.a.children.b.rate?.score ?? 0;
+    expect(score).toBeCloseTo(Math.exp(-1) + 1, 5);
+
+    unsub();
+  });
+});

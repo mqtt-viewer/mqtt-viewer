@@ -4,6 +4,10 @@
     description: string;
     type: "error" | "info" | "success";
     hideCloseButton?: boolean;
+    // Descriptions are sentence-cased by default, which is right for messages
+    // but wrong for anything literal. Set this for filenames and paths, where
+    // the exact string is the point.
+    descriptionIsLiteral?: boolean;
   };
 
   const {
@@ -62,10 +66,14 @@
             />
           </h3>
           <div use:melt={$description(id)}>
-            {capitalizeFirstLetter(
-              data?.description ??
-                "Missing error message - please report this bug"
-            )}
+            {#if data.descriptionIsLiteral}
+              {data.description}
+            {:else}
+              {capitalizeFirstLetter(
+                data?.description ??
+                  "Missing error message - please report this bug"
+              )}
+            {/if}
           </div>
         </div>
         {#if !data.hideCloseButton}

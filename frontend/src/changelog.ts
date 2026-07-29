@@ -32,7 +32,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         title: "Run MQTT Viewer in your browser",
-        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. It still lets you know when a newer image is available, with the pull command to update. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. It lets you know when a newer image is available, with the pull command to update, and you can turn that check off if you'd rather it stayed off the network. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+      },
+      {
+        title: "Sort topics by how busy they are",
+        body: "The topic list can now order itself by what matters in the moment: busiest first, most messages, newest first or silent first, alongside the usual A to Z. The graph view offers the same choices and remembers the one you pick per connection. Its filter box also understands MQTT wildcards now, like sensors/+/temperature, just as the list does, and whatever you type in the filter follows you when you switch between list and graph.",
       },
       {
         title: "A status page for your broker",
