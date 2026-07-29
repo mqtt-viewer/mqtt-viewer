@@ -30,6 +30,7 @@
     CollectionsStore,
   } from "../stores/collections";
   import AddToCollectionMenu from "./AddToCollectionMenu.svelte";
+  import { errorMessage } from "@/util/error-message";
 
   export let connection: Connection;
   export let isPublishDisabled: boolean;
@@ -113,7 +114,7 @@
   const debouncedGetMatchingProtoType = _.debounce(async (topic: string) => {
     try {
       const match = await GetMatchingProtoTypeForTopic(connectionId, topic);
-      matchingProtoType = match?.Source ? match.MessageType : null;
+      matchingProtoType = match?.source ? match.messageType : null;
     } catch (e) {
       console.error(e);
       matchingProtoType = null;
@@ -266,16 +267,21 @@
         ),
       });
     } catch (e) {
-      handlePublishError(e as string);
+      handlePublishError(e);
       console.error(e);
     }
   };
 
-  const handlePublishError = (e: string) => {
+  const handlePublishError = (e: unknown) => {
+    // A rejected Wails call throws an Error (or a RuntimeError-shaped
+    // object), never a bare string, so normalise before touching string
+    // methods: calling replaceAll on the raw value threw a TypeError and
+    // the user saw no toast at all.
+    const raw = errorMessage(e);
     // The Go protobuf library prefixes its errors with "proto:"; expand it
     // in place rather than discarding the surrounding context (the backend's
     // encode error names the type: "protobuf encode as <type> failed: ...").
-    const message = e.replaceAll("proto:", "protobuf:");
+    const message = raw.replaceAll("proto:", "protobuf:");
     addToast({
       data: {
         title: "Publish Error",
