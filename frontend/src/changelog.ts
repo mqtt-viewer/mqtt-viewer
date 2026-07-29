@@ -153,6 +153,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Updates that match your install",
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
+      {
+        title: "The interface font loads again",
+        body: "The Mona Sans typeface the app is designed in was quietly failing to bundle, so the interface fell back to a system font. It now ships and loads properly.",
+      },
     ],
   },
   {
