@@ -205,6 +205,7 @@
           data: {
             title: "Messages exported",
             description: payload.filename,
+            descriptionIsLiteral: true,
             type: "success",
           },
         });
@@ -219,6 +220,7 @@
           data: {
             title: "Messages exported",
             description: path,
+            descriptionIsLiteral: true,
             type: "success",
           },
         });
