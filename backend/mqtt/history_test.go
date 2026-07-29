@@ -22,7 +22,7 @@ func TestHistoryKeepsAllUnderBudget(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024) // 10MB, plenty
 	for i := 0; i < 100; i++ {
-		h.addMessageToHistory(msg("a/b", 100))
+		h.AddMessage(msg("a/b", 100))
 	}
 	got, err := h.GetTopicHistory("a/b")
 	if err != nil {
@@ -40,7 +40,7 @@ func TestHistoryEvictsOldestOverBudget(t *testing.T) {
 	h.SetBudgetBytes(int64(perMsg * 5))
 
 	for i := 0; i < 50; i++ {
-		h.addMessageToHistory(msg("t", 1024))
+		h.AddMessage(msg("t", 1024))
 	}
 
 	got, err := h.GetTopicHistory("t")
@@ -64,9 +64,9 @@ func TestHistoryKeepsLatestPerTopicAfterEviction(t *testing.T) {
 
 	// One message on a low-traffic topic, then flood a different topic so the
 	// low-traffic topic's only message ages out of the recent window.
-	h.addMessageToHistory(msg("low/traffic", 1024))
+	h.AddMessage(msg("low/traffic", 1024))
 	for i := 0; i < 20; i++ {
-		h.addMessageToHistory(msg("busy/topic", 1024))
+		h.AddMessage(msg("busy/topic", 1024))
 	}
 
 	// Selecting the low-traffic topic must still return its latest value.
@@ -84,9 +84,9 @@ func TestHistoryGetAllIncludesEvictedTopicLatest(t *testing.T) {
 	perMsg := estBytes(msg("x", 1024))
 	h.SetBudgetBytes(int64(perMsg * 3))
 
-	h.addMessageToHistory(msg("topic/a", 1024))
+	h.AddMessage(msg("topic/a", 1024))
 	for i := 0; i < 20; i++ {
-		h.addMessageToHistory(msg("topic/b", 1024))
+		h.AddMessage(msg("topic/b", 1024))
 	}
 
 	all := h.GetAllHistory()
@@ -103,11 +103,11 @@ func TestHistoryGetByTopicPrefixFiltersAndOrders(t *testing.T) {
 	h.SetBudgetBytes(10 * 1024 * 1024)
 
 	// Interleave $SYS and non-$SYS topics; arrival order is insertion order.
-	h.addMessageToHistory(msg("$SYS/broker/uptime", 10))
-	h.addMessageToHistory(msg("factory/line1/s1", 10))
-	h.addMessageToHistory(msg("$SYS/broker/clients/connected", 10))
+	h.AddMessage(msg("$SYS/broker/uptime", 10))
+	h.AddMessage(msg("factory/line1/s1", 10))
+	h.AddMessage(msg("$SYS/broker/clients/connected", 10))
 	// "$SYS" alone (no trailing slash) must not match the "$SYS/" prefix.
-	h.addMessageToHistory(msg("$SYS", 10))
+	h.AddMessage(msg("$SYS", 10))
 
 	got := h.GetHistoryByTopicPrefix("$SYS/")
 	if len(got) != 2 {
@@ -127,9 +127,9 @@ func TestHistoryGetByTopicPrefixIncludesEvictedLatest(t *testing.T) {
 
 	// One $SYS message, then flood a different $SYS topic so the first ages out
 	// of the recent window; its latest value must still be returned.
-	h.addMessageToHistory(msg("$SYS/broker/uptime", 1024))
+	h.AddMessage(msg("$SYS/broker/uptime", 1024))
 	for i := 0; i < 20; i++ {
-		h.addMessageToHistory(msg("$SYS/broker/load", 1024))
+		h.AddMessage(msg("$SYS/broker/load", 1024))
 	}
 
 	got := h.GetHistoryByTopicPrefix("$SYS/")
@@ -148,7 +148,7 @@ func TestHistoryGetByTopicPrefixIncludesEvictedLatest(t *testing.T) {
 func TestHistoryGetByTopicPrefixEmpty(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
-	h.addMessageToHistory(msg("factory/line1/s1", 10))
+	h.AddMessage(msg("factory/line1/s1", 10))
 	if got := h.GetHistoryByTopicPrefix("$SYS/"); len(got) != 0 {
 		t.Errorf("expected no matches, got %d", len(got))
 	}
@@ -158,7 +158,7 @@ func TestHistoryClearPreservesBudget(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(123456)
 	for i := 0; i < 10; i++ {
-		h.addMessageToHistory(msg("a", 100))
+		h.AddMessage(msg("a", 100))
 	}
 	h.Clear()
 	if h.totalBytes != 0 || len(h.recent) != 0 || h.head != 0 {
@@ -185,7 +185,7 @@ func TestHistoryCompactionKeepsCorrectness(t *testing.T) {
 	h.SetBudgetBytes(int64(perMsg * 4))
 	// Drive many evictions to exercise compaction repeatedly.
 	for i := 0; i < 1000; i++ {
-		h.addMessageToHistory(msg("t", 64))
+		h.AddMessage(msg("t", 64))
 	}
 	got, err := h.GetTopicHistory("t")
 	if err != nil {
@@ -205,7 +205,7 @@ func TestHistoryMultiTopicOrdering(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
 	for i := 0; i < 5; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("topic/%d", i), 10))
+		h.AddMessage(msg(fmt.Sprintf("topic/%d", i), 10))
 	}
 	all := h.GetAllHistory()
 	if len(all) != 5 {

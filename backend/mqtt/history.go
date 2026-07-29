@@ -60,7 +60,9 @@ func (m *MessageHistory) Clear() {
 	m.totalBytes = 0
 }
 
-func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
+// AddMessage retains a copy of message, updates the topic's latest value, and
+// evicts oldest-first if that pushes the store over its byte budget.
+func (m *MessageHistory) AddMessage(message MqttMessage) {
 	msg := message
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

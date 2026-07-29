@@ -8,10 +8,16 @@ import (
 	"time"
 )
 
-// GetSparkplugMessageHistory returns every retained Sparkplug message for a
-// connection (the spBv1.0 namespace plus legacy root-level STATE topics),
-// flattened across topics and sorted by arrival time, so a Sparkplug view
-// opened mid-session can replay births received earlier.
+// maxSparkplugHistoryMessages caps the mount replay defensively. Births and
+// STATE are kept in full, and a fleet large enough to blow through this is one
+// where a complete replay would stall the panel anyway, so keep the newest and
+// drop the rest.
+const maxSparkplugHistoryMessages = 10000
+
+// GetSparkplugMessageHistory returns the retained Sparkplug messages a view
+// needs to rebuild its tree (the spBv1.0 namespace plus legacy root-level STATE
+// topics), sorted by arrival time, so a Sparkplug view opened mid-session can
+// replay births received earlier.
 func (a *App) GetSparkplugMessageHistory(connectionId uint) ([]mqtt.MqttMessage, error) {
 	appConnection, ok := a.AppConnections[connectionId]
 	if !ok {
@@ -20,8 +26,41 @@ func (a *App) GetSparkplugMessageHistory(connectionId uint) ([]mqtt.MqttMessage,
 	history := appConnection.MqttManager.MessageHistory
 	messages := history.GetHistoryByTopicPrefix("spBv1.0/")
 	messages = append(messages, history.GetHistoryByTopicPrefix("STATE/")...)
-	sortMessagesByTimeAsc(messages)
-	return messages, nil
+	return narrowSparkplugHistory(messages), nil
+}
+
+// narrowSparkplugHistory keeps every birth (each one establishes the aliases
+// later data depends on) and every STATE, but only the latest message per other
+// topic. The full window can run to hundreds of thousands of NDATA messages the
+// frontend then base64-decodes and parses one at a time on panel mount, and all
+// but the last of those is redundant for building the tree. Topics that fail
+// the Sparkplug grammar fall in the latest-per-topic bucket. Returns the result
+// sorted by arrival time ascending.
+func narrowSparkplugHistory(messages []mqtt.MqttMessage) []mqtt.MqttMessage {
+	kept := make([]mqtt.MqttMessage, 0, len(messages))
+	latestIndex := map[string]int{}
+	for _, message := range messages {
+		if info, ok := sparkplug.ParseTopic(message.Topic); ok {
+			switch info.Type {
+			case sparkplug.MessageTypeNBirth, sparkplug.MessageTypeDBirth, sparkplug.MessageTypeState:
+				kept = append(kept, message)
+				continue
+			}
+		}
+		if index, ok := latestIndex[message.Topic]; ok {
+			if message.TimeMs >= kept[index].TimeMs {
+				kept[index] = message
+			}
+			continue
+		}
+		latestIndex[message.Topic] = len(kept)
+		kept = append(kept, message)
+	}
+	sortMessagesByTimeAsc(kept)
+	if len(kept) > maxSparkplugHistoryMessages {
+		kept = kept[len(kept)-maxSparkplugHistoryMessages:]
+	}
+	return kept
 }
 
 // PublishSparkplugRebirth publishes the standard NCMD Node Control/Rebirth

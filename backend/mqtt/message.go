@@ -37,7 +37,60 @@ func (m *MqttMessage) estimatedBytes() int {
 			n += len(key) + len(value) + 16
 		}
 	}
+	// Middleware properties are no longer just flags: the Sparkplug decode
+	// attaches a per-message meta map, which history would otherwise retain
+	// entirely off-budget and under-evict.
+	if m.MiddlewareProperties != nil {
+		for key, value := range *m.MiddlewareProperties {
+			n += len(key) + mapEntryOverhead + estimatedValueBytes(value, maxValueDepth)
+		}
+	}
 	return n
+}
+
+const (
+	// mapEntryOverhead approximates a Go map bucket slot plus the interface
+	// header the value is boxed in.
+	mapEntryOverhead = 32
+	// nestedFlatCost stands in for a container past maxValueDepth, so a
+	// pathologically nested value costs a constant rather than a full walk.
+	nestedFlatCost = 64
+	maxValueDepth  = 2
+)
+
+// estimatedValueBytes approximates the retained size of a middleware property
+// value. Depth-limited on purpose: this runs per message on the receive path
+// and again on every eviction, so it must stay cheap and never recurse deeply.
+func estimatedValueBytes(value any, depth int) int {
+	switch v := value.(type) {
+	case string:
+		return len(v)
+	case []byte:
+		return len(v)
+	case bool, int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64, float32, float64:
+		return 8
+	case map[string]any:
+		if depth <= 0 {
+			return nestedFlatCost
+		}
+		n := 0
+		for key, nested := range v {
+			n += len(key) + mapEntryOverhead + estimatedValueBytes(nested, depth-1)
+		}
+		return n
+	case []any:
+		if depth <= 0 {
+			return nestedFlatCost
+		}
+		n := 0
+		for _, item := range v {
+			n += estimatedValueBytes(item, depth-1)
+		}
+		return n
+	default:
+		return 16
+	}
 }
 
 type MessageProperties struct {
