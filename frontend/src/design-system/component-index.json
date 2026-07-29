@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-19T02:25:12.802Z",
+  "generatedAt": "2026-07-29T05:06:26.202Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1241,11 +1241,18 @@
           "type": "function",
           "required": false,
           "default": "() => {}"
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
         }
       ],
       "tokens": [
         "primary",
         "white-text",
+        "secondary-text",
         "elevation-2",
         "elevation-2-hover"
       ],
@@ -2230,7 +2237,7 @@
         "error"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Toast itself takes no props: it renders the shared toast store, populated via addToast(data: ToastData). ToastData.descriptionStyle (\"text\" default | \"code\") controls whether the description is capitalised as a sentence or rendered verbatim in monospace for identifiers like MQTT topics.",
       "sourcePath": "src/components/Toast/Toast.svelte",
       "specPath": "src/components/Toast/Toast.spec.json",
       "storyPath": "src/components/Toast/Toast.stories.svelte",
@@ -3026,19 +3033,39 @@
           "description": "Number of topics that will be cleared. 0 selects the single-topic wording."
         },
         {
+          "name": "topics",
+          "type": "array",
+          "required": false,
+          "default": "[]",
+          "description": "The exact topics a branch clear will publish tombstones to, so the count can be checked rather than taken on trust. Shows up to 10, then an 'and N more' line."
+        },
+        {
+          "name": "busy",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "True while the clear is in flight. Clear shows a busy label and disables with Cancel; the dialog does not close on its own until the parent closes it."
+        },
+        {
           "name": "onConfirm",
           "type": "function",
-          "required": true
+          "required": true,
+          "description": "Called on Clear; returns a promise. The dialog does not close itself — the parent awaits the call and closes isOpen once it resolves."
         }
       ],
       "tokens": [
         "emphasis",
         "error",
-        "error-light"
+        "error-light",
+        "outline",
+        "elevation-0",
+        "secondary-text"
       ],
       "dependencies": [
         "Button",
-        "Dialog"
+        "Dialog",
+        "IconButton",
+        "Icon"
       ],
       "notes": "Figma is not linked yet. The branch copy hedges deliberately: under MQTT 3 the retained flag only arrives on subscribe-time replay, so the count cannot claim to be the broker's complete retained set.",
       "sourcePath": "src/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte",
