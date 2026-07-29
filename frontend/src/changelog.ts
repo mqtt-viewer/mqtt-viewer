@@ -113,7 +113,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Sparkplug B with the names filled in",
-        body: "MQTT Viewer now remembers Sparkplug birth certificates, so data messages show real metric names instead of bare aliases. A new Sparkplug tab shows a live group, node and metric tree with sequence gap and rebirth storm warnings, and you can request a rebirth right from the viewer.",
+        body: "MQTT Viewer now remembers Sparkplug birth certificates, so data messages show real metric names instead of bare aliases. A new Sparkplug tab shows a live group, node and metric tree with sequence gap and rebirth storm warnings, and you can request a rebirth right from the viewer. This needs \"Automatically encode/decode Sparkplug messages\" enabled on the connection, which is off by default.",
         thanks: [
           {
             name: "adamwoodland2",

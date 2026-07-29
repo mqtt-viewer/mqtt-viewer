@@ -110,6 +110,9 @@
     sparkplugMeta?.birthAtMs !== undefined
       ? formatClockTime(sparkplugMeta!.birthAtMs!)
       : null;
+  // Built once so the visible (truncating) label and its tooltip can never drift.
+  $: spResolvedLabel = `Sparkplug B ${sparkplugMeta?.msgType ?? ""} - aliases resolved from birth ${spResolvedFrom ?? ""}`;
+  $: spUnresolvedLabel = `Sparkplug B ${sparkplugMeta?.msgType ?? ""} - aliases unresolved, no birth seen`;
 
   let rebirthInFlight = false;
   const requestRebirth = async () => {
@@ -180,8 +183,8 @@
           >Sparkplug host state - {sparkplugMeta.hostId}</span
         >
       {:else if spUnresolved}
-        <span class="text-warning truncate"
-          >aliases unresolved - no birth seen</span
+        <Tooltip class="text-warning truncate" text={spUnresolvedLabel}
+          >{spUnresolvedLabel}</Tooltip
         >
         <Button
           variant="text"
@@ -190,9 +193,8 @@
           on:click={requestRebirth}>Request rebirth</Button
         >
       {:else if spIsData && spResolvedFrom}
-        <span class="truncate"
-          >Sparkplug B {sparkplugMeta.msgType} - aliases resolved from birth
-          {spResolvedFrom}</span
+        <Tooltip class="truncate" text={spResolvedLabel}
+          >{spResolvedLabel}</Tooltip
         >
         {#if spPartial}
           <span class="text-warning">some aliases unresolved</span>

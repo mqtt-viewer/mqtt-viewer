@@ -18,7 +18,9 @@ Ctrl-C to stop. Each topic publishes on its own cadence; rates are msgs/sec.
 
 --sparkplug adds a simulated Sparkplug B world (group "EnergyCo") alongside
 the plain-JSON topics above rather than replacing them, so a broker can be
-used to exercise both decode paths at once; see --help for the sub-flags.
+used to exercise both decode paths at once: births, aliased data, a periodic
+seq gap, and a device DDEATH followed by its node's NDEATH and rebirth. See
+--help for the sub-flags.
 """
 import argparse
 import json
@@ -395,11 +397,18 @@ class NodeSim:
         payload = encode_payload(timestamp=now_ms(), metrics=metrics, seq=self._next_seq())
         self.client.publish(self.topic("DDATA", device.device_id), payload, qos=0, retain=False)
 
+    def publish_ddeath(self, device):
+        # Per spec a DDEATH consumes a seq from the edge node's counter;
+        # only NDEATH is exempt. Getting this wrong looks like a seq gap.
+        payload = encode_payload(timestamp=now_ms(), seq=self._next_seq())
+        self.client.publish(self.topic("DDEATH", device.device_id), payload, qos=0, retain=False)
+
 
 def build_sparkplug_world(client):
     """Group "EnergyCo": substation-7 (+ device meter-01) is the rich,
     well-behaved node; substation-4 has a periodic seq gap; substation-9
-    cycles offline/rebirth; substation-2 only exists for --sparkplug-storm."""
+    (+ device relay-09) cycles offline/rebirth, taking the device down with a
+    DDEATH first; substation-2 only exists for --sparkplug-storm."""
     substation7 = NodeSim(client, "substation-7", [
         _metric("Volts/L1", 3, DT_FLOAT, 11000.0, "float", spread=8.0, lo=10800, hi=11200),
         _metric("Volts/L2", 4, DT_FLOAT, 10995.0, "float", spread=8.0, lo=10800, hi=11200),
@@ -422,6 +431,11 @@ def build_sparkplug_world(client):
     substation9 = NodeSim(client, "substation-9", [
         _metric("Volts/L1", 3, DT_FLOAT, 11020.0, "float", spread=8.0, lo=10800, hi=11200),
     ])
+    relay09 = DeviceSim("relay-09", [
+        _metric("Breaker/State", 3, DT_BOOLEAN, True, "bool"),
+        _metric("Trip/Count", 4, DT_INT64, 4, "long", spread=0.05, monotonic=True),
+    ])
+    substation9.devices.append(relay09)
 
     substation2 = NodeSim(client, "substation-2", [
         _metric("Status", 3, DT_BOOLEAN, True, "bool"),
@@ -443,6 +457,7 @@ def start_sparkplug(client, args, start):
     n7, n4, n9, n2 = (nodes["substation-7"], nodes["substation-4"],
                        nodes["substation-9"], nodes["substation-2"])
     device7 = n7.devices[0]
+    device9 = n9.devices[0]
 
     client.publish("spBv1.0/STATE/scada-primary",
                     json.dumps({"online": True, "timestamp": now_ms()}),
@@ -487,6 +502,7 @@ def start_sparkplug(client, args, start):
         birth_n7()
         state["n7_birthed"] = True
     n9.publish_nbirth()
+    n9.publish_dbirth(device9)
     n4.publish_nbirth()
 
     def tick(t):
@@ -514,15 +530,20 @@ def start_sparkplug(client, args, start):
         if state["n9_phase"] == "alive":
             if t >= state["n9_next_data"]:
                 n9.publish_ndata()
+                n9.publish_ddata(device9)
                 state["n9_next_data"] = t + 1.0
             if t >= state["n9_next_transition"]:
+                n9.publish_ddeath(device9)
                 n9.publish_ndeath()
+                print(f"  [sparkplug] substation-9 offline: DDEATH for "
+                      f"{device9.device_id} (seq consumed) then NDEATH")
                 state["n9_phase"] = "dead"
                 state["n9_next_transition"] = t + 30.0
         else:
             if t >= state["n9_next_transition"]:
                 n9.bd_seq += 1
                 n9.publish_nbirth()
+                n9.publish_dbirth(device9)
                 state["n9_phase"] = "alive"
                 state["n9_next_data"] = t + 1.0
                 state["n9_next_transition"] = t + 30.0
@@ -544,8 +565,9 @@ def main():
                     help="periodically spike backyard/sensors/34/temperature")
     ap.add_argument("--sparkplug", action="store_true", default=False,
                     help="also simulate a Sparkplug B world (group \"EnergyCo\": "
-                         "NBIRTH/NDATA with aliasing, a device under a node, a periodic "
-                         "seq gap, an NDEATH/rebirth cycle, STATE, and NCMD->rebirth) "
+                         "NBIRTH/NDATA with aliasing, devices under nodes, a periodic "
+                         "seq gap, a DDEATH/NDEATH/rebirth cycle, STATE, and "
+                         "NCMD->rebirth) "
                          "alongside the plain-JSON topics above. Payloads are hand-encoded "
                          "protobuf (see spBv1.proto) — no extra pip dependency.")
     ap.add_argument("--sparkplug-storm", action="store_true", default=False,
