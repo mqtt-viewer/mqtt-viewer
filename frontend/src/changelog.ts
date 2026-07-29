@@ -32,7 +32,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         title: "Run MQTT Viewer in your browser",
-        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and the pop-out chart and broker status views open as tabs. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. It also works served under a subpath behind a reverse proxy, rather than only at the root of a domain, which is what a Home Assistant ingress panel needs. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
       },
       {
         title: "Sort topics by how busy they are",
