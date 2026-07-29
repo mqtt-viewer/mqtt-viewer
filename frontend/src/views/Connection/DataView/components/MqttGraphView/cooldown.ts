@@ -90,36 +90,17 @@ export function tintForAge(
 }
 
 // ---- EWMA decaying-score rate estimator ----
-// score ~= exponentially-weighted recent event count. decayScore() ages it to
-// `now`; bump it by 1 on each message. rate magnitude is read off the score.
+// The pure engine now lives in `@/util/decay-score` so the topic List can share
+// it without a list->graph import. Re-exported here so this module's existing
+// consumers (topic-model, pixi-graph, MqttGraphView) keep importing unchanged.
 
-export type DecayScore = { score: number; lastMs: number };
-
-export function decayScore(s: DecayScore, nowMs: number, tauMs: number): number {
-  if (s.lastMs === 0) {
-    s.lastMs = nowMs;
-    return s.score;
-  }
-  const dt = nowMs - s.lastMs;
-  if (dt > 0) {
-    s.score *= Math.exp(-dt / tauMs);
-    s.lastMs = nowMs;
-  }
-  return s.score;
-}
-
-export function bumpScore(s: DecayScore, nowMs: number, tauMs: number): void {
-  decayScore(s, nowMs, tauMs);
-  s.score += 1;
-}
-
-// Convert a decayed score to an approximate message rate in msg/s. At steady
-// state the accumulator converges to rate x tau, so score / tau recovers the
-// real unit — comparable across smoothing (tau) settings, unlike the raw score.
-export function rateFromScore(score: number, tauMs: number): number {
-  if (tauMs <= 0) return 0;
-  return score / (tauMs / 1000);
-}
+export {
+  decayScore,
+  peekScore,
+  bumpScore,
+  rateFromScore,
+} from "@/util/decay-score";
+export type { DecayScore } from "@/util/decay-score";
 
 // Human-friendly msg/s label for tooltips/legends.
 export function formatRate(msgPerSec: number): string {
