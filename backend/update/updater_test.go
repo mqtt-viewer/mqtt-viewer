@@ -56,6 +56,60 @@ func TestUpdateGuidance_SelfUpdateTypesHaveNoInstructions(t *testing.T) {
 	}
 }
 
+func TestIsNixStorePath(t *testing.T) {
+	if !isNixStorePath("/nix/store/abcd-mqtt-viewer-1.0.0/bin/mqtt-viewer") {
+		t.Fatal("a path under /nix/store should be a store path")
+	}
+	if isNixStorePath("/usr/local/bin/mqtt-viewer") {
+		t.Fatal("/usr/local/bin should not be a store path")
+	}
+	if isNixStorePath("/home/u/.nix-profile/bin/mqtt-viewer") {
+		t.Fatal("a profile symlink path is not itself a store path")
+	}
+	// The prefix trap: without the separator, HasPrefix would match this.
+	if isNixStorePath("/nix/storeage/bin/x") {
+		t.Fatal("/nix/storeage should not be treated as being inside /nix/store")
+	}
+	if isNixStorePath("/nix/store") {
+		t.Fatal("the store root itself is not a store path")
+	}
+}
+
+func TestIsNixStorePath_HonoursNixStoreDir(t *testing.T) {
+	t.Setenv("NIX_STORE_DIR", "/custom/store")
+	if !isNixStorePath("/custom/store/x/bin/y") {
+		t.Fatal("should honour NIX_STORE_DIR")
+	}
+	if isNixStorePath("/nix/store/x/bin/y") {
+		t.Fatal("the default root should not apply when NIX_STORE_DIR is set")
+	}
+}
+
+func TestResolveInstallType_Nix(t *testing.T) {
+	t.Setenv("FLATPAK_ID", "")
+	t.Setenv("APPIMAGE", "")
+	defer func(orig func() (string, error)) { osExecutable = orig }(osExecutable)
+	osExecutable = func() (string, error) {
+		return "/nix/store/abcd-mqtt-viewer-1.0.0/bin/mqtt-viewer", nil
+	}
+	if got := resolveInstallType(); got != installNix {
+		t.Fatalf("expected nix, got %q", got)
+	}
+}
+
+func TestUpdateGuidance_Nix(t *testing.T) {
+	cmd, instructions, url := updateGuidance(installNix)
+	if !strings.Contains(cmd, "nix profile upgrade") {
+		t.Fatalf("nix command should run `nix profile upgrade`, got %q", cmd)
+	}
+	if instructions == "" {
+		t.Fatal("nix should have instructions")
+	}
+	if url != "" {
+		t.Fatalf("nix should have no releases URL, got %q", url)
+	}
+}
+
 func TestIsFlatpak(t *testing.T) {
 	t.Setenv("FLATPAK_ID", "")
 	if isFlatpak() {

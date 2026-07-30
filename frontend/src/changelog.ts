@@ -153,6 +153,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Updates that match your install",
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
+      {
+        title: "Install it with Nix",
+        body: "MQTT Viewer is now packaged as a Nix flake for x86_64 and aarch64 Linux, and the updater points Nix installs at Nix instead of the .deb download.",
+      },
     ],
   },
   {

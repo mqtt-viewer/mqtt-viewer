@@ -81,7 +81,7 @@ Update through Nix, not through the app:
 nix profile upgrade --all
 ```
 
-The Nix store is read only, so MQTT Viewer cannot replace its own binary and will not try to. Be aware that the in-app update prompt currently tells you to download a .deb or .rpm, which is wrong for a Nix install. Ignore it.
+The app recognises a Nix install and points you at Nix. Store paths are immutable, so it will not try to replace its own binary. The in-app text assumes a profile install; if you pinned MQTT Viewer in a NixOS or home-manager configuration, update the flake input and rebuild instead.
 
 ## Contributing
 
