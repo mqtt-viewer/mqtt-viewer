@@ -161,6 +161,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Reconnecting when the network drops out",
         body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
       },
+      {
+        title: "Install it with Nix",
+        body: "MQTT Viewer is now packaged as a Nix flake for x86_64 and aarch64 Linux, and the updater points Nix installs at Nix instead of the .deb download.",
+      },
     ],
   },
   {
