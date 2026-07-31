@@ -36,22 +36,25 @@ Backend (repo root):
 ```sh
 just dev                 # wails3 dev: run the app with hot reload
 just test                # go test ./... via tparse
+just stub-dist           # create the embedded frontend/dist stub
 just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
 
-On a fresh checkout or new worktree, `go build ./...` fails with
-`pattern all:frontend/dist: no matching files found`: main.go embeds the
-frontend build, which does not exist yet (`frontend/dist` is gitignored
-and vite empties it on every build, so a committed placeholder would not
-survive). Stub it once before building Go code:
+`just test` runs `stub-dist` first, so it works on a fresh tree. For a
+bare `go build ./...` or `go vet ./...`, run the stub once yourself:
 
 ```sh
-mkdir -p frontend/dist && [ -f frontend/dist/index.html ] || echo "<html></html>" > frontend/dist/index.html
+just stub-dist
 ```
 
-(the same stub `build/Taskfile.yml`'s `generate:bindings` task creates),
-or run a real `pnpm build` from `frontend/`.
+Without it those commands fail with `pattern all:frontend/dist: no
+matching files found`. main.go embeds the frontend build, which does not
+exist yet on a fresh checkout or new worktree (`frontend/dist` is
+gitignored and vite empties it on every build, so a committed
+placeholder would not survive). The recipe mirrors the stub
+`build/Taskfile.yml`'s `generate:bindings` task creates. A real
+`pnpm build` from `frontend/` satisfies the embed too.
 
 Dev-server ports are derived per checkout so parallel agent worktrees
 never collide. Once per checkout, run `scripts/dev-ports.sh write-launch`

@@ -198,6 +198,12 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 		cm.Disconnect(ctx)
 		return nil, nil
 	case <-time.After(CONNECTION_TIMEOUT):
+		// Shut the connection manager down. Left running it keeps retrying in
+		// the background forever, and can later report itself connected on a
+		// connection the caller has already given up on.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), CONNECTION_TIMEOUT)
+		defer cancel()
+		cm.Disconnect(shutdownCtx)
 		return nil, fmt.Errorf("timeout while connecting to broker")
 	}
 
@@ -268,6 +274,9 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 		client.Disconnect(500)
 		return nil, nil
 	case <-time.After(CONNECTION_TIMEOUT):
+		// Same as v5: auto-reconnect is on, so a client we walk away from
+		// keeps trying to connect in the background.
+		client.Disconnect(500)
 		return nil, fmt.Errorf("timeout while connecting to broker")
 	case err := <-subErrChan:
 		if err != nil {
@@ -276,6 +285,7 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 		}
 	}
 	if token.Error() != nil {
+		client.Disconnect(500)
 		return nil, token.Error()
 	}
 	return &client, nil
