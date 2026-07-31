@@ -90,6 +90,7 @@ func newMqttMessageFromV3(m *mqttV3.Message, arrivedAt time.Time) *MqttMessage {
 		TimeMs:  arrivedAt.UnixMilli(),
 		Time:    arrivedAt,
 	}
+	message.MiddlewareProperties = &map[string]any{}
 
 	return &message
 }

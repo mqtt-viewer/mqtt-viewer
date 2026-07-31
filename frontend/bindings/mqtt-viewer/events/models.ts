@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
+import {Create as $Create} from "@wailsio/runtime";
 
 export class ConnectionEventsSet {
     "mqttConnected": string;
@@ -14,6 +14,7 @@ export class ConnectionEventsSet {
     "mqttMessages": string;
     "mqttLatency": string;
     "mqttClearHistory": string;
+    "protoStateChanged": string;
 
     /** Creates a new ConnectionEventsSet instance. */
     constructor($$source: Partial<ConnectionEventsSet> = {}) {
@@ -40,6 +41,9 @@ export class ConnectionEventsSet {
         }
         if (!("mqttClearHistory" in $$source)) {
             this["mqttClearHistory"] = "";
+        }
+        if (!("protoStateChanged" in $$source)) {
+            this["protoStateChanged"] = "";
         }
 
         Object.assign(this, $$source);

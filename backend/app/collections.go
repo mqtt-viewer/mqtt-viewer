@@ -82,6 +82,7 @@ type SaveCollectionMessageParams struct {
 	HeaderTopicAlias             *int32  `json:"headerTopicAlias"`
 	HeaderSubscriptionIdentifier *int32  `json:"headerSubscriptionIdentifier"`
 	UserPropertiesString         *string `json:"userProperties"`
+	ProtoOverride                *string `json:"protoOverride"`
 }
 
 func (a *App) SaveCollectionMessage(params SaveCollectionMessageParams) (models.CollectionMessage, error) {
@@ -107,6 +108,7 @@ func (a *App) SaveCollectionMessage(params SaveCollectionMessageParams) (models.
 	message.HeaderMessageExpiryInterval = params.HeaderMessageExpiryInterval
 	message.HeaderTopicAlias = params.HeaderTopicAlias
 	message.HeaderSubscriptionIdentifier = params.HeaderSubscriptionIdentifier
+	message.ProtoOverride = params.ProtoOverride
 
 	if err := a.Db.Save(&message).Error; err != nil {
 		return models.CollectionMessage{}, err

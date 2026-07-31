@@ -3,6 +3,7 @@ package protobuf
 import (
 	"path"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -104,6 +105,45 @@ func TestRegistryWithProto2LoadsCorrectly(t *testing.T) {
 	}
 	if len(*registry.LoadedDescriptorsNameMap) != 1 {
 		t.Errorf("Expected 1 descriptors in name map, got %v", len(*registry.LoadedDescriptorsNameMap))
+	}
+}
+
+func TestRegistryRecursesNestedMessages(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-nested"))
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+		return
+	}
+	// Outer and Outer.Inner; the map field's synthetic MapEntry message is skipped.
+	if len(*registry.LoadedDescriptors) != 2 {
+		t.Errorf("Expected 2 descriptors, got %v", len(*registry.LoadedDescriptors))
+	}
+
+	names := registry.GetLoadedDescriptorNames()
+	found := false
+	for _, name := range names {
+		if name == "nested.Outer.Inner" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected %v to contain nested.Outer.Inner, got %v", names, names)
+	}
+
+	for _, name := range names {
+		if strings.Contains(name, "Entry") {
+			t.Errorf("Expected no map-entry synthetic message in %v, got %v", names, name)
+		}
+	}
+
+	descriptor, ok := registry.GetMessageDescriptorFromName("nested.Outer.Inner")
+	if !ok {
+		t.Error("Expected nested.Outer.Inner to resolve via GetMessageDescriptorFromName")
+		return
+	}
+	if string(descriptor.FullName()) != "nested.Outer.Inner" {
+		t.Errorf("Expected full name nested.Outer.Inner, got %v", descriptor.FullName())
 	}
 }
 

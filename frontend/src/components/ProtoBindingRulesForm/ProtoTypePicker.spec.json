@@ -1,0 +1,54 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "ProtoTypePicker",
+  "tier": "component",
+  "description": "Searchable dropdown for choosing a protobuf message type from the loaded registry, used by every row of ProtoBindingRulesForm.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "value",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Currently chosen message type; empty renders the 'Choose a type' placeholder."
+    },
+    {
+      "name": "descriptorNames",
+      "type": "object",
+      "required": false,
+      "default": "[]",
+      "description": "Full message-type names available from the loaded proto registry. Empty renders the 'No types loaded' empty state."
+    },
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "onPick",
+      "type": "function",
+      "required": false,
+      "default": "(name) => void"
+    }
+  ],
+  "tokens": [
+    "outline",
+    "divider",
+    "white-text",
+    "secondary-text"
+  ],
+  "dependencies": [
+    "DropdownMenu",
+    "DropdownMenuItem",
+    "Icon"
+  ],
+  "notes": "Extracted from a ProtoBindingRulesForm {#snippet} so the codebase stays on legacy Svelte syntax. Filter text is local component state, so each picker instance keeps its own search and the parent needs no per-row map. ProtoBindingRulesForm's spec deliberately omits this from its dependencies[]: both are tier 'component' and the validator only allows component -> primitive edges. Extracting a generic SearchableDropdownMenu primitive shared with AddToCollectionMenu is the follow-up."
+}

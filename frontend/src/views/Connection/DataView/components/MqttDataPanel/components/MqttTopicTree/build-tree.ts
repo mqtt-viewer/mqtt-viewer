@@ -5,7 +5,8 @@ import { getSortedDataKeys } from "./sort";
 
 export type TreeRow = {
   levelCount: number;
-  isDecodedProto: boolean;
+  protoDecode?: "ok" | "failed";
+  protoDescriptorName?: string;
   topicLevel: string;
   topic: string;
   expandKey: string;
@@ -61,7 +62,8 @@ const buildRows = (params: BuildRowParams) => {
     const thisRowIsExpanded = expandedTopics.has(expandKey) ?? false;
     result.push({
       levelCount,
-      isDecodedProto: topicData.isDecodedProto,
+      protoDecode: topicData.protoDecode,
+      protoDescriptorName: topicData.protoDescriptorName,
       topic: topicData.topic,
       topicLevel: key,
       expandKey,

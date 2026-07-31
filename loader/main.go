@@ -28,6 +28,7 @@ func main() {
 		&models.Collection{},
 		&models.CollectionMessage{},
 		&models.SysMetricMapping{},
+		&models.ProtoBindingRule{},
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load gorm schema: %v\n", err)

@@ -71,6 +71,11 @@ Caveats:
   binding calls need nothing extra.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
+- A plain `go build -tags server` leaves `env.Version` at `0.0.0-dev`, which sets
+  `env.IsDev` and makes startup use the dev paths, silently ignoring
+  `MQTT_VIEWER_DATA_DIR`. Pass
+  `-ldflags "-X mqtt-viewer/backend/env.Version=<v>"` (as the Dockerfile and CI
+  do) when you need a custom data dir to take effect.
 
 ### Fallback for human/visual verification
 

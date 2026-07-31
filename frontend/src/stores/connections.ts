@@ -17,6 +17,7 @@ import type { DeepOmit } from "@/util/types";
 import { addToast } from "@/components/Toast/Toast.svelte";
 import tabs from "@/stores/tabs";
 import subscriptions from "./subscriptions";
+import protoState from "./proto-state";
 
 export type ConnectionState =
   | "connected"
@@ -83,6 +84,7 @@ const init = async () => {
       const id: number = e.data;
       await tabs.closeTab(id);
       await subscriptions.removeConnection(id);
+      protoState.removeConnection(id);
       update((store) => {
         delete store.connections[id];
         return store;
@@ -237,23 +239,31 @@ const updateConnectionState = (
 const updateConnectionDetails = async (
   connectionDetails: Connection["connectionDetails"]
 ) => {
+  const connectionId = connectionDetails.id;
+  const previous = get({ subscribe }).connections[connectionId];
+  const connectionString = getConnectionString(connectionDetails);
+  update((store) => {
+    const existingConnection = store.connections[connectionId];
+    store.connections[connectionId] = {
+      ...existingConnection,
+      connectionDetails,
+      connectionString,
+    };
+    return store;
+  });
   try {
     console.log("updating connection details", connectionDetails);
     await UpdateConnection(
       connectionDetails as unknown as app.Connection["connectionDetails"]
     );
-    const connectionString = getConnectionString(connectionDetails);
-    update((store) => {
-      const existingConnection = store.connections[connectionDetails.id];
-      store.connections[connectionDetails.id] = {
-        ...existingConnection,
-        connectionDetails: connectionDetails,
-        connectionString,
-      };
-      return store;
-    });
   } catch (e) {
     console.error(e);
+    if (previous) {
+      update((store) => {
+        store.connections[connectionId] = previous;
+        return store;
+      });
+    }
     throw e;
   }
 };
@@ -289,6 +299,7 @@ const deleteConnection = async (id: number) => {
   try {
     await DeleteConnection(id);
     subscriptionsStore.removeConnection(id);
+    protoState.removeConnection(id);
     update((store) => {
       delete store.connections[id];
       return store;

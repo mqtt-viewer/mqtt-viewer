@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path"
 	"time"
 
 	db "mqtt-viewer/backend/db"
@@ -12,6 +13,7 @@ import (
 	"mqtt-viewer/backend/logging"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/paths"
 	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/backend/update"
@@ -114,12 +116,18 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error writing sparkplug proto files: %v", err))
 			return
 		}
-		registry, err := protobuf.LoadProtoRegistry(a.Paths.ResourcePath)
+		// Scoped to the sparkplug-only subdir, not the whole resource path:
+		// ResourcePath also holds proto-imports/<connId>/, one per
+		// connection's user-supplied .proto files, which must never reach
+		// this global registry (a bad or colliding user import would break
+		// Sparkplug decoding app-wide, and user types have no business being
+		// globally resolvable).
+		registry, err := protobuf.LoadProtoRegistry(path.Join(a.Paths.ResourcePath, protobuf.ProtoResourceDirName))
 		if err != nil {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
 			return
 		}
-		a.ProtoRegistry = registry
+		a.ProtoRegistry.Store(registry)
 	}()
 
 	if a.Mode != AppModes.Test {
@@ -176,12 +184,33 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	mqttManager := mqtt.NewMqttManager(withMqttModule, onLatencyUpdate)
 	mqttManager.SetMessageMemoryBudget(a.memoryBudgetBytes())
 
+	protoRules := []models.ProtoBindingRule{}
+	if res := a.Db.Where("connection_id = ?", conn.ID).Order("sort_order, id").Find(&protoRules); res.Error != nil {
+		return nil, res.Error
+	}
+	protoEnabled := conn.IsProtoEnabled != nil && *conn.IsProtoEnabled
+	connProtoState := newProtoState(protoEnabled, protoRules)
+
 	appConnection := AppConnection{
 		ctx:          &withName,
 		ConnectionId: conn.ID,
 		MqttManager:  mqttManager,
 		EventSet:     &connEvents,
+		ProtoState:   connProtoState,
 	}
+
+	// Installed exactly once, here, for the lifetime of the AppConnection.
+	// Both middlewares early-return when protoState isn't enabled, so they
+	// stay wired up across connect/disconnect cycles; ConnectMqtt only
+	// refreshes protoState's enabled flag and rules.
+	mqttManager.UseMiddleware(mqtt.MqttMiddlewares{
+		BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
+			mqttmiddleware.NewProtoEncodeMiddleware(connProtoState, a.ProtoRegistry.Load).Middleware,
+		},
+		BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
+			mqttmiddleware.NewProtoDecodeMiddleware(connProtoState, a.ProtoRegistry.Load).Middleware,
+		},
+	})
 
 	mqttManager.SetConnectionCallbacks(
 		mqtt.MqttConnectionCallbacks{

@@ -88,9 +88,12 @@
 </button>
 
 {#if $open}
+  <!-- The menu is portalled to <body>, so it must clear Dialog's z-[10000]
+       content (and its z-[9999] backdrop) or every dropdown opened inside a
+       dialog fails hit-testing and can't be clicked. -->
   <div
     class={`
-     z-30 p-1 py-1.5 min-w-[100px] shadow
+     z-[10005] p-1 py-1.5 min-w-[100px] shadow
      bg-elevation-2 rounded focus:!ring-0
   `}
     use:melt={$menu}

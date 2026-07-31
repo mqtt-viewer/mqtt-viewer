@@ -71,6 +71,7 @@ type Connection struct {
 	Username             *string          `json:"username"`
 	Password             *string          `json:"password"`
 	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
+	ProtoRegDir          *string          `json:"protoRegDir"`
 	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
 	SkipCertVerification *bool            `json:"skipCertVerification"`
 	CertCa               *string          `json:"certCa"`
@@ -89,6 +90,9 @@ type Connection struct {
 	// Declared only for the ON DELETE CASCADE foreign key; fetched via
 	// GetSysMetricMappingsByConnectionId, never preloaded.
 	SysMetricMappings []SysMetricMapping `json:"-" gorm:"constraint:OnDelete:CASCADE"`
+	// Declared only for the ON DELETE CASCADE foreign key; fetched via
+	// GetProtoBindingRulesByConnectionId, never preloaded.
+	ProtoBindingRules []ProtoBindingRule `json:"-" gorm:"constraint:OnDelete:CASCADE"`
 }
 
 type FilterHistory struct {
@@ -117,6 +121,9 @@ type PublishHistory struct {
 	HeaderTopicAlias             *int32    `json:"headerTopicAlias"`
 	HeaderSubscriptionIdentifier *int32    `json:"headerSubscriptionIdentifier"`
 	PublishedAt                  time.Time `json:"publishedAt"`
+	// nil = auto (matcher decides), "" = raw (no protobuf), "<name>" = forced
+	// message type. Persisted so replaying history honours the original choice.
+	ProtoOverride *string `json:"protoOverride"`
 }
 
 type Collection struct {
@@ -150,6 +157,10 @@ type CollectionMessage struct {
 	HeaderSubscriptionIdentifier *int32    `json:"headerSubscriptionIdentifier"`
 	CreatedAt                    time.Time `json:"createdAt"`
 	UpdatedAt                    time.Time `json:"updatedAt"`
+	// nil = auto (matcher decides), "" = raw (no protobuf), "<name>" = forced
+	// message type. Persisted so replaying a saved message honours the
+	// original choice.
+	ProtoOverride *string `json:"protoOverride"`
 }
 
 type Tab struct {
@@ -187,6 +198,20 @@ type SysMetricMapping struct {
 	// optional display suffix
 	Unit      string `json:"unit"`
 	SortOrder int    `json:"sortOrder"`
+}
+
+// ProtoBindingRule is a per-connection rule mapping a topic filter to a
+// protobuf message type name. The matcher (backend/topic-matching) resolves
+// the most specific rule for a given topic; SortOrder breaks ties among
+// equally specific rules.
+type ProtoBindingRule struct {
+	ID           uint      `json:"id" gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	ConnectionID uint      `json:"connectionId" gorm:"index:proto_binding_rules_connid"`
+	TopicFilter  string    `json:"topicFilter"`
+	MessageType  string    `json:"messageType"`
+	SortOrder    int       `json:"sortOrder"`
 }
 
 type PanelSize struct {

@@ -23,7 +23,11 @@ type App struct {
 	Version        string
 	AppConnections map[uint]*AppConnection
 	Updater        *update.Updater
-	ProtoRegistry  *protobuf.ProtoRegistry
+	// Global sparkplug proto registry, compiled once at startup by a
+	// background goroutine. atomic.Pointer avoids a data race between that
+	// goroutine's Store and connect-time reads of a connection that comes up
+	// before the compile finishes.
+	ProtoRegistry atomic.Pointer[protobuf.ProtoRegistry]
 	// Cached so the 300ms message-buffer drain doesn't hit the DB to decide
 	// whether to persist; kept in sync by loadRetentionSettings / UpdateAppSettings.
 	recordingEnabled atomic.Bool
@@ -40,6 +44,7 @@ type AppConnection struct {
 	SubscriptionMatcher *topicmatching.SubscriptionMatcher
 	MqttMessageBuffer   *mqtt.MessageBuffer
 	EventSet            *events.ConnectionEventsSet
+	ProtoState          *protoState
 }
 
 func NewApp(appMode AppMode, version string) *App {

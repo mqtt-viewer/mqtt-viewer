@@ -84,6 +84,6 @@
 <AddFieldButton
   disabled={isAllFieldsDisabled}
   class="mt-10"
-  text="Add Subscription"
+  text="Add subscription"
   onClick={onAddSubscriptionClick}
 />

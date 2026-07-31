@@ -18,6 +18,7 @@ export class ConnectionEventsSet {
   mqttMessages = "storybook:mqttMessages";
   mqttLatency = "storybook:mqttLatency";
   mqttClearHistory = "storybook:mqttClearHistory";
+  protoStateChanged = "storybook:protoStateChanged";
 
   static createFrom(source: any = {}) {
     return new ConnectionEventsSet(source);

@@ -24,6 +24,7 @@ export const mockEventSet = {
   mqttMessages: "storybook:mqttMessages",
   mqttLatency: "storybook:mqttLatency",
   mqttClearHistory: "storybook:mqttClearHistory",
+  protoStateChanged: "storybook:protoStateChanged",
 };
 
 export const mockSubscriptions = [
@@ -60,6 +61,11 @@ export const mockConnectionDetails = {
   username: "demo",
   password: "demo",
   isProtoEnabled: true,
+  // Display only (the "Imported from ..." line): matches the initial mock
+  // proto-import state in app.ts's storybook mock, and ChooseDirectory's
+  // mock return value, so picking a folder in a running ProtoSection story
+  // resolves to the same "imported" state as this default.
+  protoRegDir: "/Users/sam/certs",
   isCertsEnabled: false,
   skipCertVerification: false,
   certCa: "",
@@ -400,14 +406,16 @@ export const mockMqttData = {
     messageCount: 3,
     topic: "factory",
     latestMessageTime: new Date(now - 60000),
-    isDecodedProto: false,
+    // "ok" propagates to ancestors (a decoded message somewhere below),
+    // matching the insert logic in mqtt-data.ts.
+    protoDecode: "ok" as const,
     children: {
       line: {
         subtopicCount: 2,
         messageCount: 3,
         topic: "factory/line",
         latestMessageTime: new Date(now - 60000),
-        isDecodedProto: false,
+        protoDecode: "ok" as const,
         children: {
           temperature: {
             subtopicCount: 0,
@@ -415,7 +423,6 @@ export const mockMqttData = {
             topic: "factory/line/temperature",
             latestMessageTime: new Date(now - 120000),
             message: '{"temp":21.4,"unit":"C"}',
-            isDecodedProto: false,
             children: {},
           },
           humidity: {
@@ -424,7 +431,8 @@ export const mockMqttData = {
             topic: "factory/line/humidity",
             latestMessageTime: new Date(now - 60000),
             message: '{"humidity":42.8}',
-            isDecodedProto: true,
+            protoDecode: "ok" as const,
+            protoDescriptorName: "mqtt.viewer.HumidityReading",
             children: {},
           },
         },
@@ -450,6 +458,8 @@ export const mockPublishHistory = [
   },
 ];
 
+// Also feeds the Storybook Wails mock's proto-state responses
+// (.storybook/mocks/bindings/mqtt-viewer/backend/app/app.ts).
 export const mockLoadedProtoFiles = {
   "/workspace/protos/sparkplug/spBv1.proto": [
     "org.eclipse.tahu.protobuf.Payload",
@@ -528,12 +538,15 @@ export const createMockPublishStore = () => {
     sourceMessageName: null,
     sourceCollectionId: null,
     baseline: null,
+    protoOverrideChoice: "auto",
   });
   return {
     subscribe,
     set,
     setPartial: (partial: Record<string, unknown>) =>
       update((store) => ({ ...store, ...partial })),
+    setTopic: (topic: string) =>
+      update((store) => ({ ...store, topic, protoOverrideChoice: "auto" })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -742,7 +755,8 @@ const propDefaults: Record<string, () => unknown> = {
   isActive: () => true,
   isAutoSelectingMostRecent: () => true,
   isComparing: () => true,
-  isDecodedProto: () => false,
+  protoDecode: () => undefined,
+  protoDescriptorName: () => undefined,
   isExpanded: () => true,
   isOpen: () => writable(true),
   isPublishDisabled: () => false,
@@ -750,8 +764,6 @@ const propDefaults: Record<string, () => unknown> = {
   isSelected: () => true,
   label: () => "Enable option",
   left: () => '{"before": true}',
-  loadedProtoFilesWithDescriptorsMap: () => mockLoadedProtoFiles,
-  loadedRootDir: () => "/workspace/protos",
   maxContainerWidth: () => 720,
   maxSize: () => 520,
   message: () => '{"temp":21.4,"unit":"C"}',
@@ -769,7 +781,6 @@ const propDefaults: Record<string, () => unknown> = {
   onConfirm: () => noop,
   onCrossClick: () => noop,
   onDeleteClick: () => noop,
-  onDescriptorSelect: () => noop,
   onFileChosen: () => noop,
   onFileRemoved: () => noop,
   onFocus: () => noop,
@@ -801,8 +812,6 @@ const propDefaults: Record<string, () => unknown> = {
   searchText: () => "line",
   selected: () => writable({ label: "MQTT", value: "mqtt" }),
   selectedArrivedAtMs: () => now - 60000,
-  selectedDescriptor: () => "org.eclipse.tahu.protobuf.Payload",
-  selectedDescriptorIsMissing: () => false,
   selectedRetain: () => false,
   selectedTopic: () => "factory/line/temperature",
   selectedTopicStore: () => createMockSelectedTopicStore(),
@@ -837,20 +846,6 @@ const propDefaults: Record<string, () => unknown> = {
   triggerIconSize: () => 16,
   triggerText: () => "Actions",
   triggerVariant: () => "secondary",
-  treeItems: () => [
-    {
-      id: "/workspace/protos/sparkplug/spBv1.proto",
-      title: "spBv1.proto",
-      type: "file",
-      children: [
-        {
-          id: "org.eclipse.tahu.protobuf.Payload",
-          title: "org.eclipse.tahu.protobuf.Payload",
-          type: "descriptor",
-        },
-      ],
-    },
-  ],
   type: () => "settings",
   userProperties: () => [{ key: "source", value: "storybook" }],
   userPropertiesToCompare: () => ({ source: "previous", priority: "low" }),
@@ -894,7 +889,6 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   },
   Icon: { type: "settings", size: 24 },
   IconButton: { tooltipText: "Settings" },
-  LoadedProtoDetailsDialog: { open: writable(true) },
   PublishPanel: { isOpen: true, open: noop, close: noop },
   ConfirmDeleteDialog: {
     isOpen: writable(true),
@@ -943,6 +937,7 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
     kind: ["number", "text"],
     mqttVersion: ["3", "5"],
     placement: ["top", "right", "bottom", "left"],
+    protoDecode: ["ok", "failed"],
     resizeEdge: ["left", "right"],
     size: ["small", "medium"],
     sortDir: ["asc", "desc"],
