@@ -142,6 +142,13 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 }
 
 func (a *App) DeleteConnection(id uint) error {
+	// Durable history can run to millions of rows; sweep the bulk of it in
+	// short chunked deletes first so the transaction below never holds the
+	// write lock for the whole sweep. The in-transaction delete catches
+	// anything recorded since.
+	if err := a.deleteReceivedMessagesChunked(id); err != nil {
+		return err
+	}
 	err := a.Db.Transaction(func(tx *gorm.DB) error {
 		if res := tx.Where("connection_id = ?", id).Delete(&models.Subscription{}); res.Error != nil {
 			return res.Error
@@ -152,9 +159,17 @@ func (a *App) DeleteConnection(id uint) error {
 		if err := deleteCollectionsForConnection(tx, id); err != nil {
 			return err
 		}
+		if res := tx.Where("connection_id = ?", id).Delete(&models.FilterHistory{}); res.Error != nil {
+			return res.Error
+		}
+		if res := tx.Where("connection_id = ?", id).Delete(&models.PublishHistory{}); res.Error != nil {
+			return res.Error
+		}
 		if res := tx.Where("connection_id = ?", id).Delete(&models.ReceivedMessage{}); res.Error != nil {
 			return res.Error
 		}
+		// sys_metric_mappings has ON DELETE CASCADE; every other child table
+		// uses a NO ACTION foreign key and must be cleared above.
 		if res := tx.Delete(&models.Connection{}, id); res.Error != nil {
 			return res.Error
 		}
@@ -163,7 +178,12 @@ func (a *App) DeleteConnection(id uint) error {
 	if err != nil {
 		return err
 	}
+	// Release the pages freed by a potentially huge history delete (no-op
+	// unless auto_vacuum is INCREMENTAL).
+	a.Db.Exec("PRAGMA incremental_vacuum")
 	delete(a.AppConnections, id)
-	a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
+	if a.Mode != AppModes.Test {
+		a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
+	}
 	return nil
 }
