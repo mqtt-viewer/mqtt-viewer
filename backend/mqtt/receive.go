@@ -13,7 +13,7 @@ func (mm *MqttManager) receiveMessage(m *MqttMessage) error {
 	}
 
 	go func() {
-		mm.MessageHistory.addMessageToHistory(*m)
+		mm.MessageHistory.AddMessage(*m)
 		mm.MessageBuffer.addMessageToBuffer(*m)
 	}()
 

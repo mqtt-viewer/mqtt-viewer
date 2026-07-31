@@ -359,6 +359,18 @@ export async function GetSysMessageHistory(
   return [];
 }
 
+export async function GetSparkplugMessageHistory(
+  _connectionId: number
+): Promise<any[]> {
+  return [];
+}
+
+export async function PublishSparkplugRebirth(
+  _connectionId: number,
+  _group: string,
+  _edgeNode: string
+): Promise<void> {}
+
 export async function OpenBrokerStatusWindow(
   _connectionId: number
 ): Promise<void> {}

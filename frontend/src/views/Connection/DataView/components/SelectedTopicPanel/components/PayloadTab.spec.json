@@ -54,13 +54,29 @@
         "json-prettier",
         "xml"
       ]
+    },
+    {
+      "name": "sparkplugMeta",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders the decode banner when present."
+    },
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Needed for the unresolved banner's Request rebirth action."
     }
   ],
   "tokens": [
     "secondary",
     "secondary-text",
-    "outline"
+    "outline",
+    "divider",
+    "warning"
   ],
-  "dependencies": [],
+  "dependencies": ["SparkplugLogo", "Button"],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
 }

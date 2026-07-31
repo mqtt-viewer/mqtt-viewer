@@ -29,6 +29,11 @@ enforced by CI (`design-system.yml` runs `pnpm ds:validate` and
 Read the root `AGENTS.md` too. It carries the always-binding writing-style
 contract (`docs/WRITING_STYLE.md`) for anything a user reads.
 
+End-to-end verification IS possible from a browser: run the app in Wails
+server mode via `scripts/serve-browser.sh` (real Go backend, bindings work
+over HTTP). A plain `wails3 dev` Vite port renders but bindings fail. Full
+how-to and gotchas: AGENTS.md "Driving the app from a browser (agents)".
+
 ## Commands
 
 Backend (repo root):

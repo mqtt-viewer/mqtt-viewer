@@ -149,6 +149,180 @@ export const mockSparklinePoints = Array.from({ length: 30 }, (_, i) => ({
   v: 40 + i * 1.5 + Math.sin(i / 2) * 6,
 }));
 
+// --- Sparkplug tree fixtures --------------------------------------------------
+
+const spMetric = (
+  name: string,
+  typeName: string,
+  value: string,
+  ageMs: number,
+  over: Partial<import("@/views/Connection/DataView/components/MqttDataPanel/stores/sparkplug-tree-store").SparkplugMetric> = {}
+) => ({
+  name,
+  placeholder: false,
+  typeName,
+  value,
+  valueRaw: value,
+  lastSeenMs: now - ageMs,
+  payloadTsMs: now - ageMs,
+  stale: false,
+  ...over,
+});
+
+const mockSubstation7 = {
+  group: "EnergyCo",
+  name: "substation-7",
+  online: true,
+  bdSeq: 3,
+  seqOk: true,
+  metricCount: 4,
+  birthAtMs: now - 45 * 60_000,
+  lastSeenMs: now - 2000,
+  rebirthCount90s: 0,
+  hasBirth: true,
+  metrics: [
+    spMetric("Volts/L1", "Float", "239.9", 2000),
+    spMetric("Volts/L2", "Float", "240.1", 2000),
+    spMetric("Amps/L1", "Float", "13.2", 2000),
+    spMetric("Breaker/State", "Boolean", "true", 6 * 60_000, { stale: true }),
+  ],
+  devices: [
+    {
+      name: "meter-01",
+      online: true,
+      lastSeenMs: now - 1000,
+      metrics: [
+        spMetric("Energy/kWh", "Double", "48211.4", 1000),
+        spMetric("Energy/Demand", "Float", "3.2", 1000, {
+          isHistorical: true,
+        }),
+      ],
+    },
+  ],
+};
+
+export const mockSparkplugTreeState = {
+  hasSparkplug: true,
+  hosts: [
+    { hostId: "scada-primary", online: true, sinceMs: now - 45 * 60_000 },
+  ],
+  groups: [
+    {
+      name: "EnergyCo",
+      nodes: [
+        {
+          group: "EnergyCo",
+          name: "substation-4",
+          online: true,
+          bdSeq: 7,
+          seqOk: false,
+          lastSeqGap: { expected: 41, got: 44 },
+          metricCount: 1,
+          birthAtMs: now - 30 * 60_000,
+          lastSeenMs: now - 4000,
+          rebirthCount90s: 6,
+          hasBirth: true,
+          metrics: [spMetric("Feeder/Load", "Float", "82.4", 4000)],
+          devices: [],
+        },
+        mockSubstation7,
+        {
+          group: "EnergyCo",
+          name: "substation-9",
+          online: false,
+          bdSeq: 1,
+          seqOk: true,
+          metricCount: 2,
+          birthAtMs: now - 90 * 60_000,
+          lastSeenMs: now - 12 * 60_000,
+          deathAtMs: now - 12 * 60_000,
+          rebirthCount90s: 0,
+          hasBirth: true,
+          metrics: [
+            spMetric("Volts/L1", "Float", "238.2", 12 * 60_000),
+            spMetric("Temp/Cabinet", "Int32", "31", 12 * 60_000, {
+              isNull: true,
+              value: "null",
+              valueRaw: "null",
+            }),
+          ],
+          devices: [],
+        },
+      ],
+    },
+  ],
+  warnings: [
+    {
+      node: "substation-4",
+      text: "seq gap (expected 41, got 44)",
+      timeMs: now - 8 * 60_000,
+      kind: "seq-gap" as const,
+    },
+    {
+      node: "substation-4",
+      text: "6 rebirths in 90s, possible duplicate client id",
+      timeMs: now - 3 * 60_000,
+      kind: "rebirth-storm" as const,
+    },
+  ],
+  warningCount: 2,
+  nowMs: now,
+};
+
+export const mockSparkplugTreeStateEmpty = {
+  hasSparkplug: true,
+  hosts: [],
+  groups: [],
+  warnings: [],
+  warningCount: 0,
+  nowMs: now,
+};
+
+export const mockSparkplugTreeStateUnresolved = {
+  hasSparkplug: true,
+  hosts: [],
+  groups: [
+    {
+      name: "EnergyCo",
+      nodes: [
+        {
+          group: "EnergyCo",
+          name: "substation-2",
+          online: false,
+          seqOk: true,
+          metricCount: 2,
+          lastSeenMs: now - 3000,
+          rebirthCount90s: 0,
+          hasBirth: false,
+          metrics: [
+            spMetric("alias_3", "", "239.4", 3000, { placeholder: true }),
+            spMetric("alias_5", "", "12.9", 3000, { placeholder: true }),
+          ],
+          devices: [],
+        },
+      ],
+    },
+  ],
+  warnings: [],
+  warningCount: 0,
+  nowMs: now,
+};
+
+export const mockSparkplugTreeStateHostOffline = {
+  ...mockSparkplugTreeState,
+  hosts: [
+    { hostId: "scada-primary", online: false, sinceMs: now - 5 * 60_000 },
+  ],
+};
+
+export const mockSparkplugNodeRow = {
+  kind: "node" as const,
+  key: "EnergyCo/substation-7",
+  levelCount: 1,
+  isExpanded: true,
+  node: mockSubstation7,
+};
+
 // --- Broker Status window fixtures -----------------------------------------
 // A mock BrokerStatusStore (a writable with the BrokerStatusState shape plus
 // no-op lifecycle/reload methods) so BrokerStatusView stories can render rich
@@ -907,6 +1081,20 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   SearchMessagesModal: { isOpen: writable(true) },
   Sidebar: { isOpen: true, open: noop, close: noop },
   Sparkline: { points: mockSparklinePoints, height: 28 },
+  SparkplugPanel: {
+    treeState: mockSparkplugTreeState,
+    width: 680,
+    filter: "",
+    onRequestRebirth: noop,
+    onCopyMetricList: noop,
+  },
+  SparkplugRow: {
+    row: mockSparkplugNodeRow,
+    nowMs: now,
+    onToggleExpansion: noop,
+    onRequestRebirth: noop,
+    onCopyMetricList: noop,
+  },
   StatTile: {
     label: "Msgs/s in",
     value: "1.2k",

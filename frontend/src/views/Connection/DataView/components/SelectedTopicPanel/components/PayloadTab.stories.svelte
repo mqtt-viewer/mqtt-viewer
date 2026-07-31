@@ -14,6 +14,24 @@
   const TINY_PNG =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
+  // Backend-enriched Sparkplug NDATA payloads (names injected / alias-only).
+  const SPARKPLUG_PAYLOAD = JSON.stringify({
+    timestamp: "1752701530000",
+    metrics: [
+      { name: "Volts/L1", alias: "3", doubleValue: 239.9, timestamp: "1752701530000" },
+      { name: "Amps/L1", alias: "5", doubleValue: 13.2, timestamp: "1752701530000" },
+    ],
+    seq: "42",
+  });
+  const SPARKPLUG_UNRESOLVED_PAYLOAD = JSON.stringify({
+    timestamp: "1752701530000",
+    metrics: [
+      { alias: "3", doubleValue: 239.9, timestamp: "1752701530000" },
+      { alias: "5", doubleValue: 13.2, timestamp: "1752701530000" },
+    ],
+    seq: "42",
+  });
+
   const { Story } = defineMeta({
     title: "Views/Connection/DataView/SelectedTopicPanel/PayloadTab",
     component: Component,
@@ -53,6 +71,65 @@
     format: "none",
     chartSeriesStore: createChartSeriesStore([]),
     showFieldPicker: true,
+  }}
+  {template}
+/>
+
+<!-- Sparkplug decode banners (stateful Sparkplug feature). -->
+<Story
+  name="Sparkplug resolved"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: SPARKPLUG_PAYLOAD,
+    payloadB64: null,
+    format: "json-prettier",
+    connectionId: 1,
+    sparkplugMeta: {
+      msgType: "NDATA",
+      group: "EnergyCo",
+      edgeNode: "substation-7",
+      resolution: "resolved",
+      birthAtMs: Date.now() - 45 * 60_000,
+    },
+  }}
+  {template}
+/>
+
+<Story
+  name="Sparkplug unresolved"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: SPARKPLUG_UNRESOLVED_PAYLOAD,
+    payloadB64: null,
+    format: "json-prettier",
+    connectionId: 1,
+    sparkplugMeta: {
+      msgType: "NDATA",
+      group: "EnergyCo",
+      edgeNode: "substation-2",
+      resolution: "unresolved",
+    },
+  }}
+  {template}
+/>
+
+<Story
+  name="Sparkplug birth"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: SPARKPLUG_PAYLOAD,
+    payloadB64: null,
+    format: "json-prettier",
+    connectionId: 1,
+    sparkplugMeta: {
+      msgType: "NBIRTH",
+      group: "EnergyCo",
+      edgeNode: "substation-7",
+      bdSeq: 3,
+    },
   }}
   {template}
 />

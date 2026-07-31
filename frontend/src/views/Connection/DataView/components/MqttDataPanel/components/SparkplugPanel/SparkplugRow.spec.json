@@ -1,0 +1,59 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "SparkplugRow",
+  "tier": "view",
+  "description": "One virtualized Sparkplug tree row: group, edge node (with health meta and hover actions), device, or metric (type/value/last-seen/badges).",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "row",
+      "type": "object",
+      "required": true,
+      "description": "SparkplugTreeRow from build-sparkplug-tree (kind: group | node | device | metric)."
+    },
+    {
+      "name": "nowMs",
+      "type": "number",
+      "required": true,
+      "description": "Reference now for relative ages (from the store snapshot)."
+    },
+    {
+      "name": "onToggleExpansion",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onRequestRebirth",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onCopyMetricList",
+      "type": "function",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary-text",
+    "white-text",
+    "success",
+    "error",
+    "warning",
+    "hovered"
+  ],
+  "dependencies": [
+    "Button",
+    "Icon",
+    "DropdownMenu",
+    "DropdownMenuItem",
+    "DropdownCloseOnClick"
+  ],
+  "notes": "Figma is not linked yet; stories use local fixtures. Node actions are hover-revealed (same affordance as MqttTopicRow's broker-status button)."
+}

@@ -14,6 +14,7 @@ import (
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/backend/paths"
 	"mqtt-viewer/backend/protobuf"
+	"mqtt-viewer/backend/sparkplug"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
 
@@ -177,10 +178,11 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	mqttManager.SetMessageMemoryBudget(a.memoryBudgetBytes())
 
 	appConnection := AppConnection{
-		ctx:          &withName,
-		ConnectionId: conn.ID,
-		MqttManager:  mqttManager,
-		EventSet:     &connEvents,
+		ctx:            &withName,
+		ConnectionId:   conn.ID,
+		MqttManager:    mqttManager,
+		EventSet:       &connEvents,
+		SparkplugStore: sparkplug.NewSessionStore(),
 	}
 
 	mqttManager.SetConnectionCallbacks(
@@ -214,6 +216,9 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 			},
 			OnConnectionDown: func(reason *error) {
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
+				// Sparkplug aliases are only valid for the life of the MQTT
+				// session — drop them so a reconnect starts clean.
+				appConnection.SparkplugStore.Reset()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("connection down: %v", (*reason).Error()))
 					if a.Mode != AppModes.Test {
@@ -227,6 +232,12 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnReconnecting: func(reason *error) {
+				// A transient drop still ends the MQTT session, so the old
+				// aliases and seq counters are dead. Reset here rather than on
+				// reconnect: the link is already down, so no receive goroutine
+				// can race this, whereas resetting on connection up would race
+				// the retained births that arrive straight after resubscribe.
+				appConnection.SparkplugStore.Reset()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("starting reconnect due to: %v", (*reason).Error()))
 					if a.Mode != AppModes.Test {
