@@ -2,9 +2,9 @@
 
 Cross-platform desktop MQTT client: Go backend + Svelte 5 frontend in a
 Wails v3 shell (pinned to `v3.0.0-alpha.98-tui` in go.mod; keep the CLI
-and module aligned when bumping). One developer runs this product end to
-end; agents working here are expected to carry design, engineering, and
-release work, not just patches.
+and module aligned when bumping, see "The wails3 CLI" below). One
+developer runs this product end to end; agents working here are expected
+to carry design, engineering, and release work, not just patches.
 
 ## Repo map
 
@@ -36,27 +36,62 @@ Backend (repo root):
 ```sh
 just dev                 # wails3 dev: run the app with hot reload
 just test                # go test ./... via tparse
+just stub-dist           # create the embedded frontend/dist stub
 just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
 
-On a fresh checkout or new worktree, `go build ./...` fails with
-`pattern all:frontend/dist: no matching files found`: main.go embeds the
-frontend build, which does not exist yet (`frontend/dist` is gitignored
-and vite empties it on every build, so a committed placeholder would not
-survive). Stub it once before building Go code:
+`just test` runs `stub-dist` first, so it works on a fresh tree. For a
+bare `go build ./...` or `go vet ./...`, run the stub once yourself:
 
 ```sh
-mkdir -p frontend/dist && [ -f frontend/dist/index.html ] || echo "<html></html>" > frontend/dist/index.html
+just stub-dist
 ```
 
-(the same stub `build/Taskfile.yml`'s `generate:bindings` task creates),
-or run a real `pnpm build` from `frontend/`.
+Without it those commands fail with `pattern all:frontend/dist: no
+matching files found`. main.go embeds the frontend build, which does not
+exist yet on a fresh checkout or new worktree (`frontend/dist` is
+gitignored and vite empties it on every build, so a committed
+placeholder would not survive). The recipe mirrors the stub
+`build/Taskfile.yml`'s `generate:bindings` task creates. A real
+`pnpm build` from `frontend/` satisfies the embed too.
 
 Dev-server ports are derived per checkout so parallel agent worktrees
 never collide. Once per checkout, run `scripts/dev-ports.sh write-launch`
 to generate `.claude/launch.json` (gitignored). See
 `docs/MULTI_AGENT_DEV.md`.
+
+### The wails3 CLI
+
+The binding generator ships in the CLI, not the module, so a CLI built
+from a different tag than the `go.mod` pin rewrites every file under
+`frontend/bindings/` on the next generate. Install the matching one:
+
+```sh
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98-tui
+```
+
+Two traps when checking alignment:
+
+- `wails3 version` prints `v3.0.0-alpha.98`, with no `-tui` suffix,
+  because the fork tag never bumped `internal/version/version.txt`.
+  That output on its own is not evidence of a mismatch. Read the build
+  metadata instead, which should name the pinned tag:
+
+  ```sh
+  go version -m "$(which wails3)" | grep -E '^\s+mod\s'
+  ```
+
+- The `-tui` tag has since been deleted from `github.com/wailsapp/wails`,
+  so cloning the repo and checking the tag out fails. `go install` still
+  works, because `proxy.golang.org` serves deleted tags permanently.
+
+To prove alignment, wipe the bindings and regenerate. A clean tree means
+the CLI reproduces the committed output byte for byte:
+
+```sh
+rm -rf frontend/bindings && wails3 task common:generate:bindings && git status --porcelain
+```
 
 Frontend (from `frontend/`, pnpm version pinned in package.json):
 

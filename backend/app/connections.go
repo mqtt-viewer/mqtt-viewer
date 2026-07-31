@@ -29,7 +29,7 @@ func (a *App) GetAllConnections() Connections {
 	for id, appConn := range a.AppConnections {
 		connectionDetails := models.Connection{}
 		if res := a.Db.First(&connectionDetails, id); res.Error != nil {
-			slog.Error("Failed to get connection details", "error", res.Error)
+			slog.Error("failed to load connection details, skipping connection", "conn_id", id, "error", res.Error)
 			continue
 		}
 		result[id] = Connection{
