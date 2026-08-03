@@ -9,7 +9,6 @@
   import {
     GetAppSettings,
     UpdateAppSettings,
-    GetMemoryStats,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
   import {
@@ -25,23 +24,14 @@
   let memoryBudgetMb = 512;
   let recordingEnabled = false;
   let diskBudgetGb = 1;
-  let activeConnections = 1;
   let isSaving = false;
 
   const recordingChecked = writable(false);
 
-  $: memoryBelowMin =
-    memoryBudgetMb !== undefined && memoryBudgetMb < MIN_MEMORY_MB;
-  $: shownConnections = Math.max(1, activeConnections);
+  // A cleared Svelte number input binds null, which is also invalid.
+  $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
 
   onMount(async () => {
-    try {
-      const stats = await GetMemoryStats();
-      activeConnections = stats.activeConnections;
-    } catch (e) {
-      console.error("Failed to read memory stats", e);
-      activeConnections = 1;
-    }
     try {
       const settings = await GetAppSettings();
       if (!settings.hasSeenHistoryPrompt) {
@@ -125,23 +115,16 @@
           name="prompt-memory-budget"
           label="Memory budget (MB)"
           min={MIN_MEMORY_MB}
-          class={memoryBelowMin ? "mb-[17px]" : ""}
+          class="mb-[17px]"
           hasError={memoryBelowMin}
           errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
         <p class="text-sm text-secondary-text">
-          Caps the message history I keep in memory for each connection. The
-          newest message per topic is kept outside the cap so the topic tree
-          always has a value.
-        </p>
-        <p class="text-sm text-secondary-text">
-          Expect about {formatBytes(
-            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, activeConnections)
-          )} in total with {shownConnections} connection{shownConnections === 1
-            ? ""
-            : "s"} active. That's this budget for each connection plus around
-          300 MB for the interface and runtime.
+          Expect up to about {formatBytes(
+            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, 1)
+          )} in total with one connection. That's this budget for each
+          connection plus around 300 MB for the interface and runtime.
         </p>
       </div>
 
@@ -170,7 +153,11 @@
       <Button variant="text" disabled={isSaving} on:click={onNotNow}
         >Not now</Button
       >
-      <Button variant="primary" disabled={isSaving} on:click={onSave}>
+      <Button
+        variant="primary"
+        disabled={isSaving || memoryBelowMin}
+        on:click={onSave}
+      >
         {isSaving ? "Saving…" : "Save"}
       </Button>
     </div>
