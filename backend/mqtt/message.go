@@ -18,6 +18,11 @@ type MqttMessage struct {
 	TimeMs               int64              `json:"timeMs"`
 	MiddlewareProperties *map[string]any    `json:"middlewareProperties,omitempty"`
 	Time                 time.Time
+
+	// evictedFromRecent marks a message that has been evicted from the history's
+	// recent window but is still pinned by the latest-per-topic map. Unexported
+	// so it never serialises; only read/written under the history mutex.
+	evictedFromRecent bool
 }
 
 // estimatedBytes approximates the heap cost of retaining this message, used to
@@ -25,8 +30,7 @@ type MqttMessage struct {
 // just proportional and dominated by the variable parts (payload, topic,
 // properties) so eviction tracks real memory growth.
 func (m *MqttMessage) estimatedBytes() int {
-	// Fixed per-message overhead: struct fields, id/uuid, time.Time, and the
-	// always-allocated property/middleware map headers for v5 messages.
+	// Fixed per-message overhead: struct fields, id/uuid and time.Time.
 	const baseOverhead = 256
 	n := baseOverhead + len(m.Topic) + len(m.Payload) + len(m.Id)
 	if m.Properties != nil {
