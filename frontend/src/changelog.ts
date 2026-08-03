@@ -169,6 +169,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Deleting a connection works again",
         body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
       },
+      {
+        title: "Clearer memory settings",
+        body: "The settings dialog now shows how much memory history is using and estimates the app's total use from your budget.",
+      },
     ],
   },
   {
