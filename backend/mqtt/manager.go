@@ -60,6 +60,12 @@ func (m *MqttManager) ClearConnectionHistory() {
 	m.MessageHistory.Clear()
 }
 
+// HistoryBytes returns the estimated bytes of in-RAM message history this
+// connection currently holds.
+func (m *MqttManager) HistoryBytes() int64 {
+	return m.MessageHistory.TotalBytes()
+}
+
 // SetMessageMemoryBudget bounds the in-RAM message history for this connection.
 func (m *MqttManager) SetMessageMemoryBudget(budgetBytes int64) {
 	m.MessageHistory.SetBudgetBytes(budgetBytes)
