@@ -47,6 +47,11 @@ the memory budget:
 
 - **Latest-per-topic** map kept always (tiny, bounded by topic count) — feeds
   the live tree (already how the frontend works).
+
+  Correction (measured, 2026-08): this map is not counted against the budget
+  and costs roughly 430 B of heap per distinct topic, so very high topic
+  cardinality grows memory beyond the cap. A bound for this cache is future
+  work.
 - **Recent ring** of full `MqttMessage`s, evicting **oldest globally** when the
   estimated retained bytes exceed the memory budget. Byte estimate =
   Σ(payload len + topic len + fixed per-message overhead). Maintain a running
