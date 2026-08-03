@@ -50,6 +50,14 @@ func (m *MessageHistory) SetBudgetBytes(budget int64) {
 	m.evictLocked()
 }
 
+// TotalBytes returns the estimated bytes of message history currently held
+// in memory.
+func (m *MessageHistory) TotalBytes() int64 {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.totalBytes
+}
+
 // Clear empties the store but preserves the configured budget.
 func (m *MessageHistory) Clear() {
 	m.mutex.Lock()
