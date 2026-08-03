@@ -28,6 +28,10 @@ type MessageHistory struct {
 	latest      map[string]*MqttMessage
 	totalBytes  int64
 	budgetBytes int64
+	// latestExtraBytes tracks the bytes of newest-per-topic messages that have
+	// been evicted from the recent window but are still pinned by the latest
+	// map. Counted in TotalBytes only; never part of budget eviction.
+	latestExtraBytes int64
 }
 
 func newMessageHistory() *MessageHistory {
@@ -51,11 +55,13 @@ func (m *MessageHistory) SetBudgetBytes(budget int64) {
 }
 
 // TotalBytes returns the estimated bytes of message history currently held
-// in memory.
+// in memory. Budget eviction still uses recent-slice bytes only (totalBytes);
+// latestExtraBytes is the newest-per-topic messages retained after eviction,
+// added here so the readout reflects what is genuinely held.
 func (m *MessageHistory) TotalBytes() int64 {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	return m.totalBytes
+	return m.totalBytes + m.latestExtraBytes
 }
 
 // Clear empties the store but preserves the configured budget.
@@ -66,6 +72,7 @@ func (m *MessageHistory) Clear() {
 	m.head = 0
 	m.latest = make(map[string]*MqttMessage)
 	m.totalBytes = 0
+	m.latestExtraBytes = 0
 }
 
 func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
@@ -73,6 +80,11 @@ func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	p := &msg
+	if prev, ok := m.latest[p.Topic]; ok && prev.evictedFromRecent {
+		// The previous latest was pinned outside the recent window; it is now
+		// released, so stop counting it.
+		m.latestExtraBytes -= int64(prev.estimatedBytes())
+	}
 	m.latest[p.Topic] = p
 	m.recent = append(m.recent, p)
 	m.totalBytes += int64(p.estimatedBytes())
@@ -86,6 +98,12 @@ func (m *MessageHistory) evictLocked() {
 		m.recent[m.head] = nil // release for GC
 		m.head++
 		m.totalBytes -= int64(old.estimatedBytes())
+		if m.latest[old.Topic] == old {
+			// Still the newest message for its topic, so the latest map pins it
+			// in memory; count it towards the readout.
+			old.evictedFromRecent = true
+			m.latestExtraBytes += int64(old.estimatedBytes())
+		}
 	}
 	// Compact the backing array once head has consumed half of it, so the
 	// dead prefix is reclaimed rather than growing unbounded.

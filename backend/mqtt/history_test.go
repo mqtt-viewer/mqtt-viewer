@@ -172,6 +172,40 @@ func TestHistoryClearPreservesBudget(t *testing.T) {
 	}
 }
 
+func TestHistoryTotalBytesCountsPinnedLatest(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("topic/00", 1024))
+	// Budget for ~3 messages, then one message on each of many distinct topics
+	// so most age out of the recent window but stay pinned in the latest map.
+	h.SetBudgetBytes(int64(perMsg * 3))
+	const topics = 20
+	for i := 0; i < topics; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("topic/%02d", i), 1024))
+	}
+
+	if h.TotalBytes() <= h.budgetBytes {
+		t.Errorf("expected TotalBytes %d to exceed budget %d (pinned latest messages counted)", h.TotalBytes(), h.budgetBytes)
+	}
+
+	// Republishing to topics whose latest was evicted-and-pinned must not grow
+	// latestExtraBytes unboundedly: each replacement decrements the old pin, so
+	// the extra term stays bounded by topic cardinality.
+	for i := 0; i < 100; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("topic/%02d", i%topics), 1024))
+	}
+	if max := int64(topics * perMsg); h.latestExtraBytes > max {
+		t.Errorf("latestExtraBytes %d exceeds topic-cardinality bound %d", h.latestExtraBytes, max)
+	}
+	if h.latestExtraBytes < 0 {
+		t.Errorf("latestExtraBytes went negative: %d", h.latestExtraBytes)
+	}
+
+	h.Clear()
+	if h.TotalBytes() != 0 {
+		t.Errorf("expected TotalBytes 0 after clear, got %d", h.TotalBytes())
+	}
+}
+
 func TestHistoryUnknownTopic(t *testing.T) {
 	h := newMessageHistory()
 	if _, err := h.GetTopicHistory("nope"); err == nil {
