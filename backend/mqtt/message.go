@@ -18,11 +18,6 @@ type MqttMessage struct {
 	TimeMs               int64              `json:"timeMs"`
 	MiddlewareProperties *map[string]any    `json:"middlewareProperties,omitempty"`
 	Time                 time.Time
-
-	// evictedFromRecent marks a message that has been evicted from the history's
-	// recent window but is still pinned by the latest-per-topic map. Unexported
-	// so it never serialises; only read/written under the history mutex.
-	evictedFromRecent bool
 }
 
 // estimatedBytes approximates the heap cost of retaining this message, used to

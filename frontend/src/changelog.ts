@@ -173,6 +173,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Clearer memory settings",
         body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
       },
+      {
+        title: "The memory budget now covers every topic",
+        body: "On brokers with hundreds of thousands of topics, the last value I keep for each topic sat outside your memory budget, so memory kept growing however low you set it. It is now counted, and if it ever gets large I trim the topics you have heard from least recently. Normal brokers are nowhere near that, so the topic tree is unchanged.",
+      },
     ],
   },
   {
