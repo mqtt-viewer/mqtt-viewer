@@ -187,9 +187,9 @@
           bind:value={memoryBudgetMb}
         />
         <p class="text-sm text-secondary-text">
-          Caps the message history I keep in memory for each connection. The
-          newest message per topic is kept outside the cap so the topic tree
-          always has a value.
+          Caps the message history I keep in memory for each connection,
+          including the newest message per topic. On brokers with very many
+          topics, quiet ones lose their kept value first.
         </p>
         <p class="text-sm text-secondary-text">
           Expect up to about {formatBytes(

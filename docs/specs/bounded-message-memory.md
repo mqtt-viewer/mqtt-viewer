@@ -48,11 +48,20 @@ the memory budget:
 - **Latest-per-topic** map kept always (tiny, bounded by topic count) — feeds
   the live tree (already how the frontend works).
 
-  Correction (measured, 2026-08): this map is not counted against the budget
+  Correction (measured, 2026-08): this map was not counted against the budget
   and retains each topic's newest message in full, payload included, after it
-  ages out of the recent window, so very high topic cardinality grows memory
+  ages out of the recent window, so very high topic cardinality grew memory
   beyond the cap. The roughly 430 B of heap per distinct topic measured here
-  was with ~200 B payloads. A bound for this cache is future work.
+  was with ~200 B payloads; at 200k topics real heap reached 5x a 16 MB budget.
+
+  Bounded (2026-08): messages held only by this map are charged to the budget
+  and capped at a quarter of it (`latestBudgetShare`), with a 1 MB floor that
+  only matters for test-sized budgets. They are evicted least-recently-updated
+  first, tracked by a FIFO of pinned messages that is compacted on the same
+  half-consumed rule as the recent window. A topic whose pinned value is
+  dropped leaves the map, so `GetTopicHistory` errors for it until it publishes
+  again; the timeline treats that as empty. Total retained bytes are now
+  strictly within the budget.
 - **Recent ring** of full `MqttMessage`s, evicting **oldest globally** when the
   estimated retained bytes exceed the memory budget. Byte estimate =
   Σ(payload len + topic len + fixed per-message overhead). Maintain a running

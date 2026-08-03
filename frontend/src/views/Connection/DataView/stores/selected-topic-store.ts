@@ -191,7 +191,10 @@ export const createSelectedTopicStore = (
     }
 
     // Memory mode: the in-RAM history is already bounded by the memory budget.
-    const history = await GetMessageHistory(connectionId, topic);
+    // It rejects with "topic not found in message history" when the topic's
+    // messages have aged out and its pinned latest value was dropped too (the
+    // newest-per-topic cache is capped); an empty timeline is the right answer.
+    const history = await GetMessageHistory(connectionId, topic).catch(() => []);
     const decoded = history.map(decode);
     update((store) => ({
       ...store,
