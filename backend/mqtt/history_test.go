@@ -183,8 +183,11 @@ func TestHistoryTotalBytesCountsPinnedLatest(t *testing.T) {
 		h.addMessageToHistory(msg(fmt.Sprintf("topic/%02d", i), 1024))
 	}
 
-	if h.TotalBytes() <= h.budgetBytes {
-		t.Errorf("expected TotalBytes %d to exceed budget %d (pinned latest messages counted)", h.TotalBytes(), h.budgetBytes)
+	if h.latestExtraBytes == 0 {
+		t.Error("expected some latest messages pinned outside the recent window")
+	}
+	if h.TotalBytes() > h.budgetBytes {
+		t.Errorf("TotalBytes %d exceeds budget %d (pinned latest messages are charged to it)", h.TotalBytes(), h.budgetBytes)
 	}
 
 	// Republishing to topics whose latest was evicted-and-pinned must not grow
@@ -203,6 +206,93 @@ func TestHistoryTotalBytesCountsPinnedLatest(t *testing.T) {
 	h.Clear()
 	if h.TotalBytes() != 0 {
 		t.Errorf("expected TotalBytes 0 after clear, got %d", h.TotalBytes())
+	}
+}
+
+// The newest-per-topic cache used to sit outside the budget entirely, so high
+// topic cardinality grew memory without limit. It is now capped at a share of
+// the budget, and the whole store stays within the budget.
+func TestHistoryLatestCacheBoundedByBudget(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := int64(estBytes(msg("topic/000000", 1024)))
+	budget := perMsg * 200
+	h.SetBudgetBytes(budget)
+
+	// One message on each of many more distinct topics than the budget can hold.
+	const topics = 20000
+	for i := 0; i < topics; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("topic/%06d", i), 1024))
+	}
+
+	if h.TotalBytes() > budget {
+		t.Errorf("TotalBytes %d exceeds budget %d at %d topics", h.TotalBytes(), budget, topics)
+	}
+	if limit := h.latestBudgetLocked(); h.latestExtraBytes > limit {
+		t.Errorf("pinned latest bytes %d exceed the cache limit %d", h.latestExtraBytes, limit)
+	}
+	if len(h.latest) >= topics {
+		t.Errorf("expected the latest map to drop topics, holding %d of %d", len(h.latest), topics)
+	}
+	if len(h.latest) == 0 {
+		t.Error("expected the latest map to keep the most recently updated topics")
+	}
+	// Least recently updated topics go first, so the newest ones survive.
+	if _, err := h.GetTopicHistory(fmt.Sprintf("topic/%06d", topics-1)); err != nil {
+		t.Errorf("expected the newest topic to be retained: %v", err)
+	}
+	if _, err := h.GetTopicHistory("topic/000000"); err == nil {
+		t.Error("expected the oldest topic to have been dropped from the latest cache")
+	}
+}
+
+// Lowering the budget must trim a cache that was legal under the old one.
+func TestHistoryLatestCacheTrimsOnBudgetReduction(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := int64(estBytes(msg("topic/0000", 1024)))
+	h.SetBudgetBytes(perMsg * 400)
+	for i := 0; i < 2000; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("topic/%04d", i), 1024))
+	}
+	before := h.latestExtraBytes
+
+	h.SetBudgetBytes(perMsg * 20)
+	if h.TotalBytes() > h.budgetBytes {
+		t.Errorf("TotalBytes %d exceeds reduced budget %d", h.TotalBytes(), h.budgetBytes)
+	}
+	if h.latestExtraBytes >= before {
+		t.Errorf("expected the pinned cache to shrink with the budget: %d -> %d", before, h.latestExtraBytes)
+	}
+}
+
+// Republishing to pinned topics leaves stale queue entries behind; they must be
+// compacted away rather than growing with message volume.
+func TestHistoryPinnedQueueDoesNotGrowWithVolume(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := int64(estBytes(msg("topic/000", 1024)))
+	h.SetBudgetBytes(perMsg * 100)
+
+	const topics = 200
+	for i := 0; i < 200000; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("topic/%03d", i%topics), 1024))
+	}
+
+	if len(h.pinned) > 8*topics {
+		t.Errorf("pinned queue grew with message volume: len=%d for %d topics", len(h.pinned), topics)
+	}
+	if h.pinnedLive < 0 {
+		t.Errorf("pinnedLive went negative: %d", h.pinnedLive)
+	}
+	live := 0
+	for _, p := range h.pinned[h.pinnedHead:] {
+		if h.latest[p.Topic] == p && p.evictedFromRecent {
+			live++
+		}
+	}
+	if live != h.pinnedLive {
+		t.Errorf("pinnedLive %d does not match %d live queue entries", h.pinnedLive, live)
+	}
+	if h.TotalBytes() > h.budgetBytes {
+		t.Errorf("TotalBytes %d exceeds budget %d", h.TotalBytes(), h.budgetBytes)
 	}
 }
 
