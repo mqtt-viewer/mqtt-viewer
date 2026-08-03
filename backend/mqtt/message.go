@@ -30,6 +30,10 @@ func (m *MqttMessage) estimatedBytes() int {
 	const baseOverhead = 256
 	n := baseOverhead + len(m.Topic) + len(m.Payload) + len(m.Id)
 	if m.Properties != nil {
+		// v5 always allocates the properties struct plus the UserProperties and
+		// MiddlewareProperties maps, measured at ~450 B beyond the counted strings.
+		const v5Overhead = 448
+		n += v5Overhead
 		n += len(m.Properties.CorrelationData) +
 			len(m.Properties.ContentType) +
 			len(m.Properties.ResponseTopic)
