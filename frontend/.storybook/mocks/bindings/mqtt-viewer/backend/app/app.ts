@@ -425,6 +425,13 @@ export async function GetReceivedMessageCount(
   return mockMqttMessages.length;
 }
 
+export async function GetMemoryStats(): Promise<app.MemoryStats> {
+  return new app.MemoryStats({
+    historyBytes: 34 * 1024 * 1024,
+    activeConnections: 1,
+  });
+}
+
 export async function GetMqttStats(): Promise<app.MqttStats> {
   return new app.MqttStats({
     totalMessagesReceived: 128,
