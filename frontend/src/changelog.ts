@@ -171,7 +171,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Clearer memory settings",
-        body: "The settings dialog now shows how much memory history is using and estimates the app's total use from your budget.",
+        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
       },
     ],
   },

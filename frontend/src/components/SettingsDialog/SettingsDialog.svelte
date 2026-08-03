@@ -105,8 +105,8 @@
     stopMemoryPolling();
   }
 
-  $: memoryBelowMin =
-    memoryBudgetMb !== undefined && memoryBudgetMb < MIN_MEMORY_MB;
+  // A cleared Svelte number input binds null, which is also invalid.
+  $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
   $: shownConnections = Math.max(1, activeConnections);
 
   const onRecordingChange = (checked: boolean) => {
@@ -181,7 +181,7 @@
           name="memory-budget"
           label="Memory budget (MB)"
           min={MIN_MEMORY_MB}
-          class={memoryBelowMin ? "mb-[17px]" : ""}
+          class="mb-[17px]"
           hasError={memoryBelowMin}
           errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
@@ -192,12 +192,12 @@
           always has a value.
         </p>
         <p class="text-sm text-secondary-text">
-          Expect about {formatBytes(
+          Expect up to about {formatBytes(
             estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, activeConnections)
-          )} in total with {shownConnections} connection{shownConnections === 1
+          )} in total across {shownConnections} connection{shownConnections === 1
             ? ""
-            : "s"} active. That's this budget for each connection plus around
-          300 MB for the interface and runtime.
+            : "s"}. That's this budget for each connection plus around 300 MB
+          for the interface and runtime.
         </p>
       </div>
 
@@ -258,7 +258,11 @@
 
     <div class="flex gap-3 justify-end items-center">
       <Button variant="text" on:click={() => open.set(false)}>Cancel</Button>
-      <Button variant="primary" disabled={isSaving} on:click={onSave}>
+      <Button
+        variant="primary"
+        disabled={isSaving || memoryBelowMin}
+        on:click={onSave}
+      >
         {isSaving ? "Saving…" : "Save"}
       </Button>
     </div>
