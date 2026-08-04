@@ -15,7 +15,7 @@ func (mm *MqttManager) receiveMessage(m *MqttMessage) error {
 	mm.MessageHistory.addMessageToHistory(*m)
 	mm.MessageBuffer.addMessageToBuffer(*m)
 
-	mm.stats.ReceiveMessageToStats(*m)
+	mm.stats.receiveMessageToStats(*m)
 	err = handleReceiveMiddleware(m, mm.middleware.AfterAddToHistory)
 	if err != nil {
 		return fmt.Errorf("after add to history: %w", err)

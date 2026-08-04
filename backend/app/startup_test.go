@@ -103,8 +103,8 @@ func TestGetSeededTestApp(t *testing.T) {
 	if app == nil {
 		t.Errorf("Expected app, got nil")
 	}
-	if len(app.AppConnections) != 5 {
-		t.Errorf("Expected 5 connections, got %v", len(app.AppConnections))
+	if app.appConnectionCount() != 5 {
+		t.Errorf("Expected 5 connections, got %v", app.appConnectionCount())
 	}
 }
 
@@ -122,7 +122,7 @@ func TestGetSavedConnectionsReturnsAllConnections(t *testing.T) {
 
 func TestAppConnectionIdMapIsBuiltCorrectly(t *testing.T) {
 	app := getSeededTestApp(t)
-	for id, conn := range app.AppConnections {
+	for id, conn := range app.appConnectionsSnapshot() {
 		if conn.ConnectionId != uint(id) {
 			t.Errorf("Expected connection id %v, got %v", id+1, conn.ConnectionId)
 		}

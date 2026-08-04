@@ -169,6 +169,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Deleting a connection works again",
         body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
       },
+      {
+        title: "Steadier message counts, and a crash that can no longer happen",
+        body: "The received and sent counters dropped messages on a busy broker because several arriving at once could overwrite each other's tally. They now count every message, and adding or removing a connection while those numbers are on screen can no longer bring the app down.",
+      },
     ],
   },
   {
