@@ -3,8 +3,11 @@ package mqtt
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestConnectV3(t *testing.T) {
@@ -17,6 +20,7 @@ func TestConnectV5(t *testing.T) {
 
 func testConnect(t *testing.T, mqttVersion string) {
 	m := getTestMqttManager(t)
+	topic := testTopic(t)
 	hasConnecting := false
 	hasConnected := false
 	connectionCallbacks := MqttConnectionCallbacks{
@@ -37,7 +41,7 @@ func testConnect(t *testing.T, mqttVersion string) {
 	}
 	err := m.Connect(connDetails, []SubscribeParams{
 		{
-			Topic: t.Name(),
+			Topic: topic,
 			QoS:   0,
 		},
 	})
@@ -58,6 +62,7 @@ func TestV3ConnectWs(t *testing.T) {
 
 func testConnectWithWs(t *testing.T, mqttVersion string) {
 	m := getTestMqttManager(t)
+	topic := testTopic(t)
 	connDetails := MqttConnectionDetails{
 		Host:        "localhost",
 		Port:        9001,
@@ -66,7 +71,7 @@ func testConnectWithWs(t *testing.T, mqttVersion string) {
 	}
 	err := m.Connect(connDetails, []SubscribeParams{
 		{
-			Topic: t.Name(),
+			Topic: topic,
 			QoS:   0,
 		},
 	})
@@ -85,6 +90,7 @@ func TestV5PubSub(t *testing.T) {
 
 func testPubSub(t *testing.T, mqttVersion string) {
 	m := getTestMqttManager(t)
+	topic := testTopic(t)
 	connDetails := MqttConnectionDetails{
 		Host:        "localhost",
 		Port:        1883,
@@ -93,7 +99,7 @@ func testPubSub(t *testing.T, mqttVersion string) {
 	}
 	err := m.Connect(connDetails, []SubscribeParams{
 		{
-			Topic: t.Name(),
+			Topic: topic,
 			QoS:   0,
 		},
 	})
@@ -102,7 +108,7 @@ func testPubSub(t *testing.T, mqttVersion string) {
 	}
 
 	publishParams := MqttPublishParams{
-		Topic:   t.Name(),
+		Topic:   topic,
 		Payload: []byte("test"),
 		QoS:     0,
 		Retain:  false,
@@ -113,7 +119,7 @@ func testPubSub(t *testing.T, mqttVersion string) {
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	history, err := m.MessageHistory.GetTopicHistory(t.Name())
+	history, err := m.MessageHistory.GetTopicHistory(topic)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -125,6 +131,14 @@ func testPubSub(t *testing.T, mqttVersion string) {
 			t.Errorf("Expected 1 message in buffer, got %v", len(buffer))
 		}
 	})
+}
+
+// testTopic gives each run its own topic. The test broker is shared across
+// worktrees, so a topic fixed to t.Name() means a concurrent run's messages
+// arrive here too, which shows up as "Expected 1 message in history, got 2".
+func testTopic(t *testing.T) string {
+	t.Helper()
+	return fmt.Sprintf("%s/%d/%s", t.Name(), os.Getpid(), uuid.NewString())
 }
 
 func getTestMqttManager(t *testing.T) *MqttManager {

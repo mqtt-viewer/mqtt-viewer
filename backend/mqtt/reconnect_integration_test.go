@@ -65,7 +65,7 @@ func testReconnect(t *testing.T, mqttVersion, down, up string) {
 			Port:        reconnectBrokerPort,
 			Protocol:    "mqtt",
 			MqttVersion: mqttVersion,
-		}, []SubscribeParams{{Topic: t.Name(), QoS: 0}})
+		}, []SubscribeParams{{Topic: testTopic(t), QoS: 0}})
 		if err != nil {
 			t.Fatalf("initial connect failed: %v", err)
 		}

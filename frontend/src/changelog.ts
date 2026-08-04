@@ -169,6 +169,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Deleting a connection works again",
         body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
       },
+      {
+        title: "Two connections to the same broker no longer fight",
+        body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
+      },
     ],
   },
   {
