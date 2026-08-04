@@ -149,6 +149,27 @@ touches message handling, the topic tree, history, or the graph view.
 This bar exists because heavy public brokers (test.mosquitto.org) are a
 core use case.
 
+## Adversarial review
+
+"Adversarial review" here always means the same thing. Never review your
+own work in your own context; you will confirm what you already believe.
+
+1. Spawn a **fresh agent** with only the context it needs: the branch or
+   diff, the explicit claims being made, and how to run the tests. Do not
+   hand it your reasoning, your conclusions, or why you think the work is
+   right. Those are what it is meant to attack.
+2. Its job is to **disprove**, not to appraise. Brief it to falsify each
+   claim, run the tests and benchmarks itself rather than trusting the
+   numbers in the description, and hunt for the case that breaks the
+   change. "Looks good" is a failed review.
+3. **You then judge its findings.** It has less context than you and will
+   raise things that are wrong, out of scope, or already handled. Verify
+   each one against the code before acting, implement what genuinely
+   holds, and say plainly which you rejected and why.
+
+Use the session's top model for the reviewer. Review is judgment, and
+judgment is the one thing not worth delegating downward.
+
 ## Releases and the portal
 
 `docs/RELEASING.md` is the runbook; the `/release` skill drives it.
