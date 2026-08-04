@@ -49,6 +49,15 @@ scripts/.venv/bin/python scripts/mqtt-flood.py --port 1883 --rate 2000
 scripts/.venv/bin/python scripts/mqtt-flood.py --port 1884 --rate 2000
 ```
 
+A single flood process tops out around 1,700 msg/s on this machine
+(paho's python client is the ceiling, not the broker). To hold a true
+2,000, run two floods per broker at `--rate 1000` rather than trusting
+the target.
+
+Add `--topics 200000` to one of them when the change touches history,
+the topic tree or memory: high topic cardinality is a separate axis from
+throughput and several bounds only bite there.
+
 Then run the app (`just dev`), connect to both brokers
 (localhost:1883 and localhost:1884), and exercise it for at least a few
 minutes.
