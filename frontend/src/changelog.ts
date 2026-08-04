@@ -169,6 +169,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Deleting a connection works again",
         body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
       },
+      {
+        title: "Messages stay in the order they arrived",
+        body: "On MQTT 3 connections the timeline and message history could show messages out of order, and stamp them with the wrong arrival time, because the client handed each one off separately as it came in. They are now recorded in the order they land, which is what MQTT 5 connections already did.",
+      },
     ],
   },
   {

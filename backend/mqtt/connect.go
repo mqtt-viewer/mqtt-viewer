@@ -229,7 +229,13 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 	opts.SetAutoReconnect(true)
 	opts.SetMaxReconnectInterval(30 * time.Second)
 	opts.SetConnectRetry(false)
-	opts.SetOrderMatters(false)
+	// With this false, paho hands every incoming message to its own goroutine,
+	// so messages reach the history and the timeline shuffled and even their
+	// arrival timestamps get stamped out of order. True makes paho dispatch
+	// sequentially from its reader goroutine, matching how the v5 client
+	// already behaves. See receiveMessage for what that goroutine now carries
+	// and why it is cheap enough.
+	opts.SetOrderMatters(true)
 	opts.SetConnectionLostHandler(func(c mqttV3.Client, err error) {
 		if mm.ConnectionState == ConnectionStates.Connected {
 			mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
