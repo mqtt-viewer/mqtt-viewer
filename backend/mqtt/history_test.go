@@ -225,7 +225,7 @@ func assertHistoryAccounting(t *testing.T, h *MessageHistory) {
 		wantRecent += int64(h.recent[i].estimatedBytes())
 		inWindow[h.recent[i]] = true
 	}
-	pinned := 0
+	pinned, protected := 0, 0
 	for topic, entry := range h.latest {
 		if entry.topic != topic {
 			t.Errorf("latest entry key %q does not match entry topic %q", topic, entry.topic)
@@ -233,10 +233,19 @@ func assertHistoryAccounting(t *testing.T, h *MessageHistory) {
 		if entry.pinned == inWindow[entry.msg] {
 			t.Errorf("topic %q: pinned=%v but inRecentWindow=%v", topic, entry.pinned, inWindow[entry.msg])
 		}
+		if entry.protected && !entry.pinned {
+			t.Errorf("topic %q is protected but not pinned", topic)
+		}
 		if entry.pinned {
 			pinned++
 			wantLatest += pinnedCost(entry.msg)
 		}
+		if entry.protected {
+			protected++
+		}
+	}
+	if protected != h.protectedSysTopics {
+		t.Errorf("protectedSysTopics %d, recomputed %d", h.protectedSysTopics, protected)
 	}
 	if wantRecent != h.recentBytes {
 		t.Errorf("recentBytes %d, recomputed %d", h.recentBytes, wantRecent)
@@ -254,9 +263,109 @@ func assertHistoryAccounting(t *testing.T, h *MessageHistory) {
 			t.Errorf("LRU list links are inconsistent at topic %q", e.topic)
 		}
 	}
-	if listed != pinned {
-		t.Errorf("LRU list holds %d entries, %d topics are pinned", listed, pinned)
+	if listed != pinned-protected {
+		t.Errorf("LRU list holds %d entries, %d topics are pinned and evictable", listed, pinned-protected)
 	}
+}
+
+func TestHistoryKeepsSysTopicsWhenTrimmingLatest(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("sensors/00000", 200))
+	h.SetBudgetBytes(int64(perMsg * 500))
+
+	// A $SYS value published once at connect, the way a broker announces its
+	// version, then enough traffic across enough topics to force the latest
+	// map to trim. The $SYS value is the oldest of all, so a plain LRU would
+	// drop it first, and the broker status window would lose it for good.
+	h.addMessageToHistory(msg("$SYS/broker/version", 200))
+	for i := 0; i < 50000; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("sensors/%05d", i), 200))
+	}
+
+	if h.droppedTopics == 0 {
+		t.Fatal("expected the latest map to be trimmed in this scenario")
+	}
+	got, err := h.GetTopicHistory("$SYS/broker/version")
+	if err != nil {
+		t.Fatalf("expected the $SYS value to survive trimming, got %v", err)
+	}
+	if len(got) != 1 || got[0].Topic != "$SYS/broker/version" {
+		t.Errorf("unexpected $SYS history: %+v", got)
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryCapsProtectedSysTopics(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("$SYS/broker/000000", 200))
+	h.SetBudgetBytes(int64(perMsg * 8000))
+
+	// More $SYS topics than the protection cap, then traffic to age them all
+	// out and force trimming. Protection must stop at the cap so a broker with
+	// a huge $SYS tree cannot pin unbounded memory.
+	for i := 0; i < maxProtectedSysTopics*2; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("$SYS/broker/%06d", i), 200))
+	}
+	for i := 0; i < 50000; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("sensors/%05d", i), 200))
+	}
+
+	if h.protectedSysTopics > maxProtectedSysTopics {
+		t.Errorf("protected %d $SYS topics, cap is %d", h.protectedSysTopics, maxProtectedSysTopics)
+	}
+	if h.TotalBytes() > h.budgetBytes+int64(maxProtectedSysTopics)*(int64(perMsg)+latestEntryOverhead) {
+		t.Errorf("retained bytes %d exceed budget %d by more than the protected allowance", h.TotalBytes(), h.budgetBytes)
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryOversizedMessageDoesNotClearLatestMap(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("quiet/000", 200))
+	budget := int64(perMsg * 400)
+	h.SetBudgetBytes(budget)
+
+	// Fill the latest map with quiet topics that have aged out.
+	for i := 0; i < 200; i++ {
+		h.addMessageToHistory(msg(fmt.Sprintf("quiet/%03d", i), 200))
+	}
+	for i := 0; i < 400; i++ {
+		h.addMessageToHistory(msg("busy/topic", 200))
+	}
+	pinnedBefore := 0
+	for _, entry := range h.latest {
+		if entry.pinned {
+			pinnedBefore++
+		}
+	}
+	if pinnedBefore == 0 {
+		t.Fatal("expected quiet topics to be pinned before the oversized message")
+	}
+
+	// One message larger than the whole latest share, then enough traffic to
+	// age it out of the recent window. Pinning it at that point would evict
+	// every other topic to make room for a single value.
+	h.addMessageToHistory(msg("huge/topic", int(budget/latestBudgetDivisor)+1))
+	for i := 0; i < 400; i++ {
+		h.addMessageToHistory(msg("busy/topic", 200))
+	}
+
+	pinnedAfter := 0
+	for _, entry := range h.latest {
+		if entry.pinned {
+			pinnedAfter++
+		}
+	}
+	if pinnedAfter == 0 {
+		t.Error("an oversized message wiped every pinned topic from the latest map")
+	}
+	if _, ok := h.latest["huge/topic"]; ok {
+		t.Error("expected the oversized message to be dropped rather than pinned")
+	}
+	if h.TotalBytes() > h.budgetBytes {
+		t.Errorf("retained bytes %d exceed budget %d", h.TotalBytes(), h.budgetBytes)
+	}
+	assertHistoryAccounting(t, h)
 }
 
 func TestHistoryBoundsLatestMapAtHighCardinality(t *testing.T) {

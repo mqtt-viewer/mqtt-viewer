@@ -198,8 +198,13 @@ export const createSelectedTopicStore = (
     let history: mqtt.MqttMessage[] = [];
     try {
       history = await GetMessageHistory(connectionId, topic);
-    } catch {
+    } catch (e) {
       history = [];
+      // "Not found" is the expected case above. Anything else is a real
+      // failure, so log it rather than let an empty timeline hide it.
+      if (!String(e).includes("not found")) {
+        console.error("Failed to load message history", e);
+      }
     }
     const decoded = history.map(decode);
     update((store) => ({

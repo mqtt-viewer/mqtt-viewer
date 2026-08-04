@@ -71,6 +71,17 @@ the memory budget:
   broker never reaches the share: at 5,000 topics the map costs ~2 MB against
   a 512 MB default.
 
+  Two carve-outs, both found by reviewing the eviction policy adversarially:
+
+  - **`$SYS/` topics are protected** (up to 1,024 of them) and never picked
+    for eviction. Some are published once as retained and never again (a
+    broker's version), which makes them the oldest entries in the map and so
+    the first a plain LRU would drop, taking the broker status window's
+    backfill with them. The cap keeps the exemption bounded.
+  - **A message too big for the whole latest share is never pinned.** It
+    would evict every other topic to make room for one value. The topic
+    loses the value that did not fit instead.
+
   Consequence: at extreme cardinality a topic can appear in the tree (the
   frontend keeps its own latest-per-topic) with no history left in the
   backend, so `GetMessageHistory` rejects. The frontend treats that as an
