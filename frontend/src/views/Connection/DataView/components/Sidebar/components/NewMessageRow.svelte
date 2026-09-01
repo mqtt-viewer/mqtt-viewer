@@ -10,7 +10,7 @@
     on:click={onClick}
   >
     <span class="w-5 shrink-0 flex items-center justify-center text-primary">
-      <Icon type="plusCircle" size={20} />
+      <Icon type="plusCircle" size={18} />
     </span>
     <span class="text-base">New message</span>
   </button>
