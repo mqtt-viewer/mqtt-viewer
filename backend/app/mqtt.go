@@ -16,7 +16,7 @@ const MQTT_BUFFER_EMIT_INTERVAL = 300 * time.Millisecond
 
 func (a *App) ConnectMqtt(connId uint) error {
 	var err error
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -36,15 +36,18 @@ func (a *App) ConnectMqtt(connId uint) error {
 	// Always reload the sub matcher / proto matcher, subscriptions may have changed
 	appConnection.SubscriptionMatcher = topicmatching.NewSubscriptionMatcher(subscriptions)
 
-	// Add protobuf middlewares if enabled
-	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && a.ProtoRegistry != nil {
+	// Add protobuf middlewares if enabled. Load the registry once: it is
+	// populated by a background goroutine at startup, so re-reading it could
+	// hand the encode and decode middleware different registries.
+	protoRegistry := a.protoRegistry()
+	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && protoRegistry != nil {
 		// TODO: load sparkplug proto registry
 		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{
 			BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
-				mqttmiddleware.NewProtoEncodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoEncodeMiddleware(protoRegistry).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				mqttmiddleware.NewProtoDecodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoDecodeMiddleware(protoRegistry).Middleware,
 			},
 		})
 	} else {
@@ -74,7 +77,7 @@ func (a *App) ConnectMqtt(connId uint) error {
 }
 
 func (a *App) DisconnectMqtt(connId uint) error {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -83,7 +86,7 @@ func (a *App) DisconnectMqtt(connId uint) error {
 }
 
 func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -98,7 +101,7 @@ func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, 
 // connection, flattened across topics and sorted by arrival time, so a
 // broker-status window opened mid-session starts populated.
 func (a *App) GetSysMessageHistory(connId uint) ([]mqtt.MqttMessage, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -119,7 +122,7 @@ func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -197,11 +200,11 @@ func (a *App) GetMatchingSubscriptionForTopic(connId uint, topic string) (*model
 }
 
 func getConnectedConnection(app *App, connId uint) (*AppConnection, error) {
-	conn, ok := app.AppConnections[connId]
+	conn, ok := app.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found")
 	}
-	if conn.MqttManager.ConnectionState != mqtt.ConnectionStates.Connected {
+	if conn.MqttManager.GetConnectionState() != mqtt.ConnectionStates.Connected {
 		return nil, fmt.Errorf("specified connection not connected")
 	}
 	return conn, nil

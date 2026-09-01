@@ -147,7 +147,7 @@ func getTestMqttManager(t *testing.T) *MqttManager {
 		},
 	})
 	t.Cleanup(func() {
-		if m.ConnectionState != ConnectionStates.Disconnected {
+		if m.GetConnectionState() != ConnectionStates.Disconnected {
 			m.Disconnect(nil)
 		}
 	})

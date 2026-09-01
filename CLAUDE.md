@@ -130,8 +130,11 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 - Database changes: edit the GORM model, register it in
   `loader/main.go` if new, then `just new-migration <name>`. Never
   hand-edit applied migrations.
-- Backend tests use `getTestApp(t)` with golden dirs under
-  `backend/app/_test/<TestName>/`; keep new tests in that pattern.
+- Backend tests use `getTestApp(t)`, which gives each test a scratch
+  resource dir at `backend/app/_test/<TestName>-<pid>/` (gitignored, not
+  golden data). Keep new tests in that pattern, and never derive that
+  path yourself: the PID keeps concurrent `go test` runs from deleting
+  each other's SQLite database.
 - Anything a user reads follows `docs/WRITING_STYLE.md`. Hard rules: no
   emojis, no em dashes, first person singular, British spelling, terse.
 - Changelog: every user-facing feature or fix MUST add a section to the
