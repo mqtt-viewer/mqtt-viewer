@@ -42,7 +42,7 @@
   <div class="flex items-center justify-between h-5">
     <span class="text-sm font-semibold text-secondary-text">{title}</span>
     <Tooltip text={`New ${scope} collection`}>
-      <IconButton class="-mr-[3px]" onClick={() => (isCreating = true)}>
+      <IconButton onClick={() => (isCreating = true)}>
         <Icon type="plus" size={16} />
       </IconButton>
     </Tooltip>
@@ -59,7 +59,7 @@
 
   {#if collections.length === 0 && !isCreating}
     <div class="text-base text-secondary-text">
-      No collections yet — click + to create one
+      No collections yet
     </div>
   {:else}
     {#each collections as collection (collection.id)}

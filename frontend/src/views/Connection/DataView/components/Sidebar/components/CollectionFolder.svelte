@@ -76,17 +76,19 @@
       />
     {:else}
       <button
-        class="flex items-center gap-2 w-full min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+        class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
         on:click={() => (isExpanded = !isExpanded)}
       >
-        <Icon type={isExpanded ? "folderOpen" : "folder"} size={16} />
+        <span class="w-5 shrink-0 flex items-center justify-center">
+          <Icon type={isExpanded ? "folderOpen" : "folder"} size={16} />
+        </span>
         <span class="text-base font-medium truncate grow text-left"
           >{collection.name}</span
         >
-        <span class="text-sm text-secondary-text pr-5">{messages.length}</span>
+        <span class="text-sm text-secondary-text pr-6">{messages.length}</span>
       </button>
       <div
-        class={`absolute -right-1 top-1/2 -translate-y-1/2 ${
+        class={`absolute right-0 top-1/2 -translate-y-1/2 ${
           isHovered ? "" : "invisible"
         }`}
       >

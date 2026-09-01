@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "A tidier sidebar and forms",
+        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels.",
+      },
+      {
         title: "Dropdowns inside dialogs work again",
         body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
       },

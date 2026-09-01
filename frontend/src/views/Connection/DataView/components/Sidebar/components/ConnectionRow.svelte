@@ -111,7 +111,9 @@
         slot="trigger"
         class="flex items-center gap-2 px-1 -mx-1 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"
       >
-        <div class="size-4 min-w-4"><ConnectionIdenticon {connection} /></div>
+        <div class="w-5 shrink-0 flex items-center justify-center">
+          <div class="size-4"><ConnectionIdenticon {connection} /></div>
+        </div>
         <span class="text-lg text-emphasis truncate">{details.name}</span>
         <span class={`size-[6px] rounded-full ${isConnected ? "bg-success" : isBusy ? "bg-warning" : "bg-transparent"}`}
         ></span>

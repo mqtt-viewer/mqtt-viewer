@@ -98,12 +98,12 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative"
+  class="relative flex"
   on:mouseenter={() => (isHovered = true)}
   on:mouseleave={() => (isHovered = false)}
 >
   <button
-    class="w-full text-left rounded px-1 -mx-1 py-1 hover:bg-hovered text-white-text space-y-1"
+    class="grow min-w-0 text-left rounded px-1 -mx-1 py-1 hover:bg-hovered text-white-text space-y-1"
     on:click={onClick}
   >
     <div class="w-full flex gap-2 items-center">
@@ -121,14 +121,14 @@
           Retain
         </div>
       {/if}
-      <div class="truncate grow min-w-0 pr-5">{entry.topic}</div>
+      <div class="truncate grow min-w-0 pr-6">{entry.topic}</div>
     </div>
     <div class="font-mono truncate text-secondary-text">
       {@html syntaxHighlightedPayload}
     </div>
   </button>
   <div
-    class={`absolute -right-1 top-1 ${isHovered ? "" : "invisible"}`}
+    class={`absolute right-0 top-1 ${isHovered ? "" : "invisible"}`}
   >
     <AddToCollectionMenu
       {collectionsStore}
