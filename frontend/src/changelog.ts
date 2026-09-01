@@ -163,6 +163,42 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Updates that match your install",
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
+      {
+        title: "Fixed a crash when disconnecting from a busy broker",
+        body: "Disconnecting while messages were still flooding in could take the whole app down. The message buffer's shutdown raced its own drain timer; it now stops cleanly no matter how busy the connection is.",
+      },
+      {
+        title: "Reconnecting when the network drops out",
+        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+      },
+      {
+        title: "Install it with Nix",
+        body: "MQTT Viewer is now packaged as a Nix flake for x86_64 and aarch64 Linux, and the updater points Nix installs at Nix instead of the .deb download.",
+      },
+      {
+        title: "Deleting a connection works again",
+        body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
+      },
+      {
+        title: "Clearer memory settings",
+        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
+      },
+      {
+        title: "The memory budget now covers every topic",
+        body: "On brokers with hundreds of thousands of topics, the last value I keep for each topic sat outside your memory budget, so memory kept growing however low you set it. It is now counted, and if it ever gets large I trim the topics you have heard from least recently. Normal brokers are nowhere near that, so the topic tree is unchanged.",
+      },
+      {
+        title: "Steadier message counts, and a crash that can no longer happen",
+        body: "The received and sent counters dropped messages on a busy broker because several arriving at once could overwrite each other's tally. They now count every message, and adding or removing a connection while those numbers are on screen can no longer bring the app down.",
+      },
+      {
+        title: "Messages stay in the order they arrived",
+        body: "On MQTT 3 connections the timeline and message history could show messages out of order, and stamp them with the wrong arrival time, because the client handed each one off separately as it came in. They are now recorded in the order they land, which is what MQTT 5 connections already did.",
+      },
+      {
+        title: "Two connections to the same broker no longer fight",
+        body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
+      },
     ],
   },
   {
