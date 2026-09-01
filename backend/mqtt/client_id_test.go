@@ -112,7 +112,7 @@ func TestConcurrentConnectionsToOneBrokerBothSurvive(t *testing.T) {
 	// they are all still connected.
 	time.Sleep(time.Second)
 	for i, m := range managers {
-		if state := m.ConnectionState; state != ConnectionStates.Connected {
+		if state := m.GetConnectionState(); state != ConnectionStates.Connected {
 			t.Errorf("connection %d is %s, expected it to stay connected", i, state)
 		}
 	}

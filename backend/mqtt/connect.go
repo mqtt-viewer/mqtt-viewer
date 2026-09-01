@@ -40,17 +40,17 @@ func (mm *MqttManager) Connect(connectionDetails MqttConnectionDetails, subscrip
 		return newMqttConnectError(fmt.Errorf("please set connection callbacks before attempting connection"))
 	}
 
-	if mm.ConnectionState == ConnectionStates.Connected {
+	if mm.GetConnectionState() == ConnectionStates.Connected {
 		slog.WarnContext(mm.ctx, "attempted connection while already connected")
 		return nil
 	}
 
-	if mm.ConnectionState == ConnectionStates.Connecting {
+	if mm.GetConnectionState() == ConnectionStates.Connecting {
 		slog.WarnContext(mm.ctx, "attempted connection while already connecting")
 		return nil
 	}
 
-	if mm.ConnectionState == ConnectionStates.Reconnecting {
+	if mm.GetConnectionState() == ConnectionStates.Reconnecting {
 		slog.WarnContext(mm.ctx, "attempted connection while reconnecting")
 		return nil
 	}
@@ -162,7 +162,7 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 				}},
 			OnClientError: func(err error) {
 				err = errors.New("client error: " + err.Error())
-				if mm.ConnectionState == ConnectionStates.Connected {
+				if mm.GetConnectionState() == ConnectionStates.Connected {
 					mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
 				}
 			},
@@ -170,7 +170,7 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 
 				errString := "server disconnected: " + d.Properties.ReasonString
 				err := errors.New(errString)
-				if mm.ConnectionState == ConnectionStates.Connected {
+				if mm.GetConnectionState() == ConnectionStates.Connected {
 					mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
 				}
 			},
@@ -231,9 +231,15 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 	opts.SetAutoReconnect(true)
 	opts.SetMaxReconnectInterval(30 * time.Second)
 	opts.SetConnectRetry(false)
-	opts.SetOrderMatters(false)
+	// With this false, paho hands every incoming message to its own goroutine,
+	// so messages reach the history and the timeline shuffled and even their
+	// arrival timestamps get stamped out of order. True makes paho dispatch
+	// sequentially from its reader goroutine, matching how the v5 client
+	// already behaves. See receiveMessage for what that goroutine now carries
+	// and why it is cheap enough.
+	opts.SetOrderMatters(true)
 	opts.SetConnectionLostHandler(func(c mqttV3.Client, err error) {
-		if mm.ConnectionState == ConnectionStates.Connected {
+		if mm.GetConnectionState() == ConnectionStates.Connected {
 			mm.SetConnectionState(ConnectionStates.Reconnecting, &err)
 		}
 	})

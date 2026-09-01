@@ -126,7 +126,7 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
 			return
 		}
-		a.ProtoRegistry = registry
+		a.setProtoRegistry(registry)
 	}()
 
 	if a.Mode != AppModes.Test {
@@ -153,7 +153,7 @@ func (a *App) buildAppConnections() error {
 		}
 		appConnections[conn.ID] = appConnection
 	}
-	a.AppConnections = appConnections
+	a.replaceAppConnections(appConnections)
 	return nil
 }
 
