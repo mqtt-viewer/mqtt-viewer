@@ -30,7 +30,13 @@
     }
   };
 
-  $: isAllFieldsDisabled = connection.connectionState !== "disconnected";
+  // See ConnectionForm.svelte for why this isn't "!== disconnected": an
+  // "error" state means the last attempt failed, which is exactly when the
+  // user needs to fix these fields.
+  $: isAllFieldsDisabled =
+    connection.connectionState === "connected" ||
+    connection.connectionState === "connecting" ||
+    connection.connectionState === "reconnecting";
 </script>
 
 <div class="flex flex-col w-[550px]">

@@ -22,7 +22,8 @@ export type ConnectionState =
   | "connected"
   | "disconnected"
   | "connecting"
-  | "reconnecting";
+  | "reconnecting"
+  | "error";
 
 export type Connection = DeepOmit<
   DeepOmit<app.Connection, "subscriptions" | "isConnected">,
@@ -34,6 +35,10 @@ export type Connection = DeepOmit<
   showDataPageWhileDisconnected: boolean;
   firstConnectedThisSessionAtMs?: number;
   latencyMs?: number;
+  // Set when connectionState is "error", cleared on the next connect
+  // attempt. Lets the UI show why the last attempt failed after the toast
+  // that reported it has gone.
+  lastConnectionError?: string;
   // True only for a connection just created this session, until its details
   // dialog has been shown once (see acknowledgeConnectionCreated).
   justCreated?: boolean;
@@ -223,6 +228,9 @@ const updateConnectionState = (
       store.connections[connectionId].connectionDetails.lastConnectedAt = now;
       store.connections[connectionId].showDataPageWhileDisconnected = true;
     }
+    if (connectionState === "connecting" || connectionState === "connected") {
+      store.connections[connectionId].lastConnectionError = undefined;
+    }
     if (
       connectionState === "connected" &&
       !store.connections[connectionId].firstConnectedThisSessionAtMs
@@ -303,8 +311,48 @@ const connect = async (connectionId: number) => {
   try {
     await ConnectMqtt(connectionId);
   } catch (e) {
+    setConnectionError(connectionId, toErrorMessage(e));
     throw e;
   }
+};
+
+// toErrorMessage normalises whatever a rejected binding call throws (a plain
+// string from the Wails runtime today, but callers already treat this as
+// untyped) into a displayable string, so a non-string rejection can't render
+// as "[object Object]" in the connection's stored error state.
+const toErrorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+};
+
+// setConnectionError records why the last connect attempt failed, so the UI
+// still shows it after the toast that reported it disappears. Cleared on the
+// next connect attempt (updateConnectionState, on "connecting"/"connected").
+const setConnectionError = (connectionId: number, message: string) => {
+  update((store) => {
+    const existingConnection = store.connections[connectionId];
+    if (!existingConnection) return store;
+    // A newer attempt may have already connected (or started connecting)
+    // between this rejection firing and reaching here. Don't clobber that
+    // with a stale failure.
+    if (
+      existingConnection.connectionState === "connected" ||
+      existingConnection.connectionState === "connecting"
+    ) {
+      return store;
+    }
+    store.connections[connectionId] = {
+      ...existingConnection,
+      connectionState: "error",
+      lastConnectionError: message,
+    };
+    return store;
+  });
 };
 
 const disconnect = async (connectionId: number) => {

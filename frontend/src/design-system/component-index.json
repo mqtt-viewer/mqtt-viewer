@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-09-01T11:21:53.002Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -932,7 +932,8 @@
             "connected",
             "disconnected",
             "connecting",
-            "reconnecting"
+            "reconnecting",
+            "error"
           ]
         }
       ],
