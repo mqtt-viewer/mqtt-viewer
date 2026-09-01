@@ -109,7 +109,7 @@
     <DropdownMenu placement="bottom-start">
       <div
         slot="trigger"
-        class="flex items-center gap-2 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"
+        class="flex items-center gap-2 px-1 -mx-1 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"
       >
         <div class="size-4 min-w-4"><ConnectionIdenticon {connection} /></div>
         <span class="text-lg text-emphasis truncate">{details.name}</span>

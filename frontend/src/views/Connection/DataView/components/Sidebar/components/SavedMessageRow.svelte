@@ -60,7 +60,7 @@
     />
   {:else}
     <button
-      class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
+      class="flex items-center gap-2 w-full min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
       on:click={() => onOpenMessage(message)}
     >
       <Icon type="message" size={16} />
@@ -69,7 +69,7 @@
       >
     </button>
     <div
-      class={`absolute right-0 top-1/2 -translate-y-1/2 ${
+      class={`absolute -right-1 top-1/2 -translate-y-1/2 ${
         isHovered ? "" : "invisible"
       }`}
     >

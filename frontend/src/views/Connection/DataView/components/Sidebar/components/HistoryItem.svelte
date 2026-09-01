@@ -103,7 +103,7 @@
   on:mouseleave={() => (isHovered = false)}
 >
   <button
-    class="w-full text-left rounded px-1 py-1 hover:bg-hovered text-white-text space-y-1"
+    class="w-full text-left rounded px-1 -mx-1 py-1 hover:bg-hovered text-white-text space-y-1"
     on:click={onClick}
   >
     <div class="w-full flex gap-2 items-center">
@@ -128,7 +128,7 @@
     </div>
   </button>
   <div
-    class={`absolute right-0 top-1 ${isHovered ? "" : "invisible"}`}
+    class={`absolute -right-1 top-1 ${isHovered ? "" : "invisible"}`}
   >
     <AddToCollectionMenu
       {collectionsStore}

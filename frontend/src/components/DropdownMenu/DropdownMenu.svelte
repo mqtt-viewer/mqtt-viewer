@@ -90,7 +90,7 @@
 {#if $open}
   <div
     class={`
-     z-30 p-1 py-1.5 min-w-[100px] shadow
+     z-[10002] p-1 py-1.5 min-w-[100px] shadow
      bg-elevation-2 rounded focus:!ring-0
   `}
     use:melt={$menu}

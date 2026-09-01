@@ -71,7 +71,7 @@
 <Dialog {isOpen} startEmpty let:meltTitle>
   <div class="flex flex-col w-[550px] max-w-[78vw] max-h-[78vh]">
     <div
-      class="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-divider"
+      class="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-divider/40"
     >
       <span class="text-lg" use:melt={meltTitle}>Connection settings</span>
       <IconButton onClick={() => isOpen.set(false)}>
@@ -85,7 +85,7 @@
       </div>
     </div>
     <div
-      class="flex items-center justify-between px-6 py-4 shrink-0 border-t border-divider"
+      class="flex items-center justify-between px-6 py-4 shrink-0 border-t border-divider/40"
     >
       <span class="text-sm text-secondary-text">{footerLabel}</span>
       <Button

@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Dropdowns inside dialogs work again",
+        body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
+      },
+      {
         title: "A proper Save button for connections",
         body: "Closing the connection dialog with the X to save your changes always felt a bit wrong. The dialog now has a footer with a Save button and a note showing when your changes were last saved. Nothing about saving has changed underneath: everything still saves automatically as you type, the footer just makes that visible.",
         thanks: [
