@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-29T12:54:26.569Z",
+  "generatedAt": "2026-09-01T04:24:49.258Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -4238,7 +4238,7 @@
         "error"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook).",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.stories.svelte",
