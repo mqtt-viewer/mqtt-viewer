@@ -18,6 +18,8 @@ import * as time$0 from "../../../time/models.js";
  * user has dismissed, so it shows once per version. LaunchCount counts app
  * starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
  * the GitHub star prompt as shown so it only ever appears once.
+ * IgnoredUpdateVersion records an update the user chose to skip, so the
+ * update dialog stops auto-opening for it.
  */
 export class AppSettings {
     "id": number;
@@ -28,6 +30,7 @@ export class AppSettings {
     "lastSeenChangelogVersion": string;
     "launchCount": number;
     "hasSeenStarPrompt": boolean;
+    "ignoredUpdateVersion": string;
 
     /** Creates a new AppSettings instance. */
     constructor($$source: Partial<AppSettings> = {}) {
@@ -54,6 +57,9 @@ export class AppSettings {
         }
         if (!("hasSeenStarPrompt" in $$source)) {
             this["hasSeenStarPrompt"] = false;
+        }
+        if (!("ignoredUpdateVersion" in $$source)) {
+            this["ignoredUpdateVersion"] = "";
         }
 
         Object.assign(this, $$source);

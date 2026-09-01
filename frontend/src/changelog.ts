@@ -154,6 +154,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
       {
+        title: "Updates are harder to miss",
+        body: "When a new version is out, a dialog now opens on startup showing what changed, with the choices you'd expect: update now, remind me later, or skip this version. Previously the only hint was a dot on the notification bell.",
+      },
+      {
         title: "Fixed a crash when disconnecting from a busy broker",
         body: "Disconnecting while messages were still flooding in could take the whole app down. The message buffer's shutdown raced its own drain timer; it now stops cleanly no matter how busy the connection is.",
       },
@@ -283,7 +287,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ];
 
-const normalise = (version: string): string =>
+export const normalise = (version: string): string =>
   version.trim().replace(/^v/i, "");
 
 /** Released entries only, newest first. */

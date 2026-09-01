@@ -357,6 +357,16 @@ export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryP
     });
 }
 
+/**
+ * SkipUpdateVersion records that the user chose to skip the given update
+ * version, so the update dialog stops auto-opening for it.
+ */
+export function SkipUpdateVersion(version: string): $CancellablePromise<models$0.AppSettings> {
+    return $Call.ByID(3024334158, version).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 export function StartUpdate(): $CancellablePromise<void> {
     return $Call.ByID(1435025345);
 }

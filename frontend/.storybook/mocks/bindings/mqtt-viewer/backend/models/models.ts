@@ -12,6 +12,7 @@ export class AppSettings {
   lastSeenChangelogVersion = "";
   launchCount = 0;
   hasSeenStarPrompt = false;
+  ignoredUpdateVersion = "";
 
   static createFrom(source: any = {}) {
     return new AppSettings(source);

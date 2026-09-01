@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-09-01T15:11:44.344Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2284,9 +2284,77 @@
       "specMissing": false
     },
     {
+      "name": "UpdateAvailableContent",
+      "tier": "component",
+      "description": "Layout for the update dialog: lead line, version transition chips, scrollable release notes, install instructions with a copyable command, skip/remind/update actions.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "update",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "currentVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "updating",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "onUpdate",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onRemindLater",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onSkip",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCopyCommand",
+          "type": "function",
+          "required": false
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "emphasis",
+        "divider",
+        "primary",
+        "elevation-0",
+        "outline"
+      ],
+      "dependencies": [
+        "Button",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action.",
+      "sourcePath": "src/components/UpdateDialog/UpdateAvailableContent.svelte",
+      "specPath": "src/components/UpdateDialog/UpdateAvailableContent.spec.json",
+      "storyPath": "src/components/UpdateDialog/UpdateAvailableContent.stories.svelte",
+      "storyId": "Components/UpdateDialog/UpdateAvailableContent",
+      "specMissing": false
+    },
+    {
       "name": "UpdateDialog",
       "tier": "component",
-      "description": "Storybook coverage for UpdateDialog.",
+      "description": "Update-available dialog; auto-opens when a non-skipped update is found, once the first-run and changelog dialogs have resolved.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2298,7 +2366,7 @@
       "props": [],
       "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent.",
       "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",
       "specPath": "src/components/UpdateDialog/UpdateDialog.spec.json",
       "storyPath": "src/components/UpdateDialog/UpdateDialog.stories.svelte",

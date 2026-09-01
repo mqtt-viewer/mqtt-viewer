@@ -17,6 +17,8 @@ type Global struct {
 // user has dismissed, so it shows once per version. LaunchCount counts app
 // starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
 // the GitHub star prompt as shown so it only ever appears once.
+// IgnoredUpdateVersion records an update the user chose to skip, so the
+// update dialog stops auto-opening for it.
 type AppSettings struct {
 	ID                       uint   `json:"id" gorm:"primaryKey"`
 	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
@@ -26,6 +28,7 @@ type AppSettings struct {
 	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion" gorm:"not null;default:''"`
 	LaunchCount              int64  `json:"launchCount" gorm:"not null;default:0"`
 	HasSeenStarPrompt        bool   `json:"hasSeenStarPrompt" gorm:"not null;default:0"`
+	IgnoredUpdateVersion     string `json:"ignoredUpdateVersion" gorm:"not null;default:''"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,

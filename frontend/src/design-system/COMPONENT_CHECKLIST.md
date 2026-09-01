@@ -67,6 +67,7 @@
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
+| Components/UpdateDialog/UpdateAvailableContent | [x] | [ ] | [x] | [x] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
 | Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
 
@@ -140,7 +141,7 @@
 
 ## Summary
 
-- Components scanned: 114
-- Story present: 114
+- Components scanned: 115
+- Story present: 115
 - Figma-linked: 0
 - Missing specs: 0
