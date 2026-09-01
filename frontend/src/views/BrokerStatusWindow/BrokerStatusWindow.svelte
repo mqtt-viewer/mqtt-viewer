@@ -3,6 +3,7 @@
   import { get } from "svelte/store";
   import connections from "@/stores/connections";
   import subscriptions from "@/stores/subscriptions";
+  import os from "@/stores/env";
   import IconContext from "@/components/Icon/IconContext.svelte";
   import Toast from "@/components/Toast/Toast.svelte";
   import ConnectionStatusCircle from "@/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte";
@@ -107,8 +108,9 @@
   onMount(async () => {
     // Init subscriptions too so BrokerStatusView's hasSysSubscription reflects
     // reality (otherwise it reads as always-false and the empty state offers a
-    // duplicate "$SYS/#" subscription the connection already has).
-    await Promise.all([connections.init(), subscriptions.init()]);
+    // duplicate "$SYS/#" subscription the connection already has). env feeds
+    // the macOS traffic-light inset in the header.
+    await Promise.all([os.init(), connections.init(), subscriptions.init()]);
     const connection = get(connections).connections[connectionId];
     if (!connection) {
       error = "Connection not found";
@@ -134,19 +136,23 @@
 </script>
 
 <IconContext>
-  <main
-    class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col"
-    style="--wails-draggable:drag"
-  >
+  <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
     <header
-      class="flex items-center gap-2 px-4 py-3 min-h-0"
-      style="--wails-draggable:false"
+      class="flex items-center gap-2 px-4 py-3 border-b border-divider"
+      style="--wails-draggable:drag"
     >
+      {#if $os.isMac && !$os.isFullscreen}
+        <!-- Clear the macOS traffic lights (frameless hidden-inset titlebar). -->
+        <div class="w-[62px] shrink-0" />
+      {/if}
       <ConnectionStatusCircle state={connectionState} />
       <span class="text-lg text-emphasis truncate">{connectionName}</span>
-      <span class="text-secondary-text text-sm">broker status</span>
+      <span class="text-secondary-text text-sm shrink-0">broker status</span>
       {#if store}
-        <div class="ml-auto flex items-center gap-3">
+        <div
+          class="ml-auto flex items-center gap-3"
+          style="--wails-draggable:false"
+        >
           {#if pill.show}
             <span
               class="text-sm tabular-nums {pill.grey
@@ -174,25 +180,24 @@
 
     {#if banner && !error}
       <div
-        class="px-4 py-1 text-sm truncate border-y {banner.warn
+        class="px-4 py-1.5 text-sm truncate border-b {banner.warn
           ? 'text-warning border-warning'
           : 'text-secondary-text border-divider'}"
-        style="--wails-draggable:false"
       >
         {banner.text}
       </div>
     {/if}
 
     {#if error}
-      <div class="px-4 py-2 text-secondary-text" style="--wails-draggable:false">
+      <div class="px-4 py-2 text-secondary-text">
         {error}
       </div>
     {:else if store}
-      <div class="grow min-h-0 overflow-y-auto" style="--wails-draggable:false">
+      <div class="grow min-h-0 overflow-y-auto">
         <BrokerStatusView bind:this={viewRef} {store} {connectionId} />
       </div>
     {:else}
-      <div class="px-4 py-2 text-secondary-text" style="--wails-draggable:false">
+      <div class="px-4 py-2 text-secondary-text">
         Loading…
       </div>
     {/if}
