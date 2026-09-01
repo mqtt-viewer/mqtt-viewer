@@ -78,6 +78,7 @@
     {:else}
       <button
         class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+        aria-expanded={isExpanded}
         on:click={() => collectionCollapse.toggle(collection.id)}
       >
         <span class="w-5 shrink-0 flex items-center justify-center">

@@ -26,6 +26,9 @@ const load = async () => {
       return ids;
     });
   } catch (e) {
+    // Allow the next first-subscription to retry rather than losing the
+    // persisted state for the whole session.
+    hasLoaded = false;
     console.error("failed to load collection collapse state", e);
   }
 };
@@ -38,11 +41,9 @@ const toggle = (collectionId: number) => {
     } else {
       ids.delete(collectionId);
     }
-    try {
-      SetCollectionCollapsed(collectionId, collapsed);
-    } catch (e) {
-      console.error("failed to save collection collapse state", e);
-    }
+    SetCollectionCollapsed(collectionId, collapsed).catch((e) =>
+      console.error("failed to save collection collapse state", e)
+    );
     return ids;
   });
 };
