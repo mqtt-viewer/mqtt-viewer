@@ -12,8 +12,8 @@ func TestNewConnectionsAreCreatedWhenNoneExist(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	if len(app.AppConnections) != 1 {
-		t.Errorf("Expected 1 connection, got %v", len(app.AppConnections))
+	if app.appConnectionCount() != 1 {
+		t.Errorf("Expected 1 connection, got %v", app.appConnectionCount())
 	}
 	if newConnection.IsConnected == true {
 		t.Errorf("Expected connection to be disconnected, got connected")
@@ -22,13 +22,13 @@ func TestNewConnectionsAreCreatedWhenNoneExist(t *testing.T) {
 
 func TestNewConnectionsAreCreatedWhenSomeExist(t *testing.T) {
 	app := getSeededTestApp(t)
-	oldLen := len(app.AppConnections)
+	oldLen := app.appConnectionCount()
 	newConnection, err := app.NewConnection()
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	if len(app.AppConnections) != oldLen+1 {
-		t.Errorf("Expected 6 connections, got %v", len(app.AppConnections))
+	if app.appConnectionCount() != oldLen+1 {
+		t.Errorf("Expected 6 connections, got %v", app.appConnectionCount())
 	}
 	if newConnection.IsConnected == true {
 		t.Errorf("Expected connection to be disconnected, got connected")
@@ -123,7 +123,7 @@ func TestConnectionsWithAllNullColumnsLoadOnStartup(t *testing.T) {
 }
 
 // Documents the intended behaviour: GetAllConnections is driven by the
-// in-memory AppConnections map built at startup, so rows written straight to
+// in-memory appConnections map built at startup, so rows written straight to
 // the database are not picked up until the app restarts.
 func TestGetAllConnectionsIgnoresRowsInsertedWithoutRestart(t *testing.T) {
 	app := getTestApp(t)
@@ -242,7 +242,7 @@ func TestDeleteConnectionRemovesAllConnectionScopedRows(t *testing.T) {
 		t.Errorf("expected surviving connection row to exist, got %d", survivingConn)
 	}
 
-	if _, ok := app.AppConnections[firstID]; ok {
-		t.Errorf("expected deleted connection removed from AppConnections")
+	if _, ok := app.appConnection(firstID); ok {
+		t.Errorf("expected deleted connection removed from appConnections")
 	}
 }

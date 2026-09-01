@@ -65,7 +65,7 @@ func testReconnect(t *testing.T, mqttVersion, down, up string) {
 			Port:        reconnectBrokerPort,
 			Protocol:    "mqtt",
 			MqttVersion: mqttVersion,
-		}, []SubscribeParams{{Topic: t.Name(), QoS: 0}})
+		}, []SubscribeParams{{Topic: testTopic(t), QoS: 0}})
 		if err != nil {
 			t.Fatalf("initial connect failed: %v", err)
 		}
@@ -77,20 +77,20 @@ func testReconnect(t *testing.T, mqttVersion, down, up string) {
 		// The client must notice the broker is gone. With the socket left open
 		// this can only come from the keepalive, so allow for the ping timeout.
 		if !waitForState(t, m, ConnectionStates.Reconnecting, 45*time.Second) {
-			t.Fatalf("client never noticed the broker was gone (state=%s)", m.ConnectionState)
+			t.Fatalf("client never noticed the broker was gone (state=%s)", m.GetConnectionState())
 		}
 		logf("noticed the broker was gone")
 
 		// Stay down long enough that any give-up-after-N-attempts behaviour
 		// would have taken effect.
 		time.Sleep(60 * time.Second)
-		if m.ConnectionState != ConnectionStates.Reconnecting {
-			t.Fatalf("expected to still be retrying after 60s down, got %s", m.ConnectionState)
+		if m.GetConnectionState() != ConnectionStates.Reconnecting {
+			t.Fatalf("expected to still be retrying after 60s down, got %s", m.GetConnectionState())
 		}
 
 		docker(t, up, reconnectBrokerName)
 		if !waitForState(t, m, ConnectionStates.Connected, 45*time.Second) {
-			t.Fatalf("did not reconnect after the broker came back (state=%s)", m.ConnectionState)
+			t.Fatalf("did not reconnect after the broker came back (state=%s)", m.GetConnectionState())
 		}
 		logf("reconnected")
 	})
@@ -135,7 +135,7 @@ func waitForState(t *testing.T, m *MqttManager, want ConnectionState, timeout ti
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if m.ConnectionState == want {
+		if m.GetConnectionState() == want {
 			return true
 		}
 		time.Sleep(500 * time.Millisecond)

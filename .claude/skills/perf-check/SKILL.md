@@ -24,6 +24,12 @@ python3 -m venv scripts/.venv
 scripts/.venv/bin/pip install paho-mqtt
 ```
 
+`scripts/.venv` is gitignored, so it does not exist in an agent
+worktree. Either re-run those two lines there, or use the main
+checkout's copy at `~/git/mqtt-viewer/scripts/.venv/bin/python3`.
+Backgrounding the flood before checking the interpreter exists fails
+silently and looks like a broker with no traffic.
+
 ## Run
 
 Terminals 1 and 2, one broker each:
@@ -80,3 +86,46 @@ rather than throughput.
 
 Report concrete observations (achieved msg/s, where it stuttered, memory
 trend), not just "seems fine".
+
+## Reading memory correctly
+
+Two things make RSS misleading, so judge growth only while the floods
+are still running:
+
+- macOS compresses an idle process's pages. Once the floods stop, RSS
+  collapses (a run holding ~600 MB read as 34 MB) and tells you nothing.
+- In-RAM history is capped by `DefaultMemoryBudgetBytes`, 512 MB per
+  connection, so two connections climb toward ~1 GB of retained messages
+  by design. With Go's default GOGC the process sits well above that.
+  Rising toward the budget is the eviction working, not a leak. What
+  would be a leak is growth that keeps going after the budget is full.
+
+## Benchmarking the message path
+
+If the change is to ingest itself, a Go benchmark pins it down faster
+than watching the UI. Two traps:
+
+- `receiveMessage` debug-logs every message. That logging is off in
+  production builds (`backend/app/startup.go`), but on in tests, where
+  it costs roughly as much as the work itself: ingest measures ~700-800
+  ns per message with it off, ~1200 ns with it formatting to a discard
+  handler, and ~4000 ns writing to the console handler. Swap in a
+  discard handler with `slog.SetDefault` for the benchmark, or you are
+  timing the logger.
+- Work handed to another goroutine does not get counted. Measure to
+  completion: spin until the messages have actually landed in history
+  before `b.StopTimer()`, otherwise deferring work looks like a speedup.
+  `runtime.NumGoroutine()` sampled during the run is worth reporting
+  too, since a backlog shows up there first.
+
+## Driving the app headlessly
+
+`scripts/serve-browser.sh` runs the real backend and is drivable from
+the browser pane, which is usually easier than the native window. Two
+things to know: live message events need
+`<script src="/wails/custom.js"></script>` injected into the page (see
+`AGENTS.md`), and the process can panic on shutdown with `server
+shutdown error: context deadline exceeded`, seemingly when a client goes
+away with that WebSocket open. It is a dev-only path, but it will end a
+run mid-measurement, so take readings as you go rather than only at the
+end.

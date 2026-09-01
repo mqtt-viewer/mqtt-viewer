@@ -12,10 +12,10 @@ type MemoryStats struct {
 // history against the budget, so it counts as active while it has any.
 func (a *App) GetMemoryStats() MemoryStats {
 	stats := MemoryStats{}
-	for _, c := range a.AppConnections {
+	for _, c := range a.appConnectionsSnapshot() {
 		historyBytes := c.MqttManager.HistoryBytes()
 		stats.HistoryBytes += historyBytes
-		if c.MqttManager.ConnectionState == mqtt.ConnectionStates.Connected ||
+		if c.MqttManager.GetConnectionState() == mqtt.ConnectionStates.Connected ||
 			historyBytes > 0 {
 			stats.ActiveConnections++
 		}
