@@ -170,6 +170,14 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
       },
       {
+        title: "Clearer memory settings",
+        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
+      },
+      {
+        title: "The memory budget now covers every topic",
+        body: "On brokers with hundreds of thousands of topics, the last value I keep for each topic sat outside your memory budget, so memory kept growing however low you set it. It is now counted, and if it ever gets large I trim the topics you have heard from least recently. Normal brokers are nowhere near that, so the topic tree is unchanged.",
+      },
+      {
         title: "Steadier message counts, and a crash that can no longer happen",
         body: "The received and sent counters dropped messages on a busy broker because several arriving at once could overwrite each other's tally. They now count every message, and adding or removing a connection while those numbers are on screen can no longer bring the app down.",
       },
