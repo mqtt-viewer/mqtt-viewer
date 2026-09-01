@@ -177,6 +177,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Messages stay in the order they arrived",
         body: "On MQTT 3 connections the timeline and message history could show messages out of order, and stamp them with the wrong arrival time, because the client handed each one off separately as it came in. They are now recorded in the order they land, which is what MQTT 5 connections already did.",
       },
+      {
+        title: "Two connections to the same broker no longer fight",
+        body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
+      },
     ],
   },
   {

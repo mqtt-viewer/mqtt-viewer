@@ -2,7 +2,9 @@ package mqtt
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -297,8 +299,36 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 	return &client, nil
 }
 
+// clientIdPrefix is kept stable because brokers are commonly configured with
+// ACLs or access rules that key on the client ID.
+const clientIdPrefix = "mqtt-viewer-"
+
+// maxGeneratedClientIdBytes is the length every MQTT 3.1.1 broker is required
+// to accept ([MQTT-3.1.3-5]: servers MUST accept 1 to 23 UTF-8 bytes, and may
+// accept more). Staying inside it means a strict or embedded broker cannot
+// reject us with "identifier rejected".
+const maxGeneratedClientIdBytes = 23
+
+// getUniqueClientId builds the client ID for connections where the user has
+// not set a custom one.
+//
+// The suffix is random rather than the Unix second it used to be. At second
+// resolution any two connections opened in the same second got an identical
+// ID, and a broker evicts the existing session when a new client presents an
+// ID already in use, so the two connections sat kicking each other off. That
+// hit anyone opening two connections to one broker at once, or running two
+// copies of the app, and it was the cause of flaky broker tests.
+//
+// Five random bytes give a 22 byte ID, the same length as before and one
+// under the limit. Sessions are always clean (v3 defaults to CleanSession,
+// v5 sets CleanStartOnInitialConnection), and the generated ID is never
+// persisted, so nothing depends on it staying the same between connects.
 func getUniqueClientId() string {
-	return fmt.Sprintf("mqtt-viewer-%d", time.Now().Unix())
+	suffix := make([]byte, 5)
+	// Never returns an error: since Go 1.24 crypto/rand.Read panics rather
+	// than failing.
+	_, _ = rand.Read(suffix)
+	return clientIdPrefix + hex.EncodeToString(suffix)
 }
 
 func validateConnectionDetails(connectionDetails MqttConnectionDetails) error {
