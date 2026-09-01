@@ -95,7 +95,7 @@ func (a *App) applyMemoryBudgetToAllConnections(budget int64) {
 	if budget <= 0 {
 		budget = mqtt.DefaultMemoryBudgetBytes
 	}
-	for _, conn := range a.AppConnections {
+	for _, conn := range a.appConnectionsSnapshot() {
 		if conn != nil && conn.MqttManager != nil {
 			conn.MqttManager.SetMessageMemoryBudget(budget)
 		}

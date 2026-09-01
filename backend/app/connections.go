@@ -26,7 +26,7 @@ type Connections struct {
 
 func (a *App) GetAllConnections() Connections {
 	result := make(map[uint]Connection)
-	for id, appConn := range a.AppConnections {
+	for id, appConn := range a.appConnectionsSnapshot() {
 		connectionDetails := models.Connection{}
 		if res := a.Db.First(&connectionDetails, id); res.Error != nil {
 			slog.Error("failed to load connection details, skipping connection", "conn_id", id, "error", res.Error)
@@ -34,7 +34,7 @@ func (a *App) GetAllConnections() Connections {
 		}
 		result[id] = Connection{
 			ConnectionDetails: connectionDetails,
-			IsConnected:       appConn.MqttManager.ConnectionState == mqtt.ConnectionStates.Connected,
+			IsConnected:       appConn.MqttManager.GetConnectionState() == mqtt.ConnectionStates.Connected,
 			EventSet:          *appConn.EventSet,
 		}
 	}
@@ -96,7 +96,7 @@ func (a *App) NewConnection() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.AppConnections[conn.ID] = appConnection
+	a.setAppConnection(conn.ID, appConnection)
 	return &Connection{
 		ConnectionDetails: conn,
 		IsConnected:       false,
@@ -105,7 +105,7 @@ func (a *App) NewConnection() (*Connection, error) {
 }
 
 func (a *App) UpdateConnection(conn *models.Connection) error {
-	appConnection, ok := a.AppConnections[conn.ID]
+	appConnection, ok := a.appConnection(conn.ID)
 	if !ok {
 		return fmt.Errorf("connection not found")
 	}
@@ -181,7 +181,7 @@ func (a *App) DeleteConnection(id uint) error {
 	// Release the pages freed by a potentially huge history delete (no-op
 	// unless auto_vacuum is INCREMENTAL).
 	a.Db.Exec("PRAGMA incremental_vacuum")
-	delete(a.AppConnections, id)
+	a.removeAppConnection(id)
 	if a.Mode != AppModes.Test {
 		a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
 	}
