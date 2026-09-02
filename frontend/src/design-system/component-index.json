@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-01T04:24:49.258Z",
+  "generatedAt": "2026-09-02T12:25:30.305Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3794,7 +3794,9 @@
         "primary-light",
         "secondary",
         "secondary-text",
-        "outline"
+        "outline",
+        "elevation-2",
+        "emphasis"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",

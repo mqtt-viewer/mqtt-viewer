@@ -50,6 +50,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Peek at messages on the timeline",
+        body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
+        thanks: [
+          {
+            name: "Daschi2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/84",
+          },
+        ],
+      },
+      {
         title: "Disconnect without leaving the connection dialog",
         body: "Most connection fields lock while connected. The dialog header now has a Connect/Disconnect button, so you can drop the connection, change what you need and reconnect, all in one place.",
       },
