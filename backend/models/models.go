@@ -204,6 +204,14 @@ type SortState struct {
 	SortDirection string `json:"sortDirection"`
 }
 
+// ChartWindow persists the chart time-window selection per connection. ID is
+// the connection id (string). WindowSeconds is the selected window in seconds;
+// 0 means "All history". A custom interval is stored as its resolved seconds.
+type ChartWindow struct {
+	ID            string `json:"id" gorm:"primaryKey"`
+	WindowSeconds int64  `json:"windowSeconds"`
+}
+
 // CollectionCollapsedState remembers whether a sidebar collection folder is
 // collapsed. Keyed by collection id; a missing row means expanded.
 type CollectionCollapsedState struct {

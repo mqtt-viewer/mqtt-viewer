@@ -1,4 +1,4 @@
-h1:FxOWu9GDLSmaqADDQZt70rV0Y03fZ368HegpQqS8Hf8=
+h1:/yWX+9uOpbvcMzURDqZhxyt9cyN1iS5ZGdytXW4Lfd8=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -13,5 +13,6 @@ h1:FxOWu9GDLSmaqADDQZt70rV0Y03fZ368HegpQqS8Hf8=
 20260702032219_add-changelog-version.sql h1:ELFjvpUawUhnM7QIlqDMU2pc7j2Lm5708LKEGTJoyvg=
 20260704051603_add-star-prompt-tracking.sql h1:zG2yaLTFTUlZiFeCC0KePn6TMzT2TOpf7rl97xZBIXQ=
 20260716075440_add-sys-metric-mappings.sql h1:uClFzUq/SdPF8MNJBI9QbPKaAWESVQBMgCF2HOm26KQ=
-20260901000000_add-ignored-update-version.sql h1:WjL5Wg+9wPeFZlcRV5W3P1mHd229oaRkqnfNI6ZsFgo=
-20260901042245_collection-collapsed-states.sql h1:O3FaI3gT5+iLbFJrbPPDeU/IwD7t1QD8NxXAIMRoBO0=
+20260728093000_chart-window.sql h1:oMG+Aovw9Me9LOPCXbQCVDyu01mbfOUq/JQu0BhQK9g=
+20260901000000_add-ignored-update-version.sql h1:kvOz3qTtG6SZ4tovScJG5TijEGwuBqdFap4dd8VqwIE=
+20260901042245_collection-collapsed-states.sql h1:+G8CIaJ5ZKBxTvFjjVGtlHPGl07/NVVw/Z0JOMeP0MM=
