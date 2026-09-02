@@ -76,11 +76,12 @@ func (mm *MqttManager) Connect(connectionDetails MqttConnectionDetails, subscrip
 		cancelConnect: cancelFunc,
 		connectionCtx: connCtx,
 	}
+	usingTls := connectionDetails.TlsConfig != nil
 	if connectionDetails.MqttVersion == "3" {
 		v3Client, err := mm.connectV3(connCtx, connectionDetails, subscriptions)
 		if err != nil {
 			mm.SetConnectionState(ConnectionStates.Disconnected, nil)
-			return newMqttConnectError(err)
+			return newMqttConnectError(friendlyConnectError(err, usingTls))
 		}
 		if v3Client == nil {
 			slog.InfoContext(mm.ctx, "v3 connect cancelled")
@@ -93,7 +94,7 @@ func (mm *MqttManager) Connect(connectionDetails MqttConnectionDetails, subscrip
 		v5Client, err := mm.connectV5(connCtx, connectionDetails, subscriptions)
 		if err != nil {
 			mm.SetConnectionState(ConnectionStates.Disconnected, nil)
-			return newMqttConnectError(err)
+			return newMqttConnectError(friendlyConnectError(err, usingTls))
 		}
 		if v5Client == nil {
 			slog.InfoContext(mm.ctx, "v5 connect cancelled")
@@ -114,7 +115,11 @@ func (mm *MqttManager) connectV5(ctx context.Context, connectionDetails MqttConn
 	}
 	mm.pinger = newPingerV5(mm.ctx, mm.onNewLatencyMs)
 	clientId := connectionDetails.ClientId
-	connectErrChan := make(chan error)
+	// Buffered for the same reason as connectV3's subErrChan: a cancelled or
+	// timed-out connect that has stopped reading this channel must not
+	// strand the OnConnectionUp/OnConnectError callback goroutine on the
+	// send below.
+	connectErrChan := make(chan error, 1)
 	var initialOnce sync.Once
 	config := autopaho.ClientConfig{
 		// Debug:                         NewMqttLogger(),
@@ -244,7 +249,10 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 		}
 	})
 
-	subErrChan := make(chan error)
+	// Buffered so a cancelled/timed-out connectV3 that has stopped reading
+	// this channel doesn't strand the OnConnectHandler goroutine forever on
+	// the send below.
+	subErrChan := make(chan error, 1)
 	var initialOnce sync.Once
 	opts.SetOnConnectHandler(func(c mqttV3.Client) {
 		err := subscribeV3(mm.ctx, c, subscriptions)
@@ -273,30 +281,42 @@ func (mm *MqttManager) connectV3(ctx context.Context, connectionDetails MqttConn
 
 	client := mqttV3.NewClient(opts)
 	token := client.Connect()
+	tokenErrChan := make(chan error, 1)
 	go func() {
 		token.Wait()
+		tokenErrChan <- token.Error()
 	}()
-	select {
-	// Connection cancelled
-	case <-ctx.Done():
-		client.Disconnect(500)
-		return nil, nil
-	case <-time.After(CONNECTION_TIMEOUT):
-		// Same as v5: auto-reconnect is on, so a client we walk away from
-		// keeps trying to connect in the background.
-		client.Disconnect(500)
-		return nil, fmt.Errorf("timeout while connecting to broker")
-	case err := <-subErrChan:
-		if err != nil {
+	timeoutChan := time.After(CONNECTION_TIMEOUT)
+	for {
+		select {
+		// Connection cancelled
+		case <-ctx.Done():
 			client.Disconnect(500)
-			return nil, err
+			return nil, nil
+		case <-timeoutChan:
+			// Same as v5: auto-reconnect is on, so a client we walk away from
+			// keeps trying to connect in the background.
+			client.Disconnect(500)
+			return nil, fmt.Errorf("timeout while connecting to broker")
+		case err := <-tokenErrChan:
+			// A dial/TLS/auth failure completes the token with an error
+			// before OnConnectHandler ever runs. Without watching this
+			// channel those failures were invisible until the timeout
+			// above fired, reporting a generic message instead of the
+			// real cause. A nil error here means CONNACK succeeded, so
+			// keep waiting for the subscribe result on subErrChan.
+			if err != nil {
+				client.Disconnect(500)
+				return nil, err
+			}
+		case err := <-subErrChan:
+			if err != nil {
+				client.Disconnect(500)
+				return nil, err
+			}
+			return &client, nil
 		}
 	}
-	if token.Error() != nil {
-		client.Disconnect(500)
-		return nil, token.Error()
-	}
-	return &client, nil
 }
 
 // clientIdPrefix is kept stable because brokers are commonly configured with

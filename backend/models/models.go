@@ -204,6 +204,13 @@ type SortState struct {
 	SortDirection string `json:"sortDirection"`
 }
 
+// CollectionCollapsedState remembers whether a sidebar collection folder is
+// collapsed. Keyed by collection id; a missing row means expanded.
+type CollectionCollapsedState struct {
+	ID        uint `json:"id" gorm:"primaryKey"`
+	Collapsed bool `json:"collapsed"`
+}
+
 type Migration struct {
 	ID                uint      `json:"id" gorm:"primaryKey"`
 	MigrationFileName string    `json:"migrationFileName"`

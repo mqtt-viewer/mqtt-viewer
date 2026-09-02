@@ -58,8 +58,8 @@
   {/if}
 
   {#if collections.length === 0 && !isCreating}
-    <div class="text-base text-secondary-text px-1">
-      No collections yet — click + to create one
+    <div class="text-base text-secondary-text">
+      No collections yet
     </div>
   {:else}
     {#each collections as collection (collection.id)}

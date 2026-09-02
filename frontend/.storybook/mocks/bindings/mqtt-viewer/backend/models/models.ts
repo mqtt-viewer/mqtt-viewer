@@ -153,6 +153,19 @@ export class PanelSize {
   }
 }
 
+export class CollectionCollapsedState {
+  id = 0;
+  collapsed = false;
+
+  static createFrom(source: any = {}) {
+    return new CollectionCollapsedState(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class SortState {
   id = "";
   sortCriteria = "topic";

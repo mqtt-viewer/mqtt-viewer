@@ -50,6 +50,38 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Peek at messages on the timeline",
+        body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
+        thanks: [
+          {
+            name: "Daschi2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/84",
+          },
+        ],
+      },
+      {
+        title: "Disconnect without leaving the connection dialog",
+        body: "Most connection fields lock while connected. The dialog header now has a Connect/Disconnect button, so you can drop the connection, change what you need and reconnect, all in one place.",
+      },
+      {
+        title: "A tidier sidebar and forms",
+        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels.",
+      },
+      {
+        title: "Dropdowns inside dialogs work again",
+        body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
+      },
+      {
+        title: "A proper Save button for connections",
+        body: "Closing the connection dialog with the X to save your changes always felt a bit wrong. The dialog now has a footer with a Save button and a note showing when your changes were last saved. Nothing about saving has changed underneath: everything still saves automatically as you type, the footer just makes that visible.",
+        thanks: [
+          {
+            name: "jeeftor",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/124",
+          },
+        ],
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
         thanks: [
@@ -132,6 +164,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "A small ask, under a night sky",
+        body: "If you've been using the app a while, I'll ask once whether you'd like to star it on GitHub. It's a single dialog with some shooting stars, and it won't nag you again either way.",
+      },
+      {
         title: "Light mode looks right everywhere",
         body: "Charts, the message timeline and a few icons were keeping their dark colours in light mode. They all follow the theme properly now.",
       },
@@ -156,6 +192,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Updates are harder to miss",
         body: "When a new version is out, a dialog now opens on startup showing what changed, with the choices you'd expect: update now, remind me later, or skip this version. Previously the only hint was a dot on the notification bell.",
+      },
+      {
+        title: "The interface font loads again",
+        body: "The Mona Sans typeface the app is designed in was quietly failing to bundle, so the interface fell back to a system font. It now ships and loads properly.",
       },
       {
         title: "Fixed a crash when disconnecting from a busy broker",
@@ -192,6 +232,14 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Two connections to the same broker no longer fight",
         body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
+      },
+      {
+        title: "Connection failures no longer go unreported",
+        body: "On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting \"Connection failed\" indicator until you try again.",
+      },
+      {
+        title: "Collapsible collections",
+        body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
       },
     ],
   },

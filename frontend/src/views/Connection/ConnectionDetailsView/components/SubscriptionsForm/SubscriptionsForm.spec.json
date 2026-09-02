@@ -18,7 +18,9 @@
       "required": true
     }
   ],
-  "tokens": [],
+  "tokens": [
+    "secondary-text"
+  ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
 }
