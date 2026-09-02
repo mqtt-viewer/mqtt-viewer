@@ -46,9 +46,12 @@ not read like an AI wrote it.
    ```
 
 3. **Write the sections.** Group related changes into one section each. A section
-   is a short benefit-first title (no emoji) and one or two sentences of body.
-   Lead with what the user can now do. Follow the style guide. Reuse or extend an
-   existing section rather than adding a near-duplicate.
+   is a short benefit-first title (no emoji) and ONE terse sentence of body, two
+   at most for a big feature. Sam wants these dev-changelog style: state the
+   change plainly, no scene-setting, no explaining why it matters, no examples
+   unless the change is unintelligible without one. Follow the style guide for
+   tone and spelling. Reuse or extend an existing section rather than adding a
+   near-duplicate.
 
 4. **Credit the person who asked.** If the change traces back to a GitHub
    issue, discussion, or comment, add a `thanks` array to the section:
@@ -92,6 +95,8 @@ When cutting release `vX.Y.Z` (see `docs/RELEASING.md`):
 ## What NOT to do
 
 - No em dashes and no emojis. The changelog test fails if any slip in.
+- No padded prose. If a section body runs past one sentence, cut it down before
+  asking whether it reads well.
 - No version guessing ahead of release. Keep changes in the staging entry.
 - No marketing voice. See `docs/WRITING_STYLE.md`.
 - Don't hand-edit `frontend/src/design-system/component-index.json`.

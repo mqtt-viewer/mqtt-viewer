@@ -173,6 +173,90 @@ func TestMoveAndDuplicateAndRenameCollectionMessage(t *testing.T) {
 	}
 }
 
+func TestSetCollectionCollapsedCreatesAndUpdates(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	global, _ := createTestCollections(t, app, connID)
+
+	if err := app.SetCollectionCollapsed(global.ID, true); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	states, err := app.GetCollectionCollapsedStates()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(states) != 1 || states[0].ID != global.ID || !states[0].Collapsed {
+		t.Fatalf("expected one collapsed state for %d, got %+v", global.ID, states)
+	}
+
+	if err := app.SetCollectionCollapsed(global.ID, false); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var count int64
+	app.Db.Model(&models.CollectionCollapsedState{}).Where("id = ?", global.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("expected exactly 1 state row for %d, got %d", global.ID, count)
+	}
+	var state models.CollectionCollapsedState
+	if err := app.Db.First(&state, global.ID).Error; err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if state.Collapsed {
+		t.Errorf("expected state updated to expanded, got %+v", state)
+	}
+}
+
+func TestDeleteCollectionRemovesCollapsedState(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	_, scoped := createTestCollections(t, app, connID)
+
+	if err := app.SetCollectionCollapsed(scoped.ID, true); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if err := app.DeleteCollection(scoped.ID); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	states, err := app.GetCollectionCollapsedStates()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	for _, state := range states {
+		if state.ID == scoped.ID {
+			t.Errorf("expected collapsed state for %d deleted, got %+v", scoped.ID, states)
+		}
+	}
+}
+
+func TestDeleteConnectionCollectionsRemovesCollapsedStates(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	global, scoped := createTestCollections(t, app, connID)
+
+	if err := app.SetCollectionCollapsed(global.ID, true); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if err := app.SetCollectionCollapsed(scoped.ID, true); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// DeleteConnection itself emits runtime events unavailable in tests, so
+	// exercise the collections cleanup helper it calls.
+	if err := deleteCollectionsForConnection(&app.Db.DB, connID); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var scopedCount, globalCount int64
+	app.Db.Model(&models.CollectionCollapsedState{}).Where("id = ?", scoped.ID).Count(&scopedCount)
+	app.Db.Model(&models.CollectionCollapsedState{}).Where("id = ?", global.ID).Count(&globalCount)
+	if scopedCount != 0 {
+		t.Errorf("expected scoped collection's collapsed state deleted, got %d", scopedCount)
+	}
+	if globalCount != 1 {
+		t.Errorf("expected global collection's collapsed state kept, got %d", globalCount)
+	}
+}
+
 func TestDeleteConnectionRemovesScopedCollectionsOnly(t *testing.T) {
 	app, connID := getTestAppWithConnection(t)
 	global, scoped := createTestCollections(t, app, connID)

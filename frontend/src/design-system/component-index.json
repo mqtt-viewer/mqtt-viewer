@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-28T07:23:29.306Z",
+  "generatedAt": "2026-09-02T12:33:10.832Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -932,7 +932,8 @@
             "connected",
             "disconnected",
             "connecting",
-            "reconnecting"
+            "reconnecting",
+            "error"
           ]
         }
       ],
@@ -1070,6 +1071,18 @@
           "type": "string",
           "required": false,
           "default": "!startEmpty"
+        },
+        {
+          "name": "ariaLabel",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "openFocus",
+          "type": "string",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
@@ -2137,11 +2150,9 @@
         "lastSyncedAt": null
       },
       "props": [],
-      "tokens": [
-        "secondary-text"
-      ],
+      "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
+      "notes": "Figma is not linked yet. Bespoke night-sky illustration (scoped <style>: twinkling stars + CSS shooting stars, adapted from constgenius/ShootingStar) so it uses raw decorative colours rather than design tokens; the surface is intentionally dark regardless of theme. The action buttons' colour treatment (muted 'Maybe later' text, primary button glow) is part of the same exception and lives in the scoped style block under stable class names. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
       "sourcePath": "src/components/StarPromptDialog/StarPromptDialog.svelte",
       "specPath": "src/components/StarPromptDialog/StarPromptDialog.spec.json",
       "storyPath": "src/components/StarPromptDialog/StarPromptDialog.stories.svelte",
@@ -2284,9 +2295,77 @@
       "specMissing": false
     },
     {
+      "name": "UpdateAvailableContent",
+      "tier": "component",
+      "description": "Layout for the update dialog: lead line, version transition chips, scrollable release notes, install instructions with a copyable command, skip/remind/update actions.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "update",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "currentVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "updating",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "onUpdate",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onRemindLater",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onSkip",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCopyCommand",
+          "type": "function",
+          "required": false
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "emphasis",
+        "divider",
+        "primary",
+        "elevation-0",
+        "outline"
+      ],
+      "dependencies": [
+        "Button",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action.",
+      "sourcePath": "src/components/UpdateDialog/UpdateAvailableContent.svelte",
+      "specPath": "src/components/UpdateDialog/UpdateAvailableContent.spec.json",
+      "storyPath": "src/components/UpdateDialog/UpdateAvailableContent.stories.svelte",
+      "storyId": "Components/UpdateDialog/UpdateAvailableContent",
+      "specMissing": false
+    },
+    {
       "name": "UpdateDialog",
       "tier": "component",
-      "description": "Storybook coverage for UpdateDialog.",
+      "description": "Update-available dialog; auto-opens when a non-skipped update is found, once the first-run and changelog dialogs have resolved.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2298,7 +2377,7 @@
       "props": [],
       "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent.",
       "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",
       "specPath": "src/components/UpdateDialog/UpdateDialog.spec.json",
       "storyPath": "src/components/UpdateDialog/UpdateDialog.stories.svelte",
@@ -2939,7 +3018,9 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.svelte",
@@ -3803,7 +3884,9 @@
         "primary-light",
         "secondary",
         "secondary-text",
-        "outline"
+        "outline",
+        "elevation-2",
+        "emphasis"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
@@ -4247,7 +4330,7 @@
         "error"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook).",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.stories.svelte",
@@ -4368,7 +4451,10 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text",
+        "divider"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.svelte",

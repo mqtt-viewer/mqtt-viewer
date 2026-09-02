@@ -5,6 +5,7 @@ export {
     AppSettings,
     ChartWindow,
     Collection,
+    CollectionCollapsedState,
     CollectionMessage,
     Connection,
     FilterHistory,

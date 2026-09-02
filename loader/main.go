@@ -28,6 +28,7 @@ func main() {
 		&models.ReceivedMessage{},
 		&models.Collection{},
 		&models.CollectionMessage{},
+		&models.CollectionCollapsedState{},
 		&models.SysMetricMapping{},
 	)
 	if err != nil {

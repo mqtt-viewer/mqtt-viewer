@@ -50,6 +50,38 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Peek at messages on the timeline",
+        body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
+        thanks: [
+          {
+            name: "Daschi2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/84",
+          },
+        ],
+      },
+      {
+        title: "Disconnect without leaving the connection dialog",
+        body: "Most connection fields lock while connected. The dialog header now has a Connect/Disconnect button, so you can drop the connection, change what you need and reconnect, all in one place.",
+      },
+      {
+        title: "A tidier sidebar and forms",
+        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels.",
+      },
+      {
+        title: "Dropdowns inside dialogs work again",
+        body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
+      },
+      {
+        title: "A proper Save button for connections",
+        body: "Closing the connection dialog with the X to save your changes always felt a bit wrong. The dialog now has a footer with a Save button and a note showing when your changes were last saved. Nothing about saving has changed underneath: everything still saves automatically as you type, the footer just makes that visible.",
+        thanks: [
+          {
+            name: "jeeftor",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/124",
+          },
+        ],
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
         thanks: [
@@ -142,6 +174,14 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "A small ask, under a night sky",
+        body: "If you've been using the app a while, I'll ask once whether you'd like to star it on GitHub. It's a single dialog with some shooting stars, and it won't nag you again either way.",
+      },
+      {
+        title: "Light mode looks right everywhere",
+        body: "Charts, the message timeline and a few icons were keeping their dark colours in light mode. They all follow the theme properly now.",
+      },
+      {
         title: "Chart and dropdown fixes",
         body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
         thanks: [
@@ -155,6 +195,62 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
         ],
       },
+      {
+        title: "Updates that match your install",
+        body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
+      },
+      {
+        title: "Updates are harder to miss",
+        body: "When a new version is out, a dialog now opens on startup showing what changed, with the choices you'd expect: update now, remind me later, or skip this version. Previously the only hint was a dot on the notification bell.",
+      },
+      {
+        title: "The interface font loads again",
+        body: "The Mona Sans typeface the app is designed in was quietly failing to bundle, so the interface fell back to a system font. It now ships and loads properly.",
+      },
+      {
+        title: "Fixed a crash when disconnecting from a busy broker",
+        body: "Disconnecting while messages were still flooding in could take the whole app down. The message buffer's shutdown raced its own drain timer; it now stops cleanly no matter how busy the connection is.",
+      },
+      {
+        title: "Reconnecting when the network drops out",
+        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+      },
+      {
+        title: "Install it with Nix",
+        body: "MQTT Viewer is now packaged as a Nix flake for x86_64 and aarch64 Linux, and the updater points Nix installs at Nix instead of the .deb download.",
+      },
+      {
+        title: "Deleting a connection works again",
+        body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
+      },
+      {
+        title: "Clearer memory settings",
+        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
+      },
+      {
+        title: "The memory budget now covers every topic",
+        body: "On brokers with hundreds of thousands of topics, the last value I keep for each topic sat outside your memory budget, so memory kept growing however low you set it. It is now counted, and if it ever gets large I trim the topics you have heard from least recently. Normal brokers are nowhere near that, so the topic tree is unchanged.",
+      },
+      {
+        title: "Steadier message counts, and a crash that can no longer happen",
+        body: "The received and sent counters dropped messages on a busy broker because several arriving at once could overwrite each other's tally. They now count every message, and adding or removing a connection while those numbers are on screen can no longer bring the app down.",
+      },
+      {
+        title: "Messages stay in the order they arrived",
+        body: "On MQTT 3 connections the timeline and message history could show messages out of order, and stamp them with the wrong arrival time, because the client handed each one off separately as it came in. They are now recorded in the order they land, which is what MQTT 5 connections already did.",
+      },
+      {
+        title: "Two connections to the same broker no longer fight",
+        body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
+      },
+      {
+        title: "Connection failures no longer go unreported",
+        body: "On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting \"Connection failed\" indicator until you try again.",
+      },
+      {
+        title: "Collapsible collections",
+        body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
+      },
     ],
   },
   {
@@ -163,7 +259,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "July 2026",
     headline: "MQTT Viewer 1.0 is here",
     intro:
-      "After years of betas, MQTT Viewer is officially 1.0. Thanks for sticking with it. The big new features (charting, collections, bounded memory, image previews) arrived in 0.7.0, so have a look at that tab too. Here's what 1.0 adds on top.",
+      "After years of betas, MQTT Viewer is officially 1.0. The big new features (charting, collections, bounded memory, image previews) arrived in 0.7.0, so have a look at that tab too. Here's what 1.0 adds on top.",
     sections: [
       {
         title: "Release notes",
@@ -181,7 +277,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
     ],
     outro:
-      "Found a bug or a rough edge? Use the Feedback button, I really want to know.",
+      "Found a bug or a rough edge? Use the Feedback button, I want to know.",
   },
   {
     version: "0.7.0",
@@ -191,6 +287,20 @@ export const CHANGELOG: ChangelogEntry[] = [
     intro:
       "A big one: charting, collections, bounded memory, image previews, and a new engine under the hood.",
     sections: [
+      {
+        title: "Light mode",
+        body: "The app now has a proper light theme, with a toggle that remembers your choice.",
+        thanks: [
+          {
+            name: "oeed",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/18",
+          },
+          {
+            name: "juggledad",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/21",
+          },
+        ],
+      },
       {
         title: "Topic charting",
         body: "Chart numeric payload fields over time, live, with a pop-out window.",
@@ -235,7 +345,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ];
 
-const normalise = (version: string): string =>
+export const normalise = (version: string): string =>
   version.trim().replace(/^v/i, "");
 
 /** Released entries only, newest first. */

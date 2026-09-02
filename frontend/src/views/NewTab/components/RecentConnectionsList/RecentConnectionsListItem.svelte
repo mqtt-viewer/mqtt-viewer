@@ -124,6 +124,16 @@ transition-opacity duration-200`}
         >
         {capitalizeFirstLetter(connection.connectionState)}
       </div>
+    {:else if connection.connectionState === "error"}
+      <Tooltip
+        placement="top"
+        text={connection.lastConnectionError ?? "Connection failed"}
+      >
+        <div class="text-error flex items-center gap-1 justify-end">
+          <Icon type="warning" size={14} />
+          <span>Connection failed</span>
+        </div>
+      </Tooltip>
     {:else if lastConnectedString !== ""}
       <Tooltip
         placement="top"
