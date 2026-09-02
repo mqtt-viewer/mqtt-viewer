@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createDialog, melt } from "@melt-ui/svelte";
+  import type { CreateDialogProps } from "@melt-ui/svelte";
   import { flyAndScale } from "@/util/transitions";
   import { fade } from "svelte/transition";
   import { writable } from "svelte/store";
@@ -12,6 +13,14 @@
   export let noTitleMargin = false;
   export let startEmpty = false;
   export let showCloseButton = !startEmpty;
+  // Accessible name for startEmpty dialogs, which render no melt title or
+  // description elements. When set, it replaces the dangling aria-labelledby
+  // and aria-describedby references melt would otherwise emit.
+  export let ariaLabel: string | undefined = undefined;
+  // Passed through to melt's createDialog to override which element receives
+  // focus when the dialog opens. A selector string is the reliable form here:
+  // melt resolves it after the content has mounted.
+  export let openFocus: CreateDialogProps["openFocus"] = undefined;
 
   $: $isOpen,
     (() => {
@@ -33,6 +42,7 @@
   } = createDialog({
     forceVisible: true,
     open: isOpen,
+    openFocus,
   });
 </script>
 
@@ -50,13 +60,20 @@
     <div
       class="fixed left-[50%] top-[50%] z-[10000] max-h-[85vh] min-w-[380px]
             max-w-[90vw] translate-x-[-50%] translate-y-[-50%] rounded bg-elevation-1
-            shadow-lg"
+            shadow-lg outline-none"
       transition:flyAndScale={{
         duration: 150,
         y: 8,
         start: 0.96,
       }}
       use:melt={$content}
+      aria-label={startEmpty && ariaLabel ? ariaLabel : undefined}
+      aria-labelledby={startEmpty && ariaLabel
+        ? undefined
+        : $content["aria-labelledby"]}
+      aria-describedby={startEmpty && ariaLabel
+        ? undefined
+        : $content["aria-describedby"]}
     >
       {#if startEmpty}
         <!-- Expose melt's title builder so startEmpty consumers can mark

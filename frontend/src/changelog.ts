@@ -164,6 +164,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "A small ask, under a night sky",
+        body: "If you've been using the app a while, I'll ask once whether you'd like to star it on GitHub. It's a single dialog with some shooting stars, and it won't nag you again either way.",
+      },
+      {
         title: "Light mode looks right everywhere",
         body: "Charts, the message timeline and a few icons were keeping their dark colours in light mode. They all follow the theme properly now.",
       },
