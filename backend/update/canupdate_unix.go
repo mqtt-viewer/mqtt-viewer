@@ -21,6 +21,13 @@ func canSelfUpdate() bool {
 		// Flatpak's /app is read-only; updates come through `flatpak update`.
 		return false
 	}
+	if isNixInstall() {
+		// Nix store paths are immutable. On a single-user install the store can
+		// be user-writable, so the writability check below is not sufficient on
+		// its own: refuse explicitly rather than let the updater try to
+		// overwrite a store path.
+		return false
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return false

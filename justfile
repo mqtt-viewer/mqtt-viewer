@@ -1,5 +1,13 @@
-test PATH='./...':
+test PATH='./...': stub-dist
   set -o pipefail && go test {{PATH}} fmt -json | tparse -all
+
+# main.go embeds frontend/dist, which is gitignored and so missing on a fresh
+# checkout - without it the root package fails to load and any ./... command
+# fails. Stub it so Go-only workflows work without a full frontend build.
+# Mirrors the stub in build/Taskfile.yml's generate:bindings task.
+stub-dist:
+  mkdir -p frontend/dist
+  [ -f frontend/dist/index.html ] || echo "<html></html>" > frontend/dist/index.html
 
 new-migration NAME:
   atlas migrate diff --env gorm {{NAME}}

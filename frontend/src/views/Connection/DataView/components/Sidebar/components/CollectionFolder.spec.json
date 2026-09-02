@@ -38,5 +38,5 @@
     "error"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet."
+  "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook)."
 }

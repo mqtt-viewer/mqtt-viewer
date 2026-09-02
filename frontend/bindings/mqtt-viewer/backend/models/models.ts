@@ -117,6 +117,35 @@ export class Collection {
     }
 }
 
+/**
+ * CollectionCollapsedState remembers whether a sidebar collection folder is
+ * collapsed. Keyed by collection id; a missing row means expanded.
+ */
+export class CollectionCollapsedState {
+    "id": number;
+    "collapsed": boolean;
+
+    /** Creates a new CollectionCollapsedState instance. */
+    constructor($$source: Partial<CollectionCollapsedState> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("collapsed" in $$source)) {
+            this["collapsed"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CollectionCollapsedState instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CollectionCollapsedState {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CollectionCollapsedState($$parsedSource as Partial<CollectionCollapsedState>);
+    }
+}
+
 export class CollectionMessage {
     "id": number;
     "collectionId": number;

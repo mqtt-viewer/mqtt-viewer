@@ -29,7 +29,7 @@
 {#if groups.length === 0}
   <div class="flex flex-col gap-2">
     <span class="text-sm font-semibold text-secondary-text">History</span>
-    <div class="text-base text-secondary-text px-1">
+    <div class="text-base text-secondary-text">
       Messages you publish will appear here
     </div>
   </div>
@@ -51,7 +51,7 @@
   {/each}
   {#if hiddenCount > 0}
     <button
-      class="text-base text-secondary-text hover:text-emphasis text-left px-1 pb-2"
+      class="text-base text-secondary-text hover:text-emphasis text-left pb-2"
       on:click={() => (visibleCount += VISIBLE_STEP)}
     >
       Show {Math.min(hiddenCount, VISIBLE_STEP)} more ({hiddenCount} hidden)

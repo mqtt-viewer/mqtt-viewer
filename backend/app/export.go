@@ -23,7 +23,7 @@ type exportedMessage struct {
 }
 
 func (a *App) ExportTopicMessages(connId uint, topic string) (string, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return "", fmt.Errorf("connection not found")
 	}
@@ -37,7 +37,7 @@ func (a *App) ExportTopicMessages(connId uint, topic string) (string, error) {
 }
 
 func (a *App) ExportAllMessages(connId uint) (string, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return "", fmt.Errorf("connection not found")
 	}

@@ -12,6 +12,7 @@ import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import { Events } from "@wailsio/runtime";
 import tabsStore from "@/stores/tabs";
 import subscriptionsStore, { type Subscription } from "./subscriptions";
+import { markSaved } from "./last-saved";
 import type { DeepOmit } from "@/util/types";
 //@ts-ignore - unsure why this is throwing type errors
 import { addToast } from "@/components/Toast/Toast.svelte";
@@ -252,6 +253,7 @@ const updateConnectionDetails = async (
       };
       return store;
     });
+    markSaved(connectionDetails.id);
   } catch (e) {
     console.error(e);
     throw e;

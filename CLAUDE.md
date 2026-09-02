@@ -36,22 +36,25 @@ Backend (repo root):
 ```sh
 just dev                 # wails3 dev: run the app with hot reload
 just test                # go test ./... via tparse
+just stub-dist           # create the embedded frontend/dist stub
 just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
 
-On a fresh checkout or new worktree, `go build ./...` fails with
-`pattern all:frontend/dist: no matching files found`: main.go embeds the
-frontend build, which does not exist yet (`frontend/dist` is gitignored
-and vite empties it on every build, so a committed placeholder would not
-survive). Stub it once before building Go code:
+`just test` runs `stub-dist` first, so it works on a fresh tree. For a
+bare `go build ./...` or `go vet ./...`, run the stub once yourself:
 
 ```sh
-mkdir -p frontend/dist && [ -f frontend/dist/index.html ] || echo "<html></html>" > frontend/dist/index.html
+just stub-dist
 ```
 
-(the same stub `build/Taskfile.yml`'s `generate:bindings` task creates),
-or run a real `pnpm build` from `frontend/`.
+Without it those commands fail with `pattern all:frontend/dist: no
+matching files found`. main.go embeds the frontend build, which does not
+exist yet on a fresh checkout or new worktree (`frontend/dist` is
+gitignored and vite empties it on every build, so a committed
+placeholder would not survive). The recipe mirrors the stub
+`build/Taskfile.yml`'s `generate:bindings` task creates. A real
+`pnpm build` from `frontend/` satisfies the embed too.
 
 Dev-server ports are derived per checkout so parallel agent worktrees
 never collide. Once per checkout, run `scripts/dev-ports.sh write-launch`
@@ -127,8 +130,11 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 - Database changes: edit the GORM model, register it in
   `loader/main.go` if new, then `just new-migration <name>`. Never
   hand-edit applied migrations.
-- Backend tests use `getTestApp(t)` with golden dirs under
-  `backend/app/_test/<TestName>/`; keep new tests in that pattern.
+- Backend tests use `getTestApp(t)`, which gives each test a scratch
+  resource dir at `backend/app/_test/<TestName>-<pid>/` (gitignored, not
+  golden data). Keep new tests in that pattern, and never derive that
+  path yourself: the PID keeps concurrent `go test` runs from deleting
+  each other's SQLite database.
 - Anything a user reads follows `docs/WRITING_STYLE.md`. Hard rules: no
   emojis, no em dashes, first person singular, British spelling, terse.
 - Changelog: every user-facing feature or fix MUST add a section to the
@@ -145,6 +151,27 @@ around 2000 msg/s. Run `/perf-check` before merging anything that
 touches message handling, the topic tree, history, or the graph view.
 This bar exists because heavy public brokers (test.mosquitto.org) are a
 core use case.
+
+## Adversarial review
+
+"Adversarial review" here always means the same thing. Never review your
+own work in your own context; you will confirm what you already believe.
+
+1. Spawn a **fresh agent** with only the context it needs: the branch or
+   diff, the explicit claims being made, and how to run the tests. Do not
+   hand it your reasoning, your conclusions, or why you think the work is
+   right. Those are what it is meant to attack.
+2. Its job is to **disprove**, not to appraise. Brief it to falsify each
+   claim, run the tests and benchmarks itself rather than trusting the
+   numbers in the description, and hunt for the case that breaks the
+   change. "Looks good" is a failed review.
+3. **You then judge its findings.** It has less context than you and will
+   raise things that are wrong, out of scope, or already handled. Verify
+   each one against the code before acting, implement what genuinely
+   holds, and say plainly which you rejected and why.
+
+Use the session's top model for the reviewer. Review is judgment, and
+judgment is the one thing not worth delegating downward.
 
 ## Releases and the portal
 

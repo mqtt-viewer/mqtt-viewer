@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-16T09:48:15.466Z",
+  "generatedAt": "2026-09-01T04:24:49.258Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2939,7 +2939,9 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.svelte",
@@ -4236,7 +4238,7 @@
         "error"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook).",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.stories.svelte",
@@ -4357,7 +4359,10 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text",
+        "divider"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.svelte",

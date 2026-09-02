@@ -50,6 +50,28 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Disconnect without leaving the connection dialog",
+        body: "Most connection fields lock while connected. The dialog header now has a Connect/Disconnect button, so you can drop the connection, change what you need and reconnect, all in one place.",
+      },
+      {
+        title: "A tidier sidebar and forms",
+        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels.",
+      },
+      {
+        title: "Dropdowns inside dialogs work again",
+        body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
+      },
+      {
+        title: "A proper Save button for connections",
+        body: "Closing the connection dialog with the X to save your changes always felt a bit wrong. The dialog now has a footer with a Save button and a note showing when your changes were last saved. Nothing about saving has changed underneath: everything still saves automatically as you type, the footer just makes that visible.",
+        thanks: [
+          {
+            name: "jeeftor",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/124",
+          },
+        ],
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
         thanks: [
@@ -156,6 +178,46 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "The interface font loads again",
         body: "The Mona Sans typeface the app is designed in was quietly failing to bundle, so the interface fell back to a system font. It now ships and loads properly.",
+      },
+      {
+        title: "Fixed a crash when disconnecting from a busy broker",
+        body: "Disconnecting while messages were still flooding in could take the whole app down. The message buffer's shutdown raced its own drain timer; it now stops cleanly no matter how busy the connection is.",
+      },
+      {
+        title: "Reconnecting when the network drops out",
+        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+      },
+      {
+        title: "Install it with Nix",
+        body: "MQTT Viewer is now packaged as a Nix flake for x86_64 and aarch64 Linux, and the updater points Nix installs at Nix instead of the .deb download.",
+      },
+      {
+        title: "Deleting a connection works again",
+        body: "Deleting a connection could fail and quietly roll back if you'd ever used publish or filter history on it. It now removes everything that belongs to the connection, and clearing out a large message history no longer freezes the app while it works.",
+      },
+      {
+        title: "Clearer memory settings",
+        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
+      },
+      {
+        title: "The memory budget now covers every topic",
+        body: "On brokers with hundreds of thousands of topics, the last value I keep for each topic sat outside your memory budget, so memory kept growing however low you set it. It is now counted, and if it ever gets large I trim the topics you have heard from least recently. Normal brokers are nowhere near that, so the topic tree is unchanged.",
+      },
+      {
+        title: "Steadier message counts, and a crash that can no longer happen",
+        body: "The received and sent counters dropped messages on a busy broker because several arriving at once could overwrite each other's tally. They now count every message, and adding or removing a connection while those numbers are on screen can no longer bring the app down.",
+      },
+      {
+        title: "Messages stay in the order they arrived",
+        body: "On MQTT 3 connections the timeline and message history could show messages out of order, and stamp them with the wrong arrival time, because the client handed each one off separately as it came in. They are now recorded in the order they land, which is what MQTT 5 connections already did.",
+      },
+      {
+        title: "Two connections to the same broker no longer fight",
+        body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
+      },
+      {
+        title: "Collapsible collections",
+        body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
       },
     ],
   },

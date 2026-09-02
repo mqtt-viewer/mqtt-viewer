@@ -59,7 +59,9 @@
       use:melt={$content}
     >
       {#if startEmpty}
-        <slot />
+        <!-- Expose melt's title builder so startEmpty consumers can mark
+             their own heading as the accessible dialog title. -->
+        <slot meltTitle={$meltTitle} />
       {:else}
         <div class="p-6 size-full">
           <h2 use:melt={$meltTitle} class="m-0 text-lg font-medium">
@@ -71,7 +73,7 @@
             </p>
           {/if}
           <div class={`text-secondary-text ${noTitleMargin ? "mt-0" : "mt-4"}`}>
-            <slot />
+            <slot meltTitle={$meltTitle} />
           </div>
           {#if showCloseButton}
             <button
