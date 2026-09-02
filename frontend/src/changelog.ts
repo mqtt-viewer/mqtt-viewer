@@ -176,6 +176,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
       {
+        title: "The interface font loads again",
+        body: "The Mona Sans typeface the app is designed in was quietly failing to bundle, so the interface fell back to a system font. It now ships and loads properly.",
+      },
+      {
         title: "Fixed a crash when disconnecting from a busy broker",
         body: "Disconnecting while messages were still flooding in could take the whole app down. The message buffer's shutdown raced its own drain timer; it now stops cleanly no matter how busy the connection is.",
       },

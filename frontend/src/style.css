@@ -159,10 +159,7 @@
     font-family: "Mona Sans";
     font-weight: 200 900;
     font-stretch: 75% 125%;
-    src: url("assets/fonts/MonaSans[slnt\,wdth\,wght].woff2")
-        format("woff2 supports variations"),
-      url("assets/fonts/MonaSans[slnt\,wdth\,wght].woff2")
-        format("woff2-variations");
+    src: url("assets/fonts/MonaSans.woff2") format("woff2");
   }
 
   @keyframes flash-background {
