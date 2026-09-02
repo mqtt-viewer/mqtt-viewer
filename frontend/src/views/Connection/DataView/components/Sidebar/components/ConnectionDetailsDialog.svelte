@@ -8,7 +8,8 @@
   import IconButton from "@/components/Button/IconButton.svelte";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
-  import type { Connection } from "@/stores/connections";
+  import connections, { type Connection } from "@/stores/connections";
+  import { addToast } from "@/components/Toast/Toast.svelte";
   import lastSavedStore from "@/stores/last-saved";
   import { getConnectionIsValidContext } from "@/views/Connection/contexts/connection-is-valid";
   import ConnectionForm from "@/views/Connection/ConnectionDetailsView/components/ConnectionForm/ConnectionForm.svelte";
@@ -57,6 +58,35 @@
   $: footerLabel = $connectionIsValid
     ? lastSavedLabel
     : "Not saved, check the highlighted fields";
+
+  // Header connect toggle, mirroring ConnectionRow's dropdown action so users
+  // can disconnect, edit the disabled fields, and reconnect without leaving
+  // the dialog.
+  $: connState = connection.connectionState;
+  $: isConnected = connState === "connected";
+  $: isBusy = connState === "connecting" || connState === "reconnecting";
+  let isToggling = false;
+  const toggleConnect = async () => {
+    if (isToggling) return;
+    isToggling = true;
+    try {
+      if (isConnected || isBusy) {
+        await connections.disconnect(connection.connectionDetails.id);
+      } else {
+        await connections.connect(connection.connectionDetails.id);
+      }
+    } catch (e) {
+      addToast({
+        data: {
+          title: isConnected ? "Failed to disconnect" : "Failed to connect",
+          description: e as string,
+          type: "error",
+        },
+      });
+    } finally {
+      isToggling = false;
+    }
+  };
 </script>
 
 <!--
@@ -71,9 +101,14 @@
 <Dialog {isOpen} startEmpty let:meltTitle>
   <div class="flex flex-col w-[550px] max-w-[78vw] max-h-[78vh]">
     <div
-      class="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-divider/40"
+      class="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-outline"
     >
-      <span class="text-lg" use:melt={meltTitle}>Connection settings</span>
+      <div class="flex items-center gap-4">
+        <span class="text-lg" use:melt={meltTitle}>Connection settings</span>
+        <Button variant="secondary" disabled={isToggling} on:click={toggleConnect}>
+          {isConnected || isBusy ? "Disconnect" : "Connect"}
+        </Button>
+      </div>
       <IconButton onClick={() => isOpen.set(false)}>
         <Icon type="close" size={16} />
       </IconButton>
@@ -85,7 +120,7 @@
       </div>
     </div>
     <div
-      class="flex items-center justify-between px-6 py-4 shrink-0 border-t border-divider/40"
+      class="flex items-center justify-between px-6 py-4 shrink-0 border-t border-outline"
     >
       <span class="text-sm text-secondary-text">{footerLabel}</span>
       <Button

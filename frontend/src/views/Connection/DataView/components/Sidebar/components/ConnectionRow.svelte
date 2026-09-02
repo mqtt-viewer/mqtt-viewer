@@ -106,7 +106,7 @@
       onCancel={() => (isRenaming = false)}
     />
   {:else}
-    <DropdownMenu placement="bottom-start">
+    <DropdownMenu placement="bottom-start" triggerButtonClass="w-full">
       <div
         slot="trigger"
         class="flex items-center gap-2 px-1 -mx-1 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"

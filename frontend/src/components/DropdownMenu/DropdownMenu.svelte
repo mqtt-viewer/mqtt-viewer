@@ -8,6 +8,11 @@
   export let disabled = false;
   export let triggerText = "";
   export let triggerClass = "";
+  // Classes for the outer melt trigger <button> itself. The button is
+  // shrink-to-fit by default, which makes a max-w-full child truncate against
+  // the button's own first-pass width; pass w-full to give slotted content the
+  // row's real width.
+  export let triggerButtonClass = "";
   export let triggerIconSize = 16;
   export let triggerVariant = "secondary" as "primary" | "secondary" | "text";
   export let placement = undefined as
@@ -59,7 +64,7 @@
   setContext("menu-elements", elements);
 </script>
 
-<button type="button" class="trigger" {disabled} use:melt={$trigger}>
+<button type="button" class={`trigger ${triggerButtonClass}`} {disabled} use:melt={$trigger}>
   {#if $$slots.trigger}
     <slot name="trigger" />
   {:else}
