@@ -40,6 +40,9 @@ func (a *App) UpdateAppSettings(params UpdateAppSettingsParams) (models.AppSetti
 	a.applyMemoryBudgetToAllConnections(settings.MemoryBudgetBytes)
 	a.recordingEnabled.Store(settings.RecordingEnabled)
 	a.diskBudgetBytes.Store(settings.DiskBudgetBytes)
+	// A changed budget shifts the soft memory limit too, not just the
+	// per-connection eviction threshold.
+	a.recomputeMemoryLimit()
 	return settings, nil
 }
 
@@ -92,7 +95,7 @@ func (a *App) applyMemoryBudgetToAllConnections(budget int64) {
 	if budget <= 0 {
 		budget = mqtt.DefaultMemoryBudgetBytes
 	}
-	for _, conn := range a.AppConnections {
+	for _, conn := range a.appConnectionsSnapshot() {
 		if conn != nil && conn.MqttManager != nil {
 			conn.MqttManager.SetMessageMemoryBudget(budget)
 		}

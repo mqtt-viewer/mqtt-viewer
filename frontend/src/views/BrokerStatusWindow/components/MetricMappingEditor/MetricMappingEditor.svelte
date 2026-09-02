@@ -180,15 +180,11 @@
   $: editing = draft.id !== null;
 </script>
 
-<Dialog
-  {isOpen}
-  title="Metric tiles"
-  description="Redirect a builtin tile to your broker's topics, or add your own custom tiles. Changes apply to this connection."
->
+<Dialog {isOpen} title="Metric tiles">
   <div class="flex w-[520px] max-w-[86vw] flex-col gap-5">
     <!-- Draft form: add mode, or edit when a row was picked. -->
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-col gap-3 sm:flex-row">
+    <div class="flex flex-col gap-8 pt-2">
+      <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
           name="mapping-label"
           label="Label"
@@ -212,7 +208,7 @@
         errorMessage={topicError}
         onChange={() => (topicError = undefined)}
       />
-      <div class="flex flex-col gap-3 sm:flex-row">
+      <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
           name="mapping-path"
           label="JSON path (optional)"

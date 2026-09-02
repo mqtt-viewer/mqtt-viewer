@@ -20,7 +20,7 @@ func TestReceivedMessageWindowPagesNewestFirstInArrivalOrder(t *testing.T) {
 	for i := 0; i < 25; i++ {
 		batch = append(batch, mqtt.MqttMessage{Topic: "seq", Payload: []byte(fmt.Sprintf("%d", i))})
 	}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, batch)
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, batch)
 
 	// Newest window of 10.
 	win1, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "seq", 0, 0, 10)
@@ -80,7 +80,7 @@ func TestReceivedMessageWindowReconstructsProperties(t *testing.T) {
 		ContentType:    "text/plain",
 		UserProperties: map[string]string{"a": "b"},
 	}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
 
 	win, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)
 	if err != nil || len(win) != 1 {

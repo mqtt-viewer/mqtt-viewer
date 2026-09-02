@@ -47,6 +47,19 @@ export class EnvInfo {
   }
 }
 
+export class MemoryStats {
+  historyBytes = 0;
+  activeConnections = 0;
+
+  static createFrom(source: any = {}) {
+    return new MemoryStats(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class MqttStats {
   totalMessagesReceived = 128;
   totalMessagesSent = 42;

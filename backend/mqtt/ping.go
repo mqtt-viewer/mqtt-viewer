@@ -31,13 +31,30 @@ type Pinger interface {
 	SetDebug(log.Logger)
 }
 
+var (
+	// How often to send a PINGREQ. The MQTT keepalive is a ceiling, not a
+	// target: pinging more often than that is legal and keeps the latency
+	// readout in the UI live. A PINGREQ is two bytes, so the cost is noise
+	// even against a broker flooding us.
+	PING_INTERVAL = 2 * time.Second
+	// How long to wait for the PINGRESP before treating the connection as
+	// dead. Without this the client sits in "connected" forever whenever a
+	// broker goes silent without closing the socket, and never reconnects.
+	// Matches the v3 client's PingTimeout.
+	PING_TIMEOUT = 10 * time.Second
+)
+
 type PingerV5 struct {
 	logCtx            context.Context
 	lastPacketSent    time.Time
 	lastPingSent      time.Time
 	lastPingResponse  time.Time
 	lastPingLatencyMs int32
+	pingOutstanding   bool
 	onNewLatencyMs    func(int32)
+
+	interval time.Duration
+	timeout  time.Duration
 
 	debug log.Logger
 
@@ -51,6 +68,8 @@ func newPingerV5(ctx context.Context, onNewLatencyMs func(int32)) *PingerV5 {
 		logCtx:         ctx,
 		debug:          log.NOOPLogger{},
 		onNewLatencyMs: onNewLatencyMs,
+		interval:       PING_INTERVAL,
+		timeout:        PING_TIMEOUT,
 	}
 }
 
@@ -69,15 +88,27 @@ func (p *PingerV5) Run(ctx context.Context, conn net.Conn, keepAlive uint16) err
 		return fmt.Errorf("Run() already in progress")
 	}
 	p.running = true
+	// The pinger instance outlives a single connection (autopaho builds a new
+	// paho client per reconnect but reuses this handler), so clear anything
+	// left over from the previous connection.
+	p.lastPingSent = time.Time{}
+	p.lastPingResponse = time.Time{}
+	p.pingOutstanding = false
 	p.mu.Unlock()
+
 	defer func() {
 		p.mu.Lock()
 		p.running = false
+		p.pingOutstanding = false
 		p.mu.Unlock()
 	}()
 
-	// interval := time.Duration(keepAlive) * time.Second
-	interval := time.Second * 2
+	interval := p.interval
+	// The keepalive the server agreed to is an upper bound on the gap between
+	// packets, so never ping less often than that.
+	if keepAliveInterval := time.Duration(keepAlive) * time.Second; keepAliveInterval < interval {
+		interval = keepAliveInterval
+	}
 	timer := time.NewTimer(0) // Immediately send first pingreq
 	for {
 		select {
@@ -86,22 +117,29 @@ func (p *PingerV5) Run(ctx context.Context, conn net.Conn, keepAlive uint16) err
 			return nil
 		case <-timer.C:
 			p.mu.Lock()
-			// Only send a ping if a ping has recently arrived, or it's been more than 5 seconds
-			// (it may have been missed)
-			since := time.Since(p.lastPingResponse)
-			if since < interval || since > time.Second*5 {
-				if since > time.Second*5 {
-					slog.WarnContext(p.logCtx, fmt.Sprintf("ping response handler waited longer than 5000ms, assuming no response"))
-				}
-				p.lastPingSent = time.Now() // set before sending because WriteTo may return after PINGRESP is handled
+			outstanding := p.pingOutstanding
+			if outstanding && time.Since(p.lastPingSent) > p.timeout {
+				p.mu.Unlock()
+				slog.WarnContext(p.logCtx, fmt.Sprintf("no PINGRESP after %s, treating connection as lost", p.timeout))
+				return fmt.Errorf("no PINGRESP received within %s", p.timeout)
+			}
+			if !outstanding {
+				// Set before sending: WriteTo may return after the PINGRESP
+				// has already been handled.
+				p.lastPingSent = time.Now()
+				p.pingOutstanding = true
+			}
+			p.mu.Unlock()
+
+			if !outstanding {
+				// Write outside the lock so a blocked socket cannot stall
+				// PacketSent and PingResp, which paho calls from its own loops.
 				if _, err := packets.NewControlPacket(packets.PINGREQ).WriteTo(conn); err != nil {
-					slog.Error(fmt.Sprintf("ping packet write error: %v", err))
-					p.mu.Unlock()
+					slog.ErrorContext(p.logCtx, fmt.Sprintf("ping packet write error: %v", err))
 					return fmt.Errorf("failed to send PINGREQ: %w", err)
 				}
 			}
 			timer.Reset(interval)
-			p.mu.Unlock()
 		}
 	}
 }
@@ -114,11 +152,21 @@ func (p *PingerV5) PacketSent() {
 
 func (p *PingerV5) PingResp() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.lastPingResponse = time.Now()
-	p.lastPingLatencyMs = int32(p.lastPingResponse.UnixMilli()) - int32(p.lastPingSent.UnixMilli())
-	if p.onNewLatencyMs != nil {
-		p.onNewLatencyMs(p.lastPingLatencyMs)
+	p.pingOutstanding = false
+	if p.lastPingSent.IsZero() {
+		// A PINGRESP we did not ask for. Nothing to measure.
+		p.mu.Unlock()
+		return
+	}
+	p.lastPingLatencyMs = int32(p.lastPingResponse.Sub(p.lastPingSent).Milliseconds())
+	latency := p.lastPingLatencyMs
+	onNewLatencyMs := p.onNewLatencyMs
+	p.mu.Unlock()
+
+	// Called outside the lock: this runs into app code that emits events.
+	if onNewLatencyMs != nil {
+		onNewLatencyMs(latency)
 	}
 }
 

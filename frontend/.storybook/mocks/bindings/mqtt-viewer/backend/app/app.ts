@@ -209,6 +209,17 @@ const findMockCollectionMessage = (id: number) => {
   return null;
 };
 
+export async function GetCollectionCollapsedStates(): Promise<
+  models.CollectionCollapsedState[]
+> {
+  return [];
+}
+
+export async function SetCollectionCollapsed(
+  _collectionId: number,
+  _collapsed: boolean
+): Promise<void> {}
+
 export async function GetCollectionsForConnection(
   _connectionId: number
 ): Promise<models.Collection[]> {
@@ -423,6 +434,13 @@ export async function GetReceivedMessageCount(
   _topic: string
 ): Promise<number> {
   return mockMqttMessages.length;
+}
+
+export async function GetMemoryStats(): Promise<app.MemoryStats> {
+  return new app.MemoryStats({
+    historyBytes: 34 * 1024 * 1024,
+    activeConnections: 1,
+  });
 }
 
 export async function GetMqttStats(): Promise<app.MqttStats> {

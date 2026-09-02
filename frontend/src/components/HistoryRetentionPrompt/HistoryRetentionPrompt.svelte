@@ -11,10 +11,13 @@
     UpdateAppSettings,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
-
-  const MB = 1024 * 1024;
-  const GB = 1024 * 1024 * 1024;
-  const MIN_MEMORY_MB = 64;
+  import {
+    MB,
+    GB,
+    MIN_MEMORY_MB,
+    formatBytes,
+    estimateTotalBytes,
+  } from "@/util/memory-budget";
 
   const isOpen = writable(false);
 
@@ -24,6 +27,9 @@
   let isSaving = false;
 
   const recordingChecked = writable(false);
+
+  // A cleared Svelte number input binds null, which is also invalid.
+  $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
 
   onMount(async () => {
     try {
@@ -98,9 +104,9 @@
 <Dialog title="Message history retention" {isOpen} showCloseButton={false}>
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
     <p class="text-secondary-text">
-      MQTT Viewer now bounds how much message history it keeps in memory so long
-      subscriptions don't grow RAM. You can also record history to disk so it
-      survives restarts.
+      I cap how much message history I keep in memory so long sessions don't
+      eat your RAM. You can also record history to disk so it survives
+      restarts.
     </p>
 
     <div class="flex flex-col gap-4">
@@ -109,8 +115,17 @@
           name="prompt-memory-budget"
           label="Memory budget (MB)"
           min={MIN_MEMORY_MB}
+          class="mb-[17px]"
+          hasError={memoryBelowMin}
+          errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
+        <p class="text-sm text-secondary-text">
+          Expect up to about {formatBytes(
+            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, 1)
+          )} in total with one connection. That's this budget for each
+          connection plus around 300 MB for the interface and runtime.
+        </p>
       </div>
 
       <div class="flex flex-col gap-2">
@@ -123,7 +138,7 @@
         />
       </div>
 
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1 mt-3">
         <BaseNumberInput
           name="prompt-disk-budget"
           label="Disk budget (GB)"
@@ -138,7 +153,11 @@
       <Button variant="text" disabled={isSaving} on:click={onNotNow}
         >Not now</Button
       >
-      <Button variant="primary" disabled={isSaving} on:click={onSave}>
+      <Button
+        variant="primary"
+        disabled={isSaving || memoryBelowMin}
+        on:click={onSave}
+      >
         {isSaving ? "Saving…" : "Save"}
       </Button>
     </div>

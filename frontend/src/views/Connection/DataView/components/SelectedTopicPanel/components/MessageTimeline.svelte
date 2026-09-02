@@ -8,7 +8,7 @@
 
 <script lang="ts">
   import moment from "moment";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import "vis-timeline/styles/vis-timeline-graph2d.css";
   import {
     Timeline,
@@ -25,6 +25,7 @@
   } from "../../../stores/selected-topic-store";
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import { buildPayloadPreview, computePopoverPosition } from "./hover-preview";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -56,9 +57,43 @@
   let selectedMessageId: string | number | null = null;
   let selectedMessageIndex: number | null = null;
 
+  // The timeline's DOM host, shared by onMount and rebuilds so hover
+  // positioning can measure it.
+  let container: HTMLElement;
+
+  // Hover preview popover state.
+  let hoveredMessage: MqttHistoryMessage | null = null;
+  // Pending debounced hide; the 1s redraw fires a spurious itemout we ignore.
+  let hideHoverTimeout: ReturnType<typeof setTimeout> | null = null;
+  let popoverEl: HTMLDivElement | null = null;
+  let popoverLeft = 0;
+  let popoverTop = 0;
+  // Kept invisible until measured and positioned to avoid a first-frame flash.
+  let popoverPositioned = false;
+  let hoverMouseX = 0;
+  let hoverMouseY = 0;
+  // Programmatic pans (click-to-select, keyboard nav, zoom, auto-select)
+  // slide markers under a stationary cursor, making vis-timeline fire
+  // itemover for a message the user never hovered. Hover is suppressed until
+  // the move animation settles, unless the mouse has genuinely moved since
+  // the pan started; re-fires for the already-shown message stay allowed.
+  let lastMouseMoveAt = 0;
+  let suppressStartedAt = 0;
+  let suppressHoverUntil = 0;
+  const MOVE_ANIMATION_MS = 600;
+
+  // id -> full message for the hover popover; the vis dataset doesn't carry
+  // payload/qos/retain and a linear history scan per hover is wasteful.
+  let messageById = new Map<string, MqttHistoryMessage>();
+
+  $: hoveredPreview = hoveredMessage
+    ? buildPayloadPreview(hoveredMessage.payload, hoveredMessage.payloadB64)
+    : null;
+
   const getTimelineData = (messages: MqttHistoryMessage[]) => {
     const timelineData: DataItemCollectionType = [];
     messages.forEach((message) => {
+      messageById.set(message.id, message);
       timelineData.push({
         id: message.id,
         content: `Message ${message.id}`,
@@ -69,8 +104,98 @@
     return timelineData;
   };
 
+  const hideHover = () => {
+    if (hideHoverTimeout) {
+      clearTimeout(hideHoverTimeout);
+      hideHoverTimeout = null;
+    }
+    hoveredMessage = null;
+    popoverPositioned = false;
+  };
+
+  const suppressHover = () => {
+    suppressStartedAt = Date.now();
+    suppressHoverUntil = suppressStartedAt + MOVE_ANIMATION_MS;
+  };
+
+  // Renders the popover at body level so the timeline's overflow-hidden
+  // wrapper can't clip it.
+  const portalToBody = (node: HTMLElement) => {
+    document.body.appendChild(node);
+    return {
+      destroy: () => {
+        node.remove();
+      },
+    };
+  };
+
+  const animatedMoveTo = (start: DataItem["start"]) => {
+    suppressHover();
+    timeline.moveTo(start, { animation: true });
+  };
+
+  const positionPopover = () => {
+    if (!popoverEl) return;
+    const position = computePopoverPosition({
+      mouseX: hoverMouseX,
+      mouseY: hoverMouseY,
+      popoverWidth: popoverEl.offsetWidth,
+      popoverHeight: popoverEl.offsetHeight,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    });
+    popoverLeft = position.left;
+    popoverTop = position.top;
+    popoverPositioned = true;
+  };
+
+  const showHover = async (messageId: string, event: MouseEvent) => {
+    // During a programmatic pan, itemover fires for markers sliding under a
+    // stationary cursor. Only honour it for the already-shown message (the
+    // 1s redraw re-fires it) or when the mouse has actually moved since the
+    // pan started, which makes it a real hover again.
+    const isRefreshOfCurrent =
+      hoveredMessage !== null && hoveredMessage.id === messageId;
+    const mouseMovedSincePan = lastMouseMoveAt >= suppressStartedAt;
+    if (
+      Date.now() < suppressHoverUntil &&
+      !isRefreshOfCurrent &&
+      !mouseMovedSincePan
+    ) {
+      return;
+    }
+    // Cancel any debounced hide from a spurious itemout.
+    if (hideHoverTimeout) {
+      clearTimeout(hideHoverTimeout);
+      hideHoverTimeout = null;
+    }
+    const message = messageById.get(messageId);
+    // Guard against a hovered id that's no longer in the window (eviction).
+    if (!message) {
+      hideHover();
+      return;
+    }
+    hoverMouseX = event.clientX;
+    hoverMouseY = event.clientY;
+    // Re-firing on the already-shown message (eg. the 1s redraw) shouldn't blank
+    // and re-measure the popover; just track the cursor and reposition.
+    if (
+      hoveredMessage &&
+      hoveredMessage.id === message.id &&
+      popoverPositioned
+    ) {
+      positionPopover();
+      return;
+    }
+    hoveredMessage = message;
+    popoverPositioned = false;
+    // Wait for the popover to render before measuring it.
+    await tick();
+    positionPopover();
+  };
+
   onMount(() => {
-    let container = document.getElementsByClassName(
+    container = document.getElementsByClassName(
       `timeline timeline-${connectionId}`
     )![0] as HTMLElement;
     timelineDataSet = new DataSet<DataItem, "id">();
@@ -92,7 +217,22 @@
       animation: false,
     });
 
+    // Hover is a pure preview: show the full message on itemover, hide on
+    // itemout. It never touches selection.
+    timeline.on(
+      "itemover",
+      (properties: { item: IdType; event: MouseEvent }) => {
+        showHover(properties.item.toString(), properties.event);
+      }
+    );
+    timeline.on("itemout", () => {
+      // Debounce the hide: the 1s setOptions redraw fires a spurious
+      // itemout/itemover pair that would otherwise flicker the popover.
+      hideHoverTimeout = setTimeout(hideHover, 60);
+    });
+
     timeline.on("select", (properties: { items: IdType[] }) => {
+      hideHover();
       if (properties.items.length === 0) {
         onMessageSelect(null);
         isAutoSelectingMostRecent = false;
@@ -112,7 +252,7 @@
       selectedMessageIndex = messageIndex;
       onMessageSelect(selectedId.toString());
       if (selectedMessage) {
-        timeline.moveTo(selectedMessage.start, { animation: true });
+        animatedMoveTo(selectedMessage.start);
       }
     });
 
@@ -140,6 +280,11 @@
   });
 
   onDestroy(() => {
+    if (hideHoverTimeout) {
+      clearTimeout(hideHoverTimeout);
+      hideHoverTimeout = null;
+    }
+    hideHover();
     if (!!timeline) {
       timeline.destroy();
       timelineDataSet.clear();
@@ -164,7 +309,7 @@
       selectedMessageIndex = timelineDataSet.length - 1;
       timeline.setSelection([lastMessage.id]);
       onMessageSelect(lastMessage.id.toString());
-      timeline.moveTo(lastMessage.start, { animation: true });
+      animatedMoveTo(lastMessage.start);
     }
     timelineDataSet.on("add", selectMostRecentData);
   };
@@ -189,7 +334,7 @@
     onMessageSelect(lastMessageId.toString());
     const lastMessage = timelineDataSet.get(lastMessageId);
     if (lastMessage) {
-      timeline.moveTo(lastMessage.start, { animation: true });
+      animatedMoveTo(lastMessage.start);
     }
   };
 
@@ -210,6 +355,8 @@
   let innerWindowOldestId = $selectedTopicStore.window?.oldestId ?? null;
 
   const rebuildTimelineFromHistory = () => {
+    hideHover();
+    messageById = new Map<string, MqttHistoryMessage>();
     timelineDataSet = new DataSet<DataItem, "id">();
     timelineDataSet.add(getTimelineData($selectedTopicStore.history));
     selectedTopicStore.setOnNewMessages((messages) => {
@@ -221,7 +368,7 @@
       const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
       timeline.setSelection([lastMessage.id]);
       onMessageSelect(lastMessage.id.toString());
-      timeline.moveTo(lastMessage.start, { animation: true });
+      animatedMoveTo(lastMessage.start);
     }
     timelineIsFocused = true;
     document.getElementById("timeline")?.focus();
@@ -258,14 +405,19 @@
     selectedMessageIndex = nextMessageIndex;
     timeline.setSelection([nextMessage.id]);
     onMessageSelect(nextMessage.id.toString());
-    timeline.moveTo(nextMessage.start, { animation: true });
+    hideHover();
+    animatedMoveTo(nextMessage.start);
   };
 
   $: zoomIn = () => {
+    hideHover();
+    suppressHover();
     timeline.zoomIn(1);
   };
 
   $: zoomOut = () => {
+    hideHover();
+    suppressHover();
     timeline.zoomOut(1);
   };
 
@@ -318,6 +470,10 @@
     timelineIsFocused = false;
   }}
   on:keydown={onKeydown}
+  on:mousemove|capture={() => {
+    lastMouseMoveAt = Date.now();
+  }}
+  on:mouseleave={hideHover}
   id="timeline"
   class={`
     py-[1px]
@@ -338,6 +494,39 @@
       <Icon type="info" />
     </Tooltip>
   </div>
+
+  {#if hoveredMessage && hoveredPreview}
+    <div
+      bind:this={popoverEl}
+      use:portalToBody
+      class={`
+        pointer-events-none fixed z-[10003] max-w-[320px]
+        rounded bg-elevation-2 shadow border-[1px] border-outline
+        px-2 py-1.5 text-xs text-emphasis
+        ${popoverPositioned ? "" : "invisible"}
+      `}
+      style:left={`${popoverLeft}px`}
+      style:top={`${popoverTop}px`}
+    >
+      <div class="flex items-center gap-2 text-secondary-text">
+        <span>{moment(hoveredMessage.timeMs).format("H:mm:ss.SS")}</span>
+        <span>QoS {hoveredMessage.qos}</span>
+        {#if hoveredMessage.retain}
+          <span class="text-secondary">Retained</span>
+        {/if}
+      </div>
+      {#if hoveredPreview.kind === "binary"}
+        <div class="mt-1 text-secondary-text">{hoveredPreview.summary}</div>
+      {:else}
+        <div
+          class="mt-1 font-mono whitespace-pre-wrap break-all
+            max-h-[140px] overflow-hidden line-clamp-[8]"
+        >
+          {hoveredPreview.text}
+        </div>
+      {/if}
+    </div>
+  {/if}
 </section>
 
 <style global>
