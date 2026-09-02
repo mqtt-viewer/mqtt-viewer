@@ -39,10 +39,9 @@
     connection.connectionState === "reconnecting";
 </script>
 
-<div class="flex flex-col w-[550px]">
-  <span class="text-lg mb-4">Subscriptions</span>
-</div>
-<div class="mt-8 space-y-12 w-full">
+<div class="flex flex-col w-full">
+  <span class="text-sm font-medium text-secondary-text">Subscriptions</span>
+  <div class="mt-4 space-y-8 w-full">
   {#each subscriptions as subscription, index}
     <div class="flex gap-3 items-center">
       <div class="w-[12%]">
@@ -86,10 +85,11 @@
       {/if}
     </div>
   {/each}
+  </div>
+  <AddFieldButton
+    disabled={isAllFieldsDisabled}
+    class="mt-10"
+    text="Add Subscription"
+    onClick={onAddSubscriptionClick}
+  />
 </div>
-<AddFieldButton
-  disabled={isAllFieldsDisabled}
-  class="mt-10"
-  text="Add Subscription"
-  onClick={onAddSubscriptionClick}
-/>

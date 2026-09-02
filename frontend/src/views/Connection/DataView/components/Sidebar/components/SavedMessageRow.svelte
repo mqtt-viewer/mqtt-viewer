@@ -60,11 +60,11 @@
     />
   {:else}
     <button
-      class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
+      class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
       on:click={() => onOpenMessage(message)}
     >
       <Icon type="message" size={16} />
-      <span class="text-base font-medium truncate grow text-left pr-5"
+      <span class="text-base font-medium truncate grow text-left pr-6"
         >{message.name}</span
       >
     </button>

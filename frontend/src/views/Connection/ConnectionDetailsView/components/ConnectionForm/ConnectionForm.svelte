@@ -114,7 +114,9 @@
 
 <form use:form class="flex flex-col gap-8 w-full">
   <div class="flex items-center gap-1">
-    <span class="text-lg">Connection details</span>
+    <span class="text-sm font-medium text-secondary-text"
+      >Connection details</span
+    >
     <DropdownMenu disabled={isAllFieldsDisabled}>
       <div slot="trigger">
         <IconButton disabled={isAllFieldsDisabled}>

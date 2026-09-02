@@ -59,8 +59,23 @@ func (a *App) DeleteCollection(id uint) error {
 		if err := tx.Where("collection_id = ?", id).Delete(&models.CollectionMessage{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Delete(&models.CollectionCollapsedState{}, id).Error; err != nil {
+			return err
+		}
 		return tx.Delete(&models.Collection{}, id).Error
 	})
+}
+
+func (a *App) SetCollectionCollapsed(collectionID uint, collapsed bool) error {
+	return a.Db.Save(&models.CollectionCollapsedState{ID: collectionID, Collapsed: collapsed}).Error
+}
+
+func (a *App) GetCollectionCollapsedStates() ([]models.CollectionCollapsedState, error) {
+	var states []models.CollectionCollapsedState
+	if res := a.Db.Find(&states); res.Error != nil {
+		return nil, res.Error
+	}
+	return states, nil
 }
 
 type SaveCollectionMessageParams struct {
@@ -173,6 +188,9 @@ func deleteCollectionsForConnection(tx *gorm.DB, connectionID uint) error {
 		return nil
 	}
 	if err := tx.Where("collection_id IN ?", collectionIDs).Delete(&models.CollectionMessage{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("id IN ?", collectionIDs).Delete(&models.CollectionCollapsedState{}).Error; err != nil {
 		return err
 	}
 	return tx.Where("connection_id = ?", connectionID).Delete(&models.Collection{}).Error
