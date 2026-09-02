@@ -20,7 +20,7 @@
     </IconButton>
   </Tooltip>
   {#if isConnected && connection.latencyMs !== undefined}
-    <Tooltip text={`Connected — ${connection.latencyMs} ms`} placement="right">
+    <Tooltip text={`Connected · ${connection.latencyMs} ms`} placement="right">
       <span class="block size-[7px] rounded-full bg-success"></span>
     </Tooltip>
   {/if}

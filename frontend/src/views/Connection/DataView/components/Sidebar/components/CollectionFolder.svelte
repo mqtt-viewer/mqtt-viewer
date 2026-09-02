@@ -76,14 +76,16 @@
       />
     {:else}
       <button
-        class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
+        class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
         on:click={() => (isExpanded = !isExpanded)}
       >
-        <Icon type={isExpanded ? "folderOpen" : "folder"} size={16} />
+        <span class="w-5 shrink-0 flex items-center justify-center">
+          <Icon type={isExpanded ? "folderOpen" : "folder"} size={16} />
+        </span>
         <span class="text-base font-medium truncate grow text-left"
           >{collection.name}</span
         >
-        <span class="text-sm text-secondary-text pr-5">{messages.length}</span>
+        <span class="text-sm text-secondary-text pr-6">{messages.length}</span>
       </button>
       <div
         class={`absolute right-0 top-1/2 -translate-y-1/2 ${
@@ -114,7 +116,7 @@
   {#if isExpanded}
     <div class="flex flex-col gap-1 pl-3">
       {#if messages.length === 0}
-        <div class="text-base text-secondary-text px-1">No messages</div>
+        <div class="text-base text-secondary-text">No messages</div>
       {:else}
         {#each messages as message (message.id)}
           <SavedMessageRow {message} {collectionsStore} {onOpenMessage} />

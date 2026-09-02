@@ -50,6 +50,28 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Disconnect without leaving the connection dialog",
+        body: "Most connection fields lock while connected. The dialog header now has a Connect/Disconnect button, so you can drop the connection, change what you need and reconnect, all in one place.",
+      },
+      {
+        title: "A tidier sidebar and forms",
+        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels.",
+      },
+      {
+        title: "Dropdowns inside dialogs work again",
+        body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
+      },
+      {
+        title: "A proper Save button for connections",
+        body: "Closing the connection dialog with the X to save your changes always felt a bit wrong. The dialog now has a footer with a Save button and a note showing when your changes were last saved. Nothing about saving has changed underneath: everything still saves automatically as you type, the footer just makes that visible.",
+        thanks: [
+          {
+            name: "jeeftor",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/124",
+          },
+        ],
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
         thanks: [
