@@ -209,6 +209,17 @@ const findMockCollectionMessage = (id: number) => {
   return null;
 };
 
+export async function GetCollectionCollapsedStates(): Promise<
+  models.CollectionCollapsedState[]
+> {
+  return [];
+}
+
+export async function SetCollectionCollapsed(
+  _collectionId: number,
+  _collapsed: boolean
+): Promise<void> {}
+
 export async function GetCollectionsForConnection(
   _connectionId: number
 ): Promise<models.Collection[]> {

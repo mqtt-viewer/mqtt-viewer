@@ -4,6 +4,7 @@
 export {
     AppSettings,
     Collection,
+    CollectionCollapsedState,
     CollectionMessage,
     Connection,
     FilterHistory,

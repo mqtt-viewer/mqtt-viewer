@@ -211,6 +211,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Two connections to the same broker no longer fight",
         body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
       },
+      {
+        title: "Collapsible collections",
+        body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
+      },
     ],
   },
   {
