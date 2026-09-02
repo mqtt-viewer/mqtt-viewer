@@ -9,6 +9,9 @@
   export let initialVersion: string | null = null;
   export let onClose: () => void = () => {};
 
+  const STARGAZERS_URL =
+    "https://github.com/mqtt-viewer/mqtt-viewer/stargazers";
+
   const startIndex = (() => {
     const i = entries.findIndex((e) => e.version === initialVersion);
     return i === -1 ? 0 : i;
@@ -82,6 +85,12 @@
 
     <div class="flex justify-end items-center gap-3 mt-4">
       <span class="text-sm text-secondary-text grow">{entry.date}</span>
+      <Button
+        variant="secondary"
+        on:click={() => Browser.OpenURL(STARGAZERS_URL)}
+      >
+        Star on GitHub
+      </Button>
       <Button variant="primary" on:click={onClose}>Nice, got it</Button>
     </div>
   {/if}

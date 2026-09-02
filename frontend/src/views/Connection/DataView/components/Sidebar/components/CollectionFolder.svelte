@@ -9,13 +9,14 @@
   import type { CollectionsStore } from "../stores/collections";
   import SavedMessageRow from "./SavedMessageRow.svelte";
   import { writable } from "svelte/store";
+  import collectionCollapse from "@/stores/collection-collapse";
 
   export let collection: models.Collection;
   export let collectionsStore: CollectionsStore;
   export let onOpenMessage: (message: models.CollectionMessage) => void;
 
-  let isExpanded = true;
   let isHovered = false;
+  $: isExpanded = !$collectionCollapse.has(collection.id);
   let isDeleteOpen = writable(false);
   let isRenaming = false;
 
@@ -76,14 +77,23 @@
       />
     {:else}
       <button
-        class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
-        on:click={() => (isExpanded = !isExpanded)}
+        class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+        aria-expanded={isExpanded}
+        on:click={() => collectionCollapse.toggle(collection.id)}
       >
-        <Icon type={isExpanded ? "folderOpen" : "folder"} size={16} />
-        <span class="text-base font-medium truncate grow text-left"
+        <span class="w-5 shrink-0 flex items-center justify-center">
+          {#if isHovered}
+            <Icon type={isExpanded ? "down" : "right"} size={16} />
+          {:else}
+            <Icon type={isExpanded ? "folderOpen" : "folder"} size={16} />
+          {/if}
+        </span>
+        <span class="text-base font-medium truncate text-left"
           >{collection.name}</span
         >
-        <span class="text-sm text-secondary-text pr-5">{messages.length}</span>
+        <span class="text-sm text-secondary-text shrink-0 pr-6"
+          >{messages.length}</span
+        >
       </button>
       <div
         class={`absolute right-0 top-1/2 -translate-y-1/2 ${
@@ -114,7 +124,7 @@
   {#if isExpanded}
     <div class="flex flex-col gap-1 pl-3">
       {#if messages.length === 0}
-        <div class="text-base text-secondary-text px-1">No messages</div>
+        <div class="text-base text-secondary-text">No messages</div>
       {:else}
         {#each messages as message (message.id)}
           <SavedMessageRow {message} {collectionsStore} {onOpenMessage} />

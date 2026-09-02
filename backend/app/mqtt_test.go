@@ -153,7 +153,7 @@ func MqttPubAndSubIntegrationTest(t *testing.T, mqttVersion string, publishPrope
 	})
 	connId := localConnection.ConnectionId
 
-	appConnection := app.AppConnections[connId]
+	appConnection, _ := app.appConnection(connId)
 
 	err := app.ConnectMqtt(connId)
 	if err != nil {
@@ -270,7 +270,7 @@ func getNewConnectionWithCustomProperties(app *App, customDetails *models.Connec
 		}
 	}
 
-	appConnection := app.AppConnections[newConnection.ConnectionDetails.ID]
+	appConnection, _ := app.appConnection(newConnection.ConnectionDetails.ID)
 	// Override onConnectUp and onConnectDown handlers to avoid wails runtime errors
 	appConnection.MqttManager.SetConnectionCallbacks(mqtt.MqttConnectionCallbacks{
 		OnConnecting: func() {

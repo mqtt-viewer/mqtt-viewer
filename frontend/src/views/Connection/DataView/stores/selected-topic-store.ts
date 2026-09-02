@@ -191,7 +191,21 @@ export const createSelectedTopicStore = (
     }
 
     // Memory mode: the in-RAM history is already bounded by the memory budget.
-    const history = await GetMessageHistory(connectionId, topic);
+    // At very high topic cardinality the backend also trims its last-value
+    // cache, so a topic still shown in the tree can have no history left;
+    // that rejects, and an empty timeline is the right answer rather than a
+    // failed selection.
+    let history: mqtt.MqttMessage[] = [];
+    try {
+      history = await GetMessageHistory(connectionId, topic);
+    } catch (e) {
+      history = [];
+      // "Not found" is the expected case above. Anything else is a real
+      // failure, so log it rather than let an empty timeline hide it.
+      if (!String(e).includes("not found")) {
+        console.error("Failed to load message history", e);
+      }
+    }
     const decoded = history.map(decode);
     update((store) => ({
       ...store,

@@ -22,6 +22,10 @@ ports and none of them collide:
 something else (`wails3 dev` and Storybook both fail fast on a busy port
 rather than silently moving).
 
+Watch out: some older branches still track `.claude/launch.json`, so
+checking one out and switching away deletes the file. If it goes
+missing, just re-run `scripts/dev-ports.sh write-launch`.
+
 ## What is already isolated per worktree
 
 - Dev database: `_dev_resources/MqttViewer.db` resolves relative to the

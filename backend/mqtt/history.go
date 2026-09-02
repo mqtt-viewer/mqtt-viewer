@@ -13,27 +13,98 @@ import (
 // separately by opt-in disk recording.
 const DefaultMemoryBudgetBytes int64 = 512 * 1024 * 1024 // 512 MB
 
+// latestBudgetDivisor caps the share of the memory budget the latest-per-topic
+// map may hold: 1/4, leaving 3/4 for the recent window.
+//
+// The two stores compete for the same budget but serve different things:
+// `recent` gives back-scroll depth on the selected topic, `latest` gives
+// breadth (a last value for every topic in the tree, however quiet). A pinned
+// latest entry is always older than every message still in `recent` — its
+// newest message is what aged out — so a plain oldest-first policy would drop
+// the entire latest map before touching a single recent message, and clicking
+// a quiet topic would go blank the moment the connection went over budget.
+// Reserving a share for `latest` keeps that breadth while still bounding it.
+const latestBudgetDivisor = 4
+
+// latestEntryOverhead approximates the non-message heap cost of one
+// latest-map entry: the map bucket slot and key header (~35 B at Go's load
+// factor) plus the latestEntry struct itself (48 B). The topic string's bytes
+// are shared with the message's Topic field, so they are not counted twice.
+//
+// Only pinned entries carry this charge. An unpinned entry's overhead rides
+// free, which undercounts by at most ~19% of the budget in the pathological
+// case where every message in the recent window is on its own topic. That is
+// covered by estimatedBytes, which measures ~1.4x real heap.
+const latestEntryOverhead = 96
+
+// sysTopicPrefix marks broker-published metadata. These topics are few, are
+// what the broker status window reads, and some (a broker's version, say) are
+// published once as retained and never again — exactly the value the latest
+// map exists to hold, and exactly the entry a plain LRU would drop first on a
+// busy broker. Up to maxProtectedSysTopics of them are kept out of the LRU
+// list so they survive; the cap keeps a broker that publishes a huge $SYS
+// tree from turning the exemption into a hole in the budget.
+const (
+	sysTopicPrefix        = "$SYS/"
+	maxProtectedSysTopics = 1024
+)
+
+// latestEntry is the latest-per-topic slot for one topic.
+//
+// While the entry's message is still inside the recent window it is unpinned
+// and costs nothing extra: those bytes are already charged to recentBytes.
+// Once the message is evicted from `recent` the entry becomes the only thing
+// keeping it alive, so it is pinned and charged to latestBytes. A pinned entry
+// is either linked into the LRU list, or protected (a $SYS topic within the
+// cap) and so not evictable at all.
+type latestEntry struct {
+	msg        *MqttMessage
+	topic      string
+	pinned     bool
+	protected  bool
+	prev, next *latestEntry
+}
+
 // MessageHistory is a bounded, in-memory store of recently received messages.
 //
 //   - recent: every retained message in global insertion order. The live slice
 //     is recent[head:]; head advances on eviction so we don't reslice on every
 //     drop. Oldest is at recent[head].
 //   - latest: the newest message per topic, kept even after it falls out of
-//     the recent window, so selecting a topic in the tree always shows at least
-//     its current value. Bounded by topic cardinality, not message volume.
+//     the recent window, so selecting a topic in the tree normally shows at
+//     least its current value. Bounded by its share of the memory budget:
+//     on a broker with hundreds of thousands of topics the least recently
+//     updated topics are dropped from it (see latestBudgetDivisor).
+//
+// Every retained message is charged exactly once: to recentBytes while it is
+// in the recent window, then to latestBytes if the latest map pins it after
+// eviction. recentBytes + latestBytes is what the budget bounds.
 type MessageHistory struct {
 	mutex       sync.Mutex
 	recent      []*MqttMessage
 	head        int
-	latest      map[string]*MqttMessage
-	totalBytes  int64
+	latest      map[string]*latestEntry
+	recentBytes int64
+	latestBytes int64
 	budgetBytes int64
+	// lruOldest/lruNewest bound the list of pinned latest entries, ordered by
+	// when each topic last received a message: lruOldest is the least recently
+	// updated topic and the first to be dropped. Unpinned entries are not
+	// listed; their topics are all newer than every pinned one, because a
+	// topic pins exactly when its newest message leaves the recent window.
+	// Protected entries are not listed either, so they cannot be picked.
+	lruOldest *latestEntry
+	lruNewest *latestEntry
+	// protectedSysTopics counts pinned $SYS entries held out of the LRU list.
+	protectedSysTopics int
+	// droppedTopics counts latest entries discarded under budget pressure.
+	droppedTopics int64
 }
 
 func newMessageHistory() *MessageHistory {
 	return &MessageHistory{
 		recent:      make([]*MqttMessage, 0, 1024),
-		latest:      make(map[string]*MqttMessage),
+		latest:      make(map[string]*latestEntry),
 		budgetBytes: DefaultMemoryBudgetBytes,
 	}
 }
@@ -50,14 +121,28 @@ func (m *MessageHistory) SetBudgetBytes(budget int64) {
 	m.evictLocked()
 }
 
+// TotalBytes returns the estimated bytes of message history currently held in
+// memory: the recent window plus the newest-per-topic messages pinned outside
+// it. This is the figure the budget bounds, so the settings readout and the
+// budget describe the same thing.
+func (m *MessageHistory) TotalBytes() int64 {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.recentBytes + m.latestBytes
+}
+
 // Clear empties the store but preserves the configured budget.
 func (m *MessageHistory) Clear() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.recent = m.recent[:0]
 	m.head = 0
-	m.latest = make(map[string]*MqttMessage)
-	m.totalBytes = 0
+	m.latest = make(map[string]*latestEntry)
+	m.recentBytes = 0
+	m.latestBytes = 0
+	m.lruOldest = nil
+	m.lruNewest = nil
+	m.protectedSysTopics = 0
 }
 
 func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
@@ -65,22 +150,149 @@ func (m *MessageHistory) addMessageToHistory(message MqttMessage) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	p := &msg
-	m.latest[p.Topic] = p
+	entry, ok := m.latest[p.Topic]
+	if ok {
+		if entry.pinned {
+			// The previous newest message was held only by this map; replacing
+			// it releases those bytes and makes the topic recent again.
+			m.latestBytes -= pinnedCost(entry.msg)
+			m.unpinLocked(entry)
+		}
+		entry.msg = p
+	} else {
+		m.latest[p.Topic] = &latestEntry{msg: p, topic: p.Topic}
+	}
 	m.recent = append(m.recent, p)
-	m.totalBytes += int64(p.estimatedBytes())
+	m.recentBytes += int64(p.estimatedBytes())
 	m.evictLocked()
 }
 
-// evictLocked drops oldest messages until under budget. Caller holds mutex.
+// pinnedCost is what a latest entry costs once it is the sole holder of its
+// message.
+func pinnedCost(msg *MqttMessage) int64 {
+	return int64(msg.estimatedBytes()) + latestEntryOverhead
+}
+
+// evictLocked drops retained data until the store is back under budget.
+// Caller holds mutex.
+//
+// Priority: trim the latest map first if it is over its share, otherwise drop
+// the oldest recent message, and only once the recent window is drained fall
+// back to trimming latest below its share. Each iteration either frees bytes
+// or moves a message's charge from recent to latest, so the loop terminates.
+//
+// Protected $SYS entries are never dropped, so the store can sit above budget
+// by at most maxProtectedSysTopics entries' worth (a few hundred KB) if a
+// broker's $SYS tree alone exceeds it.
 func (m *MessageHistory) evictLocked() {
-	for m.totalBytes > m.budgetBytes && m.head < len(m.recent) {
-		old := m.recent[m.head]
-		m.recent[m.head] = nil // release for GC
-		m.head++
-		m.totalBytes -= int64(old.estimatedBytes())
+	latestBudget := m.budgetBytes / latestBudgetDivisor
+	for m.recentBytes+m.latestBytes > m.budgetBytes {
+		if m.latestBytes > latestBudget && m.lruOldest != nil {
+			m.dropOldestLatestLocked()
+			continue
+		}
+		if m.head < len(m.recent) {
+			m.evictOldestRecentLocked()
+			continue
+		}
+		if m.lruOldest != nil {
+			m.dropOldestLatestLocked()
+			continue
+		}
+		// Nothing retained left to drop: a single message larger than the
+		// whole budget. Keep it rather than spin.
+		break
 	}
-	// Compact the backing array once head has consumed half of it, so the
-	// dead prefix is reclaimed rather than growing unbounded.
+	m.compactLocked()
+}
+
+// evictOldestRecentLocked drops recent[head]. If that message is still the
+// newest for its topic the latest map becomes its only holder, so the entry is
+// pinned: its bytes move from recentBytes to latestBytes and it joins the LRU
+// list as the most recently updated pinned topic.
+func (m *MessageHistory) evictOldestRecentLocked() {
+	old := m.recent[m.head]
+	m.recent[m.head] = nil // release for GC
+	m.head++
+	m.recentBytes -= int64(old.estimatedBytes())
+	entry, ok := m.latest[old.Topic]
+	if !ok || entry.msg != old {
+		return
+	}
+	cost := pinnedCost(old)
+	if cost > m.budgetBytes/latestBudgetDivisor {
+		// One message too big for the whole last-value share would evict every
+		// other topic to make room for itself. Let it go instead: the topic
+		// loses the value that did not fit, rather than every topic losing
+		// theirs.
+		delete(m.latest, old.Topic)
+		m.droppedTopics++
+		return
+	}
+	entry.pinned = true
+	m.latestBytes += cost
+	if strings.HasPrefix(entry.topic, sysTopicPrefix) && m.protectedSysTopics < maxProtectedSysTopics {
+		entry.protected = true
+		m.protectedSysTopics++
+		return
+	}
+	m.linkNewestLocked(entry)
+}
+
+// unpinLocked releases a pinned entry back to unpinned state, taking it out of
+// whichever structure was holding it. The caller adjusts latestBytes.
+func (m *MessageHistory) unpinLocked(entry *latestEntry) {
+	if entry.protected {
+		entry.protected = false
+		m.protectedSysTopics--
+	} else {
+		m.unlinkLocked(entry)
+	}
+	entry.pinned = false
+}
+
+// dropOldestLatestLocked discards the least recently updated pinned topic.
+// That topic's last value is gone from memory: selecting it in the tree falls
+// back to whatever the frontend already holds.
+func (m *MessageHistory) dropOldestLatestLocked() {
+	entry := m.lruOldest
+	m.latestBytes -= pinnedCost(entry.msg)
+	m.unpinLocked(entry)
+	delete(m.latest, entry.topic)
+	entry.msg = nil
+	m.droppedTopics++
+}
+
+func (m *MessageHistory) linkNewestLocked(entry *latestEntry) {
+	entry.prev = m.lruNewest
+	entry.next = nil
+	if m.lruNewest != nil {
+		m.lruNewest.next = entry
+	}
+	m.lruNewest = entry
+	if m.lruOldest == nil {
+		m.lruOldest = entry
+	}
+}
+
+func (m *MessageHistory) unlinkLocked(entry *latestEntry) {
+	if entry.prev != nil {
+		entry.prev.next = entry.next
+	} else if m.lruOldest == entry {
+		m.lruOldest = entry.next
+	}
+	if entry.next != nil {
+		entry.next.prev = entry.prev
+	} else if m.lruNewest == entry {
+		m.lruNewest = entry.prev
+	}
+	entry.prev = nil
+	entry.next = nil
+}
+
+// compactLocked reclaims the dead prefix of the recent backing array once head
+// has consumed half of it, rather than letting it grow unbounded.
+func (m *MessageHistory) compactLocked() {
 	if m.head > 0 && m.head*2 >= len(m.recent) {
 		n := copy(m.recent, m.recent[m.head:])
 		for i := n; i < len(m.recent); i++ {
@@ -93,7 +305,9 @@ func (m *MessageHistory) evictLocked() {
 
 // GetTopicHistory returns the retained messages for a topic in arrival order.
 // If the topic's messages have all aged out of the recent window, its latest
-// value is still returned so a tree-click is never empty.
+// value is still returned so a tree-click is never empty — unless the topic
+// was also dropped from the latest map under budget pressure, which only
+// happens at extreme topic cardinality.
 func (m *MessageHistory) GetTopicHistory(topic string) ([]MqttMessage, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -104,8 +318,8 @@ func (m *MessageHistory) GetTopicHistory(topic string) ([]MqttMessage, error) {
 		}
 	}
 	if len(result) == 0 {
-		if latest, ok := m.latest[topic]; ok {
-			return []MqttMessage{*latest}, nil
+		if entry, ok := m.latest[topic]; ok {
+			return []MqttMessage{*entry.msg}, nil
 		}
 		return nil, fmt.Errorf("topic not found in message history")
 	}
@@ -130,9 +344,9 @@ func (m *MessageHistory) GetHistoryByTopicPrefix(prefix string) []MqttMessage {
 			inWindow[m.recent[i].Topic] = true
 		}
 	}
-	for topic, latest := range m.latest {
+	for topic, entry := range m.latest {
 		if strings.HasPrefix(topic, prefix) && !inWindow[topic] {
-			result = append(result, *latest)
+			result = append(result, *entry.msg)
 		}
 	}
 	return result
@@ -148,9 +362,9 @@ func (m *MessageHistory) GetAllHistory() map[string][]MqttMessage {
 		msg := *m.recent[i]
 		out[msg.Topic] = append(out[msg.Topic], msg)
 	}
-	for topic, latest := range m.latest {
+	for topic, entry := range m.latest {
 		if _, ok := out[topic]; !ok {
-			out[topic] = []MqttMessage{*latest}
+			out[topic] = []MqttMessage{*entry.msg}
 		}
 	}
 	return out
