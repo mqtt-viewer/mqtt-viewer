@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import chartWindows from "@/stores/chart-windows";
   import type { SelectedTopicStore } from "../../../../stores/selected-topic-store";
   import type { ChartSeriesStore } from "./chart-series-store";
   import TopicChart from "./TopicChart.svelte";
@@ -14,11 +18,57 @@
   export let onAddFromPayload: (() => void) | null = null;
   // Pop-out control (shown in the docked panel, hidden in a popped-out window).
   export let onPopOut: (() => void) | null = null;
+  // Whether the chart is actually on screen (the docked panel renders every
+  // tab slot, hidden or not). Gates TopicChart's 1 Hz window ticker. The
+  // pop-out window never passes it, so it defaults to visible there.
+  export let visible = true;
 
   let paused = false;
   let style: "line" | "area" = "line";
   let showPoints = true;
-  let windowMinutes = 0;
+  let windowSeconds = 0;
+
+  // ChartView is the shared host for both the docked chart and the pop-out
+  // (ChartWindow.svelte renders this component and owns no window state of
+  // its own). The pop-out never runs stores/initialization.ts, so the
+  // per-connection window store is loaded on demand here via its idempotent
+  // init(). The chart subtree (ChartOptions + TopicChart) is held back until
+  // the persisted value has been seeded, so ChartOptions/its custom field
+  // never mount with a default 0 that would then seed asynchronously.
+  let ready = false;
+
+  onMount(async () => {
+    try {
+      await chartWindows.init();
+      windowSeconds = chartWindows.get(get(selectedTopicStore).connectionId);
+    } catch (e) {
+      // A failed load must not blank the chart: fall back to All history
+      // (windowSeconds stays 0) and render regardless.
+      console.error("Failed to load chart window preference", e);
+    } finally {
+      ready = true;
+    }
+  });
+
+  // Fires only from a genuine user action inside ChartOptions (a preset
+  // click or a custom-field edit) -- never for the initial seed above. There
+  // is deliberately no reactive statement mirroring windowSeconds into a
+  // write here: that would also fire on the seed assignment and clobber a
+  // saved value with 0, and could loop.
+  const onWindowSecondsChange = (seconds: number) => {
+    // The chart itself already shows the new window (local state); only the
+    // persistence write can fail, so surface that without touching the view.
+    chartWindows.set(get(selectedTopicStore).connectionId, seconds).catch((e) => {
+      console.error("Failed to save chart window preference", e);
+      addToast({
+        data: {
+          title: "Chart time window",
+          description: "Could not save the time window. It will reset on restart.",
+          type: "error",
+        },
+      });
+    });
+  };
 </script>
 
 <div class="flex flex-col size-full min-h-0">
@@ -30,7 +80,14 @@
         </span>
       </IconButton>
     </Tooltip>
-    <ChartOptions bind:style bind:showPoints bind:windowMinutes />
+    {#if ready}
+      <ChartOptions
+        bind:style
+        bind:showPoints
+        bind:windowSeconds
+        {onWindowSecondsChange}
+      />
+    {/if}
     {#if onPopOut}
       <Tooltip text="Open in a new window">
         <IconButton onClick={onPopOut}>
@@ -47,14 +104,17 @@
   <div
     class="grow min-h-[160px] rounded-sm border border-outline bg-elevation-0 p-1"
   >
-    <TopicChart
-      {selectedTopicStore}
-      {chartSeriesStore}
-      {paused}
-      {style}
-      {showPoints}
-      {windowMinutes}
-    />
+    {#if ready}
+      <TopicChart
+        {selectedTopicStore}
+        {chartSeriesStore}
+        {paused}
+        {style}
+        {showPoints}
+        {windowSeconds}
+        {visible}
+      />
+    {/if}
   </div>
 
   <div class="mt-3 overflow-y-auto">

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-const unknownConnId uint = 424242
-
 func TestGetConnectionLogsUnknownConnection(t *testing.T) {
 	app := getTestApp(t)
 	if _, err := app.GetConnectionLogs(unknownConnId); err == nil {
@@ -42,7 +40,10 @@ func TestGetAndClearConnectionLogs(t *testing.T) {
 		t.Fatalf("NewConnection: %v", err)
 	}
 	connId := newConnection.ConnectionDetails.ID
-	appConnection := app.AppConnections[connId]
+	appConnection, ok := app.appConnection(connId)
+	if !ok {
+		t.Fatalf("connection %d missing from app connections", connId)
+	}
 
 	appConnection.MqttManager.LogStore.Info("first-line")
 	appConnection.MqttManager.LogStore.Error("second-line")
@@ -93,7 +94,11 @@ func TestSetConnectionDebugLoggingPersistsAcrossReopen(t *testing.T) {
 	if err := app.SetConnectionDebugLogging(connId, true); err != nil {
 		t.Fatalf("SetConnectionDebugLogging: %v", err)
 	}
-	if !app.AppConnections[connId].MqttManager.LogStore.DebugEnabled() {
+	appConnection, ok := app.appConnection(connId)
+	if !ok {
+		t.Fatalf("connection %d missing from app connections", connId)
+	}
+	if !appConnection.MqttManager.LogStore.DebugEnabled() {
 		t.Error("expected debug enabled on the live log store")
 	}
 
@@ -108,7 +113,11 @@ func TestSetConnectionDebugLoggingPersistsAcrossReopen(t *testing.T) {
 	if !conn.DebugLoggingEnabled {
 		t.Error("expected debug_logging_enabled persisted as true")
 	}
-	if !app.AppConnections[connId].MqttManager.LogStore.DebugEnabled() {
+	appConnection, ok = app.appConnection(connId)
+	if !ok {
+		t.Fatalf("connection %d missing from reopened app connections", connId)
+	}
+	if !appConnection.MqttManager.LogStore.DebugEnabled() {
 		t.Error("expected reopened app to seed debug logging from the db")
 	}
 

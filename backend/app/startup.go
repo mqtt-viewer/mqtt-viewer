@@ -101,6 +101,13 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	// the message-buffer drain hot path.
 	a.loadRetentionSettings()
 
+	// Single writer for received_messages: the drain path only enqueues.
+	a.startRecordingWorker()
+
+	// Active from launch even with zero connections up, so the base limit
+	// (SQLite/GORM, event marshalling, runtime slack) is enforced immediately.
+	a.recomputeMemoryLimit()
+
 	// Count this launch so one-time nudges (e.g. the GitHub star prompt) only
 	// fire once the app has clearly been used, never on a first-run install.
 	// Skipped in test mode to keep seeded-settings fixtures deterministic.
@@ -121,7 +128,7 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
 			return
 		}
-		a.ProtoRegistry = registry
+		a.setProtoRegistry(registry)
 	}()
 
 	if a.Mode != AppModes.Test {
@@ -148,7 +155,7 @@ func (a *App) buildAppConnections() error {
 		}
 		appConnections[conn.ID] = appConnection
 	}
-	a.AppConnections = appConnections
+	a.replaceAppConnections(appConnections)
 	return nil
 }
 
@@ -203,6 +210,10 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnConnectionUp: func() {
+				if appConnection.connUp.CompareAndSwap(false, true) {
+					a.connectedConnCount.Add(1)
+					a.recomputeMemoryLimit()
+				}
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				appConnection.MqttManager.MessageBuffer.StartHandlingBuffer(MQTT_BUFFER_EMIT_INTERVAL, func(messages []mqtt.MqttMessage) {
 					if len(messages) == 0 {
@@ -211,9 +222,9 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					if a.Mode != AppModes.Test {
 						a.EventRuntime.EventsEmit(appConnection.EventSet.MqttMessages, messages)
 					}
-					// Durably persist the batch when recording is enabled.
-					// One transaction per drain — no per-message fsync.
-					a.recordReceivedMessages(appConnection.ConnectionId, messages)
+					// Hand the batch to the recording worker when enabled.
+					// Async, single-writer: the drain never blocks on SQLite.
+					a.enqueueRecordBatch(appConnection.ConnectionId, messages)
 				})
 				if a.Mode != AppModes.Test {
 					a.EventRuntime.EventsEmit(appConnection.EventSet.MqttConnected, nil)
@@ -225,6 +236,10 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnConnectionDown: func(reason *error) {
+				if appConnection.connUp.CompareAndSwap(true, false) {
+					a.connectedConnCount.Add(-1)
+					a.recomputeMemoryLimit()
+				}
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("connection down: %v", (*reason).Error()))

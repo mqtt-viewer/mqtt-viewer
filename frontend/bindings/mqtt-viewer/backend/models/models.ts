@@ -18,6 +18,8 @@ import * as time$0 from "../../../time/models.js";
  * user has dismissed, so it shows once per version. LaunchCount counts app
  * starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
  * the GitHub star prompt as shown so it only ever appears once.
+ * IgnoredUpdateVersion records an update the user chose to skip, so the
+ * update dialog stops auto-opening for it.
  */
 export class AppSettings {
     "id": number;
@@ -28,6 +30,7 @@ export class AppSettings {
     "lastSeenChangelogVersion": string;
     "launchCount": number;
     "hasSeenStarPrompt": boolean;
+    "ignoredUpdateVersion": string;
 
     /** Creates a new AppSettings instance. */
     constructor($$source: Partial<AppSettings> = {}) {
@@ -55,6 +58,9 @@ export class AppSettings {
         if (!("hasSeenStarPrompt" in $$source)) {
             this["hasSeenStarPrompt"] = false;
         }
+        if (!("ignoredUpdateVersion" in $$source)) {
+            this["ignoredUpdateVersion"] = "";
+        }
 
         Object.assign(this, $$source);
     }
@@ -65,6 +71,36 @@ export class AppSettings {
     static createFrom($$source: any = {}): AppSettings {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new AppSettings($$parsedSource as Partial<AppSettings>);
+    }
+}
+
+/**
+ * ChartWindow persists the chart time-window selection per connection. ID is
+ * the connection id (string). WindowSeconds is the selected window in seconds;
+ * 0 means "All history". A custom interval is stored as its resolved seconds.
+ */
+export class ChartWindow {
+    "id": string;
+    "windowSeconds": number;
+
+    /** Creates a new ChartWindow instance. */
+    constructor($$source: Partial<ChartWindow> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("windowSeconds" in $$source)) {
+            this["windowSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChartWindow instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChartWindow {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ChartWindow($$parsedSource as Partial<ChartWindow>);
     }
 }
 
@@ -114,6 +150,35 @@ export class Collection {
             $$parsedSource["messages"] = $$createField5_0($$parsedSource["messages"]);
         }
         return new Collection($$parsedSource as Partial<Collection>);
+    }
+}
+
+/**
+ * CollectionCollapsedState remembers whether a sidebar collection folder is
+ * collapsed. Keyed by collection id; a missing row means expanded.
+ */
+export class CollectionCollapsedState {
+    "id": number;
+    "collapsed": boolean;
+
+    /** Creates a new CollectionCollapsedState instance. */
+    constructor($$source: Partial<CollectionCollapsedState> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("collapsed" in $$source)) {
+            this["collapsed"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CollectionCollapsedState instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CollectionCollapsedState {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CollectionCollapsedState($$parsedSource as Partial<CollectionCollapsedState>);
     }
 }
 

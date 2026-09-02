@@ -83,6 +83,7 @@ let mockAppSettings = new models.AppSettings({
   lastSeenChangelogVersion: "",
   launchCount: 0,
   hasSeenStarPrompt: false,
+  ignoredUpdateVersion: "",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
 
@@ -114,6 +115,16 @@ export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
   mockAppSettings = new models.AppSettings({
     ...mockAppSettings,
     hasSeenStarPrompt: true,
+  });
+  return mockAppSettings;
+}
+
+export async function SkipUpdateVersion(
+  version: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    ignoredUpdateVersion: version,
   });
   return mockAppSettings;
 }
@@ -234,6 +245,17 @@ const findMockCollectionMessage = (id: number) => {
   }
   return null;
 };
+
+export async function GetCollectionCollapsedStates(): Promise<
+  models.CollectionCollapsedState[]
+> {
+  return [];
+}
+
+export async function SetCollectionCollapsed(
+  _collectionId: number,
+  _collapsed: boolean
+): Promise<void> {}
 
 export async function GetCollectionsForConnection(
   _connectionId: number
@@ -451,6 +473,13 @@ export async function GetReceivedMessageCount(
   return mockMqttMessages.length;
 }
 
+export async function GetMemoryStats(): Promise<app.MemoryStats> {
+  return new app.MemoryStats({
+    historyBytes: 34 * 1024 * 1024,
+    activeConnections: 1,
+  });
+}
+
 export async function GetMqttStats(): Promise<app.MqttStats> {
   return new app.MqttStats({
     totalMessagesReceived: 128,
@@ -491,6 +520,15 @@ export async function GetSortStates(): Promise<models.SortState[]> {
     }),
   ];
 }
+
+export async function GetChartWindows(): Promise<models.ChartWindow[]> {
+  return [];
+}
+
+export async function UpdateChartWindow(
+  _id: string,
+  _windowSeconds: number
+): Promise<void> {}
 
 export async function LoadOpenTabs(): Promise<models.Tab[]> {
   return [

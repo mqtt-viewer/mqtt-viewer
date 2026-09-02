@@ -17,6 +17,8 @@ type Global struct {
 // user has dismissed, so it shows once per version. LaunchCount counts app
 // starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
 // the GitHub star prompt as shown so it only ever appears once.
+// IgnoredUpdateVersion records an update the user chose to skip, so the
+// update dialog stops auto-opening for it.
 type AppSettings struct {
 	ID                       uint   `json:"id" gorm:"primaryKey"`
 	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
@@ -26,6 +28,7 @@ type AppSettings struct {
 	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion" gorm:"not null;default:''"`
 	LaunchCount              int64  `json:"launchCount" gorm:"not null;default:0"`
 	HasSeenStarPrompt        bool   `json:"hasSeenStarPrompt" gorm:"not null;default:0"`
+	IgnoredUpdateVersion     string `json:"ignoredUpdateVersion" gorm:"not null;default:''"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,
@@ -57,34 +60,34 @@ type ReceivedMessage struct {
 }
 
 type Connection struct {
-	ID                   uint             `json:"id" gorm:"primaryKey"`
-	CreatedAt            time.Time        `json:"createdAt"`
-	UpdatedAt            time.Time        `json:"updatedAt"`
-	Name                 string           `json:"name"`
-	MqttVersion          string           `json:"mqttVersion"`
-	HasCustomClientId    *bool            `json:"hasCustomClientId"`
-	ClientId             *string          `json:"clientId"`
-	Protocol             string           `json:"protocol"`
-	Host                 string           `json:"host"`
-	Port                 int              `json:"port"`
-	WebsocketPath        string           `json:"websocketPath"`
-	Username             *string          `json:"username"`
-	Password             *string          `json:"password"`
-	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
-	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
-	SkipCertVerification *bool            `json:"skipCertVerification"`
-	CertCa               *string          `json:"certCa"`
-	CertClient           *string          `json:"certClient"`
-	CertClientKey        *string          `json:"certClientKey"`
-	Subscriptions        []Subscription   `json:"subscriptions"`
-	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
-	CustomIconSeed       *string          `json:"customIconSeed"`
+	ID                   uint           `json:"id" gorm:"primaryKey"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	Name                 string         `json:"name"`
+	MqttVersion          string         `json:"mqttVersion"`
+	HasCustomClientId    *bool          `json:"hasCustomClientId"`
+	ClientId             *string        `json:"clientId"`
+	Protocol             string         `json:"protocol"`
+	Host                 string         `json:"host"`
+	Port                 int            `json:"port"`
+	WebsocketPath        string         `json:"websocketPath"`
+	Username             *string        `json:"username"`
+	Password             *string        `json:"password"`
+	IsProtoEnabled       *bool          `json:"isProtoEnabled"`
+	IsCertsEnabled       *bool          `json:"isCertsEnabled"`
+	SkipCertVerification *bool          `json:"skipCertVerification"`
+	CertCa               *string        `json:"certCa"`
+	CertClient           *string        `json:"certClient"`
+	CertClientKey        *string        `json:"certClientKey"`
+	Subscriptions        []Subscription `json:"subscriptions"`
+	LastConnectedAt      *time.Time     `json:"lastConnectedAt"`
+	CustomIconSeed       *string        `json:"customIconSeed"`
 	// Opt-in verbose MQTT-library debug logging for this connection's client
 	// logs. false = only always-on lifecycle/error lines are captured.
 	// Non-pointer so GORM never inserts NULL into the NOT NULL column.
-	DebugLoggingEnabled bool `json:"debugLoggingEnabled" gorm:"not null;default:0"`
-	FilterHistories      []FilterHistory  `json:"filterHistories"`
-	PublishHistories     []PublishHistory `json:"publishHistories"`
+	DebugLoggingEnabled bool             `json:"debugLoggingEnabled" gorm:"not null;default:0"`
+	FilterHistories     []FilterHistory  `json:"filterHistories"`
+	PublishHistories    []PublishHistory `json:"publishHistories"`
 	// Declared only so the schema keeps the foreign keys added during the DB
 	// hardening review. Never preloaded (received history can be huge) and kept
 	// out of JSON/bindings; ConnectionID on the child is the source of truth.
@@ -203,6 +206,21 @@ type SortState struct {
 	ID            string `json:"id" gorm:"primaryKey"`
 	SortCriteria  string `json:"sortCriteria"`
 	SortDirection string `json:"sortDirection"`
+}
+
+// ChartWindow persists the chart time-window selection per connection. ID is
+// the connection id (string). WindowSeconds is the selected window in seconds;
+// 0 means "All history". A custom interval is stored as its resolved seconds.
+type ChartWindow struct {
+	ID            string `json:"id" gorm:"primaryKey"`
+	WindowSeconds int64  `json:"windowSeconds"`
+}
+
+// CollectionCollapsedState remembers whether a sidebar collection folder is
+// collapsed. Keyed by collection id; a missing row means expanded.
+type CollectionCollapsedState struct {
+	ID        uint `json:"id" gorm:"primaryKey"`
+	Collapsed bool `json:"collapsed"`
 }
 
 type Migration struct {

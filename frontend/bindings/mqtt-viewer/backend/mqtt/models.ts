@@ -9,6 +9,11 @@ import { Create as $Create } from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as time$0 from "../../../time/models.js";
 
+/**
+ * ConnectionStats is the snapshot handed to the frontend by GetStats. It is a
+ * plain value type so the counters can never be read while a message is
+ * updating them.
+ */
 export class ConnectionStats {
     "messagesReceived": number;
     "messagesSent": number;

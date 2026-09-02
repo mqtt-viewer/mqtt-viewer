@@ -7,6 +7,7 @@ import (
 	"mqtt-viewer/backend/env"
 	"mqtt-viewer/backend/logging"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -17,6 +18,8 @@ import (
 const (
 	releasesPageURL = "https://github.com/mqtt-viewer/mqtt-viewer/releases"
 	flatpakAppID    = "app.mqttviewer.MQTTViewer"
+	// Default Nix store root. NIX_STORE_DIR overrides it, see isNixStorePath.
+	nixStoreDir = "/nix/store"
 )
 
 // Install type identifiers reported to the frontend so it can show the right
@@ -24,11 +27,15 @@ const (
 const (
 	installFlatpak       = "flatpak"
 	installAppImage      = "appimage"
+	installNix           = "nix"
 	installLinuxPackage  = "linux-package" // deb or rpm
 	installLinuxPortable = "linux-portable"
 	installMacOS         = "macos"
 	installWindows       = "windows"
 )
+
+// Indirection so tests can pretend the binary lives somewhere else.
+var osExecutable = os.Executable
 
 // UpdateResponse is what the frontend receives when an update is available.
 // There is no licensing, so an update is always offered when a newer version
@@ -120,16 +127,50 @@ func isFlatpak() bool {
 	return os.Getenv("FLATPAK_ID") != ""
 }
 
+// isNixStorePath reports whether p sits inside the Nix store. Store paths are
+// immutable, so a binary living under one can never replace itself in place.
+// NIX_STORE_DIR is honoured for the rare non-default store root; it is normally
+// unset at runtime, in which case the default applies.
+func isNixStorePath(p string) bool {
+	root := os.Getenv("NIX_STORE_DIR")
+	if root == "" {
+		root = nixStoreDir
+	}
+	root = strings.TrimSuffix(filepath.Clean(root), string(os.PathSeparator))
+	return strings.HasPrefix(filepath.Clean(p), root+string(os.PathSeparator))
+}
+
+// isNixInstall reports whether Nix installed this binary. `nix profile add`
+// leaves a symlink in ~/.nix-profile/bin, so resolve it first: the real path is
+// what decides. A failed resolve is not fatal, the unresolved path is still
+// worth checking.
+func isNixInstall() bool {
+	exe, err := osExecutable()
+	if err != nil {
+		return false
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return isNixStorePath(exe)
+}
+
 // resolveInstallType classifies how MQTT Viewer was installed so the frontend
-// can show the correct update instructions. Flatpak and AppImage set their own
-// environment variables; everything else is classified by OS, with Linux split
-// into a self-updatable portable binary and a system package (deb/rpm).
+// can show the correct update instructions. Flatpak, AppImage and Nix each
+// identify themselves (the first two through environment variables, Nix through
+// its immutable store path); everything else is classified by OS, with Linux
+// split into a self-updatable portable binary and a system package (deb/rpm).
 func resolveInstallType() string {
 	if isFlatpak() {
 		return installFlatpak
 	}
 	if os.Getenv("APPIMAGE") != "" {
 		return installAppImage
+	}
+	// Ahead of the OS switch: a Nix install looks identical on Linux and macOS,
+	// and the store path is immutable either way.
+	if isNixInstall() {
+		return installNix
 	}
 	switch runtime.GOOS {
 	case "darwin":
@@ -162,6 +203,10 @@ func updateGuidance(installType string) (command, instructions, releasesURL stri
 		return "",
 			"Download the .deb or .rpm for your distribution from the releases page and install it over your current version.",
 			releasesPageURL
+	case installNix:
+		return "nix profile upgrade --all",
+			"Update MQTT Viewer through Nix. If you installed it into your profile, run:",
+			""
 	default:
 		return "", "", releasesPageURL
 	}
