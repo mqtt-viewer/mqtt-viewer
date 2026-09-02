@@ -190,6 +190,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
       },
       {
+        title: "Updates are harder to miss",
+        body: "When a new version is out, a dialog now opens on startup showing what changed, with the choices you'd expect: update now, remind me later, or skip this version. Previously the only hint was a dot on the notification bell.",
+      },
+      {
         title: "The interface font loads again",
         body: "The Mona Sans typeface the app is designed in was quietly failing to bundle, so the interface fell back to a system font. It now ships and loads properly.",
       },
@@ -331,7 +335,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ];
 
-const normalise = (version: string): string =>
+export const normalise = (version: string): string =>
   version.trim().replace(/^v/i, "");
 
 /** Released entries only, newest first. */

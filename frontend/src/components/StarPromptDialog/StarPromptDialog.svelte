@@ -15,6 +15,10 @@
     whatsNewOpen,
   } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
   import {
+    updatePromptResolved,
+    updateDialogShown,
+  } from "@/components/UpdateDialog/UpdateDialog.svelte";
+  import {
     GetAppSettings,
     AcknowledgeStarPrompt,
   } from "bindings/mqtt-viewer/backend/app/app";
@@ -49,12 +53,14 @@
   let acknowledged = false;
   let wasOpen = false;
 
-  // Decide once, and only after the "What's new" dialog has had its say. If
-  // it's showing this launch, hold off rather than stack two prompts. The seen
-  // flag stays unset, so the nudge just waits for a later launch.
-  $: if (!checked && $whatsNewResolved) {
+  // Decide once, and only after the "What's new" and update dialogs have had
+  // their say. If one is showing this launch, hold off rather than stack two
+  // prompts. Likewise, an update prompt shown this launch means the nudge
+  // waits for a later launch. The seen flag stays unset either way, so it
+  // just waits.
+  $: if (!checked && $whatsNewResolved && $updatePromptResolved) {
     checked = true;
-    if (!$whatsNewOpen) {
+    if (!$whatsNewOpen && !$updateDialogShown) {
       (async () => {
         try {
           const settings = await GetAppSettings();
