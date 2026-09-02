@@ -230,6 +230,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Opening two connections to one broker in the same second, or running a second copy of the app, gave both the same client ID, so the broker kept dropping one to make room for the other and neither would settle. Each connection now gets its own ID.",
       },
       {
+        title: "Connection failures no longer go unreported",
+        body: "On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting \"Connection failed\" indicator until you try again.",
+      },
+      {
         title: "Collapsible collections",
         body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
       },

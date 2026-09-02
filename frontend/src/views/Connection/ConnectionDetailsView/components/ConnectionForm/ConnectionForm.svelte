@@ -101,7 +101,14 @@
 
   $: isSslTls = $data.protocol === "mqtts" || $data.protocol === "wss";
 
-  $: isAllFieldsDisabled = connection.connectionState !== "disconnected";
+  // Editable whenever there isn't a live or in-progress connection to protect
+  // against edits mid-flight. Explicitly not "!== disconnected": an "error"
+  // state means the last attempt failed, which is exactly when the user
+  // needs to fix these fields.
+  $: isAllFieldsDisabled =
+    connection.connectionState === "connected" ||
+    connection.connectionState === "connecting" ||
+    connection.connectionState === "reconnecting";
   let isConfirmDeleteDialogOpen = writable(false);
 </script>
 

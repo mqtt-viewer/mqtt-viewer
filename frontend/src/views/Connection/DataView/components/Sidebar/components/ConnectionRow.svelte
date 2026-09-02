@@ -23,15 +23,21 @@
   $: isConnected = state === "connected";
   $: isBusy = state === "connecting" || state === "reconnecting";
 
+  $: isError = state === "error";
+
   // status text + dot colour shown at the top of the dropdown
   $: statusColorClass = isConnected
     ? "text-success"
     : isBusy
       ? "text-warning"
-      : "text-secondary-text";
+      : isError
+        ? "text-error"
+        : "text-secondary-text";
   $: statusLabel = isConnected
     ? `Connected${connection.latencyMs !== undefined ? ` · ${connection.latencyMs} ms` : ""}`
-    : capitalizeFirstLetter(state);
+    : isError
+      ? (connection.lastConnectionError ?? "Connection failed")
+      : capitalizeFirstLetter(state);
 
   // A connection just created this session opens straight into the details
   // dialog so the user can configure it before connecting.
@@ -115,16 +121,18 @@
           <div class="size-4"><ConnectionIdenticon {connection} /></div>
         </div>
         <span class="text-lg text-emphasis truncate">{details.name}</span>
-        <span class={`size-[6px] rounded-full ${isConnected ? "bg-success" : isBusy ? "bg-warning" : "bg-transparent"}`}
+        <span class={`size-[6px] rounded-full ${isConnected ? "bg-success" : isBusy ? "bg-warning" : isError ? "bg-error" : "bg-transparent"}`}
         ></span>
         <Icon type="down" size={10} />
       </div>
-      <div class="flex flex-col min-w-[220px]" slot="menu-content">
+      <div class="flex flex-col min-w-[220px] max-w-[280px]" slot="menu-content">
         <div class="px-2 pt-1 pb-2">
           <div class="text-sm text-secondary-text truncate">
             {connection.connectionString}
           </div>
-          <div class={`text-sm ${statusColorClass}`}>{statusLabel}</div>
+          <div class={`text-sm break-words ${statusColorClass}`}>
+            {statusLabel}
+          </div>
         </div>
         <div class="border-t border-divider my-1"></div>
         <DropdownMenuItem onClick={toggleConnect}>

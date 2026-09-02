@@ -3,7 +3,9 @@ package mqtt
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -249,6 +251,54 @@ func testSubscribeSkipsEmptyTopics(t *testing.T, mqttVersion string) {
 	}
 	if len(history) != 1 {
 		t.Errorf("Expected 1 message in history, got %v", len(history))
+	}
+}
+
+func TestConnectV3RefusedPortFailsFast(t *testing.T) {
+	testConnectRefusedPortFailsFast(t, "3")
+}
+
+func TestConnectV5RefusedPortFailsFast(t *testing.T) {
+	testConnectRefusedPortFailsFast(t, "5")
+}
+
+// testConnectRefusedPortFailsFast connects to a port nothing is listening on.
+// connectV3 used to ignore the connect token's result entirely and always
+// wait out the full CONNECTION_TIMEOUT, returning the generic "timeout while
+// connecting to broker" message instead of the real connection-refused error
+// paho.mqtt.golang already had available. This pins the fast, real-error
+// behaviour for both client versions.
+func testConnectRefusedPortFailsFast(t *testing.T, mqttVersion string) {
+	m := getTestMqttManager(t)
+	topic := testTopic(t)
+
+	// Bind then immediately release a port so nothing answers on it.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve a port: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	connDetails := MqttConnectionDetails{
+		Host:        "127.0.0.1",
+		Port:        port,
+		Protocol:    "mqtt",
+		MqttVersion: mqttVersion,
+	}
+
+	start := time.Now()
+	err = m.Connect(connDetails, []SubscribeParams{{Topic: topic, QoS: 0}})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected an error connecting to a refused port")
+	}
+	if elapsed >= CONNECTION_TIMEOUT {
+		t.Errorf("expected the connection-refused error to return well under the %v timeout, took %v: %v", CONNECTION_TIMEOUT, elapsed, err)
+	}
+	if strings.Contains(err.Error(), "timeout while connecting to broker") {
+		t.Errorf("expected the real connection-refused error, got the generic timeout message: %v", err)
 	}
 }
 
