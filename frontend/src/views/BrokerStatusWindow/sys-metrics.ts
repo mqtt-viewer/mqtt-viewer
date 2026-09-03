@@ -270,7 +270,8 @@ export const BUILTIN_METRICS: readonly MetricTile[] = [
       // /s rate from successive samples (same as the msg-rate tiles).
       { pattern: "$SYS/broker/mqtt/publish/dropped", payloadPath: "", kind: "cumulative" },
       { pattern: "$SYS/broker/publish/messages/dropped", payloadPath: "", kind: "cumulative" },
-      { pattern: "$SYS/broker/messages/publish/dropped", payloadPath: "", kind: "cumulative" },
+      // Mochi-MQTT, not mosquitto. It reads like a transposition of the line
+      // above, so leave it: mochi-mqtt/server really does publish this leaf.
       { pattern: "$SYS/broker/messages/dropped", payloadPath: "", kind: "cumulative" },
       { pattern: "$SYS/brokers/+/metrics/messages/dropped", payloadPath: "", kind: "cumulative" },
     ],
