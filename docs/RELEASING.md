@@ -1,9 +1,9 @@
 # Releasing MQTT Viewer
 
 One release = one annotated GitHub release on `main`. Publishing the release
-fires three workflows (mac / windows / linux) that build, sign, upload assets,
-and register the version with the portal. Nothing reaches users until you flip
-the `released` toggle in the portal admin.
+fires five workflows: mac, Windows, Linux, Flatpak publishing and Docker. Desktop artifacts register
+with the portal and stay out of in-app update checks until you flip `released`.
+The Docker workflow publishes its image to GHCR immediately.
 
 The `/release` skill drives this whole runbook. Its first step is always a
 changelog draft presented for approval, so you see and shape what the release
@@ -28,8 +28,8 @@ just release v0.X.Y-beta1 <previous-tag> --prerelease
 # 4. the real thing
 just release v0.X.Y <previous-tag>
 
-# 5. watch the three workflows
-gh run list --limit 5
+# 5. watch the five workflows, including Publish Docker image
+gh run list --limit 6
 
 # 6. flip `released` on the new release_v3 record in the PocketBase admin UI
 #    (https://cloud.mqttviewer.app/_/) once you're happy. This is what makes
@@ -84,6 +84,7 @@ so a dry run shows the real notes.
 | mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. |
 | windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions, so pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
 | linux (`release-linux.yaml`) | none | Runs on `ubuntu-latest` + `ubuntu-24.04-arm`. gtk3/webkit2gtk-4.1 dev packages must install **before** the wails3 CLI (`-tags gtk3`). |
+| Docker (`docker-publish.yaml`) | none | Publishes one `linux/amd64` + `linux/arm64` manifest to GHCR. Release builds fail if any shared app secret is missing; prereleases never move `latest`. |
 
 Shared foundations that have bitten before:
 
@@ -111,6 +112,18 @@ Shared foundations that have bitten before:
 - darwin: `MQTT_Viewer_<tag>_darwin_{arm64,amd64}.zip` (+ `.sha256`)
 - windows: `..._windows_amd64.zip` + `..._installer.exe` (+ `.sha256`)
 - linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm,flatpak}` (+ `.sha256`)
+- Docker: `ghcr.io/mqtt-viewer/mqtt-viewer:<version>` multi-architecture image
+
+For the first Docker publication, GHCR creates the package as private. Open the
+package settings, connect it to this repository, change visibility to public,
+then verify anonymous access and both architectures:
+
+```sh
+docker buildx imagetools inspect ghcr.io/mqtt-viewer/mqtt-viewer:<version>
+```
+
+Later releases inherit package visibility. Home Assistant cannot install a
+private image, so this check blocks publishing its app repository.
 
 Linux distro guidance: deb/rpm use the system WebKit and are the most
 compatible (Fedora needs the rpm, because the AppImage bundles Ubuntu-built
