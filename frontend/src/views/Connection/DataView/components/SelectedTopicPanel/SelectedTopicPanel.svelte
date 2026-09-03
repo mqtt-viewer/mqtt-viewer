@@ -38,6 +38,14 @@
   // Hidden in the popped-out window: the window's own close button is the
   // way out there, rather than deselecting the topic.
   export let showCloseButton = true;
+  // Window mode only: the panel header doubles as the pop-out window's drag
+  // region, so the window moves by its header like the chart and broker
+  // status pop-outs do.
+  export let headerDraggable = false;
+  // Window mode on macOS only: pixels of empty space at the header's left so
+  // the traffic lights don't sit on top of the topic path. Passed in rather
+  // than read from the env store so the panel still renders from props alone.
+  export let headerLeftInset = 0;
 
   $: selectedTopicString = $selectedTopicStore.selectedTopic;
 
@@ -127,17 +135,30 @@
     bg-elevation-1 border-l-[1px] border-l-outline p-4 pt-0"
 >
   <PanelHeader
-    ><div class="relative min-h-[50px] h-full">
+    ><div
+      class="relative min-h-[50px] h-full"
+      style={headerDraggable ? "--wails-draggable:drag" : ""}
+    >
       <div class="flex gap-1 items-center min-h-[50px] max-w-full h-full py-2">
-        <Topic topic={selectedTopicString ?? ""} />
+        {#if headerLeftInset > 0}
+          <!-- Clear the macOS traffic lights (frameless hidden-inset titlebar). -->
+          <div class="shrink-0" style={`width:${headerLeftInset}px`}></div>
+        {/if}
+        <div class="min-w-0" style="--wails-draggable:false">
+          <Topic topic={selectedTopicString ?? ""} />
+        </div>
         <div class="grow"></div>
         <DropdownMenu>
-          <div slot="trigger" class="">
+          <div slot="trigger" class="" style="--wails-draggable:false">
             <IconButton>
               <Icon type="menu" size={16} />
             </IconButton>
           </div>
-          <div slot="menu-content" class="flex flex-col gap-5 p-2">
+          <div
+            slot="menu-content"
+            class="flex flex-col gap-5 p-2"
+            style="--wails-draggable:false"
+          >
             {#if onSetDockMode}
               <div>
                 <div class="text-sm text-secondary-text mb-1">Dock side</div>

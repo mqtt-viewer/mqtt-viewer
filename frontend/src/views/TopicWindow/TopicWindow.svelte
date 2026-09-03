@@ -4,6 +4,7 @@
   import { Events } from "@wailsio/runtime";
   import connections from "@/stores/connections";
   import topicPanelDock from "@/stores/topic-panel-dock";
+  import os from "@/stores/env";
   import * as events from "bindings/mqtt-viewer/events/models";
   import {
     DeleteRetainedMessage,
@@ -71,7 +72,8 @@
   };
 
   onMount(async () => {
-    await Promise.all([connections.init(), topicPanelDock.init()]);
+    // env feeds the macOS traffic-light inset in the panel header.
+    await Promise.all([os.init(), connections.init(), topicPanelDock.init()]);
     storesInitialised = true;
     const connection = get(connections).connections[connectionId];
     if (!connection) {
@@ -127,16 +129,13 @@
 </script>
 
 <IconContext>
-  <main
-    class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col"
-    style="--wails-draggable:drag"
-  >
+  <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
     {#if error}
       <div class="size-full flex items-center justify-center text-secondary-text">
         {error}
       </div>
     {:else if selectedTopicStore}
-      <div class="grow min-h-0" style="--wails-draggable:false">
+      <div class="grow min-h-0">
         {#if selectedTopic === null}
           <div
             class="size-full flex items-center justify-center text-secondary-text"
@@ -156,6 +155,8 @@
             dockMode={$topicPanelDock.mode}
             onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
             showCloseButton={false}
+            headerDraggable={true}
+            headerLeftInset={$os.isMac && !$os.isFullscreen ? 62 : 0}
           />
         {/if}
       </div>

@@ -6,7 +6,7 @@
 
   const componentName = "SelectedTopicPanel";
   const storyId = "Views/Connection/DataView/SelectedTopicPanel";
-  const props: string[] = ["connectionId","selectedTopicStore","firstConnectedAtMs","mqttVersion","deleteRetainedMessage","exportTopicMessages","openChartWindow","dockMode","onSetDockMode","showCloseButton"];
+  const props: string[] = ["connectionId","selectedTopicStore","firstConnectedAtMs","mqttVersion","deleteRetainedMessage","exportTopicMessages","openChartWindow","dockMode","onSetDockMode","showCloseButton","headerDraggable","headerLeftInset"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -38,5 +38,20 @@
 <Story
   name="DockedBottom"
   args={{ ...storyArgs, dockMode: "bottom" }}
+  {template}
+/>
+
+<!-- Window mode header: the panel header is the pop-out window's drag region,
+     inset past the macOS traffic lights. Verifies the header still lays out
+     with the spacer in place. -->
+<Story
+  name="WindowHeader"
+  args={{
+    ...storyArgs,
+    dockMode: "window",
+    showCloseButton: false,
+    headerDraggable: true,
+    headerLeftInset: 62,
+  }}
   {template}
 />

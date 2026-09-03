@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T10:24:11.122Z",
+  "generatedAt": "2026-09-03T23:29:35.765Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3573,6 +3573,18 @@
           "type": "boolean",
           "required": false,
           "default": true
+        },
+        {
+          "name": "headerDraggable",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "headerLeftInset",
+          "type": "number",
+          "required": false,
+          "default": 0
         }
       ],
       "tokens": [
