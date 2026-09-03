@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "LoudestTopics",
   "tier": "view",
-  "description": "Client-side loudest-topics table for the broker-status window: top rows over the selected range with msg/s, bytes/s and a share bar, a '(collecting)' header suffix while the window fills, and an overflow footer line. Topics middle-ellipsise with the full topic in a tooltip; at narrow widths the share bar drops first, then bytes/s.",
+  "description": "Collapsible client-side loudest-topics table for the broker-status window, collapsed by default with the loudest topic and its rate in the header. Expanded it lists the top rows over the selected range with msg/s, bytes/s and a share bar, a '(collecting)' suffix while the window fills, and an overflow footer line. Topics keep their last two segments and ellipsise the head, with the full topic in a tooltip and a copy button on row hover; at narrow widths the share bar drops first, then bytes/s.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -18,6 +18,13 @@
       "required": false,
       "default": null,
       "description": "LoudestState from the store: { rows: {topic, msgPerSec, bytesPerSec}[], overflowTopics, overflowMsgPerSec, collecting }."
+    },
+    {
+      "name": "expanded",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether the section is open. Toggled internally by the header button; exposed so a story can force the open state. Per session, never persisted."
     }
   ],
   "tokens": [
@@ -29,6 +36,6 @@
     "divider",
     "primary"
   ],
-  "dependencies": ["Tooltip"],
-  "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport."
+  "dependencies": ["Tooltip", "CopyToClipboard", "Icon"],
+  "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport. Topic truncation is CSS only (head span truncates, tail span shrink-0), so the full topic shows whenever it fits."
 }
