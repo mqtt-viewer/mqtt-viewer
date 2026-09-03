@@ -337,3 +337,314 @@ func TestDeleteConnectionRemovesScopedCollectionsOnly(t *testing.T) {
 		t.Errorf("expected global collection kept, got %d", globalCount)
 	}
 }
+
+// idsEqual compares two id orders element by element.
+func idsEqual(a []uint, b []uint) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// globalOrder is the read-back order of the global collections only, so the
+// connection-scoped ones in the same result do not muddle the assertion.
+func globalOrder(collections []models.Collection) []uint {
+	ids := []uint{}
+	for _, collection := range collections {
+		if collection.ConnectionID == nil {
+			ids = append(ids, collection.ID)
+		}
+	}
+	return ids
+}
+
+func findCollection(t *testing.T, collections []models.Collection, id uint) models.Collection {
+	t.Helper()
+	for _, collection := range collections {
+		if collection.ID == id {
+			return collection
+		}
+	}
+	t.Fatalf("expected collection %d in %+v", id, collections)
+	return models.Collection{}
+}
+
+func messageOrder(collection models.Collection) []uint {
+	ids := []uint{}
+	for _, message := range collection.Messages {
+		ids = append(ids, message.ID)
+	}
+	return ids
+}
+
+func saveTestMessage(t *testing.T, app *App, collectionID uint, name string) models.CollectionMessage {
+	t.Helper()
+	message, err := app.SaveCollectionMessage(SaveCollectionMessageParams{
+		CollectionID: collectionID,
+		Name:         name,
+		Topic:        "test/" + name,
+	})
+	if err != nil {
+		t.Fatalf("saving message %s: %v", name, err)
+	}
+	return message
+}
+
+func createTestCollection(t *testing.T, app *App, name string) models.Collection {
+	t.Helper()
+	collection, err := app.CreateCollection(CreateCollectionParams{Name: name})
+	if err != nil {
+		t.Fatalf("creating collection %s: %v", name, err)
+	}
+	return collection
+}
+
+func TestGetCollectionsForConnectionOrdersByPosition(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	first := createTestCollection(t, app, "First")
+	second := createTestCollection(t, app, "Second")
+	third := createTestCollection(t, app, "Third")
+
+	msgA := saveTestMessage(t, app, first.ID, "a")
+	msgB := saveTestMessage(t, app, first.ID, "b")
+	msgC := saveTestMessage(t, app, first.ID, "c")
+
+	// second keeps position 0, so it ties with third and loses on id
+	if err := app.ReorderCollections(nil, []uint{third.ID, first.ID}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	// msgB keeps position 1, so it ties with msgA and loses on id
+	if _, err := app.ReorderCollectionMessages(first.ID, []uint{msgC.ID, msgA.ID}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	want := []uint{second.ID, third.ID, first.ID}
+	if got := globalOrder(collections); !idsEqual(got, want) {
+		t.Errorf("expected collection order %v, got %v", want, got)
+	}
+	wantMessages := []uint{msgC.ID, msgA.ID, msgB.ID}
+	if got := messageOrder(findCollection(t, collections, first.ID)); !idsEqual(got, wantMessages) {
+		t.Errorf("expected message order %v, got %v", wantMessages, got)
+	}
+}
+
+func TestSaveCollectionMessageAppendsAtEnd(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	_, scoped := createTestCollections(t, app, connID)
+
+	for i, name := range []string{"one", "two", "three"} {
+		message := saveTestMessage(t, app, scoped.ID, name)
+		if message.Position != i {
+			t.Errorf("expected %s at position %d, got %d", name, i, message.Position)
+		}
+		var stored models.CollectionMessage
+		if err := app.Db.First(&stored, message.ID).Error; err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if stored.Position != i {
+			t.Errorf("expected stored %s at position %d, got %d", name, i, stored.Position)
+		}
+	}
+}
+
+func TestReorderCollectionMessagesPersists(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	collection := createTestCollection(t, app, "Ordered")
+
+	first := saveTestMessage(t, app, collection.ID, "first")
+	second := saveTestMessage(t, app, collection.ID, "second")
+	third := saveTestMessage(t, app, collection.ID, "third")
+
+	want := []uint{third.ID, first.ID, second.ID}
+	reordered, err := app.ReorderCollectionMessages(collection.ID, want)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	got := []uint{}
+	for _, message := range reordered {
+		got = append(got, message.ID)
+	}
+	if !idsEqual(got, want) {
+		t.Errorf("expected returned order %v, got %v", want, got)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got := messageOrder(findCollection(t, collections, collection.ID)); !idsEqual(got, want) {
+		t.Errorf("expected persisted order %v, got %v", want, got)
+	}
+}
+
+func TestReorderCollectionMessagesMovesAcrossCollections(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	source := createTestCollection(t, app, "Source")
+	target := createTestCollection(t, app, "Target")
+
+	moving := saveTestMessage(t, app, source.ID, "moving")
+	staying := saveTestMessage(t, app, source.ID, "staying")
+	head := saveTestMessage(t, app, target.ID, "head")
+	tail := saveTestMessage(t, app, target.ID, "tail")
+
+	if _, err := app.ReorderCollectionMessages(target.ID, []uint{head.ID, moving.ID, tail.ID}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	wantTarget := []uint{head.ID, moving.ID, tail.ID}
+	if got := messageOrder(findCollection(t, collections, target.ID)); !idsEqual(got, wantTarget) {
+		t.Errorf("expected target order %v, got %v", wantTarget, got)
+	}
+	wantSource := []uint{staying.ID}
+	if got := messageOrder(findCollection(t, collections, source.ID)); !idsEqual(got, wantSource) {
+		t.Errorf("expected source order %v, got %v", wantSource, got)
+	}
+
+	var stored models.CollectionMessage
+	if err := app.Db.First(&stored, moving.ID).Error; err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if stored.CollectionID != target.ID || stored.Position != 1 {
+		t.Errorf("expected moved message in collection %d at position 1, got %d/%d", target.ID, stored.CollectionID, stored.Position)
+	}
+}
+
+func TestReorderCollectionMessagesRejectsUnknownMessage(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	collection := createTestCollection(t, app, "Ordered")
+
+	first := saveTestMessage(t, app, collection.ID, "first")
+	second := saveTestMessage(t, app, collection.ID, "second")
+	third := saveTestMessage(t, app, collection.ID, "third")
+
+	_, err := app.ReorderCollectionMessages(collection.ID, []uint{third.ID, 99999, first.ID})
+	if err == nil {
+		t.Fatal("expected error reordering with a nonexistent message")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	want := []uint{first.ID, second.ID, third.ID}
+	if got := messageOrder(findCollection(t, collections, collection.ID)); !idsEqual(got, want) {
+		t.Errorf("expected rollback to leave order %v, got %v", want, got)
+	}
+}
+
+func TestReorderCollectionsPersists(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	first := createTestCollection(t, app, "First")
+	second := createTestCollection(t, app, "Second")
+	third := createTestCollection(t, app, "Third")
+
+	want := []uint{third.ID, first.ID, second.ID}
+	if err := app.ReorderCollections(nil, want); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got := globalOrder(collections); !idsEqual(got, want) {
+		t.Errorf("expected persisted order %v, got %v", want, got)
+	}
+}
+
+func TestReorderCollectionsRejectsWrongScope(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	global, scoped := createTestCollections(t, app, connID)
+	otherGlobal := createTestCollection(t, app, "Other global")
+
+	established := []uint{otherGlobal.ID, global.ID}
+	if err := app.ReorderCollections(nil, established); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	err := app.ReorderCollections(nil, []uint{global.ID, scoped.ID})
+	if err == nil {
+		t.Fatal("expected error reordering a connection-scoped collection into the global scope")
+	}
+	if !strings.Contains(err.Error(), "not in this scope") {
+		t.Errorf("expected scope error, got %v", err)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got := globalOrder(collections); !idsEqual(got, established) {
+		t.Errorf("expected rollback to leave order %v, got %v", established, got)
+	}
+	var stored models.Collection
+	if err := app.Db.First(&stored, scoped.ID).Error; err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if stored.ConnectionID == nil || *stored.ConnectionID != connID {
+		t.Errorf("expected scoped collection to stay on connection %d, got %+v", connID, stored.ConnectionID)
+	}
+}
+
+func TestMoveCollectionMessageAppendsAtEnd(t *testing.T) {
+	app, _ := getTestAppWithConnection(t)
+	source := createTestCollection(t, app, "Source")
+	target := createTestCollection(t, app, "Target")
+
+	saveTestMessage(t, app, target.ID, "head")
+	saveTestMessage(t, app, target.ID, "tail")
+	moving := saveTestMessage(t, app, source.ID, "moving")
+
+	moved, err := app.MoveCollectionMessage(moving.ID, target.ID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if moved.CollectionID != target.ID {
+		t.Errorf("expected message in collection %d, got %d", target.ID, moved.CollectionID)
+	}
+	if moved.Position != 2 {
+		t.Errorf("expected message appended at position 2, got %d", moved.Position)
+	}
+}
+
+func TestDuplicateCollectionMessagePlacesCopyAfterOriginal(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	collection := createTestCollection(t, app, "Ordered")
+
+	first := saveTestMessage(t, app, collection.ID, "first")
+	second := saveTestMessage(t, app, collection.ID, "second")
+	third := saveTestMessage(t, app, collection.ID, "third")
+
+	copied, err := app.DuplicateCollectionMessage(first.ID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if copied.Position != first.Position+1 {
+		t.Errorf("expected copy at position %d, got %d", first.Position+1, copied.Position)
+	}
+
+	collections, err := app.GetCollectionsForConnection(connID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	want := []uint{first.ID, copied.ID, second.ID, third.ID}
+	if got := messageOrder(findCollection(t, collections, collection.ID)); !idsEqual(got, want) {
+		t.Errorf("expected order %v, got %v", want, got)
+	}
+}
