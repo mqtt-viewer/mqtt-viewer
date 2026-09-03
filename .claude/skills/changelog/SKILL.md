@@ -46,11 +46,36 @@ not read like an AI wrote it.
    ```
 
 3. **Write the sections.** Group related changes into one section each. A section
-   is a short benefit-first title (no emoji) and one or two sentences of body.
-   Lead with what the user can now do. Follow the style guide. Reuse or extend an
-   existing section rather than adding a near-duplicate.
+   is a short benefit-first title (no emoji) and ONE terse sentence of body, two
+   at most for a big feature. Sam wants these dev-changelog style: state the
+   change plainly, no scene-setting, no explaining why it matters, no examples
+   unless the change is unintelligible without one. Follow the style guide for
+   tone and spelling. Reuse or extend an existing section rather than adding a
+   near-duplicate.
 
-4. **Validate.** `cd frontend && pnpm test:run changelog` (checks shape and the
+4. **Credit the person who asked.** If the change traces back to a GitHub
+   issue, discussion, or comment, add a `thanks` array to the section:
+
+   ```ts
+   thanks: [
+     {
+       name: "someuser",
+       url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/123",
+     },
+   ],
+   ```
+
+   The dialog renders it as "Thanks @someuser" with the name linking to the
+   URL. Rules:
+   - Link to the specific issue, discussion, or comment where the idea or
+     report was raised, not to the person's profile. A profile URL is the
+     fallback when no single thread exists.
+   - Multiple people is fine when several weighed in; list them all.
+   - Never credit the maintainer (samfweb).
+   - Names are covered by the style-guard tests, and every URL must be a
+     GitHub link (`changelog.test.ts` enforces both).
+
+5. **Validate.** `cd frontend && pnpm test:run changelog` (checks shape and the
    no-em-dash guard) and `pnpm check`. Both must pass. Optionally preview it in
    Storybook: the `WhatsNewContent` "With unreleased tab" story.
 
@@ -65,11 +90,13 @@ When cutting release `vX.Y.Z` (see `docs/RELEASING.md`):
 3. Do NOT decide the version number before release. The bump (patch vs minor) is
    evaluated at release time based on everything that landed.
 4. Leave no empty `unreleased` entry behind; the next change re-creates it.
-5. Re-run the validation from step 4 above.
+5. Re-run the validation from step 5 above.
 
 ## What NOT to do
 
 - No em dashes and no emojis. The changelog test fails if any slip in.
+- No padded prose. If a section body runs past one sentence, cut it down before
+  asking whether it reads well.
 - No version guessing ahead of release. Keep changes in the staging entry.
 - No marketing voice. See `docs/WRITING_STYLE.md`.
 - Don't hand-edit `frontend/src/design-system/component-index.json`.

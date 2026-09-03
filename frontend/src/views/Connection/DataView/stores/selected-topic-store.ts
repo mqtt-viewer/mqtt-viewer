@@ -26,13 +26,13 @@ export const HISTORY_WINDOW_SIZE = 5000;
 // once. Once incremental loading (prepend/append) pushes past this, we evict
 // from the end away from the change so the timeline never grows unbounded
 // while the user pans through a busy topic's history.
-export const MAX_LOADED_MESSAGES = 20000;
+export const MAX_LOADED_MESSAGES = HISTORY_WINDOW_SIZE;
 
 // Amortization slack for the cap above: trimming the moment history crosses
 // MAX_LOADED_MESSAGES would shift the whole array on every live drain of a
 // busy topic. Instead let it overshoot by up to this much, then trim back
 // down to exactly MAX_LOADED_MESSAGES in one go.
-export const TRIM_SLACK = 2000;
+export const TRIM_SLACK = 500;
 
 // Selecting a topic (and paging its window) only ever fetches lightweight
 // stubs: id, arrival time, and small flags. Payloads are fetched individually
@@ -503,7 +503,11 @@ export const createSelectedTopicStore = (
     // loadRecordedHistory below, never paid on selection.
     let stubs: Awaited<ReturnType<typeof GetMessageTimeline>>;
     try {
-      stubs = await GetMessageTimeline(connectionId, topic, HISTORY_WINDOW_SIZE);
+      stubs = await GetMessageTimeline(
+        connectionId,
+        topic,
+        HISTORY_WINDOW_SIZE
+      );
     } catch {
       if (isStale(token, topic)) return;
       // Structural topics (e.g. an expanded parent selected in the graph)
@@ -844,7 +848,13 @@ export const createSelectedTopicStore = (
             };
       // Same reasoning as loadOlderWindow: stub-only growth the chart cache
       // doesn't reflect, so drop it and let ensureChartHistory refetch.
-      return { ...s, history, window, isLoadingWindow: null, chartHistory: null };
+      return {
+        ...s,
+        history,
+        window,
+        isLoadingWindow: null,
+        chartHistory: null,
+      };
     });
     // Re-read the callback: it may have been re-registered while the fetch
     // above was awaiting (e.g. the timeline rebuilt).
@@ -1013,7 +1023,11 @@ export const createSelectedTopicStore = (
         decoded = await decodeChunked(full);
       }
       if (isStale(token, topic)) return;
-      update((s) => ({ ...s, chartHistory: decoded, isLoadingChartHistory: false }));
+      update((s) => ({
+        ...s,
+        chartHistory: decoded,
+        isLoadingChartHistory: false,
+      }));
     } catch {
       if (isStale(token, topic)) return;
       update((s) => ({ ...s, isLoadingChartHistory: false }));

@@ -6,7 +6,7 @@
 
   const componentName = "ChartOptions";
   const storyId = "Views/Connection/DataView/SelectedTopicPanel/Chart/ChartOptions";
-  const props: string[] = ["style","showPoints","windowMinutes"];
+  const props: string[] = ["style","showPoints","windowSeconds","onWindowSecondsChange"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

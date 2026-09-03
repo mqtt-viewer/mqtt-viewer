@@ -12,7 +12,7 @@ import (
 // without needing a live broker.
 func firstConnId(t *testing.T, app *App) uint {
 	t.Helper()
-	for id := range app.AppConnections {
+	for id := range app.appConnectionsSnapshot() {
 		return id
 	}
 	t.Fatal("expected at least one seeded connection")

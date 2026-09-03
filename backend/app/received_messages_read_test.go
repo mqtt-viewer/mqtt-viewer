@@ -20,7 +20,7 @@ func TestReceivedMessageWindowPagesNewestFirstInArrivalOrder(t *testing.T) {
 	for i := 0; i < 25; i++ {
 		batch = append(batch, mqtt.MqttMessage{Topic: "seq", Payload: []byte(fmt.Sprintf("%d", i))})
 	}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, batch)
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, batch)
 
 	// Newest window of 10.
 	win1, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "seq", 0, 0, 10)
@@ -80,7 +80,7 @@ func TestReceivedMessageWindowReconstructsProperties(t *testing.T) {
 		ContentType:    "text/plain",
 		UserProperties: map[string]string{"a": "b"},
 	}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
 
 	win, err := app.GetReceivedMessageWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)
 	if err != nil || len(win) != 1 {
@@ -132,7 +132,7 @@ func TestReceivedTimelineWindowPagesStubsNewestFirstInArrivalOrder(t *testing.T)
 	for i := 0; i < 25; i++ {
 		batch = append(batch, mqtt.MqttMessage{Topic: "seq", Payload: []byte(fmt.Sprintf("%d", i))})
 	}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, batch)
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, batch)
 
 	win1, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "seq", 0, 0, 10)
 	if err != nil {
@@ -170,7 +170,7 @@ func TestReceivedTimelineWindowCarriesQosAndRetainNoPayload(t *testing.T) {
 	enableRecording(t, app)
 
 	m := mqtt.MqttMessage{Topic: "flags", Payload: []byte("some-payload"), QoS: 2, Retain: true}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{m})
 
 	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "flags", 0, 0, 10)
 	if err != nil || len(win) != 1 {
@@ -189,7 +189,7 @@ func TestGetReceivedMessageByIdReturnsFullPayload(t *testing.T) {
 	}
 	enableRecording(t, app)
 
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
 		{Topic: "p", Payload: []byte("hello world")},
 	})
 
@@ -241,7 +241,7 @@ func TestGetReceivedMessagesByIdsReturnsSubsetSkippingMissing(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		batch = append(batch, mqtt.MqttMessage{Topic: "seq", Payload: []byte(fmt.Sprintf("%d", i))})
 	}
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, batch)
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, batch)
 
 	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "seq", 0, 0, 10)
 	if err != nil || len(win) != 10 {
@@ -276,7 +276,7 @@ func TestGetReceivedMessagesByIdsScopedToTopic(t *testing.T) {
 	}
 	enableRecording(t, app)
 
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
 		{Topic: "p", Payload: []byte("hello")},
 	})
 	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)
@@ -303,7 +303,7 @@ func TestGetReceivedMessagesByIdsCapsBatchSize(t *testing.T) {
 	}
 	enableRecording(t, app)
 
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
 		{Topic: "cap", Payload: []byte("kept")},
 	})
 	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "cap", 0, 0, 10)
@@ -346,7 +346,7 @@ func TestGetReceivedMessageByIdScopedToTopic(t *testing.T) {
 	}
 	enableRecording(t, app)
 
-	app.recordReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
+	app.insertReceivedMessages(conn.ConnectionDetails.ID, []mqtt.MqttMessage{
 		{Topic: "p", Payload: []byte("hello")},
 	})
 	win, err := app.GetReceivedTimelineWindow(conn.ConnectionDetails.ID, "p", 0, 0, 10)

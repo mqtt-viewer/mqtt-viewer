@@ -8,7 +8,7 @@
 
 <script lang="ts">
   import moment from "moment";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import "vis-timeline/styles/vis-timeline-graph2d.css";
   import {
     Timeline,
@@ -28,6 +28,7 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import { sampleEvenly } from "./timeline-sampling";
+  import { buildPayloadPreview, computePopoverPosition } from "./hover-preview";
 
   // Upper bound on how many items the vis-timeline DataSet holds at once.
   // The store's `history` array (and the payload/chart features that read
@@ -104,6 +105,93 @@
   let selectedMessageId: string | number | null = null;
   let selectedMessageIndex: number | null = null;
 
+  let hoveredMessageId: string | null = null;
+  let hideHoverTimeout: ReturnType<typeof setTimeout> | null = null;
+  let popoverEl: HTMLDivElement | null = null;
+  let popoverLeft = 0;
+  let popoverTop = 0;
+  let popoverPositioned = false;
+  let hoverMouseX = 0;
+  let hoverMouseY = 0;
+  let lastMouseMoveAt = 0;
+  let suppressStartedAt = 0;
+  let suppressHoverUntil = 0;
+  const MOVE_ANIMATION_MS = 600;
+
+  $: hoveredMessage =
+    hoveredMessageId === null
+      ? null
+      : ($selectedTopicStore.history.find(
+          (message) => message.id === hoveredMessageId
+        ) ?? null);
+  $: hoveredPreview =
+    hoveredMessage?.payloadState === "loaded" &&
+    hoveredMessage.payload !== null &&
+    hoveredMessage.payloadB64 !== null
+      ? buildPayloadPreview(hoveredMessage.payload, hoveredMessage.payloadB64)
+      : null;
+
+  const hideHover = () => {
+    if (hideHoverTimeout) {
+      clearTimeout(hideHoverTimeout);
+      hideHoverTimeout = null;
+    }
+    hoveredMessageId = null;
+    popoverPositioned = false;
+  };
+
+  const suppressHover = () => {
+    suppressStartedAt = Date.now();
+    suppressHoverUntil = suppressStartedAt + MOVE_ANIMATION_MS;
+  };
+
+  const portalToBody = (node: HTMLElement) => {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  };
+
+  const positionPopover = () => {
+    if (!popoverEl) return;
+    const position = computePopoverPosition({
+      mouseX: hoverMouseX,
+      mouseY: hoverMouseY,
+      popoverWidth: popoverEl.offsetWidth,
+      popoverHeight: popoverEl.offsetHeight,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    });
+    popoverLeft = position.left;
+    popoverTop = position.top;
+    popoverPositioned = true;
+  };
+
+  const showHover = async (messageId: string, event: MouseEvent) => {
+    const isRefreshOfCurrent = hoveredMessageId === messageId;
+    const mouseMovedSincePan = lastMouseMoveAt >= suppressStartedAt;
+    if (
+      Date.now() < suppressHoverUntil &&
+      !isRefreshOfCurrent &&
+      !mouseMovedSincePan
+    ) {
+      return;
+    }
+    if (hideHoverTimeout) {
+      clearTimeout(hideHoverTimeout);
+      hideHoverTimeout = null;
+    }
+    if (!$selectedTopicStore.history.some((message) => message.id === messageId)) {
+      hideHover();
+      return;
+    }
+    hoverMouseX = event.clientX;
+    hoverMouseY = event.clientY;
+    hoveredMessageId = messageId;
+    popoverPositioned = false;
+    void selectedTopicStore.ensurePayload(messageId);
+    await tick();
+    positionPopover();
+  };
+
   // Live appends buffered between flushes (see APPEND_FLUSH_MS above) and
   // the pending flush timer. Cleared on destroy and on a wholesale rebuild.
   let pendingAppends: MqttHistoryMessage[] = [];
@@ -157,7 +245,11 @@
       evictEnd === "oldest"
         ? items.slice(0, excess)
         : items.slice(items.length - excess);
-    timelineDataSet.remove(toEvict.map((item) => item.id));
+    const removedIds = toEvict.map((item) => item.id.toString());
+    timelineDataSet.remove(removedIds);
+    if (hoveredMessageId !== null && removedIds.includes(hoveredMessageId)) {
+      hideHover();
+    }
   };
 
   // Cancels the pending append flush and drops whatever it buffered. Used on
@@ -185,6 +277,7 @@
       // DataSet than to add everything and immediately trim most of it out.
       // Sample across the whole buffer rather than slicing the newest so
       // the dots cover the full flushed span evenly.
+      hideHover();
       timelineDataSet.clear();
       timelineDataSet.add(
         getTimelineData(sampleEvenly(pendingAppends, TIMELINE_MAX_ITEMS))
@@ -296,6 +389,9 @@
     }
     // trim
     timelineDataSet.remove(delta.ids);
+    if (hoveredMessageId !== null && delta.ids.includes(hoveredMessageId)) {
+      hideHover();
+    }
     // Buffered appends may include ids the store just evicted; drop them so
     // the next flush can't add items the store no longer holds. Trims are
     // rare (amortized in the store) so the filter cost is negligible.
@@ -323,6 +419,7 @@
     onMessageSelect(lastMessage.id.toString());
     const item = timelineDataSet.get(lastMessage.id);
     if (item) {
+      suppressHover();
       timeline.moveTo(item.start, { animation: animate });
     }
   };
@@ -346,7 +443,18 @@
       animation: false,
     });
 
+    timeline.on(
+      "itemover",
+      (properties: { item: IdType; event: MouseEvent }) => {
+        showHover(properties.item.toString(), properties.event);
+      }
+    );
+    timeline.on("itemout", () => {
+      hideHoverTimeout = setTimeout(hideHover, 60);
+    });
+
     timeline.on("select", (properties: { items: IdType[] }) => {
+      hideHover();
       if (properties.items.length === 0) {
         onMessageSelect(null);
         isAutoSelectingMostRecent = false;
@@ -366,6 +474,7 @@
       selectedMessageIndex = messageIndex === -1 ? null : messageIndex;
       onMessageSelect(selectedId.toString());
       if (selectedMessage) {
+        suppressHover();
         timeline.moveTo(selectedMessage.start, { animation: true });
       }
     });
@@ -412,6 +521,7 @@
   onDestroy(() => {
     destroyed = true;
     cancelPendingAppends();
+    hideHover();
     if (!!timeline) {
       timeline.destroy();
       timelineDataSet.clear();
@@ -451,6 +561,7 @@
   let innerHistoryRevision = $selectedTopicStore.historyRevision;
 
   const rebuildTimelineFromHistory = () => {
+    hideHover();
     // A rebuild replaces the dataset wholesale from the full current
     // history; stale buffered appends would double-add items on flush.
     cancelPendingAppends();
@@ -522,15 +633,21 @@
     onMessageSelect(nextMessage.id.toString());
     const item = timelineDataSet.get(nextMessage.id);
     if (item) {
+      hideHover();
+      suppressHover();
       timeline.moveTo(item.start, { animation: true });
     }
   };
 
   $: zoomIn = () => {
+    hideHover();
+    suppressHover();
     timeline.zoomIn(1);
   };
 
   $: zoomOut = () => {
+    hideHover();
+    suppressHover();
     timeline.zoomOut(1);
   };
 
@@ -590,6 +707,10 @@
     timelineIsFocused = false;
   }}
   on:keydown={onKeydown}
+  on:mousemove|capture={() => {
+    lastMouseMoveAt = Date.now();
+  }}
+  on:mouseleave={hideHover}
   id="timeline"
   class={`
     py-[1px]
@@ -617,6 +738,42 @@
       <Icon type="info" />
     </Tooltip>
   </div>
+
+  {#if hoveredMessage}
+    <div
+      bind:this={popoverEl}
+      use:portalToBody
+      class={`
+        pointer-events-none fixed z-[10003] max-w-[320px]
+        rounded bg-elevation-2 shadow border-[1px] border-outline
+        px-2 py-1.5 text-xs text-emphasis
+        ${popoverPositioned ? "" : "invisible"}
+      `}
+      style:left={`${popoverLeft}px`}
+      style:top={`${popoverTop}px`}
+    >
+      <div class="flex items-center gap-2 text-secondary-text">
+        <span>{moment(hoveredMessage.timeMs).format("H:mm:ss.SS")}</span>
+        <span>QoS {hoveredMessage.qos}</span>
+        {#if hoveredMessage.retain}
+          <span class="text-secondary">Retained</span>
+        {/if}
+      </div>
+      {#if hoveredMessage.payloadState === "aged-out"}
+        <div class="mt-1 text-secondary-text">Payload no longer available</div>
+      {:else if hoveredMessage.payloadState !== "loaded"}
+        <div class="mt-1 text-secondary-text">Loading payload…</div>
+      {:else if hoveredPreview?.kind === "binary"}
+        <div class="mt-1 text-secondary-text">{hoveredPreview.summary}</div>
+      {:else if hoveredPreview}
+        <div
+          class="mt-1 font-mono whitespace-pre-wrap break-all max-h-[140px] overflow-hidden line-clamp-[8]"
+        >
+          {hoveredPreview.text}
+        </div>
+      {/if}
+    </div>
+  {/if}
 </section>
 
 <style global>

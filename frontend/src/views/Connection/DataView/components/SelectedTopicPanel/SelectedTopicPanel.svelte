@@ -400,10 +400,10 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
-            isActive={isChartTabActive}
           />
         </div>
       </Tabs>
@@ -490,10 +490,10 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
-            isActive={isChartTabActive}
           />
         </div>
       </Tabs>

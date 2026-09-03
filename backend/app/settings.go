@@ -40,6 +40,9 @@ func (a *App) UpdateAppSettings(params UpdateAppSettingsParams) (models.AppSetti
 	a.applyMemoryBudgetToAllConnections(settings.MemoryBudgetBytes)
 	a.recordingEnabled.Store(settings.RecordingEnabled)
 	a.diskBudgetBytes.Store(settings.DiskBudgetBytes)
+	// A changed budget shifts the soft memory limit too, not just the
+	// per-connection eviction threshold.
+	a.recomputeMemoryLimit()
 	return settings, nil
 }
 
@@ -71,6 +74,20 @@ func (a *App) AcknowledgeStarPrompt() (models.AppSettings, error) {
 	return settings, nil
 }
 
+// SkipUpdateVersion records that the user chose to skip the given update
+// version, so the update dialog stops auto-opening for it.
+func (a *App) SkipUpdateVersion(version string) (models.AppSettings, error) {
+	var settings models.AppSettings
+	if err := a.Db.First(&settings, 1).Error; err != nil {
+		return models.AppSettings{}, err
+	}
+	settings.IgnoredUpdateVersion = version
+	if err := a.Db.Save(&settings).Error; err != nil {
+		return models.AppSettings{}, err
+	}
+	return settings, nil
+}
+
 // recordAppLaunch bumps the persisted launch counter. It gates one-time nudges
 // (like the GitHub star prompt) so they never hit a fresh install on first run.
 func (a *App) recordAppLaunch() error {
@@ -92,7 +109,7 @@ func (a *App) applyMemoryBudgetToAllConnections(budget int64) {
 	if budget <= 0 {
 		budget = mqtt.DefaultMemoryBudgetBytes
 	}
-	for _, conn := range a.AppConnections {
+	for _, conn := range a.appConnectionsSnapshot() {
 		if conn != nil && conn.MqttManager != nil {
 			conn.MqttManager.SetMessageMemoryBudget(budget)
 		}

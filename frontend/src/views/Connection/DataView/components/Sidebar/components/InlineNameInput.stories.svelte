@@ -6,7 +6,7 @@
 
   const componentName = "InlineNameInput";
   const storyId = "Views/Connection/DataView/Sidebar/InlineNameInput";
-  const props: string[] = ["name","initialValue","placeholder","onCommit","onCancel"];
+  const props: string[] = ["name","initialValue","placeholder","onCommit","onCancel","selectAll"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

@@ -12,6 +12,7 @@ export class AppSettings {
   lastSeenChangelogVersion = "";
   launchCount = 0;
   hasSeenStarPrompt = false;
+  ignoredUpdateVersion = "";
 
   static createFrom(source: any = {}) {
     return new AppSettings(source);
@@ -145,6 +146,19 @@ export class PanelSize {
 
   static createFrom(source: any = {}) {
     return new PanelSize(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
+export class CollectionCollapsedState {
+  id = 0;
+  collapsed = false;
+
+  static createFrom(source: any = {}) {
+    return new CollectionCollapsedState(source);
   }
 
   constructor(source: any = {}) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openExternal } from "@/util/external";
   import Button from "@/components/Button/Button.svelte";
   import type { ChangelogEntry } from "@/changelog";
 
@@ -7,6 +8,9 @@
   // Which version's tab to open on first render (defaults to the newest).
   export let initialVersion: string | null = null;
   export let onClose: () => void = () => {};
+
+  const STARGAZERS_URL =
+    "https://github.com/mqtt-viewer/mqtt-viewer/stargazers";
 
   const startIndex = (() => {
     const i = entries.findIndex((e) => e.version === initialVersion);
@@ -58,7 +62,18 @@
         {#each entry.sections as section}
           <div class="flex flex-col gap-[2px] border-l-2 border-outline pl-3">
             <span class="text-emphasis">{section.title}</span>
-            <span class="text-secondary-text text-base">{section.body}</span>
+            <span class="text-secondary-text text-base"
+              >{section.body}{#if section.thanks?.length}
+                {" Thanks "}{#each section.thanks as t, i}{#if i > 0}{i ===
+                    (section.thanks?.length ?? 0) - 1
+                      ? " and "
+                      : ", "}{/if}<a
+                    href={t.url}
+                    class="text-primary hover:underline"
+                    on:click|preventDefault={() => openExternal(t.url)}
+                    >@{t.name}</a
+                  >{/each}.{/if}</span
+            >
           </div>
         {/each}
       </div>
@@ -70,6 +85,12 @@
 
     <div class="flex justify-end items-center gap-3 mt-4">
       <span class="text-sm text-secondary-text grow">{entry.date}</span>
+      <Button
+        variant="secondary"
+        on:click={() => openExternal(STARGAZERS_URL)}
+      >
+        Star on GitHub
+      </Button>
       <Button variant="primary" on:click={onClose}>Nice, got it</Button>
     </div>
   {/if}
