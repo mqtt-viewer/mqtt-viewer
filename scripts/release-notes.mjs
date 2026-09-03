@@ -20,16 +20,30 @@ import path from "node:path";
 const scriptPath = fileURLToPath(import.meta.url);
 const args = process.argv.slice(2);
 
-if (!process.features.typescript) {
+// Set on the child so a Node that never reports type stripping cannot re-exec
+// itself forever.
+const REEXEC = "MQTT_VIEWER_RELEASE_NOTES_REEXEC";
+const STRIP_FLAG = "--experimental-strip-types";
+
+// process.features.typescript only exists from Node 22.10. On 22.6 to 22.9 the
+// flag works but the feature flag reads undefined, so fall back to asking
+// whether we were started with it.
+const typeStripping =
+  process.features.typescript !== undefined
+    ? Boolean(process.features.typescript)
+    : process.execArgv.includes(STRIP_FLAG);
+
+if (!typeStripping) {
+  if (process.env[REEXEC] === "1") {
+    console.error(
+      `This Node (${process.version}) cannot strip TypeScript types, even with ${STRIP_FLAG}. Use Node 22.6 or newer to render the release notes.`
+    );
+    process.exit(2);
+  }
   const result = spawnSync(
     process.execPath,
-    [
-      "--experimental-strip-types",
-      "--disable-warning=ExperimentalWarning",
-      scriptPath,
-      ...args,
-    ],
-    { stdio: "inherit" }
+    [STRIP_FLAG, "--disable-warning=ExperimentalWarning", scriptPath, ...args],
+    { stdio: "inherit", env: { ...process.env, [REEXEC]: "1" } }
   );
   process.exit(result.status ?? 1);
 }
