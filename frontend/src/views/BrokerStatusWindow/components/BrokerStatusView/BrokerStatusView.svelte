@@ -171,7 +171,7 @@
       {/if}
     {/each}
 
-    <Tooltip text="Add metric tile" class="h-full">
+    <Tooltip text="Add metric tile" class="h-full" focusable>
       <button
         type="button"
         on:click={openAddEditor}

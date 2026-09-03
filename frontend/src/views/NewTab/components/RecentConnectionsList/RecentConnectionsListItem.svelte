@@ -95,7 +95,7 @@ transition-opacity duration-200`}
       onEditConnection();
     }}
   >
-    <Tooltip text="Edit connection details" placement="top">
+    <Tooltip text="Edit connection details" placement="top" focusable>
       <div
         class="rounded-full transition-colors text-secondary-text hover:text-emphasis"
       >

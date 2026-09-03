@@ -41,7 +41,7 @@
 <div class="flex flex-col gap-2">
   <div class="flex items-center justify-between h-5">
     <span class="text-sm font-semibold text-secondary-text">{title}</span>
-    <Tooltip text={`New ${scope} collection`}>
+    <Tooltip text={`New ${scope} collection`} focusable>
       <IconButton onClick={() => (isCreating = true)}>
         <Icon type="plus" size={16} />
       </IconButton>
