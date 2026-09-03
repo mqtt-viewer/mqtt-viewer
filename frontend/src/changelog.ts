@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "No more phantom scroll",
+        body: "The main window could scroll by a line and show a blank strip under the status bar, caused by an empty dialog button in the sidebar.",
+      },
+      {
         title: "Start a message inside a collection",
         body: "Every collection folder's menu now has New message, and an empty folder shows one as a row. The message is filed there when you save it. A saved message shows its collection in the top right; pick another one there to move it.",
       },
