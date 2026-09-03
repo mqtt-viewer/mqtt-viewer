@@ -106,14 +106,16 @@ export interface ReleaseNotesForVersionOptions {
 /**
  * The release body for a version, taken from its released changelog entry.
  * A prerelease tag (v1.2.0-beta1) uses the entry for the version it rehearses.
- * Throws if the entry is missing or has not been promoted yet, so a release
- * can never be created with empty notes.
+ * Throws on a blank version, and if the entry is missing or has not been
+ * promoted yet, so a release can never be created with empty notes.
  */
 export const releaseNotesForVersion = (
   version: string,
   opts: ReleaseNotesForVersionOptions = {}
 ): string => {
-  const semver = baseVersion(version);
+  if (!version || !version.trim()) throw new Error("Version is required");
+  const tag = version.trim();
+  const semver = baseVersion(tag);
   const entry = entryForVersion(semver);
   if (!entry) {
     const staged = CHANGELOG.find((e) => normalise(e.version) === semver);
@@ -123,9 +125,11 @@ export const releaseNotesForVersion = (
         : `No released changelog entry for ${semver} in frontend/src/changelog.ts. Add one and promote it before creating the release.`
     );
   }
+  // A blank prevTag means no previous release, not a tag called "v".
+  const prevTag = opts.prevTag?.trim();
   return renderReleaseNotes(entry, {
-    tag: withV(version),
-    prevTag: opts.prevTag ? withV(opts.prevTag) : undefined,
+    tag: withV(tag),
+    prevTag: prevTag ? withV(prevTag) : undefined,
     repoUrl: opts.repoUrl ?? REPO_URL,
   });
 };

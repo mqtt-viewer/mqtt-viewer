@@ -156,6 +156,34 @@ describe("releaseNotesForVersion", () => {
     );
   });
 
+  it("throws on a blank version", () => {
+    expect(() => releaseNotesForVersion("")).toThrow("Version is required");
+    expect(() => releaseNotesForVersion("   ")).toThrow("Version is required");
+    expect(() =>
+      releaseNotesForVersion(undefined as unknown as string)
+    ).toThrow("Version is required");
+  });
+
+  it("trims the version before looking it up", () => {
+    expect(releaseNotesForVersion("  v1.0.0  ", { prevTag: "v0.7.0" })).toBe(
+      releaseNotesForVersion("v1.0.0", { prevTag: "v0.7.0" })
+    );
+  });
+
+  it("trims the previous tag", () => {
+    expect(releaseNotesForVersion("v1.0.0", { prevTag: " v1.1.0 " })).toContain(
+      `[Full changelog](${REPO_URL}/compare/v1.1.0...v1.0.0)`
+    );
+  });
+
+  it("drops the compare link for a blank previous tag", () => {
+    for (const prevTag of ["", "  "]) {
+      expect(releaseNotesForVersion("v1.0.0", { prevTag })).not.toContain(
+        "Full changelog"
+      );
+    }
+  });
+
   it("throws naming the version when there is no entry", () => {
     expect(() => releaseNotesForVersion("v9.9.9")).toThrow(/9\.9\.9/);
     expect(() => releaseNotesForVersion("v9.9.9")).toThrow(

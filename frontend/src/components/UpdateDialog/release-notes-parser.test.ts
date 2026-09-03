@@ -37,6 +37,54 @@ describe("parseReleaseNotes", () => {
     ]);
   });
 
+  it("leaves arithmetic asterisks alone", () => {
+    expect(parseReleaseNotes("2*3 equals 6, and 3*4 equals 12")).toEqual([
+      { kind: "text", text: "2*3 equals 6, and 3*4 equals 12" },
+    ]);
+  });
+
+  it("leaves glob patterns alone", () => {
+    expect(parseReleaseNotes("Files matching *.log and *.txt")).toEqual([
+      { kind: "text", text: "Files matching *.log and *.txt" },
+    ]);
+  });
+
+  it("leaves topic wildcards alone", () => {
+    expect(parseReleaseNotes("sensors/*/temp and sensors/*/hum")).toEqual([
+      { kind: "text", text: "sensors/*/temp and sensors/*/hum" },
+    ]);
+  });
+
+  it("leaves free-standing asterisks alone", () => {
+    expect(parseReleaseNotes("a * b * c")).toEqual([
+      { kind: "text", text: "a * b * c" },
+    ]);
+  });
+
+  it("leaves a dunder file name alone", () => {
+    expect(parseReleaseNotes("__init__.py")).toEqual([
+      { kind: "text", text: "__init__.py" },
+    ]);
+  });
+
+  it("renders backslash-escaped markers as literal characters", () => {
+    expect(parseReleaseNotes("Use \\*escaped\\* to show asterisks")).toEqual([
+      { kind: "text", text: "Use *escaped* to show asterisks" },
+    ]);
+  });
+
+  it("renders an image as its alt text, and keeps the line", () => {
+    expect(
+      parseReleaseNotes("![The new chart](https://example.com/chart.png)")
+    ).toEqual([{ kind: "text", text: "The new chart" }]);
+  });
+
+  it("keeps a link line that carries formatting of its own", () => {
+    expect(
+      parseReleaseNotes("[**bold** text](https://example.com)")
+    ).toEqual([{ kind: "text", text: "bold text" }]);
+  });
+
   it("drops a line that is nothing but a link", () => {
     expect(
       parseReleaseNotes(
