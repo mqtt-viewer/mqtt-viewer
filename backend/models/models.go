@@ -60,30 +60,34 @@ type ReceivedMessage struct {
 }
 
 type Connection struct {
-	ID                   uint             `json:"id" gorm:"primaryKey"`
-	CreatedAt            time.Time        `json:"createdAt"`
-	UpdatedAt            time.Time        `json:"updatedAt"`
-	Name                 string           `json:"name"`
-	MqttVersion          string           `json:"mqttVersion"`
-	HasCustomClientId    *bool            `json:"hasCustomClientId"`
-	ClientId             *string          `json:"clientId"`
-	Protocol             string           `json:"protocol"`
-	Host                 string           `json:"host"`
-	Port                 int              `json:"port"`
-	WebsocketPath        string           `json:"websocketPath"`
-	Username             *string          `json:"username"`
-	Password             *string          `json:"password"`
-	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
-	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
-	SkipCertVerification *bool            `json:"skipCertVerification"`
-	CertCa               *string          `json:"certCa"`
-	CertClient           *string          `json:"certClient"`
-	CertClientKey        *string          `json:"certClientKey"`
-	Subscriptions        []Subscription   `json:"subscriptions"`
-	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
-	CustomIconSeed       *string          `json:"customIconSeed"`
-	FilterHistories      []FilterHistory  `json:"filterHistories"`
-	PublishHistories     []PublishHistory `json:"publishHistories"`
+	ID                   uint           `json:"id" gorm:"primaryKey"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	Name                 string         `json:"name"`
+	MqttVersion          string         `json:"mqttVersion"`
+	HasCustomClientId    *bool          `json:"hasCustomClientId"`
+	ClientId             *string        `json:"clientId"`
+	Protocol             string         `json:"protocol"`
+	Host                 string         `json:"host"`
+	Port                 int            `json:"port"`
+	WebsocketPath        string         `json:"websocketPath"`
+	Username             *string        `json:"username"`
+	Password             *string        `json:"password"`
+	IsProtoEnabled       *bool          `json:"isProtoEnabled"`
+	IsCertsEnabled       *bool          `json:"isCertsEnabled"`
+	SkipCertVerification *bool          `json:"skipCertVerification"`
+	CertCa               *string        `json:"certCa"`
+	CertClient           *string        `json:"certClient"`
+	CertClientKey        *string        `json:"certClientKey"`
+	Subscriptions        []Subscription `json:"subscriptions"`
+	LastConnectedAt      *time.Time     `json:"lastConnectedAt"`
+	CustomIconSeed       *string        `json:"customIconSeed"`
+	// Opt-in verbose MQTT-library debug logging for this connection's client
+	// logs. false = only always-on lifecycle/error lines are captured.
+	// Non-pointer so GORM never inserts NULL into the NOT NULL column.
+	DebugLoggingEnabled bool             `json:"debugLoggingEnabled" gorm:"not null;default:0"`
+	FilterHistories     []FilterHistory  `json:"filterHistories"`
+	PublishHistories    []PublishHistory `json:"publishHistories"`
 	// Declared only so the schema keeps the foreign keys added during the DB
 	// hardening review. Never preloaded (received history can be huge) and kept
 	// out of JSON/bindings; ConnectionID on the child is the source of truth.

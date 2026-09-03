@@ -181,6 +181,11 @@ func (a *App) DeleteConnection(id uint) error {
 	// Release the pages freed by a potentially huge history delete (no-op
 	// unless auto_vacuum is INCREMENTAL).
 	a.Db.Exec("PRAGMA incremental_vacuum")
+	// Stop the log store's emit goroutine and close its file before the
+	// connection is dropped from the map, else they leak for the process.
+	if appConnection, ok := a.appConnection(id); ok && appConnection.MqttManager != nil {
+		appConnection.MqttManager.CloseLogging()
+	}
 	a.removeAppConnection(id)
 	if a.Mode != AppModes.Test {
 		a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
