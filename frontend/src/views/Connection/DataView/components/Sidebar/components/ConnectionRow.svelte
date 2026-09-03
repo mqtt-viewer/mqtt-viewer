@@ -11,11 +11,13 @@
   import { writable } from "svelte/store";
   import InlineNameInput from "./InlineNameInput.svelte";
   import ConnectionDetailsDialog from "./ConnectionDetailsDialog.svelte";
+  import ConnectionLogsDialog from "./ConnectionLogsDialog.svelte";
 
   export let connection: Connection;
 
   let isDeleteOpen = writable(false);
   let isEditOpen = writable(false);
+  let isLogsOpen = writable(false);
   let isRenaming = false;
 
   $: details = connection.connectionDetails;
@@ -150,6 +152,9 @@
         <DropdownMenuItem iconType="edit" onClick={() => (isRenaming = true)}>
           Rename
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => ($isLogsOpen = true)}>
+          View logs
+        </DropdownMenuItem>
         <DropdownMenuItem
           iconType="delete"
           class="text-error"
@@ -161,6 +166,8 @@
 </div>
 
 <ConnectionDetailsDialog {connection} isOpen={isEditOpen} />
+
+<ConnectionLogsDialog {connection} isOpen={isLogsOpen} />
 
 <ConfirmDeleteConnectionDialog
   isOpen={isDeleteOpen}

@@ -118,6 +118,7 @@
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/ConnectionLogsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
@@ -141,7 +142,7 @@
 
 ## Summary
 
-- Components scanned: 115
-- Story present: 115
+- Components scanned: 116
+- Story present: 116
 - Figma-linked: 0
 - Missing specs: 0
