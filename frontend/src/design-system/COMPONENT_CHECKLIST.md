@@ -64,6 +64,7 @@
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
+| Components/MemoryFormula | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
@@ -142,7 +143,7 @@
 
 ## Summary
 
-- Components scanned: 116
-- Story present: 116
+- Components scanned: 117
+- Story present: 117
 - Figma-linked: 0
 - Missing specs: 0

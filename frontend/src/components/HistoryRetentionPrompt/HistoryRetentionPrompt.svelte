@@ -3,6 +3,7 @@
   import Button from "@/components/Button/Button.svelte";
   import BaseNumberInput from "@/components/InputFields/BaseNumberInput.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
+  import MemoryFormula from "@/components/MemoryFormula/MemoryFormula.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
@@ -11,13 +12,7 @@
     UpdateAppSettings,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
-  import {
-    MB,
-    GB,
-    MIN_MEMORY_MB,
-    formatBytes,
-    estimateTotalBytes,
-  } from "@/util/memory-budget";
+  import { MB, GB, MIN_MEMORY_MB } from "@/util/memory-budget";
 
   const isOpen = writable(false);
 
@@ -126,36 +121,30 @@
       restarts.
     </p>
 
-    <div class="flex flex-col gap-4">
-      <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="prompt-memory-budget"
-          label="Memory budget (MB)"
+          label="Memory budget per connection (MB)"
           min={MIN_MEMORY_MB}
-          class="mb-[17px]"
           hasError={memoryBelowMin}
-          errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
-        <p class="text-sm text-secondary-text">
-          Expect up to about {formatBytes(
-            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, 1)
-          )} in total with one connection. That's this budget for each
-          connection plus around 300 MB for the interface and runtime.
-        </p>
+        {#if memoryBelowMin}
+          <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
+        {/if}
+        <MemoryFormula budgetMb={memoryBudgetMb} />
       </div>
 
-      <div class="flex flex-col gap-2">
-        <Switch
-          name="prompt-recording-enabled"
-          label="Record history to disk"
-          checked={recordingChecked}
-          checkedBool={recordingEnabled}
-          onChange={onRecordingChange}
-        />
-      </div>
+      <Switch
+        name="prompt-recording-enabled"
+        label="Record history to disk"
+        checked={recordingChecked}
+        checkedBool={recordingEnabled}
+        onChange={onRecordingChange}
+      />
 
-      <div class="flex flex-col gap-1 mt-3">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="prompt-disk-budget"
           label="Disk budget (GB)"

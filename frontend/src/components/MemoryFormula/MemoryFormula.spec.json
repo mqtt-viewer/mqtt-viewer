@@ -1,8 +1,8 @@
 {
   "$schema": "../../design-system/component-spec.schema.json",
-  "name": "HistoryRetentionPrompt",
+  "name": "MemoryFormula",
   "tier": "component",
-  "description": "Storybook coverage for HistoryRetentionPrompt.",
+  "description": "The memory budget estimate, as a formula, shared by the settings dialog and the first-run retention prompt.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -11,11 +11,16 @@
     "lastSyncedHash": null,
     "lastSyncedAt": null
   },
-  "props": [],
+  "props": [
+    {
+      "name": "budgetMb",
+      "type": "number",
+      "required": false,
+      "default": "MIN_MEMORY_MB"
+    }
+  ],
   "tokens": [
-    "secondary",
-    "secondary-text",
-    "error"
+    "secondary-text"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet."

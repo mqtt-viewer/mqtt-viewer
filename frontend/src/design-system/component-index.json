@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T10:03:02.212Z",
+  "generatedAt": "2026-09-03T10:28:03.694Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1283,7 +1283,8 @@
       "props": [],
       "tokens": [
         "secondary",
-        "secondary-text"
+        "secondary-text",
+        "error"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
@@ -1948,6 +1949,37 @@
       "specPath": "src/components/MaxOpenTabsDialog/MaxOpenTabsDialog.spec.json",
       "storyPath": "src/components/MaxOpenTabsDialog/MaxOpenTabsDialog.stories.svelte",
       "storyId": "Components/MaxOpenTabsDialog",
+      "specMissing": false
+    },
+    {
+      "name": "MemoryFormula",
+      "tier": "component",
+      "description": "The memory budget estimate, as a formula, shared by the settings dialog and the first-run retention prompt.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "budgetMb",
+          "type": "number",
+          "required": false,
+          "default": "MIN_MEMORY_MB"
+        }
+      ],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/MemoryFormula/MemoryFormula.svelte",
+      "specPath": "src/components/MemoryFormula/MemoryFormula.spec.json",
+      "storyPath": "src/components/MemoryFormula/MemoryFormula.stories.svelte",
+      "storyId": "Components/MemoryFormula",
       "specMissing": false
     },
     {

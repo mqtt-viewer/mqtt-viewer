@@ -85,7 +85,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Settings says what memory it will use",
-        body: "The memory budget now shows the estimate as a sum, Total = connections × budget + 300 MB app, and the retention fields sit on an even rhythm instead of drifting apart.",
+        body: "The memory budget now spells itself out as a sum, Total = active connections × budget + 300 MB app, in Settings and in the first-run retention prompt. Both dialogs sit on the same spacing rhythm.",
       },
       {
         title: "The edit button on a connection tile opens the details",

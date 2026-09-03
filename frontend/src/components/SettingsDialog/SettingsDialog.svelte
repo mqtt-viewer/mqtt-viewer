@@ -3,6 +3,7 @@
   import Button from "@/components/Button/Button.svelte";
   import BaseNumberInput from "@/components/InputFields/BaseNumberInput.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
+  import MemoryFormula from "@/components/MemoryFormula/MemoryFormula.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { onDestroy } from "svelte";
   import { writable } from "svelte/store";
@@ -13,19 +14,13 @@
     ClearReceivedMessages,
     GetMemoryStats,
   } from "bindings/mqtt-viewer/backend/app/app";
-  import env from "@/stores/env";
   import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
   import {
     MB,
     GB,
     MIN_MEMORY_MB,
-    BASE_APP_BYTES,
     formatBytes,
-    estimateTotalBytes,
   } from "@/util/memory-budget";
-
-  // The fixed part of the estimate, so the figure only lives in one place.
-  const baseAppLabel = formatBytes(BASE_APP_BYTES);
 
   export let open = writable(false);
 
@@ -34,7 +29,6 @@
   let diskBudgetGb = 1;
   let dbSizeBytes: number | undefined = undefined;
   let historyBytes: number | undefined = undefined;
-  let activeConnections = 1;
   let isSaving = false;
   let isClearing = false;
 
@@ -44,11 +38,9 @@
     try {
       const stats = await GetMemoryStats();
       historyBytes = stats.historyBytes;
-      activeConnections = stats.activeConnections;
     } catch (e) {
       console.error("Failed to read memory stats", e);
       historyBytes = undefined;
-      activeConnections = 1;
     }
   };
 
@@ -111,8 +103,6 @@
 
   // A cleared Svelte number input binds null, which is also invalid.
   $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
-  $: shownConnections = Math.max(1, activeConnections);
-  $: budgetMb = memoryBudgetMb ?? MIN_MEMORY_MB;
 
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
@@ -181,26 +171,18 @@
     <section class="flex flex-col gap-5">
       <h3 class="text-emphasis font-medium">Message retention</h3>
 
-      <div class="flex flex-col gap-1.5">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="memory-budget"
-          label="Memory budget (MB)"
+          label="Memory budget per connection (MB)"
           min={MIN_MEMORY_MB}
           hasError={memoryBelowMin}
           bind:value={memoryBudgetMb}
         />
         {#if memoryBelowMin}
           <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
-        {:else}
-          <p class="text-sm text-secondary-text">
-            Cap on message history kept in memory, per connection.
-          </p>
         {/if}
-        <p class="font-mono text-sm text-secondary-text">
-          Total = {shownConnections} × {budgetMb} MB + {baseAppLabel} app = {formatBytes(
-            estimateTotalBytes(budgetMb, activeConnections)
-          )}
-        </p>
+        <MemoryFormula budgetMb={memoryBudgetMb} />
       </div>
 
       <Switch
@@ -211,7 +193,7 @@
         onChange={onRecordingChange}
       />
 
-      <div class="flex flex-col gap-1.5">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="disk-budget"
           label="Disk budget (GB)"
@@ -240,8 +222,7 @@
           {isClearing ? "Clearing…" : "Clear recorded history"}
         </Button>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="text-secondary-text">MQTT Viewer {$env.version}</span>
+      <div class="flex items-center justify-end">
         <Button
           variant="text"
           on:click={() => {

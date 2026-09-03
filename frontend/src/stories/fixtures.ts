@@ -944,6 +944,7 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     getOptionLabel: (option: unknown) => String(option).toUpperCase(),
   },
   Switch: { name: "tls", label: "TLS enabled" },
+  MemoryFormula: { budgetMb: 512 },
 };
 
 export const getStoryArgs = (
