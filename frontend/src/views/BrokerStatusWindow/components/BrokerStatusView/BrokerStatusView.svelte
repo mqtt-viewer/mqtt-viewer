@@ -2,7 +2,8 @@
   // Body of the detached Broker Status window. v2 layout, top to bottom:
   // sticky health strip (or a capability notice when no $SYS card is showing),
   // the traffic hero chart, the loudest-topics table, the gauges grid (with an
-  // always-last "+"), the facts row, and the collapsible raw $SYS browser. The
+  // always-last "+"), and the collapsible raw $SYS browser. The broker facts
+  // moved up into the window's title bar (the shell renders FactsRow). The
   // v1 no-$SYS empty state + add-subscription CTA is kept. The window shell owns
   // the store's lifecycle and the header (pill + range selector); this view only
   // reads the store and drives the mapping editor.
@@ -13,7 +14,6 @@
   import HealthStrip from "../HealthStrip/HealthStrip.svelte";
   import HeroChart from "../HeroChart/HeroChart.svelte";
   import LoudestTopics from "../LoudestTopics/LoudestTopics.svelte";
-  import FactsRow from "../FactsRow/FactsRow.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
@@ -143,11 +143,19 @@
 
   const buildHeroSeries = (state: BrokerStatusState): HeroSeries[] => {
     const m = state.metricByKey;
-    const inS = m.get("msg_rate_in")?.samples ?? [];
-    const outS = m.get("msg_rate_out")?.samples ?? [];
-    const observed = state.observedSeries ?? [];
+    // Past 15 m the store serves minute rollups stitched to the live tail; the
+    // raw second-grain buffers only reach back 900 samples.
+    const long = state.longSeries;
+    const inS = long?.get("msg_rate_in") ?? m.get("msg_rate_in")?.samples ?? [];
+    const outS =
+      long?.get("msg_rate_out") ?? m.get("msg_rate_out")?.samples ?? [];
+    const observed = long?.get("observed") ?? state.observedSeries ?? [];
     const hasBroker = inS.length > 0 || outS.length > 0;
-    const brokerGap = Math.max(30_000, 3 * state.learnedIntervalMs);
+    // A minute rollup's points sit a minute apart by design, so the gap
+    // threshold has to clear that or every point would draw as a break.
+    const minGap = long ? 3 * 60_000 : 0;
+    const brokerGap = Math.max(minGap, 30_000, 3 * state.learnedIntervalMs);
+    const observedGap = Math.max(minGap, OBSERVED_GAP_MS);
     const series: HeroSeries[] = [];
     if (inS.length > 0) {
       series.push({
@@ -176,7 +184,7 @@
       label: "Observed",
       points: withGaps(
         observed.map((p) => ({ t: p.t, v: p.v })),
-        OBSERVED_GAP_MS
+        observedGap
       ),
       dashed: hasBroker,
       emphasis: false,
@@ -186,17 +194,6 @@
   };
 
   $: heroSeries = buildHeroSeries($store);
-
-  // --- Facts row -------------------------------------------------------------
-  $: facts = {
-    version: $store.metricByKey.get("version")?.text ?? null,
-    uptimeSeconds: $store.metricByKey.get("uptime")?.value ?? null,
-    clientsConnected: $store.metricByKey.get("clients_connected")?.value ?? null,
-    clientsDisconnected:
-      $store.metricByKey.get("clients_disconnected")?.value ?? null,
-    clientsExpired: $store.metricByKey.get("clients_expired")?.value ?? null,
-    avgMsgSize: $store.metricByKey.get("avg_msg_size")?.value ?? null,
-  };
 
   // --- Gauge tiles: delta arrow + hover-panel inputs -------------------------
   // Percentage change across the visible sparkline window (last vs first). A
@@ -401,16 +398,6 @@
       {/if}
     </div>
   {/if}
-
-  <!-- Facts: broker/version, uptime, sessions, avg msg size. -->
-  <FactsRow
-    version={facts.version}
-    uptimeSeconds={facts.uptimeSeconds}
-    clientsConnected={facts.clientsConnected}
-    clientsDisconnected={facts.clientsDisconnected}
-    clientsExpired={facts.clientsExpired}
-    avgMsgSize={facts.avgMsgSize}
-  />
 
   <!-- Collapsible raw $SYS browser (hidden until a first topic arrives: an
        empty expandable under the no-$SYS card reads as dead weight). Inside

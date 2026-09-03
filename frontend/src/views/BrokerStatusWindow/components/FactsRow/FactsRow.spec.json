@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "FactsRow",
   "tier": "view",
-  "description": "One-line broker facts under the gauges: broker/version, uptime, session counts with word labels ('17 live, 6 offline, 2 expired'), and average message size. Each part is omitted when its metric has no data.",
+  "description": "One-line broker facts in the broker-status title bar: broker/version, uptime, session counts with word labels ('17 live, 6 offline, 2 expired'), and average message size. Each part is omitted when its metric has no data. Renders as a single dot-separated text node so it ellipsises on a narrow window instead of pushing the header wide.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -57,5 +57,5 @@
   ],
   "tokens": ["secondary-text"],
   "dependencies": [],
-  "notes": "Figma is not linked yet. Values are read from the store's metricByKey by BrokerStatusView and passed in as plain props."
+  "notes": "Figma is not linked yet. Values are read from the store's metricByKey by BrokerStatusWindow (the shell) and passed in as plain props. It renders nothing at all when no metric has data, so a sparse broker leaves the title bar clean."
 }

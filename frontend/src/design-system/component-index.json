@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T09:44:42.108Z",
+  "generatedAt": "2026-09-03T10:33:02.775Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2502,9 +2502,10 @@
       ],
       "dependencies": [
         "BrokerStatusView",
-        "TimeRangeSelector"
+        "TimeRangeSelector",
+        "FactsRow"
       ],
-      "notes": "Figma is not linked yet. The shell owns the header staleness pill and time-range selector, and wraps the body in an overflow-y-auto scroll container for the sticky health strip.",
+      "notes": "Figma is not linked yet. The shell owns the header staleness pill, the broker facts line and the time-range selector, and wraps the body in an overflow-y-auto scroll container for the sticky health strip. On macOS the header keeps its total height but shifts its content up (pt-2 pb-4) so the row centres on the traffic lights. The selected range is persisted per connection under a namespaced key in the chart-window table.",
       "sourcePath": "src/views/BrokerStatusWindow/BrokerStatusWindow.svelte",
       "specPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.stories.svelte",
@@ -2514,7 +2515,7 @@
     {
       "name": "BrokerStatusView",
       "tier": "view",
-      "description": "Body of the Broker Status window (v2): sticky health strip (or capability notice), traffic hero chart, loudest-topics table, gauges grid with an always-last '+', facts row, and a collapsible raw $SYS browser with a derived rate column. Keeps the v1 no-$SYS empty state + add-subscription CTA. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+      "description": "Body of the Broker Status window (v2): sticky health strip (or capability notice), traffic hero chart, loudest-topics table, gauges grid with an always-last '+', and a collapsible raw $SYS browser with a derived rate column. Keeps the v1 no-$SYS empty state + add-subscription CTA. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2552,7 +2553,6 @@
         "HealthStrip",
         "HeroChart",
         "LoudestTopics",
-        "FactsRow",
         "Icon",
         "IconButton",
         "Tooltip",
@@ -2569,7 +2569,7 @@
     {
       "name": "FactsRow",
       "tier": "view",
-      "description": "One-line broker facts under the gauges: broker/version, uptime, session counts with word labels ('17 live, 6 offline, 2 expired'), and average message size. Each part is omitted when its metric has no data.",
+      "description": "One-line broker facts in the broker-status title bar: broker/version, uptime, session counts with word labels ('17 live, 6 offline, 2 expired'), and average message size. Each part is omitted when its metric has no data. Renders as a single dot-separated text node so it ellipsises on a narrow window instead of pushing the header wide.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2626,7 +2626,7 @@
         "secondary-text"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet. Values are read from the store's metricByKey by BrokerStatusView and passed in as plain props.",
+      "notes": "Figma is not linked yet. Values are read from the store's metricByKey by BrokerStatusWindow (the shell) and passed in as plain props. It renders nothing at all when no metric has data, so a sparse broker leaves the title bar clean.",
       "sourcePath": "src/views/BrokerStatusWindow/components/FactsRow/FactsRow.svelte",
       "specPath": "src/views/BrokerStatusWindow/components/FactsRow/FactsRow.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/components/FactsRow/FactsRow.stories.svelte",
@@ -2792,7 +2792,7 @@
     {
       "name": "LoudestTopics",
       "tier": "view",
-      "description": "Client-side loudest-topics table for the broker-status window: top rows over the selected range with msg/s, bytes/s and a share bar, a '(collecting)' header suffix while the window fills, and an overflow footer line. Topics middle-ellipsise with the full topic in a tooltip; at narrow widths the share bar drops first, then bytes/s.",
+      "description": "Collapsible client-side loudest-topics table for the broker-status window, collapsed by default with the loudest topic and its rate in the header. Expanded it lists the top rows over the selected range with msg/s, bytes/s and a share bar, a '(collecting)' suffix while the window fills, and an overflow footer line. Topics keep their last two segments and ellipsise the head, with the full topic in a tooltip and a copy button on row hover; at narrow widths the share bar drops first, then bytes/s.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2808,6 +2808,13 @@
           "required": false,
           "default": null,
           "description": "LoudestState from the store: { rows: {topic, msgPerSec, bytesPerSec}[], overflowTopics, overflowMsgPerSec, collecting }."
+        },
+        {
+          "name": "expanded",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Whether the section is open. Toggled internally by the header button; exposed so a story can force the open state. Per session, never persisted."
         }
       ],
       "tokens": [
@@ -2820,9 +2827,11 @@
         "primary"
       ],
       "dependencies": [
-        "Tooltip"
+        "Tooltip",
+        "CopyToClipboard",
+        "Icon"
       ],
-      "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport.",
+      "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport. Topic truncation is CSS only (head span truncates, tail span shrink-0), so the full topic shows whenever it fits.",
       "sourcePath": "src/views/BrokerStatusWindow/components/LoudestTopics/LoudestTopics.svelte",
       "specPath": "src/views/BrokerStatusWindow/components/LoudestTopics/LoudestTopics.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/components/LoudestTopics/LoudestTopics.stories.svelte",
@@ -3030,7 +3039,7 @@
     {
       "name": "TimeRangeSelector",
       "tier": "view",
-      "description": "Small segmented control for the broker-status window range (1m / 5m / 15m); emits a legacy `change` event with the selected minutes.",
+      "description": "Segmented control for the broker-status window: 1m / 5m / 15m / 60m presets plus a custom interval (value and unit, capped at one day) in a dropdown; emits a legacy `change` event with the selected minutes.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -3045,7 +3054,7 @@
           "type": "number",
           "required": false,
           "default": 5,
-          "description": "Selected window in minutes; one of `options`."
+          "description": "Selected window in minutes. May be fractional (30 seconds is 0.5) and may sit outside `options` when the custom interval is in use."
         },
         {
           "name": "options",
@@ -3054,9 +3063,10 @@
           "default": [
             1,
             5,
-            15
+            15,
+            60
           ],
-          "description": "Selectable windows in minutes."
+          "description": "Preset windows offered as segments, in minutes."
         },
         {
           "name": "sparseNote",
@@ -3071,12 +3081,15 @@
         "elevation-1",
         "selected",
         "emphasis",
-        "secondary-text"
+        "secondary-text",
+        "error"
       ],
       "dependencies": [
-        "Tooltip"
+        "Tooltip",
+        "DropdownMenu",
+        "BaseNumberInput"
       ],
-      "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail.",
+      "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail. The custom segment is the selected-looking one whenever `value` is not a preset, and it is labelled with the live interval (\"2h\") instead of \"Custom\". Custom edits debounce at 400 ms and commit on Enter, blur or a unit click; the window is clamped to one day, which is all the broker-status store retains. Parse, clamp and label rules live in the colocated time-range.ts, which shares its unit vocabulary with the chart's chart-custom-window.ts.",
       "sourcePath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.svelte",
       "specPath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.stories.svelte",

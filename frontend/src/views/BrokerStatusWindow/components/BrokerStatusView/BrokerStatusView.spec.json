@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "BrokerStatusView",
   "tier": "view",
-  "description": "Body of the Broker Status window (v2): sticky health strip (or capability notice), traffic hero chart, loudest-topics table, gauges grid with an always-last '+', facts row, and a collapsible raw $SYS browser with a derived rate column. Keeps the v1 no-$SYS empty state + add-subscription CTA. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+  "description": "Body of the Broker Status window (v2): sticky health strip (or capability notice), traffic hero chart, loudest-topics table, gauges grid with an always-last '+', and a collapsible raw $SYS browser with a derived rate column. Keeps the v1 no-$SYS empty state + add-subscription CTA. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -40,7 +40,6 @@
     "HealthStrip",
     "HeroChart",
     "LoudestTopics",
-    "FactsRow",
     "Icon",
     "IconButton",
     "Tooltip",

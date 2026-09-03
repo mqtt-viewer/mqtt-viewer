@@ -19,6 +19,6 @@
     "white-text",
     "elevation-0"
   ],
-  "dependencies": ["BrokerStatusView", "TimeRangeSelector"],
-  "notes": "Figma is not linked yet. The shell owns the header staleness pill and time-range selector, and wraps the body in an overflow-y-auto scroll container for the sticky health strip."
+  "dependencies": ["BrokerStatusView", "TimeRangeSelector", "FactsRow"],
+  "notes": "Figma is not linked yet. The shell owns the header staleness pill, the broker facts line and the time-range selector, and wraps the body in an overflow-y-auto scroll container for the sticky health strip. On macOS the header keeps its total height but shifts its content up (pt-2 pb-4) so the row centres on the traffic lights. The selected range is persisted per connection under a namespaced key in the chart-window table."
 }

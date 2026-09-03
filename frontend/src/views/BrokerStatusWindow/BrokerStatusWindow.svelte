@@ -3,18 +3,22 @@
   import { get } from "svelte/store";
   import connections from "@/stores/connections";
   import subscriptions from "@/stores/subscriptions";
+  import chartWindows from "@/stores/chart-windows";
   import os from "@/stores/env";
   import IconContext from "@/components/Icon/IconContext.svelte";
-  import Toast from "@/components/Toast/Toast.svelte";
+  import Toast, { addToast } from "@/components/Toast/Toast.svelte";
   import ConnectionStatusCircle from "@/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import {
+    clampRange,
     createBrokerStatusStore,
+    DEFAULT_RANGE_MINUTES,
     type BrokerStatusStore,
   } from "./broker-status-store";
   import BrokerStatusView from "./components/BrokerStatusView/BrokerStatusView.svelte";
   import TimeRangeSelector from "./components/TimeRangeSelector/TimeRangeSelector.svelte";
+  import FactsRow from "./components/FactsRow/FactsRow.svelte";
   import { nowTick, formatAge } from "./components/BrokerStatusView/raw-browser";
 
   // State comes from the window URL the backend opened:
@@ -36,8 +40,32 @@
   let sysEverSeen = false;
   let sysLastSeenMs = -1;
   let learnedIntervalMs = 10_000;
-  let rangeMinutes = 5;
+  let rangeMinutes = DEFAULT_RANGE_MINUTES;
   let unsubStore: (() => void) | null = null;
+
+  // Broker facts for the title bar. They read as part of the window's identity
+  // ("which broker is this, and how long has it been up"), so they live beside
+  // the title rather than in a row of their own down the page.
+  let facts: {
+    version: string | null;
+    uptimeSeconds: number | null;
+    clientsConnected: number | null;
+    clientsDisconnected: number | null;
+    clientsExpired: number | null;
+    avgMsgSize: number | null;
+  } = {
+    version: null,
+    uptimeSeconds: null,
+    clientsConnected: null,
+    clientsDisconnected: null,
+    clientsExpired: null,
+    avgMsgSize: null,
+  };
+
+  // The selected range is persisted per connection in the same key/value table
+  // the topic chart uses for its window. The key is namespaced so it can never
+  // collide with that table's plain connection-id keys.
+  const rangeKey = `status:${connectionId}`;
 
   // Pill grace timer, re-armed whenever the store's opened-at clock changes.
   let pillGraceElapsed = false;
@@ -58,6 +86,15 @@
       sysLastSeenMs = st.sysLastSeenMs;
       learnedIntervalMs = st.learnedIntervalMs;
       rangeMinutes = st.rangeMinutes;
+      facts = {
+        version: st.metricByKey.get("version")?.text ?? null,
+        uptimeSeconds: st.metricByKey.get("uptime")?.value ?? null,
+        clientsConnected: st.metricByKey.get("clients_connected")?.value ?? null,
+        clientsDisconnected:
+          st.metricByKey.get("clients_disconnected")?.value ?? null,
+        clientsExpired: st.metricByKey.get("clients_expired")?.value ?? null,
+        avgMsgSize: st.metricByKey.get("avg_msg_size")?.value ?? null,
+      };
       if (st.windowOpenedAt !== lastOpenedAt) {
         lastOpenedAt = st.windowOpenedAt;
         armPillGrace(st.windowOpenedAt);
@@ -110,7 +147,23 @@
       ? `broker publishes about every ${Math.round(learnedIntervalMs / 1000)}s`
       : undefined;
 
-  const onRangeChange = (e: CustomEvent<number>) => store?.setRange(e.detail);
+  // Only a genuine user pick reaches this, so it is also the only place that
+  // writes the preference through. The window keeps working if the write
+  // fails; the range just resets next time.
+  const onRangeChange = (e: CustomEvent<number>) => {
+    const minutes = clampRange(e.detail);
+    store?.setRange(minutes);
+    chartWindows.set(rangeKey, Math.round(minutes * 60)).catch((err) => {
+      console.error("Failed to save the broker status time range", err);
+      addToast({
+        data: {
+          title: "Time range",
+          description: "Could not save the time range. It will reset on restart.",
+          type: "error",
+        },
+      });
+    });
+  };
 
   onMount(async () => {
     // Init subscriptions too so BrokerStatusView's hasSysSubscription reflects
@@ -124,8 +177,21 @@
       return;
     }
     connectionName = connection.connectionDetails.name;
+
+    // Restore the last range picked for this connection. A failed load must
+    // not stop the window opening: fall back to the default.
+    let seededRange = DEFAULT_RANGE_MINUTES;
+    try {
+      await chartWindows.init();
+      const seconds = chartWindows.get(rangeKey);
+      if (seconds > 0) seededRange = clampRange(seconds / 60);
+    } catch (e) {
+      console.error("Failed to load the broker status time range", e);
+    }
+
     store = createBrokerStatusStore(connectionId, connection.eventSet, {
       connected: connection.connectionState === "connected",
+      rangeMinutes: seededRange,
     });
     bindHeader(store);
     // Backfills $SYS + mapped-topic history and begins live-appending from the
@@ -144,8 +210,15 @@
 
 <IconContext>
   <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
+    <!-- macOS sits the traffic lights higher than a symmetrically padded row
+         centres its content, so on mac the same total height is kept but
+         shifted up (pt-2 pb-4 = the old py-3 total), putting the row's centre
+         on the lights' centre. Windows and Linux keep the even padding. -->
     <header
-      class="flex items-center gap-2 px-4 py-3 border-b border-divider"
+      class="flex items-center gap-2 px-4 border-b border-divider {$os.isMac &&
+      !$os.isFullscreen
+        ? 'pt-2 pb-4'
+        : 'py-3'}"
       style="--wails-draggable:drag"
     >
       {#if $os.isMac && !$os.isFullscreen}
@@ -153,8 +226,19 @@
         <div class="w-[62px] shrink-0" />
       {/if}
       <ConnectionStatusCircle state={connectionState} />
-      <span class="text-lg text-emphasis truncate">{connectionName}</span>
-      <span class="text-secondary-text text-sm shrink-0">broker status</span>
+      <div class="flex min-w-0 flex-1 items-baseline gap-2">
+        <span class="text-lg text-emphasis truncate">{connectionName}</span>
+        <span class="text-secondary-text text-sm shrink-0">broker status</span>
+        <!-- Broker facts, ellipsised before they can reach the $SYS pill. -->
+        <FactsRow
+          version={facts.version}
+          uptimeSeconds={facts.uptimeSeconds}
+          clientsConnected={facts.clientsConnected}
+          clientsDisconnected={facts.clientsDisconnected}
+          clientsExpired={facts.clientsExpired}
+          avgMsgSize={facts.avgMsgSize}
+        />
+      </div>
       {#if store}
         <div
           class="ml-auto flex items-center gap-3"
