@@ -233,10 +233,9 @@
       <div class="text">
         <h2 class="title">Like the app?</h2>
         <p class="copy">
-          Starring the project on GitHub is an easy way to help out. It helps
-          more people find MQTT Viewer, and it's a real boost for me to see.
-          Thanks for using it.
+          Starring the project on GitHub is an easy way to help out.
         </p>
+        <p class="copy">Thanks for using MQTT Viewer.</p>
       </div>
 
       <div class="action">
@@ -449,6 +448,9 @@
     font-size: 0.9rem;
     line-height: 1.5;
     color: rgba(226, 228, 245, 0.82);
+  }
+  .copy + .copy {
+    margin-top: 0.6rem;
   }
   .action {
     flex: 1 1 auto;
