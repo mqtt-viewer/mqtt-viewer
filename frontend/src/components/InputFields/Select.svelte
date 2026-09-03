@@ -31,10 +31,6 @@
     | string
     | undefined;
   export let buttonClass = "";
-  // Extra classes for the open menu, merged over the defaults. The menu
-  // portals to body and already sits above the dialog overlay at z-[10002];
-  // pass a class here only to override that or to restyle a single menu.
-  export let menuClass = "";
   export let onChange = (value: OptionType | undefined) => {};
 
   const {
@@ -157,12 +153,9 @@
   {/if}
   {#if $open}
     <div
-      class={twMerge(
-        `z-[10002] flex max-h-[300px] flex-col
+      class="z-[10002] flex max-h-[300px] flex-col
         overflow-y-auto rounded bg-elevation-2 p-1
-        shadow focus:!ring-0`,
-        menuClass
-      )}
+        shadow focus:!ring-0"
       use:melt={$menu}
       transition:fade={{ duration: 150 }}
     >

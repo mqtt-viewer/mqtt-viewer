@@ -49,13 +49,6 @@
       "default": "> string"
     },
     {
-      "name": "menuClass",
-      "type": "string",
-      "required": false,
-      "default": "",
-      "description": "Extra classes for the open menu, merged over the defaults. The menu portals to body and already sits above the dialog overlay at z-[10002]; pass a class here only to override that or to restyle a single menu."
-    },
-    {
       "name": "selected",
       "type": "string",
       "required": false,

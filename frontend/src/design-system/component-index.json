@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T10:33:02.775Z",
+  "generatedAt": "2026-09-03T10:47:12.212Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1793,13 +1793,6 @@
           "default": "> string"
         },
         {
-          "name": "menuClass",
-          "type": "string",
-          "required": false,
-          "default": "",
-          "description": "Extra classes for the open menu, merged over the defaults. The menu portals to body and already sits above the dialog overlay at z-[10002]; pass a class here only to override that or to restyle a single menu."
-        },
-        {
           "name": "selected",
           "type": "string",
           "required": false,
@@ -2711,7 +2704,7 @@
     {
       "name": "HealthStrip",
       "tier": "view",
-      "description": "Row of broker-health chips. Renders only chips that have their minimum samples (chip.render) and hides entirely when none do. Composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix).",
+      "description": "Wrapping row of broker-health chips. Renders only chips that have their minimum samples (chip.render) and hides entirely when none do. Composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix). Chips wrap onto further rows when the window is too narrow for them all, with the row gap matching the chip gap.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
