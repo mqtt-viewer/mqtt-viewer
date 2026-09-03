@@ -40,6 +40,12 @@
       "type": "function",
       "required": false,
       "default": "> void = () => {}"
+    },
+    {
+      "name": "selectAll",
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   ],
   "tokens": [],

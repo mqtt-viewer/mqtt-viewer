@@ -6,14 +6,25 @@
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
-  import type { CollectionsStore } from "../stores/collections";
+  import type { CollectionScope, CollectionsStore } from "../stores/collections";
   import SavedMessageRow from "./SavedMessageRow.svelte";
   import { writable } from "svelte/store";
   import collectionCollapse from "@/stores/collection-collapse";
+  import { draggable } from "../dnd/draggable";
+  import {
+    dragState,
+    isDraggedCollection,
+    isFolderDropTarget,
+    messageDropIndex,
+    type DropTarget,
+  } from "../dnd/drag-store";
+  import { applyDrop } from "../dnd/handle-drop";
 
   export let collection: models.Collection;
   export let collectionsStore: CollectionsStore;
+  export let scope: CollectionScope = "global";
   export let onOpenMessage: (message: models.CollectionMessage) => void;
+  export let onNewMessage: (collectionId: number) => void;
 
   let isHovered = false;
   $: isExpanded = !$collectionCollapse.has(collection.id);
@@ -21,6 +32,25 @@
   let isRenaming = false;
 
   $: messages = collection.messages ?? [];
+
+  $: isDragged = isDraggedCollection($dragState, collection.id);
+  $: isDropInto = isFolderDropTarget($dragState, collection.id);
+  $: dropIndex = messageDropIndex($dragState, collection.id);
+
+  const lineClass =
+    "absolute left-0 right-0 h-[2px] rounded-full bg-primary pointer-events-none";
+
+  $: rowClass = `flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered ${
+    isDropInto ? "bg-hovered ring-1 ring-inset ring-primary" : ""
+  }`;
+
+  const onDrop = (target: DropTarget) =>
+    applyDrop(
+      collectionsStore,
+      $collectionsStore.collections,
+      { kind: "collection", id: collection.id, scope },
+      target
+    );
 
   const commitRename = async (name: string) => {
     isRenaming = false;
@@ -61,7 +91,7 @@
       : `Delete "${collection.name}"?`;
 </script>
 
-<div class="flex flex-col gap-2">
+<div class={`flex flex-col gap-2 ${isDragged ? "opacity-40" : ""}`}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="relative flex items-center"
@@ -77,8 +107,12 @@
       />
     {:else}
       <button
-        class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+        class={rowClass}
         aria-expanded={isExpanded}
+        use:draggable={{
+          payload: { kind: "collection", id: collection.id, scope },
+          onDrop,
+        }}
         on:click={() => collectionCollapse.toggle(collection.id)}
       >
         <span class="w-5 shrink-0 flex items-center justify-center">
@@ -108,11 +142,18 @@
             <Icon type="menuDots" size={16} />
           </div>
           <div class="flex flex-col" slot="menu-content">
-            <DropdownMenuItem onClick={() => (isRenaming = true)}
-              >Rename</DropdownMenuItem
+            <DropdownMenuItem
+              iconType="plus"
+              onClick={() => onNewMessage(collection.id)}
+              >New message</DropdownMenuItem
             >
             <DropdownMenuItem
-              class="hover:text-error"
+              iconType="edit"
+              onClick={() => (isRenaming = true)}>Rename</DropdownMenuItem
+            >
+            <DropdownMenuItem
+              iconType="delete"
+              class="text-error"
               onClick={() => ($isDeleteOpen = true)}>Delete</DropdownMenuItem
             >
           </div>
@@ -122,12 +163,33 @@
   </div>
 
   {#if isExpanded}
-    <div class="flex flex-col gap-1 pl-3">
+    <div class="flex flex-col gap-1 pl-3" data-dnd-list={collection.id}>
       {#if messages.length === 0}
-        <div class="text-base text-secondary-text">No messages</div>
+        <div class="relative">
+          {#if dropIndex === 0}
+            <span class={lineClass} style="top: -3px"></span>
+          {/if}
+          <button
+            class="flex items-center gap-2 grow px-1 -mx-1 py-[2px] rounded text-secondary-text hover:bg-hovered hover:text-emphasis"
+            on:click={() => onNewMessage(collection.id)}
+          >
+            <span class="w-5 shrink-0 flex items-center justify-center">
+              <Icon type="plus" size={16} />
+            </span>
+            <span class="text-base">Add a new message</span>
+          </button>
+        </div>
       {:else}
-        {#each messages as message (message.id)}
-          <SavedMessageRow {message} {collectionsStore} {onOpenMessage} />
+        {#each messages as message, index (message.id)}
+          <div class="relative" data-dnd-row>
+            {#if dropIndex === index}
+              <span class={lineClass} style="top: -3px"></span>
+            {/if}
+            {#if dropIndex === messages.length && index === messages.length - 1}
+              <span class={lineClass} style="bottom: -3px"></span>
+            {/if}
+            <SavedMessageRow {message} {collectionsStore} {onOpenMessage} />
+          </div>
         {/each}
       {/if}
     </div>

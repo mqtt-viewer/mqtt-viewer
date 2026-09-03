@@ -125,23 +125,27 @@ type PublishHistory struct {
 type Collection struct {
 	ID uint `json:"id" gorm:"primaryKey"`
 	// nil = global collection, available on all connections
-	ConnectionID *uint               `json:"connectionId" gorm:"index:collections_connid"`
-	Name         string              `json:"name"`
-	CreatedAt    time.Time           `json:"createdAt"`
-	UpdatedAt    time.Time           `json:"updatedAt"`
-	Messages     []CollectionMessage `json:"messages"`
+	ConnectionID *uint  `json:"connectionId" gorm:"index:collections_connid"`
+	Name         string `json:"name"`
+	// order within its scope: the global list, or this connection's list
+	Position  int                 `json:"position"`
+	CreatedAt time.Time           `json:"createdAt"`
+	UpdatedAt time.Time           `json:"updatedAt"`
+	Messages  []CollectionMessage `json:"messages"`
 }
 
 type CollectionMessage struct {
 	ID           uint   `json:"id" gorm:"primaryKey"`
 	CollectionID uint   `json:"collectionId" gorm:"index:collection_messages_collid"`
 	Name         string `json:"name"`
-	Topic        string `json:"topic"`
-	QoS          uint   `json:"qos"`
-	Retain       bool   `json:"retain"`
-	Payload      string `json:"payload"`
-	Encoding     string `json:"encoding"`
-	Format       string `json:"format"`
+	// order within its collection
+	Position int    `json:"position"`
+	Topic    string `json:"topic"`
+	QoS      uint   `json:"qos"`
+	Retain   bool   `json:"retain"`
+	Payload  string `json:"payload"`
+	Encoding string `json:"encoding"`
+	Format   string `json:"format"`
 	//JSON key-value properties stored as string
 	UserProperties               *string   `json:"userProperties"`
 	HeaderContentType            *string   `json:"headerContentType"`

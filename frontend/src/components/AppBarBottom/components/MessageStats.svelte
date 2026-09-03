@@ -16,7 +16,7 @@
     : 0;
 </script>
 
-<Tooltip placement="top">
+<Tooltip placement="top" focusable>
   <Button variant="text" on:click={() => StatsStore.toggleMode()}>
     {#if $StatsStore.mode === StatsMode.ConnPerSec}
       {currentMessagesPerSec} message{currentMessagesPerSec !== 1 ? "s" : ""}/s

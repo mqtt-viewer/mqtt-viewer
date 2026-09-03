@@ -502,7 +502,9 @@ export const createMockSelectedTopicStore = () => {
   return store;
 };
 
-export const createMockPublishStore = () => {
+export const createMockPublishStore = (
+  overrides: Record<string, unknown> = {}
+) => {
   const { subscribe, set, update } = writable({
     connectionId: 1,
     topic: "factory/line/command",
@@ -528,12 +530,18 @@ export const createMockPublishStore = () => {
     sourceMessageName: null,
     sourceCollectionId: null,
     baseline: null,
+    name: "",
+    pendingCollectionId: null as number | null,
+    ...overrides,
   });
   return {
     subscribe,
     set,
     setPartial: (partial: Record<string, unknown>) =>
       update((store) => ({ ...store, ...partial })),
+    setName: (name: string) => update((store) => ({ ...store, name })),
+    setPendingCollection: (id: number | null) =>
+      update((store) => ({ ...store, pendingCollectionId: id })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -549,6 +557,7 @@ export const createMockPublishStore = () => {
 export const mockCollectionMessage = {
   id: 1,
   collectionId: 1,
+  position: 0,
   name: "Doorbell ping",
   topic: "home/doorbell/ping",
   payload: '{"ding":"dong"}',
@@ -561,12 +570,14 @@ export const mockCollectionMessage = {
 export const mockCollections = [
   {
     id: 1,
+    position: 0,
     name: "Funzone",
     messages: [
       mockCollectionMessage,
       {
         id: 2,
         collectionId: 1,
+        position: 1,
         name: "All-lights off",
         topic: "home/lights/all",
         payload: '{"state":"off"}',
@@ -580,11 +591,13 @@ export const mockCollections = [
   {
     id: 2,
     connectionId: 1,
+    position: 0,
     name: "Development",
     messages: [
       {
         id: 3,
         collectionId: 2,
+        position: 0,
         name: "Backyard sensor",
         topic: "backyard/sensors/1",
         payload: '{"temp":45,"hello":"world"}',
@@ -624,8 +637,11 @@ export const createMockCollectionsStore = () => {
     renameCollection: asyncNoop,
     deleteCollection: asyncNoop,
     saveMessage: async () => mockCollectionMessage,
+    saveMessageAt: async () => mockCollectionMessage,
     renameMessage: asyncNoop,
     moveMessage: asyncNoop,
+    reorderMessages: asyncNoop,
+    reorderCollections: asyncNoop,
     duplicateMessage: async () => mockCollectionMessage,
     deleteMessage: asyncNoop,
   };
@@ -798,6 +814,7 @@ const propDefaults: Record<string, () => unknown> = {
   sameWidth: () => false,
   searchStore: () => createSearchStore(),
   searchString: () => "factory",
+  selectAll: () => false,
   searchTerm: () => "line",
   searchText: () => "line",
   selected: () => writable({ label: "MQTT", value: "mqtt" }),
@@ -903,6 +920,12 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     description: 'Delete "Funzone"? The 2 messages in it will also be deleted.',
   },
   InlineNameInput: { name: "inline-name" },
+  // Menus render closed; the global `open` default is for dialogs.
+  AddToCollectionMenu: {
+    placeholder: "Type to add new collection",
+    open: writable(false),
+  },
+  DropdownMenu: { open: writable(false) },
   PublishView: { isPublishDisabled: false },
   SavedMessageRow: { message: mockCollectionMessage },
   SearchMessagesModal: { isOpen: writable(true) },

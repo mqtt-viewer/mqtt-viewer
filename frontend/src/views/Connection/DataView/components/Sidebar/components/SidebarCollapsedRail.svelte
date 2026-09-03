@@ -14,7 +14,7 @@
 
 <!-- Sized for the 30px collapsed ResizableContainer width -->
 <div class="size-full flex flex-col items-center gap-3 pt-3">
-  <Tooltip text="Expand sidebar" placement="right">
+  <Tooltip text="Expand sidebar" placement="right" focusable>
     <IconButton onClick={expand}>
       <Icon type="sidebar" size={16} />
     </IconButton>
@@ -24,13 +24,13 @@
       <span class="block size-[7px] rounded-full bg-success"></span>
     </Tooltip>
   {/if}
-  <Tooltip text="New message" placement="right">
+  <Tooltip text="New message" placement="right" focusable>
     <IconButton onClick={onNewMessage}>
       <span class="text-primary"><Icon type="plusCircle" size={20} /></span>
     </IconButton>
   </Tooltip>
   {#if onSearch}
-    <Tooltip text="Search messages" placement="right">
+    <Tooltip text="Search messages" placement="right" focusable>
       <IconButton onClick={onSearch}>
         <Icon type="search" size={16} />
       </IconButton>
