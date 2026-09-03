@@ -46,7 +46,7 @@ node scripts/release-notes.mjs "$version" "$prev" > "$notes"
 
 git checkout main
 git merge --ff-only origin/develop
-git push origin main
+ALLOW_MAIN_PUSH=1 git push origin main
 
 if [ -n "$prerelease" ]; then
   gh release create "$version" --target main "$prerelease" --notes-file "$notes" --title "$version"
