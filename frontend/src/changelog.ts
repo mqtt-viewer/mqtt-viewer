@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Drag messages between collections",
-        body: "Drag a saved message to reorder it inside its folder, or onto another folder to move it there. Global and connection collections are both fair game. Folders reorder the same way, and the order sticks. You can drag a history entry straight into a folder to save it, and holding over a collapsed folder opens it so you can drop in the right place.",
+        body: "Drag a saved message to reorder it in its folder, or onto another folder to move it there, global or connection. Folders reorder the same way, and a history entry can be dragged straight into a folder to save it.",
       },
       {
         title: "Peek at messages on the timeline",

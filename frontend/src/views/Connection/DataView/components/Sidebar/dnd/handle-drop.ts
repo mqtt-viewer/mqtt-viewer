@@ -1,9 +1,17 @@
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import { addToast } from "@/components/Toast/Toast.svelte";
+import { errorMessage } from "@/util/errors";
 import { filterByScope, type CollectionsStore } from "../stores/collections";
 import { historyEntryToMessage } from "../util/history-to-message";
 import type { DragPayload, DropTarget } from "./drag-store";
 import { orderAfterMove } from "./drop-index";
+
+// What went wrong, said in the terms of the thing being dragged.
+const failureTitle = (payload: DragPayload) => {
+  if (payload.kind === "collection") return "Failed to reorder collections";
+  if (payload.kind === "history") return "Failed to save message";
+  return "Failed to move message";
+};
 
 // Runs a completed drag. Everything the store does here is applied optimistically
 // and rolls back to the database on failure.
@@ -58,8 +66,8 @@ export const applyDrop = async (
   } catch (e) {
     addToast({
       data: {
-        title: "Failed to move message",
-        description: e as string,
+        title: failureTitle(payload),
+        description: errorMessage(e),
         type: "error",
       },
     });

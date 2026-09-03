@@ -15,6 +15,7 @@ import { get, writable } from "svelte/store";
 import * as app from "bindings/mqtt-viewer/backend/app/models";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import { addToast } from "@/components/Toast/Toast.svelte";
+import { errorMessage } from "@/util/errors";
 import { reorderIds } from "../dnd/drop-index";
 
 export type CollectionScope = "global" | "connection";
@@ -80,7 +81,7 @@ export const createCollectionsStore = (connId: number) => {
       addToast({
         data: {
           title: "Failed to load collections",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -110,7 +111,7 @@ export const createCollectionsStore = (connId: number) => {
   const rollback = async (title: string, e: unknown) => {
     await load();
     addToast({
-      data: { title, description: e as string, type: "error" },
+      data: { title, description: errorMessage(e), type: "error" },
     });
   };
 
@@ -273,6 +274,15 @@ export const createCollectionsStore = (connId: number) => {
   const duplicateMessage = async (id: number) => {
     const copy = await DuplicateCollectionMessage(id);
     apply((collections) => {
+      // The backend makes room for the copy by shifting everything below the
+      // original down one. Do the same locally, or the copy ties with the row
+      // it should sit above.
+      const target = collections.find((c) => c.id === copy.collectionId);
+      for (const message of target?.messages ?? []) {
+        if (message.id !== copy.id && message.position >= copy.position) {
+          message.position += 1;
+        }
+      }
       insertMessage(collections, copy);
     });
     return copy;

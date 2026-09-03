@@ -30,6 +30,10 @@ export const draggable: Action<HTMLElement, DraggableParams> = (
   let dragging = false;
   let ghost: HTMLElement | null = null;
   let scroller: ReturnType<typeof createAutoScroll> | null = null;
+  // Where the pointer was last seen, so an auto-scrolled frame can work the
+  // drop target out again without waiting for the pointer to move.
+  let pointerX = 0;
+  let pointerY = 0;
   let springTimer = 0;
   let springCollectionId: number | null = null;
 
@@ -70,10 +74,21 @@ export const draggable: Action<HTMLElement, DraggableParams> = (
     }, SPRING_LOAD_MS);
   };
 
+  // Works out where the drop would land now and tells the rest of the sidebar,
+  // so the insertion line and any spring-loaded folder follow the pointer.
+  const refreshTarget = () => {
+    const target = resolveTarget(pointerX, pointerY, params.payload);
+    dragState.setTarget(target);
+    springLoad(target);
+  };
+
   const beginDrag = () => {
     dragging = true;
     ghost = makeGhost();
-    scroller = createAutoScroll(node.closest<HTMLElement>("[data-dnd-scroll]"));
+    scroller = createAutoScroll(
+      node.closest<HTMLElement>("[data-dnd-scroll]"),
+      refreshTarget
+    );
     dragState.start(params.payload);
     document.body.style.userSelect = "none";
     window.addEventListener("keydown", onKeyDown, true);
@@ -127,6 +142,8 @@ export const draggable: Action<HTMLElement, DraggableParams> = (
 
   const onPointerMove = (event: PointerEvent) => {
     if (event.pointerId !== pointerId) return;
+    pointerX = event.clientX;
+    pointerY = event.clientY;
     if (!dragging) {
       const travelled =
         Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY);
@@ -147,9 +164,7 @@ export const draggable: Action<HTMLElement, DraggableParams> = (
         event.clientY - startY
       }px)`;
     }
-    const target = resolveTarget(event.clientX, event.clientY, params.payload);
-    dragState.setTarget(target);
-    springLoad(target);
+    refreshTarget();
     scroller?.update(event.clientY);
   };
 
@@ -171,9 +186,14 @@ export const draggable: Action<HTMLElement, DraggableParams> = (
 
   const onPointerDown = (event: PointerEvent) => {
     if (params.disabled || event.button !== 0 || pointerId !== -1) return;
+    // Touch is left alone: the sidebar scrolls under a finger, and a press that
+    // turns into a drag would fight that.
+    if (event.pointerType === "touch") return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
+    pointerX = event.clientX;
+    pointerY = event.clientY;
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerCancel);

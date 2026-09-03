@@ -6,8 +6,13 @@ const EDGE = 48;
 const MAX_SPEED = 14;
 
 // Scrolls a container while the pointer sits near its top or bottom edge, so a
-// drag can reach a folder that is off screen.
-export const createAutoScroll = (container: HTMLElement | null) => {
+// drag can reach a folder that is off screen. onScroll fires after every frame
+// that actually scrolled, because the rows have moved under a pointer that has
+// not: the caller has to work out the drop target again.
+export const createAutoScroll = (
+  container: HTMLElement | null,
+  onScroll?: () => void
+) => {
   let speed = 0;
   let frame = 0;
 
@@ -17,6 +22,7 @@ export const createAutoScroll = (container: HTMLElement | null) => {
       return;
     }
     container.scrollTop += speed;
+    onScroll?.();
     frame = requestAnimationFrame(tick);
   };
 

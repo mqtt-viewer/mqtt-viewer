@@ -185,6 +185,14 @@ unreachable.
   would silently change availability. The two sections are separate lists.
 - A history row can be dragged into a folder. The drop saves that entry as a
   new message named after its topic, at the drop position.
+- A new folder appends to the end of its scope, so creating one never lands it
+  in the middle of an order you set.
+- A reorder call does not have to list the whole list. Rows it leaves out keep
+  their relative order and are renumbered after the listed ones, in the same
+  transaction, so no two rows in a collection or scope share a position.
+- Existing folders and messages keep the alphabetical order they were shown in
+  before this feature. The migration backfills positions in name order, case
+  insensitive, not id order.
 - Hovering a collapsed folder for 600 ms while dragging expands it, through
   the existing collapse store, so the expansion persists after the drop.
 - The menu paths stay. The dots menu's "Move to...", the publish view's chip,
@@ -195,6 +203,8 @@ unreachable.
 
 - A press must move 4 px before it becomes a drag, so a click still opens the
   message. The click that follows a completed drag is swallowed.
+- Touch pointers never start a drag. The sidebar scrolls under a finger, and a
+  press that became a drag would fight that; the menu paths cover touch.
 - The dragged row dims to 40%. A clone of it follows the pointer at 70%
   opacity, `position: fixed` on `document.body`, at the row's own width.
 - Between two rows the insertion point shows as a 2 px `bg-primary` line.
@@ -249,8 +259,11 @@ id at the drop index. The store applies both optimistically, so there is no
 flash.
 
 `just new-migration collection-ordering` adds both columns. The migration
-backfills with a correlated count so existing rows keep their current id
-order within each group.
+backfills with a correlated count so existing rows keep the case-insensitive
+name order they were displayed in, id breaking a tie, within each group.
+
+Both reorder calls reject a duplicate id, and both renumber the rows they were
+not given after the ones they were.
 
 ### Frontend
 
