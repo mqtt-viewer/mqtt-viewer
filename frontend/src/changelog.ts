@@ -251,6 +251,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Collapsible collections",
         body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
       },
+      {
+        title: "Update notes match What's new",
+        body: "The update dialog now shows the same notes as What's new, instead of a list of pull request titles.",
+      },
     ],
   },
   {

@@ -2,6 +2,7 @@
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import type { UpdateResponse } from "bindings/mqtt-viewer/backend/update/models";
+  import { parseReleaseNotes } from "./release-notes-parser";
 
   export let update: UpdateResponse;
   export let currentVersion: string;
@@ -15,34 +16,7 @@
   const withV = (version: string): string =>
     `v${version.trim().replace(/^v/i, "")}`;
 
-  // Minimal, dependency-free formatting for release notes: markdown headings
-  // and bullets only, everything else renders as plain text. Blank lines
-  // collapse; spacing comes from the column gap.
-  type NoteLine =
-    | { kind: "heading"; text: string }
-    | { kind: "bullet"; text: string }
-    | { kind: "text"; text: string };
-
-  const parseReleaseNotes = (notes: string): NoteLine[] => {
-    const lines: NoteLine[] = [];
-    for (const raw of notes.split("\n")) {
-      const line = raw.trim();
-      if (!line) continue;
-      const heading = line.match(/^#{1,6}\s+(.*)$/);
-      if (heading) {
-        lines.push({ kind: "heading", text: heading[1] });
-        continue;
-      }
-      const bullet = line.match(/^[-*]\s+(.*)$/);
-      if (bullet) {
-        lines.push({ kind: "bullet", text: bullet[1] });
-        continue;
-      }
-      lines.push({ kind: "text", text: line });
-    }
-    return lines;
-  };
-
+  // Formatting lives in release-notes-parser.ts so it can be tested on its own.
   $: noteLines = update.release_notes
     ? parseReleaseNotes(update.release_notes)
     : [];
