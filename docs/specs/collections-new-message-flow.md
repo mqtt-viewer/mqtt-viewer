@@ -160,3 +160,128 @@ Frontend:
 - `frontend/src/changelog.ts`: unreleased entry.
 
 No migration. The name already lives on `collection_messages`.
+
+## Drag and drop and ordering
+
+Filing a message was still a menu-only job: "Add to collection", or the row's
+"Move to...". That is fine for one message and hopeless for arranging a
+folder. Collections also had no order of their own. Everything sorted by name,
+so the order you actually wanted (the message you run first at the top) was
+unreachable.
+
+### Decisions
+
+- Order is explicit and persisted. `Position` on `Collection` (within its
+  scope) and on `CollectionMessage` (within its collection). Reads order by
+  position, then id. Name sorting is gone.
+- Dragging a saved message between folders moves it, never copies, with no
+  confirmation. A connection folder and a global one are the same kind of
+  target; only the id matters.
+- Messages reorder inside a folder by dragging. Folders reorder inside their
+  section by dragging.
+- A folder cannot be dragged between the Global and Connection sections.
+  Changing a folder's scope is a different act from ordering it, the drop
+  would be ambiguous next to a legitimate reorder, and every message in it
+  would silently change availability. The two sections are separate lists.
+- A history row can be dragged into a folder. The drop saves that entry as a
+  new message named after its topic, at the drop position.
+- Hovering a collapsed folder for 600 ms while dragging expands it, through
+  the existing collapse store, so the expansion persists after the drop.
+- The menu paths stay. The dots menu's "Move to...", the publish view's chip,
+  and history's "Add to collection" are the accessible route. Keyboard
+  drag and drop is out of scope.
+
+### Interaction
+
+- A press must move 4 px before it becomes a drag, so a click still opens the
+  message. The click that follows a completed drag is swallowed.
+- The dragged row dims to 40%. A clone of it follows the pointer at 70%
+  opacity, `position: fixed` on `document.body`, at the row's own width.
+- Between two rows the insertion point shows as a 2 px `bg-primary` line.
+- Over a folder row, when the drop means "into this folder, at the end", the
+  row highlights with `bg-hovered` and a `border-primary` ring.
+- Within 48 px of the scroll container's top or bottom edge the sidebar
+  auto-scrolls, faster the closer you are.
+- Escape cancels. So does releasing outside any target. Nothing is written.
+- The store applies the new order immediately, then persists. A backend
+  failure reloads from the database and raises the usual error toast.
+
+### Drop targets
+
+| Dragging | Over | Result |
+| --- | --- | --- |
+| Saved message | gap in a message list | move to that collection at that index |
+| Saved message | folder row | move to that collection, at the end |
+| Saved message | its own position | nothing |
+| History entry | gap in a message list | save as a new message at that index |
+| History entry | folder row | save as a new message at the end |
+| Folder | gap in the same section | reorder |
+| Folder | the other section | no target, drop does nothing |
+
+### Backend
+
+One new mutation carries every message case:
+
+```go
+ReorderCollectionMessages(collectionID uint, orderedIDs []uint) ([]models.CollectionMessage, error)
+```
+
+It sets `collection_id` and `position` for each listed id in one transaction,
+so a same-folder reorder and a cross-folder move are the same call. The
+source folder is left with gaps in its positions, which is harmless because
+only the relative order is read.
+
+```go
+ReorderCollections(connectionID *uint, orderedIDs []uint) error
+```
+
+rewrites positions within one scope and rejects an id whose `connection_id`
+does not already match that scope, which is what keeps folders inside their
+section.
+
+The rest is bookkeeping. `SaveCollectionMessage` gives a new message
+`max(position) + 1` in its collection. `MoveCollectionMessage` (the menu path)
+appends at the end of the target. `DuplicateCollectionMessage` puts the copy
+directly after the original and shifts the rest down.
+
+A history drop is two calls: save (which appends), then reorder with the new
+id at the drop index. The store applies both optimistically, so there is no
+flash.
+
+`just new-migration collection-ordering` adds both columns. The migration
+backfills with a correlated count so existing rows keep their current id
+order within each group.
+
+### Frontend
+
+No dependency. The maintained Svelte drag libraries either assume runes, or
+own the list rendering, or use HTML5 drag events, which behave badly inside
+the Wails webviews. The pieces needed here are small enough to write and
+test directly.
+
+`Sidebar/dnd/`:
+
+- `drag-store.ts`: the one active drag. The payload (message, history entry
+  or collection), the pointer position and the resolved drop target.
+- `drop-index.ts`: the pure parts, unit tested. Insertion index from a
+  pointer y against a list of rects, and the new ordered id list for a
+  same-list reorder and a cross-list insert.
+- `draggable.ts`: a `use:draggable` action. Threshold, pointer capture, the
+  ghost clone, Escape, the swallowed click.
+- `drop-resolve.ts`: hit testing. `document.elementFromPoint` walked up to
+  the nearest `data-dnd-*` element, then the index from the sibling rects.
+- `auto-scroll.ts`: the edge scroll on `[data-dnd-scroll]`.
+
+Targets are declared with data attributes rather than a registry, so a row
+only has to say what it is:
+`data-dnd-list="<collectionId>"`, `data-dnd-folder="<collectionId>"`,
+`data-dnd-section="<scope>"`.
+
+Components: `CollectionsSection` (folder list, its own drop zone),
+`CollectionFolder` (folder row as a handle and an into-folder target, message
+list as a drop zone), `SavedMessageRow` (a handle), `HistoryItem` (a handle),
+`Sidebar` (the scroll container attribute).
+
+`stores/collections.ts` sorts by position then id instead of by name, and
+gains `reorderMessages`, `reorderCollections` and `saveMessageAt`, each
+optimistic with a reload-and-toast rollback.

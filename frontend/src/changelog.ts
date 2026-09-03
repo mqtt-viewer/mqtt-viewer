@@ -62,6 +62,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The Add to collection search now says you can type a name to create a collection.",
       },
       {
+        title: "Drag messages between collections",
+        body: "Drag a saved message to reorder it inside its folder, or onto another folder to move it there. Global and connection collections are both fair game. Folders reorder the same way, and the order sticks. You can drag a history entry straight into a folder to save it, and holding over a collapsed folder opens it so you can drop in the right place.",
+      },
+      {
         title: "Peek at messages on the timeline",
         body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
         thanks: [
