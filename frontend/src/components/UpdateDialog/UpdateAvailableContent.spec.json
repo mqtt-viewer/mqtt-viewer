@@ -60,5 +60,5 @@
     "Button",
     "Icon"
   ],
-  "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action."
+  "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action. Release notes are formatted by release-notes-parser.ts beside this component: headings and bullets keep their shape, markdown links and emphasis markers are stripped, and a line that is only a link (the Full changelog line) is dropped."
 }

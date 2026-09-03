@@ -276,6 +276,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
       },
       {
+        title: "Update notes match What's new",
+        body: "The update dialog now shows the same notes as What's new, instead of a list of pull request titles.",
+      },
+      {
         title: "Fewer stray tab stops",
         body: "Tabbing through a button with a tooltip used to stop twice, once on an invisible wrapper and once on the button; now it stops just once.",
       },

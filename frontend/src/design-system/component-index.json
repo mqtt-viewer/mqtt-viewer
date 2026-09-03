@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T09:32:57.810Z",
+  "generatedAt": "2026-09-03T09:37:30.653Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2374,7 +2374,7 @@
         "Button",
         "Icon"
       ],
-      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action.",
+      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action. Release notes are formatted by release-notes-parser.ts beside this component: headings and bullets keep their shape, markdown links and emphasis markers are stripped, and a line that is only a link (the Full changelog line) is dropped.",
       "sourcePath": "src/components/UpdateDialog/UpdateAvailableContent.svelte",
       "specPath": "src/components/UpdateDialog/UpdateAvailableContent.spec.json",
       "storyPath": "src/components/UpdateDialog/UpdateAvailableContent.stories.svelte",
