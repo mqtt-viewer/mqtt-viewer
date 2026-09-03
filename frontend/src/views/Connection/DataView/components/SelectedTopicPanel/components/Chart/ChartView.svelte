@@ -73,7 +73,7 @@
 
 <div class="flex flex-col size-full min-h-0">
   <div class="flex items-center gap-1 pb-1">
-    <Tooltip text={paused ? "Resume live updates" : "Pause live updates"}>
+    <Tooltip text={paused ? "Resume live updates" : "Pause live updates"} focusable>
       <IconButton onClick={() => (paused = !paused)}>
         <span class={paused ? "text-primary" : ""}>
           <Icon type={paused ? "connect" : "pause"} size={16} />
@@ -89,7 +89,7 @@
       />
     {/if}
     {#if onPopOut}
-      <Tooltip text="Open in a new window">
+      <Tooltip text="Open in a new window" focusable>
         <IconButton onClick={onPopOut}>
           <Icon type="popOut" size={15} />
         </IconButton>

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T08:31:44.241Z",
+  "generatedAt": "2026-09-03T09:24:24.079Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2294,6 +2294,12 @@
           "type": "boolean",
           "required": false,
           "default": true
+        },
+        {
+          "name": "focusable",
+          "type": "boolean",
+          "required": false,
+          "default": false
         }
       ],
       "tokens": [

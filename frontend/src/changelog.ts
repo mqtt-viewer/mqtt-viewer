@@ -81,7 +81,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "A tidier sidebar and forms",
-        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels.",
+        body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels. The message search dialog got the same treatment: its search field and results now have proper padding instead of sitting flush against the edges.",
       },
       {
         title: "Dropdowns inside dialogs work again",
@@ -266,6 +266,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Collapsible collections",
         body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
+      },
+      {
+        title: "Fewer stray tab stops",
+        body: "Tabbing through a button with a tooltip used to stop twice, once on an invisible wrapper and once on the button; now it stops just once.",
       },
     ],
   },
