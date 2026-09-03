@@ -112,6 +112,11 @@ export class Collection {
      */
     "connectionId": number | null;
     "name": string;
+
+    /**
+     * order within its scope: the global list, or this connection's list
+     */
+    "position": number;
     "createdAt": time$0.Time;
     "updatedAt": time$0.Time;
     "messages": CollectionMessage[];
@@ -126,6 +131,9 @@ export class Collection {
         }
         if (!("name" in $$source)) {
             this["name"] = "";
+        }
+        if (!("position" in $$source)) {
+            this["position"] = 0;
         }
         if (!("createdAt" in $$source)) {
             this["createdAt"] = null;
@@ -144,10 +152,10 @@ export class Collection {
      * Creates a new Collection instance from a string or object.
      */
     static createFrom($$source: any = {}): Collection {
-        const $$createField5_0 = $$createType1;
+        const $$createField6_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("messages" in $$parsedSource) {
-            $$parsedSource["messages"] = $$createField5_0($$parsedSource["messages"]);
+            $$parsedSource["messages"] = $$createField6_0($$parsedSource["messages"]);
         }
         return new Collection($$parsedSource as Partial<Collection>);
     }
@@ -186,6 +194,11 @@ export class CollectionMessage {
     "id": number;
     "collectionId": number;
     "name": string;
+
+    /**
+     * order within its collection
+     */
+    "position": number;
     "topic": string;
     "qos": number;
     "retain": boolean;
@@ -217,6 +230,9 @@ export class CollectionMessage {
         }
         if (!("name" in $$source)) {
             this["name"] = "";
+        }
+        if (!("position" in $$source)) {
+            this["position"] = 0;
         }
         if (!("topic" in $$source)) {
             this["topic"] = "";

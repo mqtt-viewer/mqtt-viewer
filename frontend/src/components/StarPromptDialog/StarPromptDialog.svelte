@@ -29,25 +29,105 @@
   // install never sees this on first run.
   const MIN_LAUNCHES = 3;
 
-  // Deterministic scatter of faint twinkling stars across the panel. Kept
-  // small and dim so the copy stays readable over them. Derived from the index
-  // (no randomness) so the layout is stable across renders and story snapshots.
-  // Candidates landing under the text and buttons (right of the sky panel and
-  // below the top strip) are skipped so no star reads as stray punctuation;
-  // extra candidates keep the count at 36.
-  const twinkles = Array.from({ length: 100 }, (_, i) => ({
-    left: (i * 47 + 13) % 100,
-    top: (i * 71 + 7) % 100,
-    size: (i % 3) * 0.6 + 1,
-    delay: ((i * 13) % 40) / 10,
-    duration: 2.4 + ((i * 7) % 30) / 10,
-    max: 0.5 + ((i * 5) % 5) / 10,
-  }))
-    .filter((t) => !(t.left > 36 && t.top > 9))
-    .slice(0, 36);
+  /* Night sky ------------------------------------------------------------- */
 
-  // Five shooting stars, staggered, confined to the sky panel on the left.
-  const shootingStars = [0, 1, 2, 3, 4];
+  // mulberry32, a tiny seeded PRNG. The seed is fixed, so the scatter looks
+  // random but is identical on every render and in story snapshots.
+  const seeded = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  const rand = seeded(0x5ea1f00d);
+  const between = (min: number, max: number) => min + rand() * (max - min);
+  const r = (value: number, places = 2) => Number(value.toFixed(places));
+
+  // Where the copy stops and the button column starts, as a percentage of the
+  // panel width.
+  const TEXT_EDGE = 58;
+
+  type Twinkle = {
+    left: number;
+    top: number;
+    size: number;
+    delay: number;
+    duration: number;
+    max: number;
+  };
+
+  // Forty twinkles over the whole panel, about two thirds of them right of the
+  // copy. Candidates landing within 3 units of an existing star are redrawn so
+  // nothing clumps. The ones behind the copy stay small and faint rather than
+  // being skipped, so the left side is still sky without fighting the text.
+  const twinkles: Twinkle[] = [];
+  for (let attempt = 0; attempt < 600 && twinkles.length < 40; attempt++) {
+    const onRight = rand() < 0.66;
+    const left = onRight ? between(TEXT_EDGE, 97) : between(3, TEXT_EDGE - 2);
+    const top = between(4, 94);
+    if (twinkles.some((t) => Math.hypot(t.left - left, t.top - top) < 3)) {
+      continue;
+    }
+    const behindCopy = !onRight && top > 12 && top < 92;
+    twinkles.push({
+      left: r(left),
+      top: r(top),
+      size: r(behindCopy ? between(0.9, 1.5) : between(1, 2.4)),
+      delay: r(between(0, 4.2)),
+      duration: r(between(2.4, 5.6)),
+      max: r(behindCopy ? between(0.16, 0.3) : between(0.3, 0.6)),
+    });
+  }
+
+  type Streak = {
+    x: number;
+    y: number;
+    angle: number;
+    len: number;
+    dist: number;
+    dur: number;
+    delay: number;
+  };
+
+  // Every streak falls at the same angle, so the sky reads as one shower
+  // rather than a scribble. Only where they start and how long, far and fast
+  // they run varies.
+  const STREAK_ANGLE = 32;
+
+  // Each streak is a brief flash: --dur is how long it is on screen, and the
+  // animation runs on a cycle sixteen times that, so seven of them work out at
+  // one streak every two seconds or so with real gaps in between.
+  const CYCLE = 16;
+
+  // Five over the right of the panel, around and behind the button.
+  const skyStreaks: Streak[] = Array.from({ length: 5 }, () => ({
+    x: r(between(38, 86)),
+    y: r(between(-6, 26)),
+    angle: STREAK_ANGLE,
+    len: r(between(34, 66)),
+    dist: r(between(60, 120)),
+    dur: r(between(0.6, 1)),
+    delay: r(between(0, 12)),
+  }));
+
+  // Two more skim the strip above the title. The strip clips and fades them,
+  // so neither can ever run through the copy.
+  const topStreaks: Streak[] = Array.from({ length: 2 }, () => ({
+    x: r(between(2, 30)),
+    y: r(between(4, 40)),
+    angle: STREAK_ANGLE,
+    len: r(between(30, 54)),
+    dist: r(between(50, 95)),
+    dur: r(between(0.7, 1)),
+    delay: r(between(0, 12)),
+  }));
+
+  const streakStyle = (s: Streak) =>
+    `--x:${s.x}%; --y:${s.y}%; --angle:${s.angle}deg; --len:${s.len}px; ` +
+    `--dist:${s.dist}px; --dur:${s.dur}s; --delay:${s.delay}s;`;
+
+  /* State ----------------------------------------------------------------- */
 
   let checked = false;
   let acknowledged = false;
@@ -127,13 +207,22 @@
       {/each}
     </div>
 
-    <!-- Shooting stars streaking through the open space on the left. -->
-    <div class="sky" aria-hidden="true">
-      <div class="night">
-        {#each shootingStars as i}
-          <div class="shooting-star" style="--i:{i};"></div>
-        {/each}
-      </div>
+    <!-- Shooting stars, mostly crossing the right of the panel. -->
+    <div class="streaks" aria-hidden="true">
+      {#each skyStreaks as s}
+        <span class="streak" style={streakStyle(s)}>
+          <span class="streak-body"></span>
+        </span>
+      {/each}
+    </div>
+
+    <!-- And a couple in the strip above the title. -->
+    <div class="streaks streaks-top" aria-hidden="true">
+      {#each topStreaks as s}
+        <span class="streak" style={streakStyle(s)}>
+          <span class="streak-body"></span>
+        </span>
+      {/each}
     </div>
 
     <button type="button" class="close" aria-label="close" on:click={onLater}>
@@ -141,17 +230,15 @@
     </button>
 
     <div class="content">
-      <h2 class="title">Like the app?</h2>
-      <p class="copy">
-        Starring the project on GitHub is an easy way to help out. It helps more
-        people find MQTT Viewer, and it's a real boost for me to see. Thanks for
-        using it.
-      </p>
+      <div class="text">
+        <h2 class="title">Like the app?</h2>
+        <p class="copy">
+          Starring the project on GitHub is an easy way to help out.
+        </p>
+        <p class="copy">Thanks for using MQTT Viewer.</p>
+      </div>
 
-      <div class="actions">
-        <Button variant="text" class="later-button" on:click={onLater}
-          >Maybe later</Button
-        >
+      <div class="action">
         <Button
           variant="primary"
           iconType="github"
@@ -161,6 +248,13 @@
         >
           Star on GitHub
         </Button>
+        <!-- Zero height, so "Maybe later" hangs under the button without
+             pulling the button itself off centre. -->
+        <div class="later-slot">
+          <Button variant="text" class="later-button" on:click={onLater}
+            >Maybe later</Button
+          >
+        </div>
       </div>
     </div>
   </div>
@@ -173,14 +267,22 @@
     max-width: 100%;
     overflow: hidden;
     border-radius: inherit;
-    /* Deep night sky, a touch brighter toward the top-left where the stars
-       streak, settling to near-black under the text. */
+    /* Deep night sky, dimmed down so it sits behind the copy rather than
+       competing with it, then graded across: darkest under the text on the
+       left, lifting toward the button on the right. */
     background:
+      linear-gradient(
+        90deg,
+        rgba(6, 7, 20, 0.58) 0%,
+        rgba(6, 7, 20, 0.36) 38%,
+        rgba(6, 7, 20, 0.06) 74%,
+        rgba(120, 140, 235, 0.07) 100%
+      ),
       radial-gradient(
-        130% 120% at 18% 8%,
-        #262a5a 0%,
-        #171a40 42%,
-        #0c0d24 100%
+        125% 130% at 84% 16%,
+        #1e2148 0%,
+        #14163a 46%,
+        #090a1e 100%
       );
     isolation: isolate;
   }
@@ -195,7 +297,7 @@
     position: absolute;
     border-radius: 999px;
     background: #ffffff;
-    box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 3px rgba(255, 255, 255, 0.65);
     animation-name: twinkle;
     animation-iteration-count: infinite;
     animation-timing-function: ease-in-out;
@@ -213,89 +315,108 @@
   }
 
   /* Shooting stars -------------------------------------------------------- */
-  .sky {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 190px;
-    overflow: hidden;
-    pointer-events: none;
-    /* Fade the streaks out before they reach the copy. */
-    -webkit-mask-image: linear-gradient(
-      to right,
-      #000 55%,
-      transparent 100%
-    );
-    mask-image: linear-gradient(to right, #000 55%, transparent 100%);
-  }
-  .night {
+  .streaks {
     position: absolute;
     inset: 0;
-    transform: rotateZ(38deg);
-  }
-  .shooting-star {
-    position: absolute;
-    top: calc(-10px + var(--i) * 30px);
-    left: calc(-40px + var(--i) * 14px);
-    height: 2px;
-    width: 0;
-    background: linear-gradient(-45deg, #fff, rgba(120, 150, 255, 0));
-    border-radius: 999px;
-    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
-    animation:
-      tail 3200ms ease-in-out infinite,
-      falling 3200ms ease-in-out infinite;
-    animation-delay: calc(var(--i) * 640ms);
-  }
-  .shooting-star::before,
-  .shooting-star::after {
-    content: "";
-    position: absolute;
-    top: calc(50% - 1px);
-    right: 0;
-    height: 2px;
-    width: 0;
-    background: linear-gradient(
-      -45deg,
-      rgba(120, 150, 255, 0),
-      #fff,
-      rgba(120, 150, 255, 0)
+    overflow: hidden;
+    pointer-events: none;
+    /* Anything drifting toward the copy fades out before it gets there. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(0, 0, 0, 0.12) 34%,
+      #000 62%
     );
-    border-radius: 100%;
-    transform: translateX(50%) rotateZ(45deg);
-    animation: shining 3200ms ease-in-out infinite;
-    animation-delay: calc(var(--i) * 640ms);
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(0, 0, 0, 0.12) 34%,
+      #000 62%
+    );
   }
-  .shooting-star::after {
-    transform: translateX(50%) rotateZ(-45deg);
+  /* The strip above the title, left side. Clipped and faded at the bottom so
+     these streaks stop short of the heading. */
+  .streaks-top {
+    inset: 0 auto auto 0;
+    width: 62%;
+    height: 32px;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 40%,
+      transparent 94%
+    );
+    mask-image: linear-gradient(to bottom, #000 40%, transparent 94%);
+  }
+  .streak {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    transform: rotate(var(--angle));
+    transform-origin: 0 50%;
+  }
+  .streak-body {
+    display: block;
+    position: relative;
+    height: 1px;
+    width: 0;
+    opacity: 0;
+    /* A 1px core that fades out along its own length. */
+    background: linear-gradient(
+      -90deg,
+      #ffffff 0%,
+      rgba(198, 212, 255, 0.7) 22%,
+      rgba(140, 165, 255, 0) 100%
+    );
+    border-radius: 999px;
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.55));
+    /* --dur is the flash itself; the cycle is sixteen times that, so each
+       streak rests unseen for a good while before its next one. The keyframe
+       percentages below are all inside that first 6.25%. */
+    animation:
+      tail calc(var(--dur) * 16) ease-out var(--delay) infinite,
+      falling calc(var(--dur) * 16) ease-out var(--delay) infinite,
+      burning calc(var(--dur) * 16) linear var(--delay) infinite;
   }
   @keyframes tail {
     0% {
       width: 0;
     }
-    28% {
-      width: 66px;
+    1.6%,
+    6.25% {
+      width: var(--len);
     }
+    6.26%,
     100% {
       width: 0;
     }
   }
-  @keyframes shining {
+  /* Snaps in, holds for a beat, then eases out while it is still travelling,
+     so the eye catches a streak rather than watching one slide past. */
+  @keyframes burning {
     0% {
-      width: 0;
+      opacity: 0;
+      animation-timing-function: ease-in;
     }
-    50% {
-      width: 26px;
+    0.9% {
+      opacity: 1;
+      animation-timing-function: linear;
     }
+    2.6% {
+      opacity: 1;
+      animation-timing-function: ease-out;
+    }
+    6.25%,
     100% {
-      width: 0;
+      opacity: 0;
     }
   }
   @keyframes falling {
     0% {
       transform: translateX(0);
     }
+    6.25%,
     100% {
-      transform: translateX(160px);
+      transform: translateX(var(--dist));
     }
   }
 
@@ -304,10 +425,16 @@
     position: relative;
     z-index: 1;
     display: flex;
+    align-items: stretch;
+    gap: 0.9rem;
+    padding: 1.75rem 1.5rem 1.65rem 1.7rem;
+  }
+  .text {
+    flex: 0 1 62%;
+    min-width: 0;
+    display: flex;
     flex-direction: column;
-    gap: 1.15rem;
-    padding: 1.6rem 1.6rem 1.5rem;
-    padding-left: 172px;
+    gap: 0.55rem;
   }
   .title {
     margin: 0;
@@ -320,25 +447,41 @@
     margin: 0;
     font-size: 0.9rem;
     line-height: 1.5;
-    color: rgba(226, 228, 245, 0.8);
+    color: rgba(226, 228, 245, 0.82);
   }
-  .actions {
+  .copy + .copy {
+    margin-top: 0.6rem;
+  }
+  .action {
+    flex: 1 1 auto;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
+    justify-content: center;
+  }
+  .later-slot {
+    height: 0;
+    display: flex;
+    justify-content: center;
+    /* flex-start, so the button keeps its own height inside a zero-height row
+       instead of being stretched flat. */
+    align-items: flex-start;
+    overflow: visible;
   }
   /* Button colour treatments live here with the rest of the night-sky
      palette rather than as raw values in class attributes. !important is
      needed to beat the Button component's own variant utilities. */
+  .star-prompt :global(.star-button) {
+    white-space: nowrap;
+    box-shadow: 0 0 16px -6px rgba(160, 180, 255, 0.75);
+  }
   .star-prompt :global(.later-button) {
-    color: rgba(226, 228, 245, 0.72) !important;
+    margin-top: 0.55rem;
+    font-size: 0.85rem;
+    color: rgba(226, 228, 245, 0.6) !important;
   }
   .star-prompt :global(.later-button:enabled:hover) {
     color: #ffffff !important;
-  }
-  .star-prompt :global(.star-button) {
-    box-shadow: 0 0 18px -6px rgba(160, 180, 255, 0.8);
   }
   .close {
     position: absolute;
@@ -359,26 +502,15 @@
     background-color: rgba(255, 255, 255, 0.1);
   }
 
-  /* Respect reduced-motion: hold the scene still rather than emptying it.
-     Twinkles freeze at their own peak brightness, and three streaks get a
-     faint static tail at staggered points along the diagonal so the left
-     side keeps its composition. */
+  /* Respect reduced-motion: drop the shooting stars altogether and hold the
+     twinkles at a steady mid brightness. */
   @media (prefers-reduced-motion: reduce) {
-    .twinkles span,
-    .shooting-star,
-    .shooting-star::before,
-    .shooting-star::after {
-      animation: none;
+    .streaks {
+      display: none;
     }
     .twinkles span {
-      opacity: var(--max);
-    }
-    .shooting-star:nth-child(1),
-    .shooting-star:nth-child(3),
-    .shooting-star:nth-child(5) {
-      width: 66px;
-      opacity: 0.5;
-      transform: translateX(calc(30px + var(--i) * 28px));
+      animation: none;
+      opacity: calc(var(--max) * 0.75);
     }
   }
 </style>

@@ -349,6 +349,37 @@ export async function DuplicateCollectionMessage(
   return copy;
 }
 
+export async function ReorderCollectionMessages(
+  collectionId: number,
+  orderedIds: number[]
+): Promise<models.CollectionMessage[]> {
+  const target = mockCollectionsState.find((c) => c.id === collectionId);
+  if (!target) return [];
+  const moved: models.CollectionMessage[] = [];
+  for (const id of orderedIds) {
+    const found = findMockCollectionMessage(id);
+    if (!found) continue;
+    found.collection.messages = found.collection.messages.filter(
+      (m) => m.id !== id
+    );
+    found.message.collectionId = collectionId;
+    found.message.position = moved.length;
+    moved.push(found.message);
+  }
+  target.messages = moved;
+  return moved;
+}
+
+export async function ReorderCollections(
+  _connectionId: number | null,
+  orderedIds: number[]
+): Promise<void> {
+  orderedIds.forEach((id, index) => {
+    const collection = mockCollectionsState.find((c) => c.id === id);
+    if (collection) collection.position = index;
+  });
+}
+
 export async function DeleteCollectionMessage(id: number): Promise<void> {
   const found = findMockCollectionMessage(id);
   if (found) {

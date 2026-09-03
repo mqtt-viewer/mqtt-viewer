@@ -142,6 +142,10 @@ export function DisconnectMqtt(connId: number): $CancellablePromise<void> {
     return $Call.ByID(2595921592, connId);
 }
 
+/**
+ * DuplicateCollectionMessage copies a message in directly after the original,
+ * shifting everything below it down one place.
+ */
 export function DuplicateCollectionMessage(id: number): $CancellablePromise<models$0.CollectionMessage> {
     return $Call.ByID(2896789728, id).then(($result: any) => {
         return $$createType8($result);
@@ -191,7 +195,8 @@ export function GetCollectionCollapsedStates(): $CancellablePromise<models$0.Col
 
 /**
  * GetCollectionsForConnection returns global collections (connection_id IS NULL)
- * plus collections scoped to the given connection, messages preloaded.
+ * plus collections scoped to the given connection, messages preloaded. Both
+ * levels come back in their persisted order, id breaking a tie.
  */
 export function GetCollectionsForConnection(connectionID: number): $CancellablePromise<models$0.Collection[]> {
     return $Call.ByID(2553763368, connectionID).then(($result: any) => {
@@ -323,6 +328,10 @@ export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     });
 }
 
+/**
+ * MoveCollectionMessage moves a message to another collection, appending it at
+ * the end of that collection.
+ */
 export function MoveCollectionMessage(id: number, targetCollectionID: number): $CancellablePromise<models$0.CollectionMessage> {
     return $Call.ByID(184359020, id, targetCollectionID).then(($result: any) => {
         return $$createType8($result);
@@ -367,6 +376,38 @@ export function RenameCollectionMessage(id: number, name: string): $CancellableP
     return $Call.ByID(379007077, id, name).then(($result: any) => {
         return $$createType8($result);
     });
+}
+
+/**
+ * ReorderCollectionMessages rewrites a collection's message order. orderedIDs
+ * is the collection's full new order; an id currently held by another
+ * collection moves into this one at that index, so a single call serves both a
+ * same-folder reorder and a cross-folder drop at a position. The gaps this
+ * leaves in the source collection's positions are intentional: only relative
+ * order is ever read back.
+ * 
+ * orderedIDs does not have to be the whole collection. Anything left out keeps
+ * its relative order and follows the listed messages, so no two rows in a
+ * collection end up sharing a position.
+ */
+export function ReorderCollectionMessages(collectionID: number, orderedIDs: number[]): $CancellablePromise<models$0.CollectionMessage[]> {
+    return $Call.ByID(1139884023, collectionID, orderedIDs).then(($result: any) => {
+        return $$createType37($result);
+    });
+}
+
+/**
+ * ReorderCollections rewrites the order of one scope's collections: the global
+ * list when connectionID is nil, otherwise that connection's list. An id from
+ * another scope is rejected, which is what stops a folder being dragged between
+ * the global and connection sections. It never changes connection_id.
+ * 
+ * orderedIDs does not have to be the whole scope. Anything left out keeps its
+ * relative order and follows the listed folders, so no two rows in a scope end
+ * up sharing a position.
+ */
+export function ReorderCollections(connectionID: number | null, orderedIDs: number[]): $CancellablePromise<void> {
+    return $Call.ByID(3401681988, connectionID, orderedIDs);
 }
 
 export function SaveCollectionMessage(params: $models.SaveCollectionMessageParams): $CancellablePromise<models$0.CollectionMessage> {
@@ -504,3 +545,4 @@ const $$createType33 = models$0.Tab.createFrom;
 const $$createType34 = $Create.Array($$createType33);
 const $$createType35 = $models.Connection.createFrom;
 const $$createType36 = $Create.Nullable($$createType35);
+const $$createType37 = $Create.Array($$createType8);
