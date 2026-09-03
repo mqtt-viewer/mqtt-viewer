@@ -239,7 +239,7 @@
 
 <div class="size-full flex flex-col p-4 pt-3 min-h-0">
   <div class="flex items-center gap-2 mb-3 min-w-0">
-    <Tooltip text="Back to messages">
+    <Tooltip text="Back to messages" focusable>
       <IconButton onClick={onBack}>
         <Icon type="back" size={16} />
       </IconButton>
