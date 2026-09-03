@@ -14,12 +14,23 @@
 //   - with < 3 in-window samples the trend clause is simply false — the state
 //     falls back to its non-trend column, never "hold previous";
 //   - a missing new sample means the value held flat (change-only
-//     republishers like mosquitto only re-emit changed values, so silence is
-//     signal, not a gap);
+//     republishers like mosquitto only re-emit changed values, so silence is a
+//     held value, never a gap and never staleness — see below);
 //   - a chip renders nothing until it has a sample (cumulative sources only
 //     produce their first, rate, sample after two raw counter readings);
 //   - `trendFloorMs` excludes samples from before a reconnect, so a restarted
 //     broker refilling its retained store never reads as "rising".
+//
+// Staleness is a property of the $SYS feed, never of one metric. A chip greys
+// out only when the broker has stopped publishing $SYS altogether, that is when
+// the newest $SYS message on any topic (`sysLastSeenMs`) is older than
+// 3 × learnedInterval + 30 s. One quiet metric means nothing: change-only
+// republishers like mosquitto never re-emit a value that has not moved, so a
+// broker with no drops leaves `.../publish/messages/dropped` at 0 forever.
+// Reading that silence as staleness greyed out healthy chips and stripped the
+// qualifier off a genuinely amber one, so no rule may derive staleness from a
+// single metric's own sample age. With no $SYS seen at all (`sysLastSeenMs`
+// ≤ 0) nothing is stale; the render gate already hides those chips.
 //
 // See the health table in docs/broker-status-v2-spec.md.
 
@@ -58,7 +69,7 @@ export const MIN_RENDER_SAMPLES = 1;
 export const TREND_MIN_SAMPLES = 3;
 /** Hysteresis floor; the effective hold is max(this, learnedInterval). */
 export const HYSTERESIS_MIN_MS = 30_000;
-/** A chip greys out once its source has been silent this long. */
+/** Chips grey out once the whole $SYS feed has been silent this long. */
 export const STALE_EXTRA_MS = 30_000; // added to 3 × learnedInterval
 
 const RANK: Record<HealthLevel, number> = { ok: 0, attention: 1, problem: 2 };
@@ -126,17 +137,20 @@ export function isRising(
   return true;
 }
 
-const newestTime = (samples: readonly TrendSample[]): number =>
-  samples.length > 0 ? samples[samples.length - 1].t : -1;
-
-const isStale = (
-  samples: readonly TrendSample[],
+/**
+ * Feed-level staleness: true once the broker has stopped publishing $SYS
+ * entirely. `sysLastSeenMs` is the newest $SYS message time across every topic,
+ * so a metric that simply never changes (and is therefore never republished)
+ * cannot make a chip stale on its own. A non-positive value means no $SYS has
+ * been seen yet, which is not staleness.
+ */
+export const isFeedStale = (
+  sysLastSeenMs: number,
   now: number,
   learnedIntervalMs: number
 ): boolean => {
-  const last = newestTime(samples);
-  if (last < 0) return false;
-  return now - last > 3 * learnedIntervalMs + STALE_EXTRA_MS;
+  if (sysLastSeenMs <= 0) return false;
+  return now - sysLastSeenMs > 3 * learnedIntervalMs + STALE_EXTRA_MS;
 };
 
 /**
@@ -187,6 +201,7 @@ function stateChip(
   prev: Map<HealthChipId, HealthChipState>,
   now: number,
   learnedIntervalMs: number,
+  stale: boolean,
   next: Map<HealthChipId, HealthChipState>
 ): HealthChip {
   const render = metric.samples.length >= MIN_RENDER_SAMPLES;
@@ -208,7 +223,6 @@ function stateChip(
   const holdMs = Math.max(HYSTERESIS_MIN_MS, learnedIntervalMs);
   const state = applyHysteresis(prev.get(id), raw, now, holdMs);
   next.set(id, state);
-  const stale = isStale(metric.samples, now, learnedIntervalMs);
   return {
     id,
     label,
@@ -231,7 +245,7 @@ function infoChip(
   metric: HealthMetric,
   detail: number | null,
   now: number,
-  learnedIntervalMs: number
+  stale: boolean
 ): HealthChip {
   const render = metric.samples.length >= MIN_RENDER_SAMPLES;
   return {
@@ -243,7 +257,7 @@ function infoChip(
     value: metric.value,
     detail,
     since: now,
-    stale: render && isStale(metric.samples, now, learnedIntervalMs),
+    stale: render && stale,
     render,
   };
 }
@@ -271,6 +285,13 @@ const STORE_RISE_MS = 120_000;
 const DROPS_RELATIVE_FRACTION = 0.05;
 /** ...but never on a trickle of inbound traffic. */
 const DROPS_MIN_INBOUND = 1;
+/**
+ * Below one drop a minute the chip stays green. mosquitto's
+ * `load/publish/dropped/1min` is a decaying moving average that lingers above
+ * zero for minutes after a single drop, so "any non-zero rate" made an idle
+ * broker read "Drops <0.1/s present" the moment the window opened.
+ */
+const DROPS_ATTENTION_MIN_RATE = 1 / 60;
 
 /**
  * Evaluates every health chip. Returns the renderable chips plus the next
@@ -281,9 +302,12 @@ export function evaluateHealth(
   prev: Map<HealthChipId, HealthChipState>,
   now: number,
   learnedIntervalMs: number,
-  trendFloorMs = 0
+  trendFloorMs = 0,
+  sysLastSeenMs = -1
 ): { chips: HealthChip[]; states: Map<HealthChipId, HealthChipState> } {
   const next = new Map<HealthChipId, HealthChipState>();
+  // One verdict for every chip: the feed is quiet, or it is not.
+  const stale = isFeedStale(sysLastSeenMs, now, learnedIntervalMs);
   const rising = (samples: readonly TrendSample[], ruleWindowMs: number) =>
     isRising(samples, now, ruleWindowMs, learnedIntervalMs, trendFloorMs);
 
@@ -305,7 +329,7 @@ export function evaluateHealth(
     inboundRate >= DROPS_MIN_INBOUND &&
     dropRate > DROPS_RELATIVE_FRACTION * inboundRate;
   let dropsRaw: HealthLevel;
-  if (dropRate <= 0) dropsRaw = "ok";
+  if (dropRate < DROPS_ATTENTION_MIN_RATE) dropsRaw = "ok";
   else if (dropsRising || dropsRelativeHigh) dropsRaw = "problem";
   else dropsRaw = "attention";
   const dropsChip = stateChip(
@@ -317,6 +341,7 @@ export function evaluateHealth(
     prev,
     now,
     learnedIntervalMs,
+    stale,
     next
   );
 
@@ -338,6 +363,7 @@ export function evaluateHealth(
     prev,
     now,
     learnedIntervalMs,
+    stale,
     next
   );
 
@@ -357,6 +383,7 @@ export function evaluateHealth(
     prev,
     now,
     learnedIntervalMs,
+    stale,
     next
   );
 
@@ -367,7 +394,7 @@ export function evaluateHealth(
     heapCur,
     heapMax.value,
     now,
-    learnedIntervalMs
+    stale
   );
 
   // --- Churn (informational) -------------------------------------------------
@@ -377,7 +404,7 @@ export function evaluateHealth(
     sockets,
     null,
     now,
-    learnedIntervalMs
+    stale
   );
 
   return {

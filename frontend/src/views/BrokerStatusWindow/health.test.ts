@@ -37,8 +37,12 @@ const evalHealth = (
   inputs: Parameters<typeof evaluateHealth>[0],
   interval: number,
   prev: Map<HealthChipId, HealthChipState> = new Map(),
-  now = NOW
-) => chipsById(evaluateHealth(inputs, prev, now, interval).chips);
+  now = NOW,
+  sysLastSeenMs = -1
+) =>
+  chipsById(
+    evaluateHealth(inputs, prev, now, interval, 0, sysLastSeenMs).chips
+  );
 
 // --- isRising: cadence-robust trend ------------------------------------------
 
@@ -202,6 +206,42 @@ describe("evaluateHealth — Drops", () => {
     expect(chips.drops.level).toBe("problem");
   });
 
+  it("is ok below 1 drop per minute (a lingering decayed moving average)", () => {
+    // mosquitto's load/publish/dropped/1min decays slowly, so it sits just above
+    // zero for minutes after a single drop. That is not worth an amber chip.
+    const chips = evalHealth(
+      { msgs_dropped: metric(0.008, series([0.008, 0.008], 10_000)) },
+      10_000
+    );
+    expect(chips.drops.level).toBe("ok");
+    expect(chips.drops.qualifier).toBe("");
+  });
+
+  it("stays ok below the threshold even while the trickle is rising", () => {
+    const chips = evalHealth(
+      { msgs_dropped: metric(0.003, series([0.001, 0.002, 0.003], 10_000)) },
+      10_000
+    );
+    expect(chips.drops.level).toBe("ok");
+  });
+
+  it("goes attention at exactly 1 drop per minute", () => {
+    const chips = evalHealth(
+      { msgs_dropped: metric(1 / 60, series([1 / 60, 1 / 60], 10_000)) },
+      10_000
+    );
+    expect(chips.drops.level).toBe("attention");
+    expect(chips.drops.qualifier).toBe("present");
+  });
+
+  it("goes attention above 1 drop per minute", () => {
+    const chips = evalHealth(
+      { msgs_dropped: metric(0.05, series([0.05, 0.05], 10_000)) },
+      10_000
+    );
+    expect(chips.drops.level).toBe("attention");
+  });
+
   it("never fires the relative rule on inbound below 1 msg/s", () => {
     const chips = evalHealth(
       {
@@ -293,24 +333,86 @@ describe("evaluateHealth — Store / Heap / Churn", () => {
 
 // --- evaluateHealth: staleness ------------------------------------------------
 
-describe("evaluateHealth — staleness", () => {
-  it("greys a chip whose source has been silent past 3x interval + 30 s", () => {
-    // Newest sample 200 s old at a 10 s interval → threshold 60 s → stale.
+describe("evaluateHealth — staleness is feed-level", () => {
+  it("greys every chip once the whole $SYS feed has been silent past 3x interval + 30 s", () => {
+    // The feed's newest message of any topic is 200 s old at a 10 s interval
+    // → threshold 60 s → stale, even though this chip's own sample is fresh.
     const chips = evalHealth(
-      { store_msgs: metric(5, series([5, 5], 10_000, NOW - 200_000)) },
-      10_000
+      { store_msgs: metric(5, series([5, 5], 10_000)) },
+      10_000,
+      new Map(),
+      NOW,
+      NOW - 200_000
     );
     expect(chips.store.render).toBe(true);
     expect(chips.store.stale).toBe(true);
     expect(chips.store.qualifier).toBe(""); // qualifier drops when stale
   });
 
-  it("is not stale while samples arrive within the threshold", () => {
+  it("is not stale while the feed keeps arriving within the threshold", () => {
     const chips = evalHealth(
       { store_msgs: metric(5, series([5, 5], 10_000)) },
-      10_000
+      10_000,
+      new Map(),
+      NOW,
+      NOW
     );
     expect(chips.store.stale).toBe(false);
+  });
+
+  it("does not grey a metric mosquitto has simply stopped republishing", () => {
+    // Mosquitto only re-emits a $SYS value when it changes, so a broker with no
+    // drops keeps .../dropped at 0 and never republishes it. The feed itself is
+    // alive (another topic arrived 5 s ago), so the chip stays live.
+    const chips = evalHealth(
+      { msgs_dropped: metric(0, series([0], 10_000, NOW - 300_000)) },
+      10_000,
+      new Map(),
+      NOW,
+      NOW - 5_000
+    );
+    expect(chips.drops.render).toBe(true);
+    expect(chips.drops.stale).toBe(false);
+    expect(chips.drops.level).toBe("ok");
+  });
+
+  it("keeps an amber chip's qualifier while only that metric is quiet", () => {
+    // Drops sat at 2/s and was last republished 200 s ago; the feed is alive.
+    const chips = evalHealth(
+      { msgs_dropped: metric(2, series([2, 2], 10_000, NOW - 200_000)) },
+      10_000,
+      new Map(),
+      NOW,
+      NOW - 5_000
+    );
+    expect(chips.drops.stale).toBe(false);
+    expect(chips.drops.level).toBe("attention");
+    expect(chips.drops.qualifier).toBe("present");
+  });
+
+  it("greys the informational chips on a dead feed too", () => {
+    const chips = evalHealth(
+      { heap_current: metric(1, series([1, 1], 10_000)) },
+      10_000,
+      new Map(),
+      NOW,
+      NOW - 200_000
+    );
+    expect(chips.heap.render).toBe(true);
+    expect(chips.heap.stale).toBe(true);
+  });
+
+  it("never marks a chip stale when no $SYS has been seen at all", () => {
+    for (const sysLastSeen of [-1, 0]) {
+      const chips = evalHealth(
+        { store_msgs: metric(5, series([5, 5], 10_000, NOW - 500_000)) },
+        10_000,
+        new Map(),
+        NOW,
+        sysLastSeen
+      );
+      expect(chips.store.stale).toBe(false);
+    }
   });
 });
 
