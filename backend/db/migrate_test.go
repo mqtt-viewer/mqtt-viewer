@@ -114,17 +114,20 @@ func TestCollectionOrderingBackfill(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Rows as they look before the backfill: every position still 0.
+	// Rows as they look before the backfill: every position still 0. The names
+	// deliberately run against id order, and mix cases, because the backfill
+	// has to reproduce the case-insensitive name order the app used to display.
 	seed := []string{
 		"INSERT INTO connections (id, name) VALUES (1, 'seed')",
-		"INSERT INTO collections (id, connection_id, name, position) VALUES (1, NULL, 'global one', 0)",
+		"INSERT INTO collections (id, connection_id, name, position) VALUES (1, NULL, 'Zeta', 0)",
 		"INSERT INTO collections (id, connection_id, name, position) VALUES (2, 1, 'scoped', 0)",
-		"INSERT INTO collections (id, connection_id, name, position) VALUES (3, NULL, 'global two', 0)",
-		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (1, 1, 'a', 0)",
-		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (2, 1, 'b', 0)",
-		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (3, 3, 'c', 0)",
-		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (4, 1, 'd', 0)",
-		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (5, 3, 'e', 0)",
+		"INSERT INTO collections (id, connection_id, name, position) VALUES (3, NULL, 'alpha', 0)",
+		"INSERT INTO collections (id, connection_id, name, position) VALUES (4, NULL, 'beta', 0)",
+		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (1, 1, 'Zeta', 0)",
+		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (2, 1, 'alpha', 0)",
+		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (3, 3, 'delta', 0)",
+		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (4, 1, 'beta', 0)",
+		"INSERT INTO collection_messages (id, collection_id, name, position) VALUES (5, 3, 'Charlie', 0)",
 	}
 	for _, statement := range seed {
 		if err := testDb.Exec(statement).Error; err != nil {
@@ -147,8 +150,9 @@ func TestCollectionOrderingBackfill(t *testing.T) {
 		t.Fatalf("expected 2 backfill statements, got %d", backfilled)
 	}
 
-	// ids 1, 2, 4 sit in collection 1; ids 3, 5 sit in collection 3
-	wantMessagePositions := map[uint]int{1: 0, 2: 1, 4: 2, 3: 0, 5: 1}
+	// collection 1 holds Zeta(1), alpha(2) and beta(4); collection 3 holds
+	// delta(3) and Charlie(5)
+	wantMessagePositions := map[uint]int{2: 0, 4: 1, 1: 2, 5: 0, 3: 1}
 	for id, want := range wantMessagePositions {
 		var got int
 		if err := testDb.Raw("SELECT position FROM collection_messages WHERE id = ?", id).Scan(&got).Error; err != nil {
@@ -159,8 +163,9 @@ func TestCollectionOrderingBackfill(t *testing.T) {
 		}
 	}
 
-	// ids 1 and 3 are the global scope; id 2 is alone on connection 1
-	wantCollectionPositions := map[uint]int{1: 0, 3: 1, 2: 0}
+	// Zeta(1), alpha(3) and beta(4) are the global scope; scoped(2) is alone on
+	// connection 1
+	wantCollectionPositions := map[uint]int{3: 0, 4: 1, 1: 2, 2: 0}
 	for id, want := range wantCollectionPositions {
 		var got int
 		if err := testDb.Raw("SELECT position FROM collections WHERE id = ?", id).Scan(&got).Error; err != nil {

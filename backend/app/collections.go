@@ -32,15 +32,43 @@ type CreateCollectionParams struct {
 }
 
 func (a *App) CreateCollection(params CreateCollectionParams) (models.Collection, error) {
+	position, err := nextCollectionPosition(&a.Db.DB, params.ConnectionID)
+	if err != nil {
+		return models.Collection{}, err
+	}
 	collection := models.Collection{
 		Name:         params.Name,
 		ConnectionID: params.ConnectionID,
+		Position:     position,
 		Messages:     []models.CollectionMessage{},
 	}
 	if err := a.Db.Create(&collection).Error; err != nil {
 		return models.Collection{}, err
 	}
 	return collection, nil
+}
+
+// scopedCollections narrows a query to one collection scope: the global list
+// when connectionID is nil, otherwise that connection's list.
+func scopedCollections(tx *gorm.DB, connectionID *uint) *gorm.DB {
+	if connectionID == nil {
+		return tx.Where("connection_id IS NULL")
+	}
+	return tx.Where("connection_id = ?", *connectionID)
+}
+
+// nextCollectionPosition returns the position that appends to the end of a
+// scope's folder list, 0 when the scope is empty.
+func nextCollectionPosition(tx *gorm.DB, connectionID *uint) (int, error) {
+	var highest *int
+	query := scopedCollections(tx.Model(&models.Collection{}), connectionID)
+	if err := query.Select("MAX(position)").Scan(&highest).Error; err != nil {
+		return 0, err
+	}
+	if highest == nil {
+		return 0, nil
+	}
+	return *highest + 1, nil
 }
 
 func (a *App) RenameCollection(id uint, name string) (models.Collection, error) {
@@ -55,11 +83,32 @@ func (a *App) RenameCollection(id uint, name string) (models.Collection, error) 
 	return collection, nil
 }
 
+// rejectDuplicateIDs guards a reorder against the same id appearing twice,
+// which would otherwise leave the row at whichever position came last and the
+// rest of the list one place out.
+func rejectDuplicateIDs(ids []uint) error {
+	seen := make(map[uint]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			return fmt.Errorf("duplicate id %d", id)
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
+}
+
 // ReorderCollections rewrites the order of one scope's collections: the global
 // list when connectionID is nil, otherwise that connection's list. An id from
 // another scope is rejected, which is what stops a folder being dragged between
 // the global and connection sections. It never changes connection_id.
+//
+// orderedIDs does not have to be the whole scope. Anything left out keeps its
+// relative order and follows the listed folders, so no two rows in a scope end
+// up sharing a position.
 func (a *App) ReorderCollections(connectionID *uint, orderedIDs []uint) error {
+	if err := rejectDuplicateIDs(orderedIDs); err != nil {
+		return err
+	}
 	return a.Db.Transaction(func(tx *gorm.DB) error {
 		for i, id := range orderedIDs {
 			var collection models.Collection
@@ -78,8 +127,29 @@ func (a *App) ReorderCollections(connectionID *uint, orderedIDs []uint) error {
 				return fmt.Errorf("reordering collection %d: %w", id, err)
 			}
 		}
-		return nil
+		return renumberRemainingCollections(tx, connectionID, orderedIDs)
 	})
+}
+
+// renumberRemainingCollections puts every folder in the scope that orderedIDs
+// left out after the listed ones, keeping the order they were already in.
+func renumberRemainingCollections(tx *gorm.DB, connectionID *uint, listed []uint) error {
+	query := scopedCollections(tx.Model(&models.Collection{}), connectionID)
+	if len(listed) > 0 {
+		query = query.Where("id NOT IN ?", listed)
+	}
+	var remaining []models.Collection
+	if err := query.Order("position asc, id asc").Find(&remaining).Error; err != nil {
+		return err
+	}
+	for i, collection := range remaining {
+		if err := tx.Model(&models.Collection{}).
+			Where("id = ?", collection.ID).
+			Update("position", len(listed)+i).Error; err != nil {
+			return fmt.Errorf("reordering collection %d: %w", collection.ID, err)
+		}
+	}
+	return nil
 }
 
 // sameCollectionScope reports whether two collection scopes match, treating nil
@@ -223,8 +293,15 @@ func (a *App) RenameCollectionMessage(id uint, name string) (models.CollectionMe
 // same-folder reorder and a cross-folder drop at a position. The gaps this
 // leaves in the source collection's positions are intentional: only relative
 // order is ever read back.
+//
+// orderedIDs does not have to be the whole collection. Anything left out keeps
+// its relative order and follows the listed messages, so no two rows in a
+// collection end up sharing a position.
 func (a *App) ReorderCollectionMessages(collectionID uint, orderedIDs []uint) ([]models.CollectionMessage, error) {
 	if err := a.requireCollection(collectionID); err != nil {
+		return nil, err
+	}
+	if err := rejectDuplicateIDs(orderedIDs); err != nil {
 		return nil, err
 	}
 	var messages []models.CollectionMessage
@@ -245,12 +322,34 @@ func (a *App) ReorderCollectionMessages(collectionID uint, orderedIDs []uint) ([
 			}
 			messages = append(messages, message)
 		}
-		return nil
+		return renumberRemainingMessages(tx, collectionID, orderedIDs)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return messages, nil
+}
+
+// renumberRemainingMessages puts every message in the collection that
+// orderedIDs left out after the listed ones, keeping the order they were
+// already in.
+func renumberRemainingMessages(tx *gorm.DB, collectionID uint, listed []uint) error {
+	query := tx.Model(&models.CollectionMessage{}).Where("collection_id = ?", collectionID)
+	if len(listed) > 0 {
+		query = query.Where("id NOT IN ?", listed)
+	}
+	var remaining []models.CollectionMessage
+	if err := query.Order("position asc, id asc").Find(&remaining).Error; err != nil {
+		return err
+	}
+	for i, message := range remaining {
+		if err := tx.Model(&models.CollectionMessage{}).
+			Where("id = ?", message.ID).
+			Update("position", len(listed)+i).Error; err != nil {
+			return fmt.Errorf("reordering message %d: %w", message.ID, err)
+		}
+	}
+	return nil
 }
 
 // MoveCollectionMessage moves a message to another collection, appending it at
