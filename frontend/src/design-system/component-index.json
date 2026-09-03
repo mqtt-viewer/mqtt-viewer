@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T09:31:00.135Z",
+  "generatedAt": "2026-09-03T10:03:02.212Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1163,6 +1163,12 @@
           "default": false
         },
         {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
           "name": "triggerText",
           "type": "string",
           "required": false,
@@ -1239,6 +1245,13 @@
           "type": "function",
           "required": false,
           "default": "() => {}"
+        },
+        {
+          "name": "iconType",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Optional leading icon, keyed to the Icon component's icon names. Items without one keep their plain text layout."
         }
       ],
       "tokens": [
@@ -2153,7 +2166,7 @@
       "props": [],
       "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet. Bespoke night-sky illustration (scoped <style>: twinkling stars + CSS shooting stars, adapted from constgenius/ShootingStar) so it uses raw decorative colours rather than design tokens; the surface is intentionally dark regardless of theme. The action buttons' colour treatment (muted 'Maybe later' text, primary button glow) is part of the same exception and lives in the scoped style block under stable class names. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
+      "notes": "Figma is not linked yet. Bespoke night-sky illustration (scoped <style>): a seeded mulberry32 PRNG scatters the twinkling stars and the shooting-star streaks, so the sky looks random but is identical on every render and in story snapshots. Anatomy is two columns over the sky: copy on the left (title and paragraph), the 'Star on GitHub' button vertically centred in the right column with 'Maybe later' hanging beneath it, plus a close X pinned top right. The illustration uses raw decorative colours rather than design tokens and the surface is intentionally dark regardless of theme; the action buttons' colour treatment (muted 'Maybe later' text, primary button glow) is part of the same exception and lives in the scoped style block under stable class names. Streaks are driven by per-element CSS custom properties (--x, --y, --angle, --len, --dist, --dur, --delay); they all share one fall angle and are brief flashes that fade while still travelling, on a cycle sixteen times their visible duration so there are real gaps between them. Under prefers-reduced-motion the streaks are dropped and the twinkles hold at a static mid brightness. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
       "sourcePath": "src/components/StarPromptDialog/StarPromptDialog.svelte",
       "specPath": "src/components/StarPromptDialog/StarPromptDialog.spec.json",
       "storyPath": "src/components/StarPromptDialog/StarPromptDialog.stories.svelte",
@@ -2362,7 +2375,7 @@
         "Button",
         "Icon"
       ],
-      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action.",
+      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action. Release notes are formatted by release-notes-parser.ts beside this component: headings and bullets keep their shape, markdown links and emphasis markers are stripped, and a line that is only a link (the Full changelog line) is dropped.",
       "sourcePath": "src/components/UpdateDialog/UpdateAvailableContent.svelte",
       "specPath": "src/components/UpdateDialog/UpdateAvailableContent.spec.json",
       "storyPath": "src/components/UpdateDialog/UpdateAvailableContent.stories.svelte",
@@ -4232,7 +4245,7 @@
         "elevation-1"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. The scrolling library pane carries data-dnd-scroll so a drag near its edges auto-scrolls it.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/Sidebar.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/Sidebar.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/Sidebar.stories.svelte",
@@ -4258,6 +4271,12 @@
           "required": true
         },
         {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
           "name": "currentCollectionId",
           "type": "number",
           "required": false,
@@ -4268,9 +4287,9 @@
           "type": "enum",
           "required": false,
           "options": [
-            "Add message to..."
+            "Type to add new collection"
           ],
-          "default": "Add message to..."
+          "default": "Type to add new collection"
         },
         {
           "name": "onSelect",
@@ -4322,22 +4341,38 @@
           "required": true
         },
         {
+          "name": "scope",
+          "type": "string",
+          "required": false,
+          "default": "global",
+          "options": [
+            "global",
+            "connection"
+          ]
+        },
+        {
           "name": "onOpenMessage",
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": true
         }
       ],
       "tokens": [
-        "secondary",
         "white-text",
         "emphasis",
         "secondary-text",
         "hovered",
-        "error"
+        "error",
+        "primary",
+        "elevation-2"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook).",
+      "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook). Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2. The folder row highlights with bg-hovered and a ring-primary when the drop means \"into this folder\"; the insertion line between messages is bg-primary.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.stories.svelte",
@@ -4372,14 +4407,19 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": true
         }
       ],
       "tokens": [
-        "secondary",
-        "secondary-text"
+        "secondary-text",
+        "primary"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Folder reordering is driven by the dnd drag store, not by props; the story sets that store directly. The insertion line between folders is bg-primary.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.stories.svelte",
@@ -4471,6 +4511,49 @@
       "specMissing": false
     },
     {
+      "name": "ConnectionLogsDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionLogsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "connection",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "divider",
+        "error",
+        "warning",
+        "elevation-0",
+        "elevation-2"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConnectionLogsDialog",
+      "specMissing": false
+    },
+    {
       "name": "ConnectionRow",
       "tier": "view",
       "description": "Storybook coverage for ConnectionRow.",
@@ -4546,10 +4629,11 @@
         "divider",
         "error",
         "elevation-1",
-        "chip-border"
+        "chip-border",
+        "elevation-2"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2. Dropping the row into a folder saves it there.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.stories.svelte",
@@ -4639,6 +4723,12 @@
           "type": "function",
           "required": false,
           "default": "> void = () => {}"
+        },
+        {
+          "name": "selectAll",
+          "type": "boolean",
+          "required": false,
+          "default": false
         }
       ],
       "tokens": [],
@@ -4736,7 +4826,8 @@
         "secondary",
         "emphasis",
         "secondary-text",
-        "warning"
+        "warning",
+        "hovered"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
@@ -4777,15 +4868,15 @@
         }
       ],
       "tokens": [
-        "secondary",
         "white-text",
         "emphasis",
         "secondary-text",
         "hovered",
-        "error"
+        "error",
+        "elevation-2"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.stories.svelte",

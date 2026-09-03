@@ -60,30 +60,34 @@ type ReceivedMessage struct {
 }
 
 type Connection struct {
-	ID                   uint             `json:"id" gorm:"primaryKey"`
-	CreatedAt            time.Time        `json:"createdAt"`
-	UpdatedAt            time.Time        `json:"updatedAt"`
-	Name                 string           `json:"name"`
-	MqttVersion          string           `json:"mqttVersion"`
-	HasCustomClientId    *bool            `json:"hasCustomClientId"`
-	ClientId             *string          `json:"clientId"`
-	Protocol             string           `json:"protocol"`
-	Host                 string           `json:"host"`
-	Port                 int              `json:"port"`
-	WebsocketPath        string           `json:"websocketPath"`
-	Username             *string          `json:"username"`
-	Password             *string          `json:"password"`
-	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
-	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
-	SkipCertVerification *bool            `json:"skipCertVerification"`
-	CertCa               *string          `json:"certCa"`
-	CertClient           *string          `json:"certClient"`
-	CertClientKey        *string          `json:"certClientKey"`
-	Subscriptions        []Subscription   `json:"subscriptions"`
-	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
-	CustomIconSeed       *string          `json:"customIconSeed"`
-	FilterHistories      []FilterHistory  `json:"filterHistories"`
-	PublishHistories     []PublishHistory `json:"publishHistories"`
+	ID                   uint           `json:"id" gorm:"primaryKey"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	Name                 string         `json:"name"`
+	MqttVersion          string         `json:"mqttVersion"`
+	HasCustomClientId    *bool          `json:"hasCustomClientId"`
+	ClientId             *string        `json:"clientId"`
+	Protocol             string         `json:"protocol"`
+	Host                 string         `json:"host"`
+	Port                 int            `json:"port"`
+	WebsocketPath        string         `json:"websocketPath"`
+	Username             *string        `json:"username"`
+	Password             *string        `json:"password"`
+	IsProtoEnabled       *bool          `json:"isProtoEnabled"`
+	IsCertsEnabled       *bool          `json:"isCertsEnabled"`
+	SkipCertVerification *bool          `json:"skipCertVerification"`
+	CertCa               *string        `json:"certCa"`
+	CertClient           *string        `json:"certClient"`
+	CertClientKey        *string        `json:"certClientKey"`
+	Subscriptions        []Subscription `json:"subscriptions"`
+	LastConnectedAt      *time.Time     `json:"lastConnectedAt"`
+	CustomIconSeed       *string        `json:"customIconSeed"`
+	// Opt-in verbose MQTT-library debug logging for this connection's client
+	// logs. false = only always-on lifecycle/error lines are captured.
+	// Non-pointer so GORM never inserts NULL into the NOT NULL column.
+	DebugLoggingEnabled bool             `json:"debugLoggingEnabled" gorm:"not null;default:0"`
+	FilterHistories     []FilterHistory  `json:"filterHistories"`
+	PublishHistories    []PublishHistory `json:"publishHistories"`
 	// Declared only so the schema keeps the foreign keys added during the DB
 	// hardening review. Never preloaded (received history can be huge) and kept
 	// out of JSON/bindings; ConnectionID on the child is the source of truth.
@@ -125,23 +129,27 @@ type PublishHistory struct {
 type Collection struct {
 	ID uint `json:"id" gorm:"primaryKey"`
 	// nil = global collection, available on all connections
-	ConnectionID *uint               `json:"connectionId" gorm:"index:collections_connid"`
-	Name         string              `json:"name"`
-	CreatedAt    time.Time           `json:"createdAt"`
-	UpdatedAt    time.Time           `json:"updatedAt"`
-	Messages     []CollectionMessage `json:"messages"`
+	ConnectionID *uint  `json:"connectionId" gorm:"index:collections_connid"`
+	Name         string `json:"name"`
+	// order within its scope: the global list, or this connection's list
+	Position  int                 `json:"position"`
+	CreatedAt time.Time           `json:"createdAt"`
+	UpdatedAt time.Time           `json:"updatedAt"`
+	Messages  []CollectionMessage `json:"messages"`
 }
 
 type CollectionMessage struct {
 	ID           uint   `json:"id" gorm:"primaryKey"`
 	CollectionID uint   `json:"collectionId" gorm:"index:collection_messages_collid"`
 	Name         string `json:"name"`
-	Topic        string `json:"topic"`
-	QoS          uint   `json:"qos"`
-	Retain       bool   `json:"retain"`
-	Payload      string `json:"payload"`
-	Encoding     string `json:"encoding"`
-	Format       string `json:"format"`
+	// order within its collection
+	Position int    `json:"position"`
+	Topic    string `json:"topic"`
+	QoS      uint   `json:"qos"`
+	Retain   bool   `json:"retain"`
+	Payload  string `json:"payload"`
+	Encoding string `json:"encoding"`
+	Format   string `json:"format"`
 	//JSON key-value properties stored as string
 	UserProperties               *string   `json:"userProperties"`
 	HeaderContentType            *string   `json:"headerContentType"`

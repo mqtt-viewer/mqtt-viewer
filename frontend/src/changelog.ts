@@ -50,6 +50,26 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "See what the MQTT client is doing",
+        body: "Pick View logs from the connection menu for a live, terminal-style view of connects, reconnects, subscriptions and errors, with a filter, level chips, copy and clear. Turn on debug logging per connection when you need the library's full output; it is also written to a rotating file.",
+      },
+      {
+        title: "Start a message inside a collection",
+        body: "Every collection folder's menu now has New message, and an empty folder shows one as a row. The message is filed there when you save it. A saved message shows its collection in the top right; pick another one there to move it.",
+      },
+      {
+        title: "Rename messages where you edit them",
+        body: "Click the message name at the top of the publish view to rename it.",
+      },
+      {
+        title: "Clearer collection creation",
+        body: "The Add to collection search now says you can type a name to create a collection.",
+      },
+      {
+        title: "Drag messages between collections",
+        body: "Drag a saved message to reorder it in its folder, or onto another folder to move it there, global or connection. Folders reorder the same way, and a history entry can be dragged straight into a folder to save it.",
+      },
+      {
         title: "Peek at messages on the timeline",
         body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
         thanks: [
@@ -140,6 +160,10 @@ export const CHANGELOG: ChangelogEntry[] = [
             url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/78",
           },
         ],
+      },
+      {
+        title: "See what your connection is doing",
+        body: "There's a \"View logs\" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.",
       },
       {
         title: "Pick your own chart time window",
@@ -258,6 +282,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Collapsible collections",
         body: "Collection folders in the sidebar now collapse and expand, and they remember which were closed between sessions. The message count sits next to the collection name where it's easier to read.",
+      },
+      {
+        title: "Update notes match What's new",
+        body: "The update dialog now shows the same notes as What's new, instead of a list of pull request titles.",
       },
       {
         title: "Fewer stray tab stops",
