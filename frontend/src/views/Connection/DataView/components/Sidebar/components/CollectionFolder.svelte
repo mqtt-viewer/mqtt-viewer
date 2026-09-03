@@ -14,6 +14,7 @@
   export let collection: models.Collection;
   export let collectionsStore: CollectionsStore;
   export let onOpenMessage: (message: models.CollectionMessage) => void;
+  export let onNewMessage: (collectionId: number) => void;
 
   let isHovered = false;
   $: isExpanded = !$collectionCollapse.has(collection.id);
@@ -108,6 +109,9 @@
             <Icon type="menuDots" size={16} />
           </div>
           <div class="flex flex-col" slot="menu-content">
+            <DropdownMenuItem onClick={() => onNewMessage(collection.id)}
+              >New message</DropdownMenuItem
+            >
             <DropdownMenuItem onClick={() => (isRenaming = true)}
               >Rename</DropdownMenuItem
             >
@@ -124,7 +128,17 @@
   {#if isExpanded}
     <div class="flex flex-col gap-1 pl-3">
       {#if messages.length === 0}
-        <div class="text-base text-secondary-text">No messages</div>
+        <button
+          class="flex items-center gap-2 grow px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+          on:click={() => onNewMessage(collection.id)}
+        >
+          <span
+            class="w-5 shrink-0 flex items-center justify-center text-primary"
+          >
+            <Icon type="plusCircle" size={16} />
+          </span>
+          <span class="text-base">New message</span>
+        </button>
       {:else}
         {#each messages as message (message.id)}
           <SavedMessageRow {message} {collectionsStore} {onOpenMessage} />

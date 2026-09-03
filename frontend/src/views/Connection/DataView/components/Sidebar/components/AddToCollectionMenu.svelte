@@ -8,7 +8,7 @@
   export let collectionsStore: CollectionsStore;
   // Collection currently holding the message (checked in the list), if any.
   export let currentCollectionId: number | null = null;
-  export let placeholder = "Add message to...";
+  export let placeholder = "Type to add new collection";
   export let onSelect: (collectionId: number) => void;
   // Creates the collection, then selects it.
   export let onCreate: (

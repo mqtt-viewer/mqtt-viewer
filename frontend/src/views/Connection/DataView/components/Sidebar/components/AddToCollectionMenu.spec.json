@@ -28,9 +28,9 @@
       "type": "enum",
       "required": false,
       "options": [
-        "Add message to..."
+        "Type to add new collection"
       ],
-      "default": "Add message to..."
+      "default": "Type to add new collection"
     },
     {
       "name": "onSelect",

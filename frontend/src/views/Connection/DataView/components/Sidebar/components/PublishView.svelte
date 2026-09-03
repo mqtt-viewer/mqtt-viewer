@@ -27,6 +27,7 @@
     CollectionsStore,
   } from "../stores/collections";
   import AddToCollectionMenu from "./AddToCollectionMenu.svelte";
+  import InlineNameInput from "./InlineNameInput.svelte";
 
   export let connection: Connection;
   export let isPublishDisabled: boolean;
@@ -105,6 +106,50 @@
     $publishStore.baseline !== null &&
     snapshotPublishDetails($publishStore) !== $publishStore.baseline;
 
+  let isRenaming = false;
+  $: displayName = isSavedMessage
+    ? ($publishStore.sourceMessageName ?? "")
+    : $publishStore.name || "Untitled message";
+
+  // The chip is derived from the collections store so a deleted collection
+  // drops out of the header on its own.
+  $: pendingCollection =
+    $publishStore.pendingCollectionId === null
+      ? null
+      : ($collectionsStore.collections.find(
+          (c) => c.id === $publishStore.pendingCollectionId
+        ) ?? null);
+  $: if (
+    $publishStore.pendingCollectionId !== null &&
+    pendingCollection === null &&
+    $collectionsStore.isLoaded
+  ) {
+    publishStore.setPendingCollection(null);
+  }
+
+  // Draft: the name lives on the draft until it is saved. Saved message:
+  // persisted through the same rename path the sidebar row uses.
+  const commitRename = async (name: string) => {
+    isRenaming = false;
+    if (!isSavedMessage) {
+      publishStore.setName(name);
+      return;
+    }
+    if (!name || name === $publishStore.sourceMessageName) return;
+    try {
+      await collectionsStore.renameMessage($publishStore.sourceMessageId!, name);
+      publishStore.setPartial({ sourceMessageName: name, name });
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to rename message",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
+
   const userPropertiesString = () => {
     const userProperties = publishStore.getUserProperties();
     return Object.keys(userProperties).length > 0
@@ -151,12 +196,16 @@
     }
   };
 
-  // First save of a new message into a collection; named after its topic.
+  // First save of a new message into a collection; named after the draft,
+  // falling back to its topic.
   const saveNewToCollection = async (collectionId: number) => {
     try {
       const saved = await collectionsStore.saveMessage({
         collectionId,
-        name: $publishStore.topic || "Untitled message",
+        name:
+          $publishStore.name.trim() ||
+          $publishStore.topic ||
+          "Untitled message",
         ...messageParamsFromStore(),
       });
       publishStore.markSaved(saved);
@@ -176,6 +225,11 @@
         },
       });
     }
+  };
+
+  const savePendingDraft = () => {
+    if (pendingCollection === null) return;
+    saveNewToCollection(pendingCollection.id);
   };
 
   const createAndSave = async (name: string, scope: CollectionScope) => {
@@ -244,26 +298,67 @@
         <Icon type="back" size={16} />
       </IconButton>
     </Tooltip>
-    {#if isSavedMessage}
-      <span class="text-base text-emphasis truncate grow">
-        {$publishStore.sourceMessageName}
-      </span>
+    {#if isRenaming}
+      <div class="grow min-w-0">
+        <InlineNameInput
+          name="rename-publish-message"
+          initialValue={isSavedMessage
+            ? ($publishStore.sourceMessageName ?? "")
+            : $publishStore.name}
+          selectAll
+          onCommit={commitRename}
+          onCancel={() => (isRenaming = false)}
+        />
+      </div>
     {:else}
-      <span class="text-base text-emphasis truncate grow">New message</span>
-      <AddToCollectionMenu
-        {collectionsStore}
-        placeholder="Add message to..."
-        onSelect={saveNewToCollection}
-        onCreate={createAndSave}
-      >
-        <div
-          slot="trigger"
-          class="flex items-center gap-1 text-secondary-text hover:text-emphasis whitespace-nowrap"
+      <Tooltip text="Rename" class="flex grow min-w-0">
+        <button
+          class="group flex items-center gap-1 min-w-0 grow px-1 -mx-1 py-[2px] rounded hover:bg-hovered cursor-pointer text-left"
+          on:click={() => (isRenaming = true)}
         >
-          <Icon type="plus" size={12} />
-          <span class="text-base">Add to collection</span>
-        </div>
-      </AddToCollectionMenu>
+          <span class="text-base text-emphasis truncate">{displayName}</span>
+          <!-- Reserved width so the name does not shift when the pencil appears. -->
+          <span
+            class="w-4 shrink-0 flex items-center justify-center text-secondary-text opacity-0 group-hover:opacity-100 group-hover:text-emphasis"
+          >
+            <Icon type="edit" size={14} />
+          </span>
+        </button>
+      </Tooltip>
+    {/if}
+    {#if !isSavedMessage}
+      <!-- Tooltip renders its bare slot when text is empty, so the no-chip
+           case has no wrapper. -->
+      <Tooltip
+        text={pendingCollection
+          ? `Will be saved to ${pendingCollection.name}`
+          : ""}
+      >
+        <AddToCollectionMenu
+          {collectionsStore}
+          currentCollectionId={pendingCollection?.id ?? null}
+          onSelect={saveNewToCollection}
+          onCreate={createAndSave}
+        >
+          <div slot="trigger">
+            {#if pendingCollection}
+              <div
+                class="flex items-center gap-1 min-w-0 max-w-[160px] text-secondary-text hover:text-emphasis"
+              >
+                <Icon type="folder" size={12} />
+                <span class="text-base truncate">{pendingCollection.name}</span>
+              </div>
+            {:else}
+              <div
+                class="flex items-center gap-1 text-secondary-text hover:text-emphasis whitespace-nowrap"
+              >
+                <Icon type="plus" size={12} />
+                <span class="text-base">Add to collection</span>
+              </div>
+            {/if}
+          </div>
+        </AddToCollectionMenu>
+      </Tooltip>
     {/if}
   </div>
 
@@ -438,6 +533,8 @@
           disabled={!isModified}
           on:click={saveMessage}>Save</Button
         >
+      {:else if pendingCollection !== null}
+        <Button variant="secondary" on:click={savePendingDraft}>Save</Button>
       {/if}
       <Button
         disabled={!!$publishStore.topicError || isPublishDisabled}

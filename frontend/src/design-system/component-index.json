@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-02T12:33:10.832Z",
+  "generatedAt": "2026-09-03T01:34:02.142Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -4261,9 +4261,9 @@
           "type": "enum",
           "required": false,
           "options": [
-            "Add message to..."
+            "Type to add new collection"
           ],
-          "default": "Add message to..."
+          "default": "Type to add new collection"
         },
         {
           "name": "onSelect",
@@ -4319,6 +4319,11 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": true
         }
       ],
       "tokens": [
@@ -4327,7 +4332,8 @@
         "emphasis",
         "secondary-text",
         "hovered",
-        "error"
+        "error",
+        "primary"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook).",
@@ -4365,6 +4371,11 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": true
         }
       ],
       "tokens": [
@@ -4632,6 +4643,12 @@
           "type": "function",
           "required": false,
           "default": "> void = () => {}"
+        },
+        {
+          "name": "selectAll",
+          "type": "boolean",
+          "required": false,
+          "default": false
         }
       ],
       "tokens": [],
@@ -4729,7 +4746,8 @@
         "secondary",
         "emphasis",
         "secondary-text",
-        "warning"
+        "warning",
+        "hovered"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",

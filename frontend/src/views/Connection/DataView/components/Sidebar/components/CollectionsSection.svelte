@@ -15,6 +15,7 @@
   export let scope: CollectionScope;
   export let collectionsStore: CollectionsStore;
   export let onOpenMessage: (message: models.CollectionMessage) => void;
+  export let onNewMessage: (collectionId: number) => void;
 
   $: collections = filterByScope($collectionsStore.collections, scope);
   $: title = scope === "global" ? "Global Collections" : "Connection Collections";
@@ -63,7 +64,12 @@
     </div>
   {:else}
     {#each collections as collection (collection.id)}
-      <CollectionFolder {collection} {collectionsStore} {onOpenMessage} />
+      <CollectionFolder
+        {collection}
+        {collectionsStore}
+        {onOpenMessage}
+        {onNewMessage}
+      />
     {/each}
   {/if}
 </div>

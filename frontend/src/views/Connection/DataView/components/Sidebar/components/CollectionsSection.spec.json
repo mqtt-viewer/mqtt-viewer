@@ -27,6 +27,11 @@
       "type": "function",
       "required": false,
       "default": "> void"
+    },
+    {
+      "name": "onNewMessage",
+      "type": "function",
+      "required": true
     }
   ],
   "tokens": [

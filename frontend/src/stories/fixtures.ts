@@ -502,7 +502,9 @@ export const createMockSelectedTopicStore = () => {
   return store;
 };
 
-export const createMockPublishStore = () => {
+export const createMockPublishStore = (
+  overrides: Record<string, unknown> = {}
+) => {
   const { subscribe, set, update } = writable({
     connectionId: 1,
     topic: "factory/line/command",
@@ -528,12 +530,18 @@ export const createMockPublishStore = () => {
     sourceMessageName: null,
     sourceCollectionId: null,
     baseline: null,
+    name: "",
+    pendingCollectionId: null as number | null,
+    ...overrides,
   });
   return {
     subscribe,
     set,
     setPartial: (partial: Record<string, unknown>) =>
       update((store) => ({ ...store, ...partial })),
+    setName: (name: string) => update((store) => ({ ...store, name })),
+    setPendingCollection: (id: number | null) =>
+      update((store) => ({ ...store, pendingCollectionId: id })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -798,6 +806,7 @@ const propDefaults: Record<string, () => unknown> = {
   sameWidth: () => false,
   searchStore: () => createSearchStore(),
   searchString: () => "factory",
+  selectAll: () => false,
   searchTerm: () => "line",
   searchText: () => "line",
   selected: () => writable({ label: "MQTT", value: "mqtt" }),
@@ -903,6 +912,7 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     description: 'Delete "Funzone"? The 2 messages in it will also be deleted.',
   },
   InlineNameInput: { name: "inline-name" },
+  AddToCollectionMenu: { placeholder: "Type to add new collection" },
   PublishView: { isPublishDisabled: false },
   SavedMessageRow: { message: mockCollectionMessage },
   SearchMessagesModal: { isOpen: writable(true) },

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"mqtt-viewer/backend/models"
 
@@ -99,7 +100,20 @@ type SaveCollectionMessageParams struct {
 	UserPropertiesString         *string `json:"userProperties"`
 }
 
+// requireCollection returns a clear error when no collection has the given
+// id, and the raw database error for anything else.
+func (a *App) requireCollection(id uint) error {
+	err := a.Db.First(&models.Collection{}, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("collection %d not found", id)
+	}
+	return err
+}
+
 func (a *App) SaveCollectionMessage(params SaveCollectionMessageParams) (models.CollectionMessage, error) {
+	if err := a.requireCollection(params.CollectionID); err != nil {
+		return models.CollectionMessage{}, err
+	}
 	message := models.CollectionMessage{}
 	if params.ID != nil {
 		if err := a.Db.First(&message, *params.ID).Error; err != nil {
@@ -146,8 +160,7 @@ func (a *App) MoveCollectionMessage(id uint, targetCollectionID uint) (models.Co
 	if err := a.Db.First(&message, id).Error; err != nil {
 		return models.CollectionMessage{}, err
 	}
-	var target models.Collection
-	if err := a.Db.First(&target, targetCollectionID).Error; err != nil {
+	if err := a.requireCollection(targetCollectionID); err != nil {
 		return models.CollectionMessage{}, err
 	}
 	message.CollectionID = targetCollectionID

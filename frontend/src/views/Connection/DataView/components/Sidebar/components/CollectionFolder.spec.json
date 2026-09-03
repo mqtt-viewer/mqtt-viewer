@@ -27,6 +27,11 @@
       "type": "function",
       "required": false,
       "default": "> void"
+    },
+    {
+      "name": "onNewMessage",
+      "type": "function",
+      "required": true
     }
   ],
   "tokens": [
@@ -35,7 +40,8 @@
     "emphasis",
     "secondary-text",
     "hovered",
-    "error"
+    "error",
+    "primary"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook)."

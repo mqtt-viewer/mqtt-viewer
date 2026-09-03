@@ -2,6 +2,7 @@ package app
 
 import (
 	"mqtt-viewer/backend/models"
+	"strings"
 	"testing"
 )
 
@@ -103,6 +104,59 @@ func TestSaveCollectionMessageCreatesAndUpdates(t *testing.T) {
 	app.Db.Model(&models.CollectionMessage{}).Count(&count)
 	if count != 1 {
 		t.Errorf("expected 1 message row, got %d", count)
+	}
+}
+
+func TestSaveCollectionMessageRejectsUnknownCollection(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	createTestCollections(t, app, connID)
+
+	_, err := app.SaveCollectionMessage(SaveCollectionMessageParams{
+		CollectionID: 99999,
+		Name:         "Orphan",
+		Topic:        "orphan/1",
+	})
+	if err == nil {
+		t.Fatal("expected error saving into nonexistent collection")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+
+	var count int64
+	app.Db.Model(&models.CollectionMessage{}).Count(&count)
+	if count != 0 {
+		t.Errorf("expected no message rows, got %d", count)
+	}
+}
+
+func TestMoveCollectionMessageRejectsUnknownCollection(t *testing.T) {
+	app, connID := getTestAppWithConnection(t)
+	_, scoped := createTestCollections(t, app, connID)
+
+	msg, err := app.SaveCollectionMessage(SaveCollectionMessageParams{
+		CollectionID: scoped.ID,
+		Name:         "Stays put",
+		Topic:        "stay/1",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	_, err = app.MoveCollectionMessage(msg.ID, 99999)
+	if err == nil {
+		t.Fatal("expected error moving to nonexistent collection")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+
+	var stored models.CollectionMessage
+	if err := app.Db.First(&stored, msg.ID).Error; err != nil {
+		t.Fatalf("expected message to still exist, got %v", err)
+	}
+	if stored.CollectionID != scoped.ID {
+		t.Errorf("expected message to stay in collection %d, got %d", scoped.ID, stored.CollectionID)
 	}
 }
 

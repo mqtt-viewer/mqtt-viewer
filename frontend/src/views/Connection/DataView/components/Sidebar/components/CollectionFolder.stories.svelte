@@ -6,7 +6,7 @@
 
   const componentName = "CollectionFolder";
   const storyId = "Views/Connection/DataView/Sidebar/CollectionFolder";
-  const props: string[] = ["collection","collectionsStore","onOpenMessage"];
+  const props: string[] = ["collection","collectionsStore","onOpenMessage","onNewMessage"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
