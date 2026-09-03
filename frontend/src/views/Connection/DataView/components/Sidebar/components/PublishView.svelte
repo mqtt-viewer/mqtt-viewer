@@ -134,6 +134,63 @@
     publishStore.setPendingCollection(null);
   }
 
+  // Collection a saved message lives in; drives the same chip as a draft's
+  // pending collection, but picking another one moves the message.
+  $: currentCollection =
+    $publishStore.sourceCollectionId === null
+      ? null
+      : ($collectionsStore.collections.find(
+          (c) => c.id === $publishStore.sourceCollectionId
+        ) ?? null);
+  $: chipCollection = isSavedMessage ? currentCollection : pendingCollection;
+  $: chipTooltip =
+    chipCollection === null || $collectionMenuOpen
+      ? ""
+      : isSavedMessage
+        ? `In ${chipCollection.name}`
+        : `Will be saved to ${chipCollection.name}`;
+
+  // Moves a saved message to another collection. The store updates both
+  // folders and their counts; only the editor's collection id needs syncing.
+  const moveSavedMessage = async (collectionId: number) => {
+    if (
+      $publishStore.sourceMessageId === null ||
+      collectionId === $publishStore.sourceCollectionId
+    ) {
+      return;
+    }
+    try {
+      await collectionsStore.moveMessage(
+        $publishStore.sourceMessageId,
+        collectionId
+      );
+      publishStore.setPartial({ sourceCollectionId: collectionId });
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to move message",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
+
+  const createAndMove = async (name: string, scope: CollectionScope) => {
+    try {
+      const created = await collectionsStore.createCollection(name, scope);
+      await moveSavedMessage(created.id);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to create collection",
+          description: e as string,
+          type: "error",
+        },
+      });
+    }
+  };
+
   // Draft: the name lives on the draft until it is saved. Saved message:
   // persisted through the same rename path the sidebar row uses.
   const commitRename = async (name: string) => {
@@ -323,9 +380,10 @@
         />
       </div>
     {:else}
-      <Tooltip text="Rename" class="flex grow min-w-0">
+      <!-- Hugs the name plus pencil; min-w-0 lets a long name truncate. -->
+      <Tooltip text="Rename" class="flex min-w-0 max-w-full">
         <button
-          class="group flex items-center gap-1 min-w-0 grow px-1 -mx-1 py-[2px] rounded hover:bg-hovered cursor-pointer text-left"
+          class="group inline-flex items-center gap-1 min-w-0 max-w-full px-1 -mx-1 py-[2px] rounded hover:bg-hovered cursor-pointer text-left"
           on:click={() => (isRenaming = true)}
         >
           <span class="text-base text-emphasis truncate">{displayName}</span>
@@ -337,29 +395,27 @@
           </span>
         </button>
       </Tooltip>
+      <div class="grow"></div>
     {/if}
-    {#if !isSavedMessage}
+    {#if !isSavedMessage || chipCollection !== null}
       <!-- Tooltip renders its bare slot when text is empty, so the no-chip
-           case has no wrapper. -->
-      <Tooltip
-        text={pendingCollection && !$collectionMenuOpen
-          ? `Will be saved to ${pendingCollection.name}`
-          : ""}
-      >
+           case has no wrapper. Draft: picking a collection saves into it.
+           Saved message: picking one moves it. -->
+      <Tooltip text={chipTooltip}>
         <AddToCollectionMenu
           {collectionsStore}
           open={collectionMenuOpen}
-          currentCollectionId={pendingCollection?.id ?? null}
-          onSelect={saveNewToCollection}
-          onCreate={createAndSave}
+          currentCollectionId={chipCollection?.id ?? null}
+          onSelect={isSavedMessage ? moveSavedMessage : saveNewToCollection}
+          onCreate={isSavedMessage ? createAndMove : createAndSave}
         >
           <div slot="trigger">
-            {#if pendingCollection}
+            {#if chipCollection}
               <div
                 class="flex items-center gap-1 min-w-0 max-w-[160px] text-secondary-text hover:text-emphasis"
               >
                 <Icon type="folder" size={12} />
-                <span class="text-base truncate">{pendingCollection.name}</span>
+                <span class="text-base truncate">{chipCollection.name}</span>
               </div>
             {:else}
               <div

@@ -22,8 +22,9 @@
       pendingCollectionId: mockCollections[1].id,
     }),
   };
-  // A saved message's scratch copy: name in the header, Save disabled until
-  // the copy drifts from its baseline.
+  // A saved message's scratch copy: name in the header, its collection in
+  // the top-right chip, Save disabled until the copy drifts from its
+  // baseline.
   const savedArgs: Record<string, unknown> = {
     ...storyArgs,
     publishStore: createMockPublishStore({

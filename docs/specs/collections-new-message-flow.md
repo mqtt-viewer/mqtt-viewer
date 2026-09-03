@@ -41,8 +41,10 @@ row's Rename. The publish view shows the name but cannot edit it.
 - The message name is editable in the publish view through one clickable
   control: the name, then a pencil icon on its right that only shows on
   hover (its space is reserved so the name does not shift). One hover pill
-  covers both. Clicking anywhere on it swaps the control for the inline name
-  input.
+  covers both and hugs its content rather than the header width. Clicking
+  anywhere on it swaps the control for the inline name input.
+- A saved message shows its collection in the same top-right chip. Picking
+  another collection there moves the message (not a copy).
 
 ## Flows
 
@@ -68,6 +70,12 @@ row's Rename. The publish view shows the name but cannot edit it.
    - Back writes nothing. The draft and its pending collection survive, so
      the "New message" row reopens the same draft with the same chip.
 6. Picking a collection from the menu saves immediately, as it does today.
+
+Once saved, the chip shows the collection the message is in (tooltip "In
+{name}"), with that collection ticked in the menu. Picking another one moves
+the message there; the sidebar row leaves the old folder and both counts
+update. A "Create" item creates the collection and moves the message into
+it.
 
 Global and connection collections behave the same. Only the id matters.
 
@@ -99,7 +107,8 @@ Global and connection collections behave the same. Only the id matters.
 - Folder menu item and empty-folder row: New message
 - Draft header when the name is empty: Untitled message
 - Pencil control tooltip: Rename
-- Chip tooltip: Will be saved to {name}
+- Chip tooltip, draft: Will be saved to {name}
+- Chip tooltip, saved message: In {name}
 - Save button: Save
 - Search placeholder: Type to add new collection
 - Create items (unchanged): Create "x", Create "x" (global)

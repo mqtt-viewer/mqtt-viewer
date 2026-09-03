@@ -51,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         title: "Start a message inside a collection",
-        body: "Every collection folder's menu now has New message, and an empty folder shows one as a row. The message is filed there when you save it.",
+        body: "Every collection folder's menu now has New message, and an empty folder shows one as a row. The message is filed there when you save it. A saved message shows its collection in the top right; pick another one there to move it.",
       },
       {
         title: "Rename messages where you edit them",
