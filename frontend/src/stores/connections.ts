@@ -12,6 +12,7 @@ import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import { Events } from "@wailsio/runtime";
 import tabsStore from "@/stores/tabs";
 import subscriptionsStore, { type Subscription } from "./subscriptions";
+import { markSaved } from "./last-saved";
 import type { DeepOmit } from "@/util/types";
 //@ts-ignore - unsure why this is throwing type errors
 import { addToast } from "@/components/Toast/Toast.svelte";
@@ -22,7 +23,8 @@ export type ConnectionState =
   | "connected"
   | "disconnected"
   | "connecting"
-  | "reconnecting";
+  | "reconnecting"
+  | "error";
 
 export type Connection = DeepOmit<
   DeepOmit<app.Connection, "subscriptions" | "isConnected">,
@@ -34,6 +36,10 @@ export type Connection = DeepOmit<
   showDataPageWhileDisconnected: boolean;
   firstConnectedThisSessionAtMs?: number;
   latencyMs?: number;
+  // Set when connectionState is "error", cleared on the next connect
+  // attempt. Lets the UI show why the last attempt failed after the toast
+  // that reported it has gone.
+  lastConnectionError?: string;
   // True only for a connection just created this session, until its details
   // dialog has been shown once (see acknowledgeConnectionCreated).
   justCreated?: boolean;
@@ -51,6 +57,11 @@ const { subscribe, set, update } = writable<ConnectionStore>({
 
 const init = async () => {
   try {
+    // First fetch: learn which connections exist plus their config/event sets.
+    // Connections are seeded as "disconnected" here; live "connected" state is
+    // applied via updateConnectionState *after* listeners are registered (below)
+    // so no transition is lost in the gap and the session bookkeeping the seed
+    // depends on is populated.
     let { connections: appConnections } = await GetAllConnections();
     const connections: ConnectionStore["connections"] = {};
     const connectionsArray: Connection[] = [];
@@ -66,6 +77,11 @@ const init = async () => {
     set({
       connections: connections,
     });
+
+    // Register per-connection listeners BEFORE reading live connection state, so
+    // a transition that lands while we set up can't slip through the gap. Ids
+    // are only known from the snapshot above, so we register here and then
+    // re-read the snapshot to seed authoritative state.
     for (const connection of connectionsArray) {
       registerConnectionEvents(connection);
     }
@@ -77,6 +93,23 @@ const init = async () => {
         delete store.connections[id];
         return store;
       });
+    });
+
+    // Re-fetch now that listeners are live and seed the already-connected
+    // connections through updateConnectionState, so firstConnectedThisSessionAtMs,
+    // lastConnectedAt and showDataPageWhileDisconnected are set. DataView's
+    // never-connected prompt and MessageTimeline's time lower-bound depend on
+    // these — a bare "connected" seed with firstConnectedThisSessionAtMs unset
+    // shows the connect prompt after a later disconnect and a 1970 timeline
+    // bound. Any transition after this read is delivered by the now-registered
+    // listeners. On a cold main-window start nothing is connected, so this loop
+    // is a no-op and launch behavior is unchanged.
+    const { connections: liveConnections } = await GetAllConnections();
+    Object.keys(liveConnections).forEach((id) => {
+      const connId = parseInt(id);
+      if (liveConnections[id as `${number}`]?.isConnected) {
+        updateConnectionState(connId, "connected");
+      }
     });
   } catch (e) {
     console.error(e);
@@ -90,6 +123,12 @@ const getConnectionFromAppConnection = (appConnection: app.Connection) => {
     connectionString: getConnectionString(
       typedAppConn.connectionDetails as Connection["connectionDetails"]
     ),
+    // Always seed "disconnected" here. Live "connected" state (for windows or
+    // instances created *after* connecting — broker status, chart — since Wails
+    // events only fire on state *changes*) is applied by init() via
+    // updateConnectionState once listeners are registered, so the session
+    // bookkeeping (firstConnectedThisSessionAtMs, lastConnectedAt,
+    // showDataPageWhileDisconnected) is populated rather than left stale.
     connectionState: "disconnected" as ConnectionState,
     showDataPageWhileDisconnected: false,
     connectionDetails: {
@@ -190,6 +229,9 @@ const updateConnectionState = (
       store.connections[connectionId].connectionDetails.lastConnectedAt = now;
       store.connections[connectionId].showDataPageWhileDisconnected = true;
     }
+    if (connectionState === "connecting" || connectionState === "connected") {
+      store.connections[connectionId].lastConnectionError = undefined;
+    }
     if (
       connectionState === "connected" &&
       !store.connections[connectionId].firstConnectedThisSessionAtMs
@@ -219,6 +261,7 @@ const updateConnectionDetails = async (
       };
       return store;
     });
+    markSaved(connectionDetails.id);
   } catch (e) {
     console.error(e);
     throw e;
@@ -270,8 +313,48 @@ const connect = async (connectionId: number) => {
   try {
     await ConnectMqtt(connectionId);
   } catch (e) {
+    setConnectionError(connectionId, toErrorMessage(e));
     throw e;
   }
+};
+
+// toErrorMessage normalises whatever a rejected binding call throws (a plain
+// string from the Wails runtime today, but callers already treat this as
+// untyped) into a displayable string, so a non-string rejection can't render
+// as "[object Object]" in the connection's stored error state.
+const toErrorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+};
+
+// setConnectionError records why the last connect attempt failed, so the UI
+// still shows it after the toast that reported it disappears. Cleared on the
+// next connect attempt (updateConnectionState, on "connecting"/"connected").
+const setConnectionError = (connectionId: number, message: string) => {
+  update((store) => {
+    const existingConnection = store.connections[connectionId];
+    if (!existingConnection) return store;
+    // A newer attempt may have already connected (or started connecting)
+    // between this rejection firing and reaching here. Don't clobber that
+    // with a stale failure.
+    if (
+      existingConnection.connectionState === "connected" ||
+      existingConnection.connectionState === "connecting"
+    ) {
+      return store;
+    }
+    store.connections[connectionId] = {
+      ...existingConnection,
+      connectionState: "error",
+      lastConnectionError: message,
+    };
+    return store;
+  });
 };
 
 const disconnect = async (connectionId: number) => {
@@ -321,7 +404,11 @@ export default {
 };
 
 const getConnectionString = (connection: Connection["connectionDetails"]) => {
+  const isWs = connection.protocol === "ws" || connection.protocol === "wss";
+  const wsPath = isWs && connection.websocketPath
+    ? "/" + connection.websocketPath.replace(/^\/+/, "")
+    : "";
   return `${connection.protocol}://${
     !!connection.username ? connection.username + "@" : ""
-  }${connection.host}:${connection.port}`;
+  }${connection.host}:${connection.port}${wsPath}`;
 };

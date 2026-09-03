@@ -1,0 +1,46 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "BrokerStatusView",
+  "tier": "view",
+  "description": "Body of the Broker Status window: responsive stat-tile grid with an always-last add-tile '+', a no-$SYS empty state with an add-subscription CTA, and a collapsible raw $SYS topic browser. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "store",
+      "type": "store",
+      "required": true,
+      "description": "BrokerStatusStore providing tiles, latestByTopic, connected, sysEverSeen, windowOpenedAt. Lifecycle (init/destroy) is owned by the window shell, not this view."
+    },
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": true,
+      "description": "Connection whose mappings and $SYS/# subscription this view reads and edits."
+    }
+  ],
+  "tokens": [
+    "outline",
+    "elevation-1",
+    "secondary-text",
+    "emphasis",
+    "hovered",
+    "divider"
+  ],
+  "dependencies": [
+    "StatTile",
+    "MetricMappingEditor",
+    "Icon",
+    "IconButton",
+    "Tooltip",
+    "Button",
+    "BaseInput"
+  ],
+  "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed."
+}

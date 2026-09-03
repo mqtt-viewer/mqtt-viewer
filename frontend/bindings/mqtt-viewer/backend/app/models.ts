@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Create as $Create} from "@wailsio/runtime";
+import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -59,7 +59,7 @@ export class Connection {
 }
 
 export class Connections {
-    "connections": { [_: `${number}`]: Connection };
+    "connections": { [_ in `${number}`]?: Connection };
 
     /** Creates a new Connections instance. */
     constructor($$source: Partial<Connections> = {}) {
@@ -141,12 +141,37 @@ export class EnvInfo {
     }
 }
 
+export class MemoryStats {
+    "historyBytes": number;
+    "activeConnections": number;
+
+    /** Creates a new MemoryStats instance. */
+    constructor($$source: Partial<MemoryStats> = {}) {
+        if (!("historyBytes" in $$source)) {
+            this["historyBytes"] = 0;
+        }
+        if (!("activeConnections" in $$source)) {
+            this["activeConnections"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryStats instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryStats {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryStats($$parsedSource as Partial<MemoryStats>);
+    }
+}
+
 export class MqttStats {
     "totalMessagesReceived": number;
     "totalMessagesSent": number;
     "totalBytesReceived": number;
     "totalBytesSent": number;
-    "statsByConnection": { [_: `${number}`]: mqtt$0.ConnectionStats };
+    "statsByConnection": { [_ in `${number}`]?: mqtt$0.ConnectionStats };
 
     /** Creates a new MqttStats instance. */
     constructor($$source: Partial<MqttStats> = {}) {
@@ -268,7 +293,7 @@ export class PublishProperties {
     "responseTopic"?: string;
     "correlationData"?: string;
     "subscriptionIdentifier"?: number;
-    "userProperties"?: { [_: string]: string };
+    "userProperties"?: { [_ in string]?: string };
 
     /** Creates a new PublishProperties instance. */
     constructor($$source: Partial<PublishProperties> = {}) {

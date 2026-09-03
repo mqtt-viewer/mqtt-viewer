@@ -113,10 +113,11 @@ CI uploads these assets to each GitHub release (tag `vX.Y.Z`):
 | `darwin`  | `arm64` | `MQTT_Viewer_{tag}_darwin_arm64.zip`         | `MQTT Viewer.app` bundle  |
 | `darwin`  | `amd64` | `MQTT_Viewer_{tag}_darwin_amd64.zip`         | `MQTT Viewer.app` bundle  |
 | `windows` | `amd64` | `MQTT_Viewer_{tag}_windows_amd64.zip`        | `mqtt-viewer.exe`         |
+| `windows` | `arm64` | `MQTT_Viewer_{tag}_windows_arm64.zip`        | `mqtt-viewer.exe`         |
 | `linux`   | `amd64` | `MQTT_Viewer_{tag}_linux_amd64.zip`          | `mqtt-viewer` binary      |
 | `linux`   | `arm64` | `MQTT_Viewer_{tag}_linux_arm64.zip`          | `mqtt-viewer` binary      |
 
-(The release also carries `MQTT_Viewer_{tag}_windows_amd64_installer.exe`,
+(The release also carries `MQTT_Viewer_{tag}_windows_{arch}_installer.exe`,
 `MQTT_Viewer_{tag}_linux_{arch}.AppImage`, `.deb` and `.rpm` assets for
 first-time installs — the updater never consumes those. AppImage, deb and rpm
 installs detect that their binary is not user-writable and fall back to a

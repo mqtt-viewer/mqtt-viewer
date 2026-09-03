@@ -8,6 +8,7 @@ import (
 	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/security"
 	topicmatching "mqtt-viewer/backend/topic-matching"
+	"sort"
 	"time"
 )
 
@@ -15,7 +16,7 @@ const MQTT_BUFFER_EMIT_INTERVAL = 300 * time.Millisecond
 
 func (a *App) ConnectMqtt(connId uint) error {
 	var err error
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -35,15 +36,18 @@ func (a *App) ConnectMqtt(connId uint) error {
 	// Always reload the sub matcher / proto matcher, subscriptions may have changed
 	appConnection.SubscriptionMatcher = topicmatching.NewSubscriptionMatcher(subscriptions)
 
-	// Add protobuf middlewares if enabled
-	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && a.ProtoRegistry != nil {
+	// Add protobuf middlewares if enabled. Load the registry once: it is
+	// populated by a background goroutine at startup, so re-reading it could
+	// hand the encode and decode middleware different registries.
+	protoRegistry := a.protoRegistry()
+	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && protoRegistry != nil {
 		// TODO: load sparkplug proto registry
 		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{
 			BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
-				mqttmiddleware.NewProtoEncodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoEncodeMiddleware(protoRegistry).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				mqttmiddleware.NewProtoDecodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoDecodeMiddleware(protoRegistry).Middleware,
 			},
 		})
 	} else {
@@ -73,13 +77,19 @@ func (a *App) ConnectMqtt(connId uint) error {
 }
 
 func (a *App) DisconnectMqtt(connId uint) error {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
 	appConnection.MqttManager.Disconnect(nil)
 	return nil
 }
 
 func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, error) {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
 	messageHistory, err := appConnection.MqttManager.MessageHistory.GetTopicHistory(topic)
 	if err != nil {
 		return nil, err
@@ -87,10 +97,86 @@ func (a *App) GetMessageHistory(connId uint, topic string) ([]mqtt.MqttMessage, 
 	return messageHistory, nil
 }
 
+// GetSysMessageHistory returns every retained $SYS/* message for a
+// connection, flattened across topics and sorted by arrival time, so a
+// broker-status window opened mid-session starts populated.
+func (a *App) GetSysMessageHistory(connId uint) ([]mqtt.MqttMessage, error) {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	// Prefix-filter inside the history lock so we only copy $SYS/* messages,
+	// rather than struct-copying the entire retained window under the ingest
+	// mutex (GetAllHistory).
+	messages := appConnection.MqttManager.MessageHistory.GetHistoryByTopicPrefix("$SYS/")
+	sortMessagesByTimeAsc(messages)
+	return messages, nil
+}
+
+// sortMessagesByTimeAsc orders messages by arrival time ascending, stably.
+// Pure so it is testable without a broker.
+func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
+	sort.SliceStable(messages, func(i, j int) bool {
+		return messages[i].TimeMs < messages[j].TimeMs
+	})
+}
+
 func (a *App) ClearConnectionHistory(connId uint) error {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
 	appConnection.MqttManager.ClearConnectionHistory()
 	a.EventRuntime.EventsEmit(appConnection.EventSet.MqttClearHistory, nil)
+	return nil
+}
+
+// GetConnectionLogs returns the buffered client-log lines for a connection
+// (snapshot of the in-RAM ring that backs the logs dialog).
+func (a *App) GetConnectionLogs(connId uint) ([]mqtt.LogEntry, error) {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection.MqttManager.GetLogs(), nil
+}
+
+// SetLogsStreaming starts or stops forwarding a connection's client-log
+// batches to the frontend. The logs dialog switches this on while open; the
+// ring and durable file keep capturing regardless, so nothing is lost while
+// streaming is off.
+func (a *App) SetLogsStreaming(connId uint, streaming bool) error {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.MqttManager.SetLogsStreaming(streaming)
+	return nil
+}
+
+// ClearConnectionLogs empties a connection's client-log ring and truncates its
+// durable log file.
+func (a *App) ClearConnectionLogs(connId uint) error {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.MqttManager.ClearLogs()
+	return nil
+}
+
+// SetConnectionDebugLogging persists and applies the per-connection verbose
+// debug-logging toggle. Takes effect immediately for v5; for v3 it (de)registers
+// the process-global debug dispatcher.
+func (a *App) SetConnectionDebugLogging(connId uint, enabled bool) error {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	if err := a.Db.Model(&models.Connection{}).Where("id = ?", connId).Update("debug_logging_enabled", enabled).Error; err != nil {
+		return err
+	}
+	appConnection.MqttManager.SetDebugLoggingEnabled(enabled)
 	return nil
 }
 
@@ -163,11 +249,11 @@ func (a *App) GetMatchingSubscriptionForTopic(connId uint, topic string) (*model
 }
 
 func getConnectedConnection(app *App, connId uint) (*AppConnection, error) {
-	conn, ok := app.AppConnections[connId]
+	conn, ok := app.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found")
 	}
-	if conn.MqttManager.ConnectionState != mqtt.ConnectionStates.Connected {
+	if conn.MqttManager.GetConnectionState() != mqtt.ConnectionStates.Connected {
 		return nil, fmt.Errorf("specified connection not connected")
 	}
 	return conn, nil
@@ -223,10 +309,11 @@ func makePublishProperties(properties *PublishProperties) (*mqtt.MessageProperti
 
 func getConnectionDetailsFromConnectionModel(connection *models.Connection) (*mqtt.MqttConnectionDetails, error) {
 	details := &mqtt.MqttConnectionDetails{
-		MqttVersion: connection.MqttVersion,
-		Protocol:    connection.Protocol,
-		Host:        connection.Host,
-		Port:        connection.Port,
+		MqttVersion:   connection.MqttVersion,
+		Protocol:      connection.Protocol,
+		Host:          connection.Host,
+		Port:          connection.Port,
+		WebsocketPath: connection.WebsocketPath,
 	}
 
 	if connection.Username != nil {

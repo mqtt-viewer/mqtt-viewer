@@ -179,15 +179,18 @@
 </fieldset>
 
 <style>
-  input::-webkit-input-placeholder.label-moves-to-top {
-    -webkit-transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* When a floating label is present it doubles as the resting hint, so the
+     example placeholder is hidden until the field is focused (and the label has
+     floated up), then fades in. The selector must be `.class::placeholder`, not
+     `::placeholder.class` — the latter never matches, which previously left the
+     placeholder permanently visible and overlapping the resting label. */
+  input.label-moves-to-top::placeholder {
     opacity: 0;
-    background-color: yellowgreen;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  input:focus::-webkit-input-placeholder.label-moves-to-top {
+  input.label-moves-to-top:focus::placeholder {
     opacity: 1;
-    background-color: yellowgreen;
   }
 
   input:placeholder-shown {

@@ -26,6 +26,16 @@ const createThemeStore = () => {
   applyTheme(initial);
   const { subscribe, update } = writable<Theme>(initial);
 
+  // Detached chart/status windows share localStorage with the main window;
+  // following storage events keeps every window on the same theme.
+  window.addEventListener("storage", (e) => {
+    if (e.key !== STORAGE_KEY) return;
+    if (e.newValue === "light" || e.newValue === "dark") {
+      applyTheme(e.newValue);
+      update(() => e.newValue as Theme);
+    }
+  });
+
   const set = (theme: Theme) => {
     applyTheme(theme);
     try {

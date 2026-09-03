@@ -53,10 +53,21 @@ const isFiniteNumber = (v: unknown): v is number =>
 // empty/whitespace, hex ("0x1f"), Infinity/NaN, and unit-suffixed values ("24C").
 const NUMERIC_STRING = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
+// Two or more comma-separated 3-digit groups: unambiguous thousands grouping
+// ("1,000,000", "12,345,678") — an EU decimal can only carry one comma.
+const THOUSANDS_GROUPED = /^[+-]?\d{1,3}(?:,\d{3}){2,}$/;
+// A single comma splitting an integer part from a trailing digit run.
+const SINGLE_COMMA = /^[+-]?\d+,(\d+)$/;
+
 /**
  * Coerces a leaf value to a finite number for charting. Numbers pass through;
- * quoted numerics (e.g. "24.6", "-72") are cast to float. Everything else
- * (non-numeric strings, booleans, null, objects) yields null.
+ * quoted numerics (e.g. "24.6", "-72") are cast to float. Comma numbers:
+ * multi-group forms ("1,000,000") are unambiguous thousands grouping and are
+ * cast; a single comma followed by exactly 3 digits ("1,000", "12,345") is
+ * ambiguous between thousands grouping and an EU decimal, with no locale
+ * available to resolve it, so it is left unconverted; any other single-comma
+ * run ("12,1", "3,1416", "1,000000") can only be an EU-style decimal and is
+ * cast. Everything else yields null.
  */
 const coerceNumber = (v: unknown): number | null => {
   if (isFiniteNumber(v)) return v;
@@ -65,6 +76,19 @@ const coerceNumber = (v: unknown): number | null => {
     if (NUMERIC_STRING.test(trimmed)) {
       const n = Number(trimmed);
       if (Number.isFinite(n)) return n;
+    }
+    if (trimmed.includes(",")) {
+      if (THOUSANDS_GROUPED.test(trimmed)) {
+        const n = Number(trimmed.replace(/,/g, ""));
+        if (Number.isFinite(n)) return n;
+      }
+      const single = SINGLE_COMMA.exec(trimmed);
+      // A 3-digit run ("1,000") is ambiguous between thousands grouping and
+      // an EU decimal — skip it; any other run length must be a decimal.
+      if (single && single[1].length !== 3) {
+        const n = Number(trimmed.replace(",", "."));
+        if (Number.isFinite(n)) return n;
+      }
     }
   }
   return null;

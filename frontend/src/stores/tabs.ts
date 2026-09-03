@@ -25,6 +25,14 @@ const { subscribe, set, update } = writable<TabStore>(
   (set) => {}
 );
 
+// Detached windows (chart, broker status) initialize the connections store —
+// which registers the global ConnectionDeleted handler that calls closeTab —
+// but never initialize this tabs store. Without this guard, a deletion arriving
+// while such a window is open would persist an empty open-tabs list
+// (UpdateOpenConnectionTabs([])) and wipe the user's saved tabs. init() flips
+// this true so persistence only happens in the main window that owns the tabs.
+let initialized = false;
+
 const init = async () => {
   try {
     let tabs = await LoadOpenTabs();
@@ -35,6 +43,7 @@ const init = async () => {
       isNewTabSelected: false,
       isMaxOpenTabsDialogOpen: false,
     });
+    initialized = true;
   } catch (e) {
     console.error(e);
   }
@@ -117,6 +126,12 @@ const addTab = async (connectionId: number) => {
 };
 
 const closeTab = async (connectionId: number) => {
+  // No-op in windows that never initialized the tabs store (chart/status
+  // detached windows): mutating + persisting here would clobber the main
+  // window's saved open-tabs list. See the `initialized` note above.
+  if (!initialized) {
+    return get({ subscribe }).tabs;
+  }
   const currentTab = get({ subscribe }).selectedTab;
   const newTabs = get({ subscribe }).tabs.filter((tab) => tab !== connectionId);
   if (currentTab === connectionId) {

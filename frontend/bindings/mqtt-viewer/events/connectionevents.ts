@@ -3,32 +3,26 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Call as $Call, Create as $Create} from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
-export function GetConnectionEventsSet(connectionId: number): Promise<$models.ConnectionEventsSet> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(278216920, connectionId) as any;
-    let $typingPromise = $resultPromise.then(($result: any) => {
+export function GetConnectionEventsSet(connectionId: number): $CancellablePromise<$models.ConnectionEventsSet> {
+    return $Call.ByID(278216920, connectionId).then(($result: any) => {
         return $$createType0($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
+    });
 }
 
 /**
  * GlobalEventNames returns all global event names. It exists so the
  * GlobalEvent enum is included in the generated frontend bindings.
  */
-export function GlobalEventNames(): Promise<$models.GlobalEvent[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(2419412048) as any;
-    let $typingPromise = $resultPromise.then(($result: any) => {
+export function GlobalEventNames(): $CancellablePromise<$models.GlobalEvent[]> {
+    return $Call.ByID(2419412048).then(($result: any) => {
         return $$createType1($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
+    });
 }
 
 // Private type creation functions

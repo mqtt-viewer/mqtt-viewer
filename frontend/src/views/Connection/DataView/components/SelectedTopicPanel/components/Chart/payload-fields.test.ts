@@ -54,8 +54,39 @@ describe("numericFields", () => {
 
   it("excludes strings that are not purely numeric", () => {
     expect(
-      numericFields('{"a":"24C","b":"","c":"0x1f","d":"1,000","e":"NaN"}')
+      numericFields('{"a":"24C","b":"","c":"0x1f","d":"1,2,3","e":"NaN"}')
     ).toEqual([]);
+  });
+
+  it("casts EU-style decimal commas to numbers", () => {
+    // Any single-comma run other than exactly 3 digits reads as a decimal.
+    expect(
+      numericFields(
+        '{"temp":"12,1","rssi":"-3,05","pi":"3,1416","frac":"1,000000"}'
+      )
+    ).toEqual([
+      { path: "temp", value: 12.1 },
+      { path: "rssi", value: -3.05 },
+      { path: "pi", value: 3.1416 },
+      { path: "frac", value: 1 },
+    ]);
+  });
+
+  it("reads multi-group comma forms as thousands grouping", () => {
+    expect(numericFields('{"a":"1,000,000","b":"12,345,678"}')).toEqual([
+      { path: "a", value: 1000000 },
+      { path: "b", value: 12345678 },
+    ]);
+  });
+
+  it("skips single-comma 3-digit runs as ambiguous", () => {
+    // "1,000" could be thousands grouping or an EU decimal; with no locale
+    // to resolve it, it stays unconverted (previous behaviour).
+    expect(numericFields('{"a":"1,000","b":"12,345"}')).toEqual([]);
+  });
+
+  it("excludes malformed comma numbers", () => {
+    expect(numericFields('{"a":"1,2,3","b":"1,00,000"}')).toEqual([]);
   });
 
   it("returns [] for non-JSON payloads", () => {
@@ -79,6 +110,10 @@ describe("valueAtPath", () => {
   it("reads quoted numeric values as numbers", () => {
     expect(valueAtPath('{"temp":"24.6"}', "temp")).toBe(24.6);
     expect(valueAtPath('"42.5"', "")).toBe(42.5);
+  });
+  it("reads EU-style decimal commas as numbers", () => {
+    expect(valueAtPath('{"temp":"24,6"}', "temp")).toBe(24.6);
+    expect(valueAtPath('"42,5"', "")).toBe(42.5);
   });
   it("returns null when path is missing or non-numeric", () => {
     expect(valueAtPath('{"a":1}', "b")).toBeNull();

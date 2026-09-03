@@ -11,6 +11,10 @@
   import _ from "lodash";
   import { buildTree, type TreeRow } from "./build-tree";
   import type { HighlightedMqttTopicsStore } from "../../stores/highlighted-topics";
+  import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
+  import { OpenBrokerStatusWindow } from "bindings/mqtt-viewer/backend/app/app";
+
+  const connectionId = getConnectionIdContext();
 
   export let width: number;
   export let selectedTopic: string | null;
@@ -49,6 +53,9 @@
         messageCount={item.countMessage}
         toggleExpansion={expandedTopicsStore.toggleMqttTopicExpansion}
         onTopicSelect={() => onTopicSelect(item)}
+        onOpenBrokerStatus={item.levelCount === 0 && item.topicLevel === "$SYS"
+          ? () => OpenBrokerStatusWindow(connectionId)
+          : undefined}
         {highlightedTopicStore}
       />
     </div>

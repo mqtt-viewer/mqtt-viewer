@@ -1,6 +1,7 @@
 import {
   House,
   Clock,
+  GithubLogo,
   Heart,
   Plus,
   PlusSquare,
@@ -46,6 +47,7 @@ import {
   SidebarSimple,
   DotsThree,
   ArrowLeft,
+  ArrowRight,
   PlusCircle,
   ChartLine,
   Eye,
@@ -53,6 +55,7 @@ import {
   ArrowSquareOut,
   Pause,
   Image,
+  Pulse,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -60,6 +63,7 @@ export const ICON_MAP = {
   notification: Bell,
   clock: Clock,
   heart: Heart,
+  github: GithubLogo,
   home: House,
   options: Gear,
   settings: Gear,
@@ -94,6 +98,7 @@ export const ICON_MAP = {
   plusSquare: PlusSquare,
   plusCircle: PlusCircle,
   back: ArrowLeft,
+  arrowRight: ArrowRight,
   sidebar: SidebarSimple,
   search: MagnifyingGlass,
   refresh: ArrowsClockwise,
@@ -104,6 +109,7 @@ export const ICON_MAP = {
   bug: Bug,
   download: DownloadSimple,
   chart: ChartLine,
+  pulse: Pulse,
   show: Eye,
   hide: EyeSlash,
   popOut: ArrowSquareOut,

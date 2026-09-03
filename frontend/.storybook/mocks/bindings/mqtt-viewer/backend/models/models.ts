@@ -12,6 +12,7 @@ export class AppSettings {
   lastSeenChangelogVersion = "";
   launchCount = 0;
   hasSeenStarPrompt = false;
+  ignoredUpdateVersion = "";
 
   static createFrom(source: any = {}) {
     return new AppSettings(source);
@@ -32,6 +33,27 @@ export class Subscription {
 
   static createFrom(source: any = {}) {
     return new Subscription(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
+export class SysMetricMapping {
+  id = 0;
+  createdAt: any = null;
+  updatedAt: any = null;
+  connectionId = 0;
+  metricKey = "";
+  label = "";
+  topic = "";
+  payloadPath = "";
+  unit = "";
+  sortOrder = 0;
+
+  static createFrom(source: any = {}) {
+    return new SysMetricMapping(source);
   }
 
   constructor(source: any = {}) {
@@ -124,6 +146,19 @@ export class PanelSize {
 
   static createFrom(source: any = {}) {
     return new PanelSize(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
+export class CollectionCollapsedState {
+  id = 0;
+  collapsed = false;
+
+  static createFrom(source: any = {}) {
+    return new CollectionCollapsedState(source);
   }
 
   constructor(source: any = {}) {

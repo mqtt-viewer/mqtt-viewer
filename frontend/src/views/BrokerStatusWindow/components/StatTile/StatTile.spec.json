@@ -1,0 +1,64 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "StatTile",
+  "tier": "view",
+  "description": "Broker-status metric tile: small label, big preformatted value with optional unit suffix, optional sparkline, subdued no-data state.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "label",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "value",
+      "type": "string",
+      "required": true,
+      "description": "Preformatted display string (SI abbreviation etc. is done by the caller)."
+    },
+    {
+      "name": "unit",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Subdued suffix rendered after the value, e.g. '/s'."
+    },
+    {
+      "name": "kind",
+      "type": "string",
+      "required": false,
+      "default": "number",
+      "description": "'number' renders big, tabular, one line; 'text' renders smaller and wraps to two lines. Fed from the tile's valueKind."
+    },
+    {
+      "name": "points",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "{t, v}[] sparkline samples; omitted or <2 points hides the sparkline."
+    },
+    {
+      "name": "noData",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Shows a subdued 'no data yet' placeholder instead of the value."
+    }
+  ],
+  "tokens": [
+    "elevation-1",
+    "outline",
+    "secondary-text",
+    "emphasis",
+    "primary"
+  ],
+  "dependencies": ["Sparkline"],
+  "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper."
+}

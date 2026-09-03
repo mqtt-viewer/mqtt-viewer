@@ -1,0 +1,32 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "Sparkline",
+  "tier": "view",
+  "description": "Pure SVG polyline sparkline for broker-status stat tiles; stroke is currentColor so the parent controls color via a text token.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "points",
+      "type": "object",
+      "required": true,
+      "description": "{t, v}[] time-series samples. Fewer than 2 points renders nothing; a zero value range renders a midline."
+    },
+    {
+      "name": "height",
+      "type": "number",
+      "required": false,
+      "default": 28,
+      "description": "Rendered height in px; width stretches to the container."
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "No color tokens consumed directly by design — stroke follows currentColor, parent sets e.g. text-primary. No external chart lib."
+}

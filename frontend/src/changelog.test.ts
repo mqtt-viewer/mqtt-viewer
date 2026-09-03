@@ -104,7 +104,11 @@ describe("content", () => {
     e.headline,
     e.intro,
     e.outro ?? "",
-    ...e.sections.flatMap((s) => [s.title, s.body]),
+    ...e.sections.flatMap((s) => [
+      s.title,
+      s.body,
+      ...(s.thanks ?? []).map((t) => t.name),
+    ]),
   ];
 
   it("contains no em or en dashes in any user-facing copy", () => {
@@ -112,6 +116,19 @@ describe("content", () => {
       for (const t of userFacingText(e)) {
         expect(t.includes("—"), `em dash in: ${t}`).toBe(false);
         expect(t.includes("–"), `en dash in: ${t}`).toBe(false);
+      }
+    }
+  });
+
+  // Credits usually link to the issue, discussion, or comment where the idea
+  // was raised; a plain profile link is fine when there's no single thread.
+  it("every thanks credit has a name and a GitHub link", () => {
+    for (const e of CHANGELOG) {
+      for (const s of e.sections) {
+        for (const t of s.thanks ?? []) {
+          expect(t.name.length).toBeGreaterThan(0);
+          expect(t.url).toMatch(/^https:\/\/github\.com\//);
+        }
       }
     }
   });

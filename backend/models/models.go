@@ -17,6 +17,8 @@ type Global struct {
 // user has dismissed, so it shows once per version. LaunchCount counts app
 // starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
 // the GitHub star prompt as shown so it only ever appears once.
+// IgnoredUpdateVersion records an update the user chose to skip, so the
+// update dialog stops auto-opening for it.
 type AppSettings struct {
 	ID                       uint   `json:"id" gorm:"primaryKey"`
 	MemoryBudgetBytes        int64  `json:"memoryBudgetBytes"`
@@ -26,6 +28,7 @@ type AppSettings struct {
 	LastSeenChangelogVersion string `json:"lastSeenChangelogVersion" gorm:"not null;default:''"`
 	LaunchCount              int64  `json:"launchCount" gorm:"not null;default:0"`
 	HasSeenStarPrompt        bool   `json:"hasSeenStarPrompt" gorm:"not null;default:0"`
+	IgnoredUpdateVersion     string `json:"ignoredUpdateVersion" gorm:"not null;default:''"`
 }
 
 // ReceivedMessage is a durable record of a message received from the broker,
@@ -57,35 +60,42 @@ type ReceivedMessage struct {
 }
 
 type Connection struct {
-	ID                   uint             `json:"id" gorm:"primaryKey"`
-	CreatedAt            time.Time        `json:"createdAt"`
-	UpdatedAt            time.Time        `json:"updatedAt"`
-	Name                 string           `json:"name"`
-	MqttVersion          string           `json:"mqttVersion"`
-	HasCustomClientId    *bool            `json:"hasCustomClientId"`
-	ClientId             *string          `json:"clientId"`
-	Protocol             string           `json:"protocol"`
-	Host                 string           `json:"host"`
-	Port                 int              `json:"port"`
-	WebsocketPath        string           `json:"websocketPath"`
-	Username             *string          `json:"username"`
-	Password             *string          `json:"password"`
-	IsProtoEnabled       *bool            `json:"isProtoEnabled"`
-	IsCertsEnabled       *bool            `json:"isCertsEnabled"`
-	SkipCertVerification *bool            `json:"skipCertVerification"`
-	CertCa               *string          `json:"certCa"`
-	CertClient           *string          `json:"certClient"`
-	CertClientKey        *string          `json:"certClientKey"`
-	Subscriptions        []Subscription   `json:"subscriptions"`
-	LastConnectedAt      *time.Time       `json:"lastConnectedAt"`
-	CustomIconSeed       *string          `json:"customIconSeed"`
-	FilterHistories      []FilterHistory  `json:"filterHistories"`
-	PublishHistories     []PublishHistory `json:"publishHistories"`
+	ID                   uint           `json:"id" gorm:"primaryKey"`
+	CreatedAt            time.Time      `json:"createdAt"`
+	UpdatedAt            time.Time      `json:"updatedAt"`
+	Name                 string         `json:"name"`
+	MqttVersion          string         `json:"mqttVersion"`
+	HasCustomClientId    *bool          `json:"hasCustomClientId"`
+	ClientId             *string        `json:"clientId"`
+	Protocol             string         `json:"protocol"`
+	Host                 string         `json:"host"`
+	Port                 int            `json:"port"`
+	WebsocketPath        string         `json:"websocketPath"`
+	Username             *string        `json:"username"`
+	Password             *string        `json:"password"`
+	IsProtoEnabled       *bool          `json:"isProtoEnabled"`
+	IsCertsEnabled       *bool          `json:"isCertsEnabled"`
+	SkipCertVerification *bool          `json:"skipCertVerification"`
+	CertCa               *string        `json:"certCa"`
+	CertClient           *string        `json:"certClient"`
+	CertClientKey        *string        `json:"certClientKey"`
+	Subscriptions        []Subscription `json:"subscriptions"`
+	LastConnectedAt      *time.Time     `json:"lastConnectedAt"`
+	CustomIconSeed       *string        `json:"customIconSeed"`
+	// Opt-in verbose MQTT-library debug logging for this connection's client
+	// logs. false = only always-on lifecycle/error lines are captured.
+	// Non-pointer so GORM never inserts NULL into the NOT NULL column.
+	DebugLoggingEnabled bool             `json:"debugLoggingEnabled" gorm:"not null;default:0"`
+	FilterHistories     []FilterHistory  `json:"filterHistories"`
+	PublishHistories    []PublishHistory `json:"publishHistories"`
 	// Declared only so the schema keeps the foreign keys added during the DB
 	// hardening review. Never preloaded (received history can be huge) and kept
 	// out of JSON/bindings; ConnectionID on the child is the source of truth.
 	Collections      []Collection      `json:"-"`
 	ReceivedMessages []ReceivedMessage `json:"-"`
+	// Declared only for the ON DELETE CASCADE foreign key; fetched via
+	// GetSysMetricMappingsByConnectionId, never preloaded.
+	SysMetricMappings []SysMetricMapping `json:"-" gorm:"constraint:OnDelete:CASCADE"`
 }
 
 type FilterHistory struct {
@@ -119,23 +129,27 @@ type PublishHistory struct {
 type Collection struct {
 	ID uint `json:"id" gorm:"primaryKey"`
 	// nil = global collection, available on all connections
-	ConnectionID *uint               `json:"connectionId" gorm:"index:collections_connid"`
-	Name         string              `json:"name"`
-	CreatedAt    time.Time           `json:"createdAt"`
-	UpdatedAt    time.Time           `json:"updatedAt"`
-	Messages     []CollectionMessage `json:"messages"`
+	ConnectionID *uint  `json:"connectionId" gorm:"index:collections_connid"`
+	Name         string `json:"name"`
+	// order within its scope: the global list, or this connection's list
+	Position  int                 `json:"position"`
+	CreatedAt time.Time           `json:"createdAt"`
+	UpdatedAt time.Time           `json:"updatedAt"`
+	Messages  []CollectionMessage `json:"messages"`
 }
 
 type CollectionMessage struct {
 	ID           uint   `json:"id" gorm:"primaryKey"`
 	CollectionID uint   `json:"collectionId" gorm:"index:collection_messages_collid"`
 	Name         string `json:"name"`
-	Topic        string `json:"topic"`
-	QoS          uint   `json:"qos"`
-	Retain       bool   `json:"retain"`
-	Payload      string `json:"payload"`
-	Encoding     string `json:"encoding"`
-	Format       string `json:"format"`
+	// order within its collection
+	Position int    `json:"position"`
+	Topic    string `json:"topic"`
+	QoS      uint   `json:"qos"`
+	Retain   bool   `json:"retain"`
+	Payload  string `json:"payload"`
+	Encoding string `json:"encoding"`
+	Format   string `json:"format"`
 	//JSON key-value properties stored as string
 	UserProperties               *string   `json:"userProperties"`
 	HeaderContentType            *string   `json:"headerContentType"`
@@ -165,6 +179,27 @@ type Subscription struct {
 	Topic        string    `json:"topic"`
 }
 
+// SysMetricMapping is a per-connection broker-status tile mapping: either an
+// override redirecting a builtin metric tile to a user-chosen topic
+// (MetricKey set) or a fully custom tile (MetricKey empty).
+type SysMetricMapping struct {
+	ID           uint      `json:"id" gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	ConnectionID uint      `json:"connectionId" gorm:"index:sys_metric_mappings_connid"`
+	// builtin tile id to override, or "" = custom tile
+	MetricKey string `json:"metricKey"`
+	// display label (custom tiles)
+	Label string `json:"label"`
+	// exact topic to read (any topic, not only $SYS)
+	Topic string `json:"topic"`
+	// optional dotted JSON path into the payload
+	PayloadPath string `json:"payloadPath"`
+	// optional display suffix
+	Unit      string `json:"unit"`
+	SortOrder int    `json:"sortOrder"`
+}
+
 type PanelSize struct {
 	ID     string `json:"id" gorm:"primaryKey"`
 	Size   uint   `json:"size"`
@@ -175,6 +210,21 @@ type SortState struct {
 	ID            string `json:"id" gorm:"primaryKey"`
 	SortCriteria  string `json:"sortCriteria"`
 	SortDirection string `json:"sortDirection"`
+}
+
+// ChartWindow persists the chart time-window selection per connection. ID is
+// the connection id (string). WindowSeconds is the selected window in seconds;
+// 0 means "All history". A custom interval is stored as its resolved seconds.
+type ChartWindow struct {
+	ID            string `json:"id" gorm:"primaryKey"`
+	WindowSeconds int64  `json:"windowSeconds"`
+}
+
+// CollectionCollapsedState remembers whether a sidebar collection folder is
+// collapsed. Keyed by collection id; a missing row means expanded.
+type CollectionCollapsedState struct {
+	ID        uint `json:"id" gorm:"primaryKey"`
+	Collapsed bool `json:"collapsed"`
 }
 
 type Migration struct {

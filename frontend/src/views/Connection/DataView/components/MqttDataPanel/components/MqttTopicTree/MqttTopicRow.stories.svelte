@@ -6,7 +6,7 @@
 
   const componentName = "MqttTopicRow";
   const storyId = "Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow";
-  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore"];
+  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

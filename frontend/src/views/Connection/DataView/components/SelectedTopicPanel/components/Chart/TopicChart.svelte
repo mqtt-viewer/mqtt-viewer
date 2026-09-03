@@ -1,95 +1,45 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import * as echarts from "echarts";
-  import type {
-    MqttHistoryMessage,
-    SelectedTopicStore,
-  } from "../../../../stores/selected-topic-store";
+  import theme from "@/stores/theme";
+  import type { SelectedTopicStore } from "../../../../stores/selected-topic-store";
   import type { ChartSeriesStore } from "./chart-series-store";
-  import { valueAtPath } from "./payload-fields";
+  import { buildChartOption } from "./chart-option";
 
   export let selectedTopicStore: SelectedTopicStore;
   export let chartSeriesStore: ChartSeriesStore;
   export let paused = false;
   export let style: "line" | "area" = "line";
   export let showPoints = true;
-  // 0 = all history; otherwise show only the last N minutes.
-  export let windowMinutes = 0;
+  // 0 = all history; otherwise show only the last N seconds.
+  export let windowSeconds = 0;
+  // False while the chart is rendered but off screen (an inactive tab slot).
+  // Gates the 1 Hz ticker so a hidden chart doesn't re-parse history every
+  // second from launch.
+  export let visible = true;
 
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
   let resizeObserver: ResizeObserver | null = null;
-  // Drives the sliding time-window: when windowMinutes>0 the x-axis min/max are
+  // Drives the sliding time-window: when windowSeconds>0 the x-axis min/max are
   // anchored to Date.now(), so without fresh data the view would freeze. Tick
   // re-renders ~1s so the window keeps sliding even when no messages arrive.
   let windowTick: ReturnType<typeof setInterval> | null = null;
 
-  const seriesData = (history: MqttHistoryMessage[], path: string) => {
-    const points: [number, number][] = [];
-    for (const m of history) {
-      const value = valueAtPath(m.payload, path);
-      if (value !== null) points.push([m.timeMs, value]);
-    }
-    return points;
-  };
-
-  const buildOption = (
-    history: MqttHistoryMessage[],
-    series: { path: string; label: string; color: string; visible: boolean }[]
-  ): echarts.EChartsOption => {
-    const visible = series.filter((s) => s.visible);
-    const axisColor = "#525252";
-    const labelColor = "#aeaeae";
-    let xAxisExtra: Record<string, unknown> = {};
-    if (windowMinutes > 0) {
-      const now = Date.now();
-      xAxisExtra = { min: now - windowMinutes * 60_000, max: now };
-    }
-    return {
-      animation: false,
-      grid: { left: 48, right: 14, top: 14, bottom: 26 },
-      tooltip: {
-        trigger: "axis",
-        backgroundColor: "#1f1e1e",
-        borderColor: "#525252",
-        textStyle: { color: "#eee", fontSize: 12 },
-      },
-      xAxis: {
-        type: "time",
-        axisLine: { lineStyle: { color: axisColor } },
-        axisLabel: { color: labelColor, fontSize: 10, hideOverlap: true },
-        splitLine: { show: false },
-        ...xAxisExtra,
-      },
-      yAxis: {
-        type: "value",
-        scale: true,
-        axisLine: { show: false },
-        axisLabel: { color: labelColor, fontSize: 10 },
-        splitLine: { lineStyle: { color: "#2e2e2e" } },
-      },
-      series: visible.map((s) => ({
-        // id keys the series by its full payload path so replaceMerge and the
-        // tooltip stay stable even when two paths share a last segment (and
-        // thus the same display label, e.g. a.temp / b.temp -> "temp").
-        id: s.path,
-        name: s.label,
-        type: "line",
-        showSymbol: showPoints,
-        symbolSize: 5,
-        smooth: false,
-        lineStyle: { color: s.color, width: 2 },
-        itemStyle: { color: s.color },
-        areaStyle: style === "area" ? { color: s.color, opacity: 0.12 } : undefined,
-        data: seriesData(history, s.path),
-      })),
-    };
-  };
-
-  const render = () => {
-    if (!chart || paused) return;
+  // force bypasses the paused guard: a theme flip must restyle the axis and
+  // tooltip chrome immediately, even while the chart is paused.
+  const render = (force = false) => {
+    if (!chart || (paused && !force)) return;
     chart.setOption(
-      buildOption($selectedTopicStore.history, $chartSeriesStore),
+      buildChartOption({
+        history: $selectedTopicStore.history,
+        series: $chartSeriesStore,
+        windowSeconds,
+        showPoints,
+        style,
+        now: Date.now(),
+        theme: $theme,
+      }),
       { replaceMerge: ["series"] }
     );
   };
@@ -100,21 +50,26 @@
     $chartSeriesStore,
     style,
     showPoints,
-    windowMinutes,
+    windowSeconds,
     paused,
     render();
 
-  // Keep the ticker running only while a finite, unpaused window is shown.
+  $: $theme, render(true);
+
+  // Keep the ticker running only while a finite, unpaused window is actually
+  // on screen. On becoming visible again, render once immediately so the
+  // window is current rather than up to a second stale.
   const syncWindowTick = () => {
-    const wantTick = windowMinutes > 0 && !paused;
+    const wantTick = windowSeconds > 0 && !paused && visible;
     if (wantTick && windowTick === null) {
+      render();
       windowTick = setInterval(render, 1000);
     } else if (!wantTick && windowTick !== null) {
       clearInterval(windowTick);
       windowTick = null;
     }
   };
-  $: windowMinutes, paused, syncWindowTick();
+  $: windowSeconds, paused, visible, syncWindowTick();
 
   onMount(() => {
     chart = echarts.init(container, undefined, { renderer: "canvas" });

@@ -65,3 +65,21 @@ func TestBuildChartWindowURLNoFields(t *testing.T) {
 		t.Error("expected no fields param when none selected")
 	}
 }
+
+func TestBuildStatusWindowURL(t *testing.T) {
+	u := buildStatusWindowURL(42)
+	if !strings.HasPrefix(u, "/?") {
+		t.Fatalf("expected /? prefix, got %s", u)
+	}
+	parsed, err := url.Parse(u)
+	if err != nil {
+		t.Fatalf("url did not parse: %v", err)
+	}
+	q := parsed.Query()
+	if q.Get("view") != "status" {
+		t.Errorf("expected view=status, got %q", q.Get("view"))
+	}
+	if q.Get("conn") != "42" {
+		t.Errorf("expected conn=42, got %q", q.Get("conn"))
+	}
+}

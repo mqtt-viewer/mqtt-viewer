@@ -186,7 +186,13 @@ export const createSelectedTopicStore = (
     if (recording) {
       const [count, windowMessages] = await Promise.all([
         GetReceivedMessageCount(connectionId, topic),
-        GetReceivedMessageWindow(connectionId, topic, 0, 0, HISTORY_WINDOW_SIZE),
+        GetReceivedMessageWindow(
+          connectionId,
+          topic,
+          0,
+          0,
+          HISTORY_WINDOW_SIZE
+        ),
       ]);
       const decoded = windowMessages.map(decode);
       update((store) => ({
@@ -202,10 +208,17 @@ export const createSelectedTopicStore = (
       return;
     }
 
-    // Memory mode: the backend budget bounds bytes, not entry count, so a
-    // busy topic with small payloads can still return far more entries than
-    // the renderer should hold — keep only the newest MAX_LOADED_MESSAGES.
-    const history = await GetMessageHistory(connectionId, topic);
+    // A topic can remain in the tree after its bounded backend history is
+    // evicted. Keep that expected miss empty, and cap decoded renderer entries
+    // by count because the backend budget is byte-based.
+    let history: mqtt.MqttMessage[] = [];
+    try {
+      history = await GetMessageHistory(connectionId, topic);
+    } catch (e) {
+      if (!String(e).includes("not found")) {
+        console.error("Failed to load message history", e);
+      }
+    }
     const decoded = history.slice(-MAX_LOADED_MESSAGES).map(decode);
     update((store) => ({
       ...store,

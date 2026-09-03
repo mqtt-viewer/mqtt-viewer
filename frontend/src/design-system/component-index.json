@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-07-04T05:21:19.313Z",
+  "generatedAt": "2026-09-03T09:37:30.653Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -932,7 +932,8 @@
             "connected",
             "disconnected",
             "connecting",
-            "reconnecting"
+            "reconnecting",
+            "error"
           ]
         }
       ],
@@ -1070,6 +1071,18 @@
           "type": "string",
           "required": false,
           "default": "!startEmpty"
+        },
+        {
+          "name": "ariaLabel",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "openFocus",
+          "type": "string",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
@@ -1150,6 +1163,12 @@
           "default": false
         },
         {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
           "name": "triggerText",
           "type": "string",
           "required": false,
@@ -1226,6 +1245,13 @@
           "type": "function",
           "required": false,
           "default": "() => {}"
+        },
+        {
+          "name": "iconType",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Optional leading icon, keyed to the Icon component's icon names. Items without one keep their plain text layout."
         }
       ],
       "tokens": [
@@ -2137,11 +2163,9 @@
         "lastSyncedAt": null
       },
       "props": [],
-      "tokens": [
-        "secondary-text"
-      ],
+      "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
+      "notes": "Figma is not linked yet. Bespoke night-sky illustration (scoped <style>): a seeded mulberry32 PRNG scatters the twinkling stars and the shooting-star streaks, so the sky looks random but is identical on every render and in story snapshots. Anatomy is two columns over the sky: copy on the left (title and paragraph), the 'Star on GitHub' button vertically centred in the right column with 'Maybe later' hanging beneath it, plus a close X pinned top right. The illustration uses raw decorative colours rather than design tokens and the surface is intentionally dark regardless of theme; the action buttons' colour treatment (muted 'Maybe later' text, primary button glow) is part of the same exception and lives in the scoped style block under stable class names. Streaks are driven by per-element CSS custom properties (--x, --y, --angle, --len, --dist, --dur, --delay); they all share one fall angle and are brief flashes that fade while still travelling, on a cycle sixteen times their visible duration so there are real gaps between them. Under prefers-reduced-motion the streaks are dropped and the twinkles hold at a static mid brightness. Auto-opens from app state (launch count, seen flag) via bindings, gated behind the What's New dialog; renders closed in Storybook where those stores are inert.",
       "sourcePath": "src/components/StarPromptDialog/StarPromptDialog.svelte",
       "specPath": "src/components/StarPromptDialog/StarPromptDialog.spec.json",
       "storyPath": "src/components/StarPromptDialog/StarPromptDialog.stories.svelte",
@@ -2270,6 +2294,12 @@
           "type": "boolean",
           "required": false,
           "default": true
+        },
+        {
+          "name": "focusable",
+          "type": "boolean",
+          "required": false,
+          "default": false
         }
       ],
       "tokens": [
@@ -2284,9 +2314,77 @@
       "specMissing": false
     },
     {
+      "name": "UpdateAvailableContent",
+      "tier": "component",
+      "description": "Layout for the update dialog: lead line, version transition chips, scrollable release notes, install instructions with a copyable command, skip/remind/update actions.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "update",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "currentVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "updating",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "onUpdate",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onRemindLater",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onSkip",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCopyCommand",
+          "type": "function",
+          "required": false
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "emphasis",
+        "divider",
+        "primary",
+        "elevation-0",
+        "outline"
+      ],
+      "dependencies": [
+        "Button",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action. Release notes are formatted by release-notes-parser.ts beside this component: headings and bullets keep their shape, markdown links and emphasis markers are stripped, and a line that is only a link (the Full changelog line) is dropped.",
+      "sourcePath": "src/components/UpdateDialog/UpdateAvailableContent.svelte",
+      "specPath": "src/components/UpdateDialog/UpdateAvailableContent.spec.json",
+      "storyPath": "src/components/UpdateDialog/UpdateAvailableContent.stories.svelte",
+      "storyId": "Components/UpdateDialog/UpdateAvailableContent",
+      "specMissing": false
+    },
+    {
       "name": "UpdateDialog",
       "tier": "component",
-      "description": "Storybook coverage for UpdateDialog.",
+      "description": "Update-available dialog; auto-opens when a non-skipped update is found, once the first-run and changelog dialogs have resolved.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2298,7 +2396,7 @@
       "props": [],
       "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent.",
       "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",
       "specPath": "src/components/UpdateDialog/UpdateDialog.spec.json",
       "storyPath": "src/components/UpdateDialog/UpdateDialog.stories.svelte",
@@ -2373,6 +2471,253 @@
       "specPath": "src/components/WhatsNewDialog/WhatsNewDialog.spec.json",
       "storyPath": "src/components/WhatsNewDialog/WhatsNewDialog.stories.svelte",
       "storyId": "Components/WhatsNewDialog",
+      "specMissing": false
+    },
+    {
+      "name": "BrokerStatusWindow",
+      "tier": "view",
+      "description": "Storybook coverage for BrokerStatusWindow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "warning",
+        "emphasis",
+        "secondary-text",
+        "white-text",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/BrokerStatusWindow/BrokerStatusWindow.svelte",
+      "specPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow",
+      "specMissing": false
+    },
+    {
+      "name": "BrokerStatusView",
+      "tier": "view",
+      "description": "Body of the Broker Status window: responsive stat-tile grid with an always-last add-tile '+', a no-$SYS empty state with an add-subscription CTA, and a collapsible raw $SYS topic browser. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "store",
+          "type": "store",
+          "required": true,
+          "description": "BrokerStatusStore providing tiles, latestByTopic, connected, sysEverSeen, windowOpenedAt. Lifecycle (init/destroy) is owned by the window shell, not this view."
+        },
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true,
+          "description": "Connection whose mappings and $SYS/# subscription this view reads and edits."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-1",
+        "secondary-text",
+        "emphasis",
+        "hovered",
+        "divider"
+      ],
+      "dependencies": [
+        "StatTile",
+        "MetricMappingEditor",
+        "Icon",
+        "IconButton",
+        "Tooltip",
+        "Button",
+        "BaseInput"
+      ],
+      "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/BrokerStatusView",
+      "specMissing": false
+    },
+    {
+      "name": "MetricMappingEditor",
+      "tier": "view",
+      "description": "Dialog for a connection's broker-status metric-tile mappings: add/edit/delete rows with Label, Topic (required), JSON path, Unit, and an Overrides target (a builtin tile id or a custom tile). Persists via the SysMetricMapping CRUD bindings and reloads the store. Opens blank or prefilled from the raw browser's pin action.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": true,
+          "description": "Connection whose mappings are listed and edited."
+        },
+        {
+          "name": "store",
+          "type": "store",
+          "required": true,
+          "description": "BrokerStatusStore; reloadMappings() is called after every create/update/delete so tiles refresh live."
+        },
+        {
+          "name": "isOpen",
+          "type": "store",
+          "required": false,
+          "default": null,
+          "description": "Writable<boolean> controlling visibility; the form reloads and resets each time it opens."
+        },
+        {
+          "name": "prefill",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "{ topic?, label? } seeding the add-mode draft (used by the raw browser's pin-as-tile)."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-0",
+        "secondary-text",
+        "emphasis",
+        "error",
+        "divider"
+      ],
+      "dependencies": [
+        "Dialog",
+        "Button",
+        "IconButton",
+        "Icon",
+        "BaseInput",
+        "Select"
+      ],
+      "notes": "Figma is not linked yet. Delete has no confirm step (rows are cheap to recreate) but uses the destructive text-error styling. Override targets exclude the computed observed_* tiles, which have no topic to redirect.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/MetricMappingEditor/MetricMappingEditor.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/MetricMappingEditor/MetricMappingEditor.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/MetricMappingEditor/MetricMappingEditor.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/MetricMappingEditor",
+      "specMissing": false
+    },
+    {
+      "name": "Sparkline",
+      "tier": "view",
+      "description": "Pure SVG polyline sparkline for broker-status stat tiles; stroke is currentColor so the parent controls color via a text token.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "points",
+          "type": "object",
+          "required": true,
+          "description": "{t, v}[] time-series samples. Fewer than 2 points renders nothing; a zero value range renders a midline."
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": false,
+          "default": 28,
+          "description": "Rendered height in px; width stretches to the container."
+        }
+      ],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "No color tokens consumed directly by design — stroke follows currentColor, parent sets e.g. text-primary. No external chart lib.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/Sparkline/Sparkline.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/Sparkline",
+      "specMissing": false
+    },
+    {
+      "name": "StatTile",
+      "tier": "view",
+      "description": "Broker-status metric tile: small label, big preformatted value with optional unit suffix, optional sparkline, subdued no-data state.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true,
+          "description": "Preformatted display string (SI abbreviation etc. is done by the caller)."
+        },
+        {
+          "name": "unit",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Subdued suffix rendered after the value, e.g. '/s'."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "required": false,
+          "default": "number",
+          "description": "'number' renders big, tabular, one line; 'text' renders smaller and wraps to two lines. Fed from the tile's valueKind."
+        },
+        {
+          "name": "points",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "{t, v}[] sparkline samples; omitted or <2 points hides the sparkline."
+        },
+        {
+          "name": "noData",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Shows a subdued 'no data yet' placeholder instead of the value."
+        }
+      ],
+      "tokens": [
+        "elevation-1",
+        "outline",
+        "secondary-text",
+        "emphasis",
+        "primary"
+      ],
+      "dependencies": [
+        "Sparkline"
+      ],
+      "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/StatTile",
       "specMissing": false
     },
     {
@@ -2692,7 +3037,9 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/ConnectionDetailsView/components/SubscriptionsForm/SubscriptionsForm.svelte",
@@ -2844,6 +3191,12 @@
           "name": "highlightedTopicStore",
           "type": "store",
           "required": true
+        },
+        {
+          "name": "onOpenBrokerStatus",
+          "type": "function",
+          "required": false,
+          "default": "undefined"
         }
       ],
       "tokens": [
@@ -3223,10 +3576,15 @@
           "default": true
         },
         {
-          "name": "windowMinutes",
-          "type": "string",
+          "name": "windowSeconds",
+          "type": "number",
           "required": false,
           "default": 0
+        },
+        {
+          "name": "onWindowSecondsChange",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [
@@ -3437,10 +3795,16 @@
           "default": true
         },
         {
-          "name": "windowMinutes",
-          "type": "string",
+          "name": "windowSeconds",
+          "type": "number",
           "required": false,
           "default": 0
+        },
+        {
+          "name": "visible",
+          "type": "boolean",
+          "required": false,
+          "default": true
         }
       ],
       "tokens": [
@@ -3539,7 +3903,9 @@
         "primary-light",
         "secondary",
         "secondary-text",
-        "outline"
+        "outline",
+        "elevation-2",
+        "emphasis"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
@@ -3878,7 +4244,7 @@
         "elevation-1"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. The scrolling library pane carries data-dnd-scroll so a drag near its edges auto-scrolls it.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/Sidebar.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/Sidebar.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/Sidebar.stories.svelte",
@@ -3904,6 +4270,12 @@
           "required": true
         },
         {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
+        },
+        {
           "name": "currentCollectionId",
           "type": "number",
           "required": false,
@@ -3914,9 +4286,9 @@
           "type": "enum",
           "required": false,
           "options": [
-            "Add message to..."
+            "Type to add new collection"
           ],
-          "default": "Add message to..."
+          "default": "Type to add new collection"
         },
         {
           "name": "onSelect",
@@ -3968,22 +4340,38 @@
           "required": true
         },
         {
+          "name": "scope",
+          "type": "string",
+          "required": false,
+          "default": "global",
+          "options": [
+            "global",
+            "connection"
+          ]
+        },
+        {
           "name": "onOpenMessage",
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": true
         }
       ],
       "tokens": [
-        "secondary",
         "white-text",
         "emphasis",
         "secondary-text",
         "hovered",
-        "error"
+        "error",
+        "primary",
+        "elevation-2"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook). Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2. The folder row highlights with bg-hovered and a ring-primary when the drop means \"into this folder\"; the insertion line between messages is bg-primary.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionFolder.stories.svelte",
@@ -4018,14 +4406,19 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onNewMessage",
+          "type": "function",
+          "required": true
         }
       ],
       "tokens": [
-        "secondary",
-        "secondary-text"
+        "secondary-text",
+        "primary"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Folder reordering is driven by the dnd drag store, not by props; the story sets that store directly. The insertion line between folders is bg-primary.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/CollectionsSection.stories.svelte",
@@ -4104,13 +4497,59 @@
           "required": true
         }
       ],
-      "tokens": [],
+      "tokens": [
+        "secondary-text",
+        "divider"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionDetailsDialog.stories.svelte",
       "storyId": "Views/Connection/DataView/Sidebar/ConnectionDetailsDialog",
+      "specMissing": false
+    },
+    {
+      "name": "ConnectionLogsDialog",
+      "tier": "view",
+      "description": "Storybook coverage for ConnectionLogsDialog.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "connection",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "divider",
+        "error",
+        "warning",
+        "elevation-0",
+        "elevation-2"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/Sidebar/components/ConnectionLogsDialog.stories.svelte",
+      "storyId": "Views/Connection/DataView/Sidebar/ConnectionLogsDialog",
       "specMissing": false
     },
     {
@@ -4189,10 +4628,11 @@
         "divider",
         "error",
         "elevation-1",
-        "chip-border"
+        "chip-border",
+        "elevation-2"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2. Dropping the row into a folder saves it there.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/HistoryItem.stories.svelte",
@@ -4282,6 +4722,12 @@
           "type": "function",
           "required": false,
           "default": "> void = () => {}"
+        },
+        {
+          "name": "selectAll",
+          "type": "boolean",
+          "required": false,
+          "default": false
         }
       ],
       "tokens": [],
@@ -4379,7 +4825,8 @@
         "secondary",
         "emphasis",
         "secondary-text",
-        "warning"
+        "warning",
+        "hovered"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
@@ -4420,15 +4867,15 @@
         }
       ],
       "tokens": [
-        "secondary",
         "white-text",
         "emphasis",
         "secondary-text",
         "hovered",
-        "error"
+        "error",
+        "elevation-2"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2.",
       "sourcePath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.svelte",
       "specPath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.spec.json",
       "storyPath": "src/views/Connection/DataView/components/Sidebar/components/SavedMessageRow.stories.svelte",

@@ -19,6 +19,7 @@
   import PleaseUpdate from "./views/PleaseUpdate/PleaseUpdate.svelte";
   import UpdateDialog from "./components/UpdateDialog/UpdateDialog.svelte";
   import ChartWindow from "./views/ChartWindow/ChartWindow.svelte";
+  import BrokerStatusWindow from "./views/BrokerStatusWindow/BrokerStatusWindow.svelte";
   import HistoryRetentionPrompt from "./components/HistoryRetentionPrompt/HistoryRetentionPrompt.svelte";
   import WhatsNewDialog from "./components/WhatsNewDialog/WhatsNewDialog.svelte";
   import StarPromptDialog from "./components/StarPromptDialog/StarPromptDialog.svelte";
@@ -27,6 +28,10 @@
   // /?view=chart&...; render only the standalone chart, not the full app shell.
   const isChartWindow =
     new URLSearchParams(window.location.search).get("view") === "chart";
+  // Detached broker-status windows (opened by OpenBrokerStatusWindow) load the
+  // same assets at /?view=status&conn=<id>; render only the standalone window.
+  const isStatusWindow =
+    new URLSearchParams(window.location.search).get("view") === "status";
 
   gsap.registerPlugin(Flip);
   gsap.registerPlugin(Draggable);
@@ -62,6 +67,8 @@
 
 {#if isChartWindow}
   <ChartWindow />
+{:else if isStatusWindow}
+  <BrokerStatusWindow />
 {:else}
   <main
     class="h-full w-full flex flex-col bg-elevation-0"
