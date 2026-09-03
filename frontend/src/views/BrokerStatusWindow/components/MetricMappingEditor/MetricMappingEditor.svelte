@@ -185,18 +185,13 @@
   $: editing = draft.id !== null;
 </script>
 
-<Dialog
-  {isOpen}
-  title="Metric tiles"
-  description="Redirect a built-in tile to your broker's topics, or add your own custom tiles. Changes apply to this connection."
->
+<Dialog {isOpen} title="Metric tiles">
   <div class="flex max-h-[70vh] w-[520px] max-w-[86vw] flex-col gap-5 overflow-y-auto">
     <!-- Draft form: add mode, or edit when a row was picked. The floating
-         labels sit ABOVE each input's box, so rows need the larger gap, and
-         the first row needs enough top padding inside the scroll container's
-         clip box or the floated labels render with their tops cut off. -->
-    <div class="flex flex-col gap-5 pt-3">
-      <div class="flex flex-col gap-5 sm:flex-row">
+         labels sit above each input's box, so the first row needs top padding
+         inside the scroll container's clip box or their tops render cut off. -->
+    <div class="flex flex-col gap-8 pt-2">
+      <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
           name="mapping-label"
           label="Label"
@@ -221,7 +216,7 @@
         errorMessage={topicError}
         onChange={() => (topicError = undefined)}
       />
-      <div class="flex flex-col gap-5 sm:flex-row">
+      <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
           name="mapping-path"
           label="JSON path (optional)"

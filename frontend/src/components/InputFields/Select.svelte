@@ -31,10 +31,9 @@
     | string
     | undefined;
   export let buttonClass = "";
-  // Extra classes for the open menu. Its default z-index deliberately sits
-  // BELOW the toast layer; a select rendered inside a dialog needs to escape
-  // the dialog's own stacking level and passes an elevated one here rather
-  // than raising every select in the app above the toasts.
+  // Extra classes for the open menu, merged over the defaults. The menu
+  // portals to body and already sits above the dialog overlay at z-[10002];
+  // pass a class here only to override that or to restyle a single menu.
   export let menuClass = "";
   export let onChange = (value: OptionType | undefined) => {};
 
@@ -159,7 +158,7 @@
   {#if $open}
     <div
       class={twMerge(
-        `z-10 flex max-h-[300px] flex-col
+        `z-[10002] flex max-h-[300px] flex-col
         overflow-y-auto rounded bg-elevation-2 p-1
         shadow focus:!ring-0`,
         menuClass

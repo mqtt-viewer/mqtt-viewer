@@ -249,6 +249,7 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}
@@ -305,6 +306,7 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
             onPopOut={openChartWindow ? popOut : null}

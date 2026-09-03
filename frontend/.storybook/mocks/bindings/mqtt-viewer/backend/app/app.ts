@@ -47,6 +47,32 @@ export async function ClearConnectionHistory(
   _connectionId: number
 ): Promise<void> {}
 
+// Client-logs mocks. LogEntry is a flat {timestampMs, level, message} shape;
+// plain objects satisfy it structurally in stories.
+export async function GetConnectionLogs(_connId: number): Promise<any[]> {
+  const base = 1_710_000_000_000;
+  return [
+    { timestampMs: base, level: "info", message: "connection state changed from disconnected to connecting" },
+    { timestampMs: base + 500, level: "info", message: "connection state changed from connecting to connected" },
+    { timestampMs: base + 1200, level: "debug", message: "PINGREQ sent" },
+    { timestampMs: base + 1400, level: "debug", message: "PINGRESP received" },
+    { timestampMs: base + 2600, level: "warn", message: "reconnecting to broker" },
+    { timestampMs: base + 3000, level: "error", message: "connect failed: connection refused" },
+  ];
+}
+
+export async function ClearConnectionLogs(_connId: number): Promise<void> {}
+
+export async function SetConnectionDebugLogging(
+  _connId: number,
+  _enabled: boolean
+): Promise<void> {}
+
+export async function SetLogsStreaming(
+  _connId: number,
+  _streaming: boolean
+): Promise<void> {}
+
 // App settings / message retention mocks.
 let mockAppSettings = new models.AppSettings({
   id: 1,
@@ -57,6 +83,7 @@ let mockAppSettings = new models.AppSettings({
   lastSeenChangelogVersion: "",
   launchCount: 0,
   hasSeenStarPrompt: false,
+  ignoredUpdateVersion: "",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
 
@@ -88,6 +115,16 @@ export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
   mockAppSettings = new models.AppSettings({
     ...mockAppSettings,
     hasSeenStarPrompt: true,
+  });
+  return mockAppSettings;
+}
+
+export async function SkipUpdateVersion(
+  version: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    ignoredUpdateVersion: version,
   });
   return mockAppSettings;
 }
@@ -209,6 +246,17 @@ const findMockCollectionMessage = (id: number) => {
   return null;
 };
 
+export async function GetCollectionCollapsedStates(): Promise<
+  models.CollectionCollapsedState[]
+> {
+  return [];
+}
+
+export async function SetCollectionCollapsed(
+  _collectionId: number,
+  _collapsed: boolean
+): Promise<void> {}
+
 export async function GetCollectionsForConnection(
   _connectionId: number
 ): Promise<models.Collection[]> {
@@ -299,6 +347,37 @@ export async function DuplicateCollectionMessage(
   });
   found.collection.messages.push(copy);
   return copy;
+}
+
+export async function ReorderCollectionMessages(
+  collectionId: number,
+  orderedIds: number[]
+): Promise<models.CollectionMessage[]> {
+  const target = mockCollectionsState.find((c) => c.id === collectionId);
+  if (!target) return [];
+  const moved: models.CollectionMessage[] = [];
+  for (const id of orderedIds) {
+    const found = findMockCollectionMessage(id);
+    if (!found) continue;
+    found.collection.messages = found.collection.messages.filter(
+      (m) => m.id !== id
+    );
+    found.message.collectionId = collectionId;
+    found.message.position = moved.length;
+    moved.push(found.message);
+  }
+  target.messages = moved;
+  return moved;
+}
+
+export async function ReorderCollections(
+  _connectionId: number | null,
+  orderedIds: number[]
+): Promise<void> {
+  orderedIds.forEach((id, index) => {
+    const collection = mockCollectionsState.find((c) => c.id === id);
+    if (collection) collection.position = index;
+  });
 }
 
 export async function DeleteCollectionMessage(id: number): Promise<void> {
@@ -425,6 +504,13 @@ export async function GetReceivedMessageCount(
   return mockMqttMessages.length;
 }
 
+export async function GetMemoryStats(): Promise<app.MemoryStats> {
+  return new app.MemoryStats({
+    historyBytes: 34 * 1024 * 1024,
+    activeConnections: 1,
+  });
+}
+
 export async function GetMqttStats(): Promise<app.MqttStats> {
   return new app.MqttStats({
     totalMessagesReceived: 128,
@@ -465,6 +551,15 @@ export async function GetSortStates(): Promise<models.SortState[]> {
     }),
   ];
 }
+
+export async function GetChartWindows(): Promise<models.ChartWindow[]> {
+  return [];
+}
+
+export async function UpdateChartWindow(
+  _id: string,
+  _windowSeconds: number
+): Promise<void> {}
 
 export async function LoadOpenTabs(): Promise<models.Tab[]> {
   return [

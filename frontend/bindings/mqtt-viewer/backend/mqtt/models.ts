@@ -9,6 +9,11 @@ import { Create as $Create } from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as time$0 from "../../../time/models.js";
 
+/**
+ * ConnectionStats is the snapshot handed to the frontend by GetStats. It is a
+ * plain value type so the counters can never be read while a message is
+ * updating them.
+ */
 export class ConnectionStats {
     "messagesReceived": number;
     "messagesSent": number;
@@ -39,6 +44,38 @@ export class ConnectionStats {
     static createFrom($$source: any = {}): ConnectionStats {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new ConnectionStats($$parsedSource as Partial<ConnectionStats>);
+    }
+}
+
+/**
+ * LogEntry is one client-log line, surfaced to the frontend as-is.
+ */
+export class LogEntry {
+    "timestampMs": number;
+    "level": string;
+    "message": string;
+
+    /** Creates a new LogEntry instance. */
+    constructor($$source: Partial<LogEntry> = {}) {
+        if (!("timestampMs" in $$source)) {
+            this["timestampMs"] = 0;
+        }
+        if (!("level" in $$source)) {
+            this["level"] = "";
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LogEntry instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LogEntry {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LogEntry($$parsedSource as Partial<LogEntry>);
     }
 }
 

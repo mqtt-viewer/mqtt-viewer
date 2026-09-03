@@ -53,7 +53,7 @@
       "type": "string",
       "required": false,
       "default": "",
-      "description": "Extra classes for the open menu. The default z-index sits below the toast layer; a select inside a dialog passes an elevated one (e.g. 'z-[10002]') rather than raising every select app-wide."
+      "description": "Extra classes for the open menu, merged over the defaults. The menu portals to body and already sits above the dialog overlay at z-[10002]; pass a class here only to override that or to restyle a single menu."
     },
     {
       "name": "selected",
