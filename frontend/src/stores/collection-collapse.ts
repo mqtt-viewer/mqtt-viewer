@@ -48,4 +48,16 @@ const toggle = (collectionId: number) => {
   });
 };
 
-export default { subscribe, toggle };
+// Expands a folder if it is collapsed; a no-op otherwise.
+const expand = (collectionId: number) => {
+  update((ids) => {
+    if (!ids.has(collectionId)) return ids;
+    ids.delete(collectionId);
+    SetCollectionCollapsed(collectionId, false).catch((e) =>
+      console.error("failed to save collection collapse state", e)
+    );
+    return ids;
+  });
+};
+
+export default { subscribe, toggle, expand };

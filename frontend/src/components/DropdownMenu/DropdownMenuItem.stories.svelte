@@ -6,7 +6,7 @@
 
   const componentName = "DropdownMenuItem";
   const storyId = "Primitives/DropdownMenu/DropdownMenuItem";
-  const props: string[] = ["isSelected","onClick"];
+  const props: string[] = ["isSelected","onClick","iconType"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -23,3 +23,9 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<Story
+  name="With icon"
+  args={{ ...storyArgs, iconType: "delete" }}
+  {template}
+/>
