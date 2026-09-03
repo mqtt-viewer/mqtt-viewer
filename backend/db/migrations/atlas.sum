@@ -1,4 +1,4 @@
-h1:/yWX+9uOpbvcMzURDqZhxyt9cyN1iS5ZGdytXW4Lfd8=
+h1:cGcMQ+umUh0zeciVw97G5W7yPass6Vb9KGd/K9tQ+dM=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -16,3 +16,4 @@ h1:/yWX+9uOpbvcMzURDqZhxyt9cyN1iS5ZGdytXW4Lfd8=
 20260728093000_chart-window.sql h1:oMG+Aovw9Me9LOPCXbQCVDyu01mbfOUq/JQu0BhQK9g=
 20260901000000_add-ignored-update-version.sql h1:kvOz3qTtG6SZ4tovScJG5TijEGwuBqdFap4dd8VqwIE=
 20260901042245_collection-collapsed-states.sql h1:+G8CIaJ5ZKBxTvFjjVGtlHPGl07/NVVw/Z0JOMeP0MM=
+20260903023223_collection-ordering.sql h1:K8t7MXn5zJq0lL80HC6Lk+OKLoLYbCWrXZZM0YAT46Q=

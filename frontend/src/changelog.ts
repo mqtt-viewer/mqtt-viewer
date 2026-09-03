@@ -50,6 +50,22 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Start a message inside a collection",
+        body: "Every collection folder's menu now has New message, and an empty folder shows one as a row. The message is filed there when you save it. A saved message shows its collection in the top right; pick another one there to move it.",
+      },
+      {
+        title: "Rename messages where you edit them",
+        body: "Click the message name at the top of the publish view to rename it.",
+      },
+      {
+        title: "Clearer collection creation",
+        body: "The Add to collection search now says you can type a name to create a collection.",
+      },
+      {
+        title: "Drag messages between collections",
+        body: "Drag a saved message to reorder it in its folder, or onto another folder to move it there, global or connection. Folders reorder the same way, and a history entry can be dragged straight into a folder to save it.",
+      },
+      {
         title: "Peek at messages on the timeline",
         body: "Hovering a marker on the message timeline now shows a small preview with the payload, time, QoS and whether it was retained.",
         thanks: [

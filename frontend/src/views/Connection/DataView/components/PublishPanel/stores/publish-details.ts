@@ -39,6 +39,11 @@ export interface PublishDetails {
   sourceMessageName: string | null;
   sourceCollectionId: number | null;
   baseline: string | null;
+  // Draft name, editable from the publish view header. Not part of the
+  // "Modified (unsaved)" snapshot.
+  name: string;
+  // Collection a draft will be filed into on Save. Cleared once saved.
+  pendingCollectionId: number | null;
 }
 
 // Flat record shape shared by publish history entries and collection messages.
@@ -155,6 +160,8 @@ export const createPublishStore = (connId: number) => {
     sourceMessageName: null,
     sourceCollectionId: null,
     baseline: null,
+    name: "",
+    pendingCollectionId: null,
   });
 
   const publish = async () => {
@@ -251,12 +258,16 @@ export const createPublishStore = (connId: number) => {
           sourceMessageId: message.id,
           sourceMessageName: message.name,
           sourceCollectionId: message.collectionId,
+          name: message.name,
+          pendingCollectionId: null,
         }
       : {
           ...blankDetails,
           sourceMessageId: null,
           sourceMessageName: null,
           sourceCollectionId: null,
+          name: "",
+          pendingCollectionId: null,
         };
     loaded.baseline = message
       ? snapshotPublishDetails(loaded as PublishDetails)
@@ -281,9 +292,18 @@ export const createPublishStore = (connId: number) => {
       store.sourceMessageId = saved.id;
       store.sourceMessageName = saved.name;
       store.sourceCollectionId = saved.collectionId;
+      store.pendingCollectionId = null;
       store.baseline = snapshotPublishDetails(store);
       return store;
     });
+  };
+
+  const setName = (name: string) => {
+    update((store) => ({ ...store, name }));
+  };
+
+  const setPendingCollection = (id: number | null) => {
+    update((store) => ({ ...store, pendingCollectionId: id }));
   };
 
   const store = {
@@ -295,6 +315,8 @@ export const createPublishStore = (connId: number) => {
     formatPayload,
     setSource,
     markSaved,
+    setName,
+    setPendingCollection,
   };
 
   setContext(contextKey, store);
