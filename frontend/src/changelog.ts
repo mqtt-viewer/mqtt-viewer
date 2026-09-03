@@ -103,7 +103,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "A status page for your broker",
-        body: "There's a new broker status window built for on-the-fly debugging. A health strip warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart plots messages in and out against what this client receives over a window from a minute to a day, and a loudest topics table shows which topics are making the noise. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
+        body: "There's a new broker status window on the pulse icon above the topic tree, with a health strip that warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart, and a table of the loudest topics over a window from a minute to a day. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and measures rates here as well, so a broker that publishes nothing still gives you numbers.",
         thanks: [
           {
             name: "m1dnight",
@@ -121,7 +121,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Make the status page your own",
-        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic too, and you can pin one as a tile straight from it. Your tiles are saved per connection.",
+        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic to pin from too, and your tiles are saved per connection.",
         thanks: [
           {
             name: "andyg2",
@@ -131,7 +131,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Pop-out windows you can actually move",
-        body: "Pop-out chart and broker status windows could not be dragged at all. Grab the header to move them now. On macOS the header also leaves room for the window buttons instead of hiding the connection name behind them.",
+        body: "The pop-out chart window could not be dragged at all. Grab its header to move it now, and the same goes for the new broker status window, which on macOS also leaves room for the window buttons instead of hiding the connection name behind them.",
       },
       {
         title: "Chart values that arrive as text",
