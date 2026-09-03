@@ -58,42 +58,41 @@ const platformFromNavigator = (): string => {
 };
 
 const init = async () => {
-  window.addEventListener("resize", debouncedCheckFullscreen, true);
-
-  // GetEnvInfo carries version + isServerMode and must land in the store even
-  // if the native Window/System calls below fail. In a browser (server mode)
-  // those native calls reject, and a single try/catch around everything would
-  // otherwise leave version and isServerMode unset.
-  let isServerMode = false;
+  // GetEnvInfo is a normal binding in both modes. Read it before touching
+  // native Window/System APIs so browser mode never makes calls that can only
+  // fail in Wails' headless server.
   try {
     const configuredEnv = await GetEnvInfo();
-    isServerMode = configuredEnv.isServerMode;
+    if (configuredEnv.isServerMode) {
+      const platform = platformFromNavigator();
+      update((store) => ({
+        ...store,
+        env: {
+          buildType: configuredEnv.isDev ? "dev" : "production",
+          platform,
+          arch: "",
+        },
+        version: configuredEnv.version,
+        isServerMode: true,
+        isMac: platform === "darwin",
+        isWindows: platform === "windows",
+        isLinux: platform === "linux",
+      }));
+      return;
+    }
     update((store) => ({
       ...store,
       version: configuredEnv.version,
-      isServerMode: configuredEnv.isServerMode,
+      isServerMode: false,
     }));
   } catch (e) {
     console.error(e);
   }
 
-  // In the browser the platform booleans are settled here and the native probe
-  // below is not allowed to overwrite them.
-  const browserPlatform = isServerMode ? platformFromNavigator() : "";
-  if (isServerMode) {
-    update((store) => ({
-      ...store,
-      isMac: browserPlatform === "darwin",
-      isWindows: browserPlatform === "windows",
-      isLinux: browserPlatform === "linux",
-    }));
-  }
-
-  // Native environment probing. Headless in server mode these are no-ops that
-  // reject, so keep them in their own try/catch with sensible fallbacks.
+  window.addEventListener("resize", debouncedCheckFullscreen, true);
   try {
     const info = await System.Environment();
-    const platform = isServerMode ? browserPlatform : info.OS;
+    const platform = info.OS;
     const isFullscreen = await Window.IsFullscreen();
     update((store) => ({
       ...store,

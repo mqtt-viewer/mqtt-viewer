@@ -1,6 +1,7 @@
 import { get, writable } from "svelte/store";
 import { GetPanelSizes, UpdatePanelSize } from "bindings/mqtt-viewer/backend/app/app";
 import { Window } from "@wailsio/runtime";
+import envStore from "./env";
 
 type SizePx = number;
 
@@ -27,12 +28,14 @@ const init = async () => {
   // skip GetPanelSizes below and leave every panel at its default size.
   let rootWindowWidth = 0;
   let rootWindowHeight = 0;
-  try {
-    const windowSize = await Window.Size();
-    rootWindowWidth = windowSize.width;
-    rootWindowHeight = windowSize.height;
-  } catch (e) {
-    console.error(e);
+  if (!get(envStore).isServerMode) {
+    try {
+      const windowSize = await Window.Size();
+      rootWindowWidth = windowSize.width;
+      rootWindowHeight = windowSize.height;
+    } catch (e) {
+      console.error(e);
+    }
   }
   // In the browser the viewport is the window.
   if (!rootWindowWidth || !rootWindowHeight) {
