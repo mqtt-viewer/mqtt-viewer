@@ -32,7 +32,7 @@ just release v0.X.Y <previous-tag>
 gh run list --limit 5
 
 # 6. flip `released` on the new release_v3 record in the PocketBase admin UI
-#    (https://cloud.mqttviewer.app/_/) once you're happy — this is what makes
+#    (https://cloud.mqttviewer.app/_/) once you're happy. This is what makes
 #    in-app update checks see the version.
 ```
 
@@ -60,6 +60,16 @@ and the bare semver, and get it onto `develop` before you create the release.**
 `just release` renders the notes first and stops if the entry is missing, so a
 forgotten promotion fails loudly instead of shipping an empty dialog.
 
+`just release` is a one-liner over `scripts/release.sh`, which runs three
+pre-flight checks before it touches anything. It aborts if the working tree is
+dirty, if `HEAD` is not `origin/develop` after a fetch, and if the changelog has
+no promoted entry for the version. The first two exist because the notes are
+rendered from the tree you are standing on, and that tree is what becomes
+`main` a moment later, so the two have to be the same commit. Every step is its
+own command, so a failed checkout or merge stops there instead of falling
+through to `gh release create`. `scripts/test-release-recipe.sh` covers those
+paths with shimmed `git` and `gh`.
+
 ```sh
 just release-notes v0.X.Y <previous-tag>   # preview, exactly what gets posted
 ```
@@ -72,7 +82,7 @@ so a dry run shows the real notes.
 | Platform | Signing | Gotchas |
 |---|---|---|
 | mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. |
-| windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions — pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
+| windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions, so pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
 | linux (`release-linux.yaml`) | none | Runs on `ubuntu-latest` + `ubuntu-24.04-arm`. gtk3/webkit2gtk-4.1 dev packages must install **before** the wails3 CLI (`-tags gtk3`). |
 
 Shared foundations that have bitten before:
@@ -103,9 +113,9 @@ Shared foundations that have bitten before:
 - linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm,flatpak}` (+ `.sha256`)
 
 Linux distro guidance: deb/rpm use the system WebKit and are the most
-compatible (Fedora needs the rpm — the AppImage bundles Ubuntu-built WebKit
-whose helper paths don't exist elsewhere). AppImage works on Debian/Ubuntu
-family with `libwebkit2gtk-4.1-0` installed.
+compatible (Fedora needs the rpm, because the AppImage bundles Ubuntu-built
+WebKit whose helper paths don't exist elsewhere). AppImage works on the
+Debian/Ubuntu family with `libwebkit2gtk-4.1-0` installed.
 
 ### Flatpak
 

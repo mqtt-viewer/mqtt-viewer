@@ -20,29 +20,25 @@ build VERSION="v0.0.1-defaultv":
 dev:
   wails3 dev -port $(scripts/dev-ports.sh vite)
 
-# Preview the release body for a version: the promoted entry in
-# frontend/src/changelog.ts, rendered as markdown. This is what lands on the
-# GitHub release, goes to the portal, and shows in the in-app update dialog.
-# PREV adds the compare link.
+# The body comes from the promoted entry in frontend/src/changelog.ts, rendered
+# as markdown. It is what lands on the GitHub release, goes to the portal, and
+# shows in the in-app update dialog. PREV adds the compare link.
+# Preview the release body for a version.
 release-notes VERSION PREV="":
   node scripts/release-notes.mjs {{VERSION}} {{PREV}}
 
-# Publish a release: merges develop→main and creates the GitHub release that
-# triggers the mac/windows/linux build+sign+portal-registration workflows.
-# See docs/RELEASING.md. Use PRERELEASE="--prerelease" for a dry-run tag.
-# The notes are rendered first, so a changelog missing the entry for VERSION
-# stops the release before main moves.
+# Merges develop into main and creates the GitHub release that triggers the
+# mac/windows/linux build+sign+portal-registration workflows. See
+# docs/RELEASING.md. Use PRERELEASE="--prerelease" for a dry-run tag. Aborts
+# before main moves if the tree is dirty, if HEAD is not origin/develop, or if
+# the changelog has no promoted entry for VERSION.
+# Publish a release.
 release VERSION PREV PRERELEASE="":
-  #!/usr/bin/env bash
-  set -euo pipefail
-  notes="$(mktemp -t mqtt-viewer-release-notes)"
-  trap 'rm -f "$notes"' EXIT
-  node scripts/release-notes.mjs {{VERSION}} {{PREV}} > "$notes"
-  git checkout main && git merge --ff-only origin/develop && git push origin main
-  gh release create {{VERSION}} --target main {{PRERELEASE}} --notes-file "$notes" --title "{{VERSION}}"
+  scripts/release.sh {{VERSION}} {{PREV}} {{PRERELEASE}}
 
-# Delete + recreate a release tag after a CI fix (workflows run from the tag's
-# commit, so a plain re-run would use the old workflow definitions).
+# Workflows run from the tag's commit, so a plain re-run would use the old
+# workflow definitions.
+# Delete and recreate a release tag after a CI fix.
 release-retry VERSION PREV PRERELEASE="":
   gh release delete {{VERSION}} --cleanup-tag --yes
   just release {{VERSION}} {{PREV}} {{PRERELEASE}}

@@ -18,8 +18,10 @@ version with the user and get an explicit go-ahead before step 5.**
 - `VERSION`: the tag, `vX.Y.Z` (or `vX.Y.Z-beta1` for a dry run). If the user
   didn't give one, ask. Decide the bump (patch vs minor vs major) now, from what
   actually landed since the last release. Do not pre-empt it earlier.
-- `PREV`: the previous release tag, for release notes. Get it with
-  `gh release list --limit 5` or `git tag --sort=-v:refname | head`.
+- `PREV`: the previous release tag. It is only the compare base for the "Full
+  changelog" link at the bottom of the notes; the notes themselves come from the
+  changelog entry. Get it with `gh release list --limit 5` or
+  `git tag --sort=-v:refname | head`.
 
 ## 1. Draft the changelog and get it approved (always first)
 
@@ -50,7 +52,8 @@ the gate that lets them see, and shape, what's going into the upcoming release.
   (`git merge-base --is-ancestor origin/main origin/develop`). If it can't, stop
   and tell the user: `main` has diverged and `just release` will fail its
   `--ff-only` merge.
-- Working tree clean, `gh auth status` OK.
+- Working tree clean, and `HEAD` on the commit that is about to become `main`
+  (`just release` aborts on either count). `gh auth status` OK.
 
 ## 3. Promote the changelog (this is what the release notes ARE)
 
@@ -107,8 +110,11 @@ run shows the real notes.
 just release VERSION PREV
 ```
 
-This renders the notes from the changelog entry, merges `develop` into `main`,
-pushes, and runs `gh release create --notes-file` with them. `PREV` is only the
+This runs `scripts/release.sh`, which checks the working tree is clean and that
+`HEAD` is `origin/develop` (the notes have to render from the tree that becomes
+`main`), renders the notes from the changelog entry, merges `develop` into
+`main`, pushes, and runs `gh release create --notes-file` with them. Any of
+those steps failing stops the release before the tag exists. `PREV` is only the
 compare base for the "Full changelog" link at the bottom. Then watch:
 
 ```sh
