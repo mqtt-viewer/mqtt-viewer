@@ -78,6 +78,14 @@ export function ClearConnectionHistory(connId: number): $CancellablePromise<void
 }
 
 /**
+ * ClearConnectionLogs empties a connection's client-log ring and truncates its
+ * durable log file.
+ */
+export function ClearConnectionLogs(connId: number): $CancellablePromise<void> {
+    return $Call.ByID(1243746974, connId);
+}
+
+/**
  * ClearReceivedMessages deletes all durable history (optionally for one
  * connection) and compacts the file.
  */
@@ -134,6 +142,10 @@ export function DisconnectMqtt(connId: number): $CancellablePromise<void> {
     return $Call.ByID(2595921592, connId);
 }
 
+/**
+ * DuplicateCollectionMessage copies a message in directly after the original,
+ * shifting everything below it down one place.
+ */
 export function DuplicateCollectionMessage(id: number): $CancellablePromise<models$0.CollectionMessage> {
     return $Call.ByID(2896789728, id).then(($result: any) => {
         return $$createType8($result);
@@ -178,13 +190,36 @@ export function GetAppSettings(): $CancellablePromise<models$0.AppSettings> {
     });
 }
 
+export function GetChartWindows(): $CancellablePromise<models$0.ChartWindow[]> {
+    return $Call.ByID(3282938669).then(($result: any) => {
+        return $$createType13($result);
+    });
+}
+
+export function GetCollectionCollapsedStates(): $CancellablePromise<models$0.CollectionCollapsedState[]> {
+    return $Call.ByID(3092357895).then(($result: any) => {
+        return $$createType15($result);
+    });
+}
+
 /**
  * GetCollectionsForConnection returns global collections (connection_id IS NULL)
- * plus collections scoped to the given connection, messages preloaded.
+ * plus collections scoped to the given connection, messages preloaded. Both
+ * levels come back in their persisted order, id breaking a tie.
  */
 export function GetCollectionsForConnection(connectionID: number): $CancellablePromise<models$0.Collection[]> {
     return $Call.ByID(2553763368, connectionID).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType16($result);
+    });
+}
+
+/**
+ * GetConnectionLogs returns the buffered client-log lines for a connection
+ * (snapshot of the in-RAM ring that backs the logs dialog).
+ */
+export function GetConnectionLogs(connId: number): $CancellablePromise<mqtt$0.LogEntry[]> {
+    return $Call.ByID(226016115, connId).then(($result: any) => {
+        return $$createType18($result);
     });
 }
 
@@ -197,13 +232,13 @@ export function GetDatabaseSizeBytes(): $CancellablePromise<number> {
 
 export function GetEnvInfo(): $CancellablePromise<$models.EnvInfo> {
     return $Call.ByID(3369643427).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType19($result);
     });
 }
 
 export function GetFilterHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.FilterHistory[]> {
     return $Call.ByID(2941945813, connectionID).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType21($result);
     });
 }
 
@@ -213,27 +248,38 @@ export function GetMatchingSubscriptionForTopic(connId: number, topic: string): 
     });
 }
 
+/**
+ * GetMemoryStats reports how much estimated memory in-RAM message history is
+ * using across all connections. A disconnected connection still holds its
+ * history against the budget, so it counts as active while it has any.
+ */
+export function GetMemoryStats(): $CancellablePromise<$models.MemoryStats> {
+    return $Call.ByID(3870247942).then(($result: any) => {
+        return $$createType22($result);
+    });
+}
+
 export function GetMessageHistory(connId: number, topic: string): $CancellablePromise<mqtt$0.MqttMessage[]> {
     return $Call.ByID(3700437937, connId, topic).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType24($result);
     });
 }
 
 export function GetMqttStats(): $CancellablePromise<$models.MqttStats> {
     return $Call.ByID(2888945465).then(($result: any) => {
-        return $$createType18($result);
+        return $$createType25($result);
     });
 }
 
 export function GetPanelSizes(): $CancellablePromise<models$0.PanelSize[]> {
     return $Call.ByID(3836927596).then(($result: any) => {
-        return $$createType20($result);
+        return $$createType27($result);
     });
 }
 
 export function GetPublishHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.PublishHistory[]> {
     return $Call.ByID(3102818020, connectionID).then(($result: any) => {
-        return $$createType22($result);
+        return $$createType29($result);
     });
 }
 
@@ -258,13 +304,13 @@ export function GetReceivedMessageCount(connectionID: number, topic: string): $C
  */
 export function GetReceivedMessageWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
     return $Call.ByID(2230097254, connectionID, topic, beforeID, afterID, limit).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType24($result);
     });
 }
 
 export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
     return $Call.ByID(2748919454).then(($result: any) => {
-        return $$createType24($result);
+        return $$createType31($result);
     });
 }
 
@@ -275,22 +321,26 @@ export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
  */
 export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
     return $Call.ByID(2117163184, connId).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType24($result);
     });
 }
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType25($result);
+        return $$createType32($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType27($result);
+        return $$createType34($result);
     });
 }
 
+/**
+ * MoveCollectionMessage moves a message to another collection, appending it at
+ * the end of that collection.
+ */
 export function MoveCollectionMessage(id: number, targetCollectionID: number): $CancellablePromise<models$0.CollectionMessage> {
     return $Call.ByID(184359020, id, targetCollectionID).then(($result: any) => {
         return $$createType8($result);
@@ -299,7 +349,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType29($result);
+        return $$createType36($result);
     });
 }
 
@@ -346,6 +396,38 @@ export function RenameCollectionMessage(id: number, name: string): $CancellableP
     });
 }
 
+/**
+ * ReorderCollectionMessages rewrites a collection's message order. orderedIDs
+ * is the collection's full new order; an id currently held by another
+ * collection moves into this one at that index, so a single call serves both a
+ * same-folder reorder and a cross-folder drop at a position. The gaps this
+ * leaves in the source collection's positions are intentional: only relative
+ * order is ever read back.
+ * 
+ * orderedIDs does not have to be the whole collection. Anything left out keeps
+ * its relative order and follows the listed messages, so no two rows in a
+ * collection end up sharing a position.
+ */
+export function ReorderCollectionMessages(collectionID: number, orderedIDs: number[]): $CancellablePromise<models$0.CollectionMessage[]> {
+    return $Call.ByID(1139884023, collectionID, orderedIDs).then(($result: any) => {
+        return $$createType37($result);
+    });
+}
+
+/**
+ * ReorderCollections rewrites the order of one scope's collections: the global
+ * list when connectionID is nil, otherwise that connection's list. An id from
+ * another scope is rejected, which is what stops a folder being dragged between
+ * the global and connection sections. It never changes connection_id.
+ * 
+ * orderedIDs does not have to be the whole scope. Anything left out keeps its
+ * relative order and follows the listed folders, so no two rows in a scope end
+ * up sharing a position.
+ */
+export function ReorderCollections(connectionID: number | null, orderedIDs: number[]): $CancellablePromise<void> {
+    return $Call.ByID(3401681988, connectionID, orderedIDs);
+}
+
 export function SaveCollectionMessage(params: $models.SaveCollectionMessageParams): $CancellablePromise<models$0.CollectionMessage> {
     return $Call.ByID(1468270044, params).then(($result: any) => {
         return $$createType8($result);
@@ -354,14 +436,37 @@ export function SaveCollectionMessage(params: $models.SaveCollectionMessageParam
 
 export function SaveFilterHistoryEntry(connectionId: number, text: string): $CancellablePromise<models$0.FilterHistory> {
     return $Call.ByID(481334387, connectionId, text).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType20($result);
     });
 }
 
 export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): $CancellablePromise<models$0.PublishHistory> {
     return $Call.ByID(3794014424, params).then(($result: any) => {
-        return $$createType21($result);
+        return $$createType28($result);
     });
+}
+
+export function SetCollectionCollapsed(collectionID: number, collapsed: boolean): $CancellablePromise<void> {
+    return $Call.ByID(509641409, collectionID, collapsed);
+}
+
+/**
+ * SetConnectionDebugLogging persists and applies the per-connection verbose
+ * debug-logging toggle. Takes effect immediately for v5; for v3 it (de)registers
+ * the process-global debug dispatcher.
+ */
+export function SetConnectionDebugLogging(connId: number, enabled: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1317832316, connId, enabled);
+}
+
+/**
+ * SetLogsStreaming starts or stops forwarding a connection's client-log
+ * batches to the frontend. The logs dialog switches this on while open; the
+ * ring and durable file keep capturing regardless, so nothing is lost while
+ * streaming is off.
+ */
+export function SetLogsStreaming(connId: number, streaming: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1857653305, connId, streaming);
 }
 
 /**
@@ -373,6 +478,16 @@ export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryP
  */
 export function SetTopicPanelDock(mode: string, lastDockedSide: string): $CancellablePromise<models$0.AppSettings> {
     return $Call.ByID(4192099940, mode, lastDockedSide).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
+ * SkipUpdateVersion records that the user chose to skip the given update
+ * version, so the update dialog stops auto-opening for it.
+ */
+export function SkipUpdateVersion(version: string): $CancellablePromise<models$0.AppSettings> {
+    return $Call.ByID(3024334158, version).then(($result: any) => {
         return $$createType0($result);
     });
 }
@@ -389,6 +504,10 @@ export function UpdateAppSettings(params: $models.UpdateAppSettingsParams): $Can
     return $Call.ByID(3714588585, params).then(($result: any) => {
         return $$createType0($result);
     });
+}
+
+export function UpdateChartWindow(connId: string, seconds: number): $CancellablePromise<void> {
+    return $Call.ByID(3533930699, connId, seconds);
 }
 
 export function UpdateConnection(conn: models$0.Connection | null): $CancellablePromise<void> {
@@ -432,21 +551,29 @@ const $$createType8 = models$0.CollectionMessage.createFrom;
 const $$createType9 = $models.Connections.createFrom;
 const $$createType10 = $Create.Array($$createType1);
 const $$createType11 = $Create.Map($Create.Any, $$createType10);
-const $$createType12 = $Create.Array($$createType7);
-const $$createType13 = $models.EnvInfo.createFrom;
-const $$createType14 = models$0.FilterHistory.createFrom;
+const $$createType12 = models$0.ChartWindow.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = models$0.CollectionCollapsedState.createFrom;
 const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = mqtt$0.MqttMessage.createFrom;
-const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = $models.MqttStats.createFrom;
-const $$createType19 = models$0.PanelSize.createFrom;
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = models$0.PublishHistory.createFrom;
-const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = models$0.SortState.createFrom;
+const $$createType16 = $Create.Array($$createType7);
+const $$createType17 = mqtt$0.LogEntry.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = $models.EnvInfo.createFrom;
+const $$createType20 = models$0.FilterHistory.createFrom;
+const $$createType21 = $Create.Array($$createType20);
+const $$createType22 = $models.MemoryStats.createFrom;
+const $$createType23 = mqtt$0.MqttMessage.createFrom;
 const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = $Create.Array($$createType3);
-const $$createType26 = models$0.Tab.createFrom;
+const $$createType25 = $models.MqttStats.createFrom;
+const $$createType26 = models$0.PanelSize.createFrom;
 const $$createType27 = $Create.Array($$createType26);
-const $$createType28 = $models.Connection.createFrom;
-const $$createType29 = $Create.Nullable($$createType28);
+const $$createType28 = models$0.PublishHistory.createFrom;
+const $$createType29 = $Create.Array($$createType28);
+const $$createType30 = models$0.SortState.createFrom;
+const $$createType31 = $Create.Array($$createType30);
+const $$createType32 = $Create.Array($$createType3);
+const $$createType33 = models$0.Tab.createFrom;
+const $$createType34 = $Create.Array($$createType33);
+const $$createType35 = $models.Connection.createFrom;
+const $$createType36 = $Create.Nullable($$createType35);
+const $$createType37 = $Create.Array($$createType8);

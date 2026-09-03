@@ -98,7 +98,7 @@
       />
     </div>
     {#if detectedImage && showRawImageBytes}
-      <Tooltip text="Show image preview">
+      <Tooltip text="Show image preview" focusable>
         <button
           class="flex items-center gap-1 text-sm px-2 py-1 rounded whitespace-nowrap text-secondary-text hover:text-emphasis"
           on:click={() => (showRawImageBytes = false)}
@@ -109,7 +109,7 @@
       </Tooltip>
     {/if}
     {#if canChart}
-      <Tooltip text={showFieldPicker ? "Show raw payload" : "Pick values to chart"}>
+      <Tooltip text={showFieldPicker ? "Show raw payload" : "Pick values to chart"} focusable>
         <button
           class={`flex items-center gap-1 text-sm px-2 py-1 rounded whitespace-nowrap ${
             showFieldPicker ? "text-primary" : "text-secondary-text hover:text-emphasis"

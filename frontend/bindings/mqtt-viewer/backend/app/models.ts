@@ -141,6 +141,31 @@ export class EnvInfo {
     }
 }
 
+export class MemoryStats {
+    "historyBytes": number;
+    "activeConnections": number;
+
+    /** Creates a new MemoryStats instance. */
+    constructor($$source: Partial<MemoryStats> = {}) {
+        if (!("historyBytes" in $$source)) {
+            this["historyBytes"] = 0;
+        }
+        if (!("activeConnections" in $$source)) {
+            this["activeConnections"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryStats instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryStats {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryStats($$parsedSource as Partial<MemoryStats>);
+    }
+}
+
 export class MqttStats {
     "totalMessagesReceived": number;
     "totalMessagesSent": number;

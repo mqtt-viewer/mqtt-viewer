@@ -78,3 +78,14 @@ For pixel-level UI checks, prefer **Storybook** on its own dev port (see
 `scripts/dev-ports.sh` / `.claude/launch.json`) plus the **native app** via
 `wails3 dev` for real end-to-end behaviour. Use server mode when an agent needs to
 exercise real bindings over HTTP without a native webview.
+## Writing style (binding, always)
+
+Anything a user reads follows `docs/WRITING_STYLE.md`: the changelog and
+"What's new" notes, dialog copy, tooltips, empty states, README, release
+notes. Read that file before writing any of it. The hard rules, so they are
+never missed:
+
+- No em dashes, ever. It is the fastest tell that a machine wrote it.
+- No emojis.
+- First person singular ("I", not "we"), British spelling.
+- Terse. Changelog section bodies are one sentence, dev-changelog style.

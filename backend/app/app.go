@@ -10,20 +10,28 @@ import (
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
+	"sync"
 	"sync/atomic"
 )
 
 type App struct {
-	ctx            context.Context
-	Mode           AppMode
-	Paths          paths.Paths
-	Db             *db.DB
-	EventRuntime   *eventRuntime.EventRuntime
-	Events         *events.ConnectionEvents
-	Version        string
-	AppConnections map[uint]*AppConnection
-	Updater        *update.Updater
-	ProtoRegistry  *protobuf.ProtoRegistry
+	ctx          context.Context
+	Mode         AppMode
+	Paths        paths.Paths
+	Db           *db.DB
+	EventRuntime *eventRuntime.EventRuntime
+	Events       *events.ConnectionEvents
+	Version      string
+	Updater      *update.Updater
+	// Loaded in the background by Startup while binding calls are already
+	// being served, so reads have to be atomic. Use protoRegistry() /
+	// setProtoRegistry rather than touching it directly.
+	protoRegistryPtr atomic.Pointer[protobuf.ProtoRegistry]
+	// Guarded by appConnectionsMu; reach it only through the helpers in
+	// app_connections.go. Binding calls arrive on separate goroutines, so an
+	// unlocked add/delete against a concurrent poll is a fatal map race.
+	appConnections   map[uint]*AppConnection
+	appConnectionsMu sync.RWMutex
 	// Cached so the 300ms message-buffer drain doesn't hit the DB to decide
 	// whether to persist; kept in sync by loadRetentionSettings / UpdateAppSettings.
 	recordingEnabled atomic.Bool
@@ -35,6 +43,19 @@ type App struct {
 	// windows: lets WindowClosing handlers tell an app quit apart from the
 	// user closing a window by hand (see OpenTopicWindow).
 	shuttingDown atomic.Bool
+	// recordQueue hands drained batches to the single recording-worker
+	// goroutine so DB writes never happen on the buffer-drain hot path.
+	recordQueue chan recordBatch
+	recordStop  chan struct{}
+	// recordDropped counts batches shed because recordQueue was full.
+	recordDropped atomic.Int64
+	// Throttles the "record queue full" warning the same way lastPruneCheckNanos
+	// throttles the prune check.
+	lastRecordDropLogNanos atomic.Int64
+	// connectedConnCount tracks how many connections are currently up, so the
+	// soft runtime memory limit (memlimit.go) can scale with live connection
+	// count rather than assuming every saved connection is active.
+	connectedConnCount atomic.Int64
 }
 
 type AppConnection struct {
@@ -44,6 +65,22 @@ type AppConnection struct {
 	SubscriptionMatcher *topicmatching.SubscriptionMatcher
 	MqttMessageBuffer   *mqtt.MessageBuffer
 	EventSet            *events.ConnectionEventsSet
+	// connUp guards connectedConnCount against double-counting: the
+	// underlying manager's OnConnectionUp/OnConnectionDown callbacks are not
+	// guaranteed to alternate (e.g. Disconnect() on an already-down
+	// connection, or repeated Connected transitions on reconnect) and are not
+	// guaranteed to be serialised onto one goroutine, so counting is gated by
+	// a CompareAndSwap rather than trusting callback alternation.
+	connUp atomic.Bool
+}
+
+// protoRegistry returns the loaded registry, or nil while it is still loading.
+func (a *App) protoRegistry() *protobuf.ProtoRegistry {
+	return a.protoRegistryPtr.Load()
+}
+
+func (a *App) setProtoRegistry(registry *protobuf.ProtoRegistry) {
+	a.protoRegistryPtr.Store(registry)
 }
 
 func NewApp(appMode AppMode, version string) *App {
