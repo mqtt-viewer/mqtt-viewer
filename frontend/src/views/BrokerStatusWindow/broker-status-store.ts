@@ -13,6 +13,9 @@
 //   - Svelte store writes are coalesced: at most one `set` per incoming batch
 //     event (~300 ms cadence) and one per 1 s ticker tick — never per message.
 //   - Sparkline buffers are capped and trimmed in place.
+//   - Ranges longer than 15 m are served by fixed-size minute rollups (a
+//     1,440-slot topic ring and one-minute averages of the hero series), so a
+//     24 h range costs the same memory as a 1 m one. See long-series.ts.
 
 import { get, writable } from "svelte/store";
 import { Events } from "@wailsio/runtime";
@@ -41,6 +44,11 @@ import {
   type HealthChipState,
   type HealthMetric,
 } from "./health";
+import {
+  createMinuteSeries,
+  stitch,
+  type MinuteSeries,
+} from "./long-series";
 
 /**
  * Max sparkline points retained per tile; older points are trimmed in place.
@@ -73,6 +81,12 @@ export const TOPIC_ADMISSION_CAP = 512;
 export const TOPIC_TOP_K = 16;
 /** Depth of the per-second ring: 900 s = 15 m at 1 Hz. */
 export const TOPIC_RING_CAP = 900;
+/**
+ * Depth of the per-minute ring the second-grain records roll up into: 1,440
+ * minutes = one day, which is the longest selectable range. Fixed cost: it
+ * holds the same 1,440 records whether the selected range is 1 m or 24 h.
+ */
+export const TOPIC_MINUTE_RING_CAP = 1440;
 /** Rows shown in the loudest-topics table. */
 export const LOUDEST_ROWS = 6;
 
@@ -99,6 +113,32 @@ export const TREND_SETTLE_MIN_MS = 120_000;
 
 // --- Time-range constants ----------------------------------------------------
 export const DEFAULT_RANGE_MINUTES = 5;
+/** Shortest selectable range (1 s), so a range can never divide by zero. */
+export const MIN_RANGE_MINUTES = 1 / 60;
+/** Longest selectable range: one day, the span the minute rings retain. */
+export const MAX_RANGE_MINUTES = 1440;
+/**
+ * Span the second-grain buffers cover (the 900-deep topic ring and the 900
+ * settled seconds of observed samples). Ranges up to this read straight from
+ * them; longer ranges read the minute rollups, stitched to the second-grain
+ * tail so the live edge stays live.
+ */
+export const RAW_RANGE_MINUTES = 15;
+/**
+ * Re-merge interval for the loudest table on a long range. At 24 h a merge
+ * walks both rings, which is far more work than the 1 Hz tick needs to do for
+ * a table whose numbers move slowly. Short ranges keep merging every tick.
+ */
+export const LONG_MERGE_INTERVAL_MS = 5_000;
+
+/**
+ * Holds a range inside what the buffers can honestly serve. A range longer
+ * than a day would draw a line the minute rings never retained.
+ */
+export const clampRange = (minutes: number): number => {
+  if (!Number.isFinite(minutes) || minutes <= 0) return DEFAULT_RANGE_MINUTES;
+  return Math.min(Math.max(minutes, MIN_RANGE_MINUTES), MAX_RANGE_MINUTES);
+};
 
 // --- Learned $SYS interval (burst-collapsed EMA) constants -------------------
 /** Seed interval (s) until two burst gaps have been observed. */
@@ -225,6 +265,13 @@ export interface BrokerStatusState {
   sysLastSeenMs: number;
   /** Per-second client-observed msgs/s (settled), for the hero's third series. */
   observedSeries: SparklineSample[];
+  /**
+   * Minute-grain hero series, stitched to their live second-grain tail. Set
+   * only while the selected range is longer than the second-grain buffers
+   * cover (see RAW_RANGE_MINUTES); null otherwise, meaning "read the raw
+   * samples". Keyed by "observed", "msg_rate_in" and "msg_rate_out".
+   */
+  longSeries: Map<string, SparklineSample[]> | null;
   /** Loudest-topics view model (top rows + overflow + collecting flag). */
   loudest: LoudestState;
   /** Evaluated health chips (renderable), in strip order. */
@@ -261,14 +308,20 @@ interface TopicRingEntry {
 }
 
 /**
- * A frozen per-second capture: the interval's top-K topics plus the collapsed
- * other-bucket totals. Pushed onto the ring by the tick; never mutated after.
+ * A frozen capture: the interval's top-K topics plus the collapsed other-bucket
+ * totals. Pushed onto the ring by the tick; never mutated after.
+ *
+ * `secs` is how many wall seconds the record accounts for. Per-second records
+ * always carry 1; a minute rollup carries however many of its seconds were
+ * actually observed, so a rate divided by the summed `secs` stays true even
+ * when a minute was only partly covered.
  */
 interface TopicRingRecord {
   sec: number;
   entries: TopicRingEntry[];
   otherCount: number;
   otherBytes: number;
+  secs: number;
 }
 
 const emptyRuntime = (): TileRuntime => ({
@@ -293,7 +346,7 @@ const isVisibleTile = (tile: MetricTile): boolean => !tile.hidden;
 export const createBrokerStatusStore = (
   connectionId: number,
   eventSet: events.ConnectionEventsSet,
-  opts: { connected?: boolean } = {}
+  opts: { connected?: boolean; rangeMinutes?: number } = {}
 ) => {
   // Effective tiles + per-tile runtime, keyed by tile.key. Runtime survives a
   // mappings reload for tiles whose key is unchanged (preserving sparklines).
@@ -329,6 +382,16 @@ export const createBrokerStatusStore = (
   // Per-second client-observed msgs/s, settled at sec(now)-2. Capped ring array
   // (trimmed in place), consumed by the hero's third series.
   let observedSeries: SparklineSample[] = [];
+  // Minute rollups of the three hero series, so a range longer than the
+  // second-grain buffers still has a full line to draw. Fixed cost: 1,440
+  // closed minutes each, whatever the range.
+  const observedMinutes = createMinuteSeries();
+  const heroMinutes = new Map<string, MinuteSeries>([
+    ["msg_rate_in", createMinuteSeries()],
+    ["msg_rate_out", createMinuteSeries()],
+  ]);
+  // Stitched long series, rebuilt on the tick while the range needs them.
+  let longSeriesCache: Map<string, SparklineSample[]> | null = null;
   // Newest settled second already pushed into observedSeries (-1 = none yet).
   let lastObservedSec = -1;
 
@@ -348,6 +411,16 @@ export const createBrokerStatusStore = (
   );
   let topicRingHead = -1; // index of the most recent record
   let topicRingLen = 0; // number of populated records (≤ TOPIC_RING_CAP)
+  // Minute rollups of the same records, for ranges beyond the second ring's
+  // 15 m. `minuteOpen` accumulates the minute in progress and is only pushed
+  // once a later minute starts, so a ring record always covers a whole minute
+  // (`secs` says how many of its seconds were observed).
+  const topicMinuteRing: (TopicRingRecord | null)[] = new Array(
+    TOPIC_MINUTE_RING_CAP
+  ).fill(null);
+  let topicMinuteHead = -1;
+  let topicMinuteLen = 0;
+  let minuteOpen: TopicRingRecord | null = null;
   // Cached merge over the selected window, recomputed on the tick so buildState
   // is cheap. Seeded empty.
   let loudestCache: LoudestState = {
@@ -372,8 +445,11 @@ export const createBrokerStatusStore = (
   let healthStates = new Map<HealthChipId, HealthChipState>();
   let healthChips: HealthChip[] = [];
 
-  // Selected time range (minutes). Drives the hero window + loudest merge.
-  let rangeMinutes = DEFAULT_RANGE_MINUTES;
+  // Selected time range (minutes, may be fractional for a sub-minute custom
+  // interval). Drives the hero window + loudest merge.
+  let rangeMinutes = clampRange(opts.rangeMinutes ?? DEFAULT_RANGE_MINUTES);
+  // Wall time of the last loudest merge, for the long-range throttle.
+  let lastMergeMs = 0;
 
   let sysEverSeen = false;
   let sysLastSeenMs = -1;
@@ -453,6 +529,7 @@ export const createBrokerStatusStore = (
     learnedIntervalMs: learnedIntervalSec * 1000,
     sysLastSeenMs,
     observedSeries,
+    longSeries: longSeriesCache,
     loudest: loudestCache,
     health: healthChips,
   });
@@ -460,9 +537,12 @@ export const createBrokerStatusStore = (
   const { subscribe, set } = writable<BrokerStatusState>(buildState());
   const flush = () => set(buildState());
 
-  const pushSample = (rt: TileRuntime, t: number, v: number) => {
+  // Samples feed the tile's own capped buffer and, for the two hero broker
+  // rates, the minute rollup a long range reads from.
+  const pushSample = (key: string, rt: TileRuntime, t: number, v: number) => {
     rt.samples.push({ t, v });
     if (rt.samples.length > SPARKLINE_CAP) rt.samples.shift();
+    heroMinutes.get(key)?.push(t, v);
   };
 
   // Recomputes each tile's winning candidate. Pattern matching costs
@@ -521,7 +601,7 @@ export const createBrokerStatusStore = (
           if (rate < 0) rate = 0; // counter reset (broker restart) → clamp
           rt.value = rate;
           rt.isDuration = false;
-          pushSample(rt, entry.timeMs, rate);
+          pushSample(tile.key, rt, entry.timeMs, rate);
         }
         // First cumulative sample yields no rate yet: nothing to display.
         continue;
@@ -529,7 +609,7 @@ export const createBrokerStatusStore = (
 
       rt.isDuration = sel.candidate.kind === "duration";
       rt.value = parsed.value;
-      pushSample(rt, entry.timeMs, parsed.value);
+      pushSample(tile.key, rt, entry.timeMs, parsed.value);
     }
   };
 
@@ -593,7 +673,9 @@ export const createBrokerStatusStore = (
     if (target <= lastObservedSec) return;
     const from = Math.max(lastObservedSec + 1, target - SPARKLINE_CAP + 1);
     for (let sec = from; sec <= target; sec++) {
-      observedSeries.push({ t: sec * 1000, v: bucketCountForSec(sec) });
+      const v = bucketCountForSec(sec);
+      observedSeries.push({ t: sec * 1000, v });
+      observedMinutes.push(sec * 1000, v);
     }
     // One splice, not a shift per pushed sample.
     if (observedSeries.length > SPARKLINE_CAP) {
@@ -655,6 +737,7 @@ export const createBrokerStatusStore = (
       entries,
       otherCount: dropCount,
       otherBytes: dropBytes,
+      secs: base.secs + add.secs,
     };
   };
 
@@ -680,19 +763,48 @@ export const createBrokerStatusStore = (
       entries: top,
       otherCount,
       otherBytes,
+      secs: 1,
     };
     const head = topicRingHead >= 0 ? topicRing[topicRingHead] : null;
-    if (head && head.sec === sec) {
-      topicRing[topicRingHead] = mergeRingRecords(head, record);
+    const sameSecond = !!head && head.sec === sec;
+    if (sameSecond) {
+      topicRing[topicRingHead] = mergeRingRecords(head!, record);
     } else {
       topicRingHead = (topicRingHead + 1) % TOPIC_RING_CAP;
       topicRing[topicRingHead] = record;
       topicRingLen = Math.min(topicRingLen + 1, TOPIC_RING_CAP);
     }
+    // A second tick inside the same wall second adds counts but no new second,
+    // so it must not inflate the minute's divisor.
+    rollUpMinute(sameSecond ? { ...record, secs: 0 } : record);
     curCount.clear();
     curBytes.clear();
     otherCount = 0;
     otherBytes = 0;
+  };
+
+  // Folds a frozen second into the open minute, pushing the previous minute
+  // onto the minute ring when the wall minute turns over. The fold keeps the
+  // strongest TOPIC_TOP_K topics of the minute and collapses the rest into the
+  // other-bucket, exactly as the per-second capture does within a second.
+  const rollUpMinute = (record: TopicRingRecord) => {
+    const minuteSec = Math.floor(record.sec / 60) * 60;
+    if (minuteOpen && minuteOpen.sec !== minuteSec) {
+      topicMinuteHead = (topicMinuteHead + 1) % TOPIC_MINUTE_RING_CAP;
+      topicMinuteRing[topicMinuteHead] = minuteOpen;
+      topicMinuteLen = Math.min(topicMinuteLen + 1, TOPIC_MINUTE_RING_CAP);
+      minuteOpen = null;
+    }
+    if (!minuteOpen) {
+      minuteOpen = {
+        sec: minuteSec,
+        entries: [],
+        otherCount: 0,
+        otherBytes: 0,
+        secs: 0,
+      };
+    }
+    minuteOpen = mergeRingRecords(minuteOpen, record);
   };
 
   // Merge the last `windowMinutes` of ring records into the top-N loudest
@@ -707,14 +819,12 @@ export const createBrokerStatusStore = (
     const merged = new Map<string, { count: number; bytes: number }>();
     let mergedOtherCount = 0;
     let seen = 0;
-    for (let i = 0; i < topicRingLen && seen < windowSec; i++) {
-      const idx =
-        ((topicRingHead - i) % TOPIC_RING_CAP + TOPIC_RING_CAP) %
-        TOPIC_RING_CAP;
-      const rec = topicRing[idx];
-      if (!rec) break;
-      if (rec.sec <= oldestSec) break;
-      seen++;
+    // Oldest second the second-grain scan reached. Minute records overlapping
+    // it are already accounted for and must not be counted twice.
+    let oldestScannedSec = Number.POSITIVE_INFINITY;
+
+    const foldRecord = (rec: TopicRingRecord) => {
+      seen += rec.secs;
       for (const e of rec.entries) {
         const cur = merged.get(e.topic);
         if (cur) {
@@ -725,6 +835,36 @@ export const createBrokerStatusStore = (
         }
       }
       mergedOtherCount += rec.otherCount;
+    };
+
+    for (let i = 0; i < topicRingLen && seen < windowSec; i++) {
+      const idx =
+        ((topicRingHead - i) % TOPIC_RING_CAP + TOPIC_RING_CAP) %
+        TOPIC_RING_CAP;
+      const rec = topicRing[idx];
+      if (!rec) break;
+      if (rec.sec <= oldestSec) break;
+      oldestScannedSec = rec.sec;
+      foldRecord(rec);
+    }
+
+    // Beyond the second ring's 15 m the minute rollups carry the window. A
+    // minute the second scan already touched is skipped whole: it would
+    // double-count, and the seconds it holds are the ones just counted. A
+    // minute straddling the start of the window is kept whole, which samples a
+    // little more history than asked for, but `secs` divides it honestly.
+    if (seen < windowSec) {
+      for (let i = 0; i < topicMinuteLen && seen < windowSec; i++) {
+        const idx =
+          ((topicMinuteHead - i) % TOPIC_MINUTE_RING_CAP +
+            TOPIC_MINUTE_RING_CAP) %
+          TOPIC_MINUTE_RING_CAP;
+        const rec = topicMinuteRing[idx];
+        if (!rec) break;
+        if (rec.sec <= oldestSec) break;
+        if (rec.sec + 60 > oldestScannedSec) continue; // already scanned
+        foldRecord(rec);
+      }
     }
 
     // Divide by the seconds actually covered so a partly-elapsed window still
@@ -766,6 +906,33 @@ export const createBrokerStatusStore = (
       overflowMsgPerSec,
       collecting: elapsedSec < windowSec,
     };
+  };
+
+  // Rebuilds everything that depends on the selected range: the loudest merge
+  // and, past RAW_RANGE_MINUTES, the stitched hero series. `force` bypasses the
+  // long-range throttle so a range change is visible at once.
+  const refreshRangeDerived = (now: number, force = false) => {
+    const long = rangeMinutes > RAW_RANGE_MINUTES;
+    if (!long || force || now - lastMergeMs >= LONG_MERGE_INTERVAL_MS) {
+      loudestCache = mergeLoudest(rangeMinutes, now);
+      lastMergeMs = now;
+    }
+    if (!long) {
+      longSeriesCache = null;
+      return;
+    }
+    // Point references are shared with the raw buffers, so this is a few
+    // thousand pointer copies per rebuild, not a copy of the data.
+    const out = new Map<string, SparklineSample[]>();
+    out.set(
+      "observed",
+      stitch(observedMinutes.points(), observedSeries, observedMinutes.openMs())
+    );
+    for (const [key, series] of heroMinutes) {
+      const samples = runtime.get(key)?.samples ?? [];
+      out.set(key, stitch(series.points(), samples, series.openMs()));
+    }
+    longSeriesCache = out;
   };
 
   // --- Learned $SYS interval -------------------------------------------------
@@ -853,7 +1020,7 @@ export const createBrokerStatusStore = (
     rt.value = value;
     rt.text = null;
     rt.isDuration = false;
-    pushSample(rt, timeMs, value);
+    pushSample(key, rt, timeMs, value);
   };
 
   // Clears a computed/derived tile to the "no data" state (no sample pushed).
@@ -963,9 +1130,10 @@ export const createBrokerStatusStore = (
     pushObservedSeries(nowSec);
 
     // Rotate the open per-topic interval into the ring, then refresh the cached
-    // loudest-topics merge. Both run here (once/sec), never per message.
+    // loudest-topics merge and the stitched long series. All run here
+    // (once/sec at most), never per message.
     rotateTopicInterval(nowSec);
-    loudestCache = mergeLoudest(rangeMinutes, now);
+    refreshRangeDerived(now);
 
     // Derived ratios + health, both reading the freshly-sampled runtime.
     const learnedIntervalMs = learnedIntervalSec * 1000;
@@ -1009,11 +1177,14 @@ export const createBrokerStatusStore = (
     sysEverSeen = false;
     sysLastSeenMs = -1;
 
-    // Observed instantaneous series.
+    // Observed instantaneous series, and every minute rollup built from it.
     observedSeries = [];
     lastObservedSec = -1;
+    observedMinutes.reset();
+    for (const series of heroMinutes.values()) series.reset();
+    longSeriesCache = null;
 
-    // Per-topic engine: current interval, ring, and cached merge.
+    // Per-topic engine: current interval, both rings, and cached merge.
     curCount.clear();
     curBytes.clear();
     otherCount = 0;
@@ -1021,6 +1192,11 @@ export const createBrokerStatusStore = (
     topicRing.fill(null);
     topicRingHead = -1;
     topicRingLen = 0;
+    topicMinuteRing.fill(null);
+    topicMinuteHead = -1;
+    topicMinuteLen = 0;
+    minuteOpen = null;
+    lastMergeMs = 0;
     loudestCache = {
       rows: [],
       overflowTopics: 0,
@@ -1172,6 +1348,9 @@ export const createBrokerStatusStore = (
     bindListeners();
     const rows = await loadMappings();
     await Promise.all([backfillSys(), backfillCustomTopics(rows)]);
+    // A restored long range must have its stitched series before the first
+    // tick, or the hero draws one frame off the raw buffers alone.
+    refreshRangeDerived(Date.now(), true);
     if (connected) startTicker();
     flush();
   };
@@ -1198,13 +1377,15 @@ export const createBrokerStatusStore = (
     stopTicker();
   };
 
-  // Sets the selected time range (minutes: 1/5/15). Drives the hero window and
-  // the loudest-topics merge; re-merges immediately so the change is visible
-  // without waiting for the next tick.
+  // Sets the selected time range in minutes: a preset, or a custom interval
+  // that may be fractional (30 s = 0.5) and runs to a day. Drives the hero
+  // window and the loudest-topics merge; both are rebuilt immediately so the
+  // change is visible without waiting for the next tick.
   const setRange = (minutes: number) => {
-    if (minutes === rangeMinutes) return;
-    rangeMinutes = minutes;
-    loudestCache = mergeLoudest(rangeMinutes, Date.now());
+    const next = clampRange(minutes);
+    if (next === rangeMinutes) return;
+    rangeMinutes = next;
+    refreshRangeDerived(Date.now(), true);
     flush();
   };
 
@@ -1218,6 +1399,8 @@ export const createBrokerStatusStore = (
     snapshot: () => get({ subscribe }),
     /** Test/inspection helper: populated depth of the per-topic ring. */
     topicRingSize: () => topicRingLen,
+    /** Test/inspection helper: populated depth of the per-minute rollup ring. */
+    topicMinuteRingSize: () => topicMinuteLen,
     connectionId,
   };
 };

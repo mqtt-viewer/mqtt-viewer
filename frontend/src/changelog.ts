@@ -103,7 +103,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "A status page for your broker",
-        body: "There's a new broker status window built for on-the-fly debugging. A health strip warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart plots messages in and out against what this client receives over a 1, 5 or 15 minute window, and a loudest topics table shows which topics are making the noise. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
+        body: "There's a new broker status window built for on-the-fly debugging. A health strip warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart plots messages in and out against what this client receives over a window from a minute to a day, and a loudest topics table shows which topics are making the noise. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
         thanks: [
           {
             name: "m1dnight",

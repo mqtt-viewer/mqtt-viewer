@@ -419,6 +419,9 @@ type MockBrokerState = {
   learnedIntervalMs: number;
   sysLastSeenMs: number;
   observedSeries: import("@/views/BrokerStatusWindow/broker-status-store").SparklineSample[];
+  // Minute-grain hero series, set only on ranges longer than the second-grain
+  // buffers cover. Null here: the stories all sit inside that window.
+  longSeries: Map<string, import("@/views/BrokerStatusWindow/broker-status-store").SparklineSample[]> | null;
   loudest: import("@/views/BrokerStatusWindow/broker-status-store").LoudestState;
   health: import("@/views/BrokerStatusWindow/health").HealthChip[];
 };
@@ -440,6 +443,7 @@ export const createMockBrokerStatusStore = (
     learnedIntervalMs: 10_000,
     sysLastSeenMs: now - 3000,
     observedSeries: mockObservedSeries(),
+    longSeries: null,
     loudest: mockLoudest(),
     health: mockHealthChips(),
     ...overrides,
@@ -453,6 +457,7 @@ export const createMockBrokerStatusStore = (
     snapshot: () => state,
     setRange: noop,
     topicRingSize: () => 0,
+    topicMinuteRingSize: () => 0,
     connectionId,
   };
 };

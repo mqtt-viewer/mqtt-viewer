@@ -40,6 +40,9 @@ import {
   OBSERVED_MSG_KEY,
   OBSERVED_BYTE_KEY,
   SPARKLINE_CAP,
+  TOPIC_RING_CAP,
+  TOPIC_MINUTE_RING_CAP,
+  MAX_RANGE_MINUTES,
   type BrokerStatusState,
   type BrokerTileView,
 } from "./broker-status-store";
@@ -803,6 +806,75 @@ describe("createBrokerStatusStore — setRange & reset", () => {
     expect(state.observedSeries).toHaveLength(0);
     expect(state.learnedIntervalMs).toBe(10_000); // back to the seed
     expect(store.topicRingSize()).toBe(0);
+    expect(store.topicMinuteRingSize()).toBe(0);
+    store.destroy();
+  });
+
+  it("accepts a seeded range and clamps anything beyond a day", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, {
+      rangeMinutes: 60,
+    });
+    await store.init();
+    expect(get(store).rangeMinutes).toBe(60);
+    store.setRange(5000); // longer than the rings retain
+    expect(get(store).rangeMinutes).toBe(MAX_RANGE_MINUTES);
+    store.setRange(0.5); // 30 s custom interval
+    expect(get(store).rangeMinutes).toBe(0.5);
+    store.destroy();
+  });
+});
+
+// --- v2: long ranges (minute rollups) ----------------------------------------
+
+describe("createBrokerStatusStore — ranges beyond the second-grain buffers", () => {
+  // Drives `minutes` of wall time, publishing one message a second on a fixed
+  // topic, so the per-second ring wraps and the minute ring fills behind it.
+  const runMinutes = (minutes: number) => {
+    for (let s = 0; s < minutes * 60; s++) {
+      emit("msgs", [msg("plant/a/temperature", "x", Date.now())]);
+      vi.advanceTimersByTime(1000);
+    }
+  };
+
+  it("rolls seconds into a bounded minute ring and rates the whole window", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, { rangeMinutes: 60 });
+    await store.init();
+
+    runMinutes(20); // past the 900 s second-ring depth
+
+    expect(store.topicRingSize()).toBe(TOPIC_RING_CAP); // capped, not growing
+    expect(store.topicMinuteRingSize()).toBeGreaterThan(15);
+    expect(store.topicMinuteRingSize()).toBeLessThanOrEqual(
+      TOPIC_MINUTE_RING_CAP
+    );
+
+    const row = get(store).loudest.rows.find(
+      (r) => r.topic === "plant/a/temperature"
+    );
+    expect(row).toBeDefined();
+    // One message a second across the whole window, however the window is
+    // assembled from the two rings.
+    expect(row!.msgPerSec).toBeGreaterThan(0.9);
+    expect(row!.msgPerSec).toBeLessThan(1.1);
+    store.destroy();
+  });
+
+  it("exposes stitched long series only while the range needs them", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, { rangeMinutes: 60 });
+    await store.init();
+    runMinutes(20);
+
+    const long = get(store).longSeries;
+    expect(long).not.toBeNull();
+    const observed = long!.get("observed")!;
+    // Minute averages reach further back than the 900 raw seconds ever could.
+    const span = observed[observed.length - 1].t - observed[0].t;
+    expect(span).toBeGreaterThan(SPARKLINE_CAP * 1000);
+    // The live edge is still second-grain.
+    expect(Date.now() - observed[observed.length - 1].t).toBeLessThan(10_000);
+
+    store.setRange(5);
+    expect(get(store).longSeries).toBeNull();
     store.destroy();
   });
 });

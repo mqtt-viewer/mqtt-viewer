@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "TimeRangeSelector",
   "tier": "view",
-  "description": "Small segmented control for the broker-status window range (1m / 5m / 15m); emits a legacy `change` event with the selected minutes.",
+  "description": "Segmented control for the broker-status window: 1m / 5m / 15m / 60m presets plus a custom interval (value and unit, capped at one day) in a dropdown; emits a legacy `change` event with the selected minutes.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -17,14 +17,14 @@
       "type": "number",
       "required": false,
       "default": 5,
-      "description": "Selected window in minutes; one of `options`."
+      "description": "Selected window in minutes. May be fractional (30 seconds is 0.5) and may sit outside `options` when the custom interval is in use."
     },
     {
       "name": "options",
       "type": "object",
       "required": false,
-      "default": [1, 5, 15],
-      "description": "Selectable windows in minutes."
+      "default": [1, 5, 15, 60],
+      "description": "Preset windows offered as segments, in minutes."
     },
     {
       "name": "sparseNote",
@@ -34,7 +34,14 @@
       "description": "Optional tooltip on the group explaining sparse broker series at short ranges. Nothing is ever disabled."
     }
   ],
-  "tokens": ["outline", "elevation-1", "selected", "emphasis", "secondary-text"],
-  "dependencies": ["Tooltip"],
-  "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail."
+  "tokens": [
+    "outline",
+    "elevation-1",
+    "selected",
+    "emphasis",
+    "secondary-text",
+    "error"
+  ],
+  "dependencies": ["Tooltip", "DropdownMenu", "BaseNumberInput"],
+  "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail. The custom segment is the selected-looking one whenever `value` is not a preset, and it is labelled with the live interval (\"2h\") instead of \"Custom\". Custom edits debounce at 400 ms and commit on Enter, blur or a unit click; the window is clamped to one day, which is all the broker-status store retains. Parse, clamp and label rules live in the colocated time-range.ts, which shares its unit vocabulary with the chart's chart-custom-window.ts."
 }
