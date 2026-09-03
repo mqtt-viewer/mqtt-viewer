@@ -82,9 +82,16 @@
         ? { text: "Reconnecting. Values frozen.", warn: true }
         : connectionState === "connecting"
           ? { text: "Connecting…", warn: false }
-          : everConnected
-            ? { text: "Disconnected. Values frozen.", warn: true }
-            : { text: "Not connected.", warn: false };
+          : connectionState === "error"
+            ? {
+                text: everConnected
+                  ? "Connection failed. Values frozen."
+                  : "Connection failed.",
+                warn: true,
+              }
+            : everConnected
+              ? { text: "Disconnected. Values frozen.", warn: true }
+              : { text: "Not connected.", warn: false };
 
   // Staleness pill: "waiting for $SYS" until the first message, then
   // "$SYS <age> ago" (greyed once the age exceeds 2x the learned interval).

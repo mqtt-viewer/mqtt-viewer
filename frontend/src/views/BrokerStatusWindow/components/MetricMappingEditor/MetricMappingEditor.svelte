@@ -208,7 +208,6 @@
           selected={overrideSelected}
           onChange={onOverrideChange}
           sameWidth
-          menuClass="z-[10002]"
         />
       </div>
       <BaseInput
