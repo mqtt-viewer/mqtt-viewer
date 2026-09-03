@@ -52,10 +52,17 @@ the gate that lets them see, and shape, what's going into the upcoming release.
   `--ff-only` merge.
 - Working tree clean, `gh auth status` OK.
 
-## 3. Promote the changelog (this is what makes updates show notes)
+## 3. Promote the changelog (this is what the release notes ARE)
 
-The shipped binary carries its own changelog, matched to its version at runtime.
-If you skip this, users who update see no "What's new". So:
+Two things depend on this entry. The shipped binary carries its own changelog
+and matches it to its version at runtime, so it becomes "What's new" after the
+update. And `just release` renders the same entry into the GitHub release body,
+which the workflows post to the portal and the update dialog shows under
+"What's changed" before the update.
+
+So the entry must be promoted and pushed before step 5. If it isn't,
+`just release` fails at the first command with "No released changelog entry for
+X.Y.Z" and nothing is tagged. So:
 
 - In `frontend/src/changelog.ts`, take the approved staging entry from step 1
   and promote it: set `released: true`, `version` to the bare semver
@@ -75,6 +82,12 @@ git push origin develop
 The commit must be on `develop` and pushed before step 5, because `just release`
 fast-forwards `main` from `origin/develop`.
 
+Then read back exactly what the release will say:
+
+```sh
+just release-notes VERSION PREV
+```
+
 ## 4. Dry run (recommended for risky releases)
 
 ```sh
@@ -85,14 +98,18 @@ just release-status   # watch the three workflows
 Fix any CI issues and use `just release-retry` (delete + recreate the tag, so
 workflows run from the fixed commit) rather than a plain re-run.
 
+A `-beta1` tag uses the changelog entry for the version it rehearses, so the dry
+run shows the real notes.
+
 ## 5. The real release (confirm first)
 
 ```sh
 just release VERSION PREV
 ```
 
-This merges `develop` into `main`, pushes, and runs `gh release create` with
-generated notes from `PREV`. Then watch:
+This renders the notes from the changelog entry, merges `develop` into `main`,
+pushes, and runs `gh release create --notes-file` with them. `PREV` is only the
+compare base for the "Full changelog" link at the bottom. Then watch:
 
 ```sh
 just release-status
