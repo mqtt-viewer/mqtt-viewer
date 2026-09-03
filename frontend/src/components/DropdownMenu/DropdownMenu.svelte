@@ -2,10 +2,15 @@
   import { setContext } from "svelte";
   import { createDropdownMenu, melt } from "@melt-ui/svelte";
   import { fly } from "svelte/transition";
+  import { writable } from "svelte/store";
   import Button from "../Button/Button.svelte";
   import { twMerge } from "tailwind-merge";
 
   export let disabled = false;
+  // Controlled open state. Pass a store to read or close the menu from
+  // outside (e.g. Escape inside a slotted input, or hiding a tooltip while
+  // the menu is open).
+  export let open = writable(false);
   export let triggerText = "";
   export let triggerClass = "";
   // Classes for the outer melt trigger <button> itself. The button is
@@ -51,12 +56,10 @@
   $: placementLocation = getPlacementLocation(placement);
   $: arrowRotation = getArrowRotation(placementLocation);
 
-  const {
-    elements,
-    states: { open },
-  } = createDropdownMenu({
+  const { elements } = createDropdownMenu({
     forceVisible: true,
     loop: true,
+    open,
   });
 
   const { trigger, menu, item, separator, arrow } = elements;

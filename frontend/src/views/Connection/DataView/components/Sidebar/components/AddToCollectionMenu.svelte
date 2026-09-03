@@ -4,8 +4,11 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import type { CollectionScope, CollectionsStore } from "../stores/collections";
   import { filterByScope } from "../stores/collections";
+  import { writable } from "svelte/store";
 
   export let collectionsStore: CollectionsStore;
+  // Menu open state, shared with the parent so it can react to it.
+  export let open = writable(false);
   // Collection currently holding the message (checked in the list), if any.
   export let currentCollectionId: number | null = null;
   export let placeholder = "Type to add new collection";
@@ -42,7 +45,7 @@
   };
 </script>
 
-<DropdownMenu placement="bottom-end">
+<DropdownMenu placement="bottom-end" {open}>
   <slot name="trigger" slot="trigger" />
   <div class="flex flex-col min-w-[220px]" slot="menu-content">
     <!-- svelte-ignore a11y_autofocus -->
@@ -51,7 +54,14 @@
       autofocus
       {placeholder}
       bind:value={query}
-      on:keydown|stopPropagation={() => {}}
+      on:keydown|stopPropagation={(e) => {
+        // stopPropagation keeps melt's typeahead off the input but also
+        // hides Escape from it, so close the menu here.
+        if (e.key === "Escape") {
+          e.preventDefault();
+          $open = false;
+        }
+      }}
     />
     {#if connectionMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Connection</div>

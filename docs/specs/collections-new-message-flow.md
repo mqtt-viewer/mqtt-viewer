@@ -111,9 +111,10 @@ Global and connection collections behave the same. Only the id matters.
   looking the id up in the collections store. If it is gone, the pending id
   is dropped and the control falls back to "Add to collection". Save is
   hidden again.
-- Draft kept across navigation: Back, reopening "New message", and opening a
-  history entry follow today's rules. Only opening a saved message or
-  resetting from a scratch copy clears the pending collection.
+- Draft kept across navigation: Back and reopening "New message" keep the
+  draft, its name and its pending collection. Loading a different message
+  into the editor drops all three: opening a saved message, opening a
+  history entry, or resetting from a scratch copy.
 - Empty name on save: fall back to the topic, then to "Untitled message".
   Renaming a saved message to an empty name is ignored, as the sidebar
   Rename does.

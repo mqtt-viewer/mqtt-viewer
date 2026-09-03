@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T01:34:02.142Z",
+  "generatedAt": "2026-09-03T01:58:21.740Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1161,6 +1161,12 @@
           "type": "boolean",
           "required": false,
           "default": false
+        },
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
         },
         {
           "name": "triggerText",
@@ -4249,6 +4255,12 @@
           "name": "collectionsStore",
           "type": "store",
           "required": true
+        },
+        {
+          "name": "open",
+          "type": "boolean",
+          "required": false,
+          "default": "writable(false)"
         },
         {
           "name": "currentCollectionId",

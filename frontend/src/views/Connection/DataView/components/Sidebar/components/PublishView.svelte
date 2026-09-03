@@ -28,6 +28,7 @@
   } from "../stores/collections";
   import AddToCollectionMenu from "./AddToCollectionMenu.svelte";
   import InlineNameInput from "./InlineNameInput.svelte";
+  import { writable } from "svelte/store";
 
   export let connection: Connection;
   export let isPublishDisabled: boolean;
@@ -107,6 +108,12 @@
     snapshotPublishDetails($publishStore) !== $publishStore.baseline;
 
   let isRenaming = false;
+  // Guards the pending-draft Save against a double click inserting twice:
+  // pendingCollection only clears once markSaved resolves.
+  let isSaving = false;
+  // Open state of the Add to collection menu; the chip tooltip hides while
+  // the menu is open so it cannot sit over the list.
+  const collectionMenuOpen = writable(false);
   $: displayName = isSavedMessage
     ? ($publishStore.sourceMessageName ?? "")
     : $publishStore.name || "Untitled message";
@@ -227,9 +234,14 @@
     }
   };
 
-  const savePendingDraft = () => {
-    if (pendingCollection === null) return;
-    saveNewToCollection(pendingCollection.id);
+  const savePendingDraft = async () => {
+    if (pendingCollection === null || isSaving) return;
+    isSaving = true;
+    try {
+      await saveNewToCollection(pendingCollection.id);
+    } finally {
+      isSaving = false;
+    }
   };
 
   const createAndSave = async (name: string, scope: CollectionScope) => {
@@ -319,7 +331,7 @@
           <span class="text-base text-emphasis truncate">{displayName}</span>
           <!-- Reserved width so the name does not shift when the pencil appears. -->
           <span
-            class="w-4 shrink-0 flex items-center justify-center text-secondary-text opacity-0 group-hover:opacity-100 group-hover:text-emphasis"
+            class="w-4 shrink-0 flex items-center justify-center text-secondary-text opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-hover:text-emphasis"
           >
             <Icon type="edit" size={14} />
           </span>
@@ -330,12 +342,13 @@
       <!-- Tooltip renders its bare slot when text is empty, so the no-chip
            case has no wrapper. -->
       <Tooltip
-        text={pendingCollection
+        text={pendingCollection && !$collectionMenuOpen
           ? `Will be saved to ${pendingCollection.name}`
           : ""}
       >
         <AddToCollectionMenu
           {collectionsStore}
+          open={collectionMenuOpen}
           currentCollectionId={pendingCollection?.id ?? null}
           onSelect={saveNewToCollection}
           onCreate={createAndSave}
@@ -534,7 +547,11 @@
           on:click={saveMessage}>Save</Button
         >
       {:else if pendingCollection !== null}
-        <Button variant="secondary" on:click={savePendingDraft}>Save</Button>
+        <Button
+          variant="secondary"
+          disabled={isSaving}
+          on:click={savePendingDraft}>Save</Button
+        >
       {/if}
       <Button
         disabled={!!$publishStore.topicError || isPublishDisabled}

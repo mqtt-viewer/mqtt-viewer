@@ -912,7 +912,12 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     description: 'Delete "Funzone"? The 2 messages in it will also be deleted.',
   },
   InlineNameInput: { name: "inline-name" },
-  AddToCollectionMenu: { placeholder: "Type to add new collection" },
+  // Menus render closed; the global `open` default is for dialogs.
+  AddToCollectionMenu: {
+    placeholder: "Type to add new collection",
+    open: writable(false),
+  },
+  DropdownMenu: { open: writable(false) },
   PublishView: { isPublishDisabled: false },
   SavedMessageRow: { message: mockCollectionMessage },
   SearchMessagesModal: { isOpen: writable(true) },

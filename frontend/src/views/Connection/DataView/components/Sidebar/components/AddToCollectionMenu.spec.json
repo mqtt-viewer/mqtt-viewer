@@ -18,6 +18,12 @@
       "required": true
     },
     {
+      "name": "open",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    },
+    {
       "name": "currentCollectionId",
       "type": "number",
       "required": false,
