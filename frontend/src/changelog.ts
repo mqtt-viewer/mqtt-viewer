@@ -78,6 +78,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Pop-out windows you can actually move",
+        body: "Pop-out chart and broker status windows could not be dragged at all. Grab the header to move them now. On macOS the header also leaves room for the window buttons instead of hiding the connection name behind them.",
+      },
+      {
         title: "Chart values that arrive as text",
         body: "Numeric readings often turn up wrapped in quotes, like \"24.6\". You can now chart those too, so a quoted number plots just like a plain one. Values that aren't really numbers stay out of the way.",
         thanks: [
