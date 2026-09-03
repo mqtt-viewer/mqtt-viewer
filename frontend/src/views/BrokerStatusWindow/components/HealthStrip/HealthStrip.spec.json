@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "HealthStrip",
   "tier": "view",
-  "description": "Row of broker-health chips. Renders only chips that have their minimum samples (chip.render) and hides entirely when none do. Composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix).",
+  "description": "Wrapping row of broker-health chips. Renders only chips that have their minimum samples (chip.render) and hides entirely when none do. Composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix). Chips wrap onto further rows when the window is too narrow for them all, with the row gap matching the chip gap.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
