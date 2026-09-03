@@ -49,6 +49,7 @@ import {
   stitch,
   type MinuteSeries,
 } from "./long-series";
+import { createHeavyHitters, lowerBound } from "./heavy-hitters";
 
 /**
  * Max sparkline points retained per tile; older points are trimmed in place.
@@ -71,14 +72,30 @@ export const AVG_MSG_SIZE_KEY = "avg_msg_size";
 
 // --- Per-topic ("loudest topics") engine constants ---------------------------
 /**
- * Admission cap on the current-interval maps: once this many distinct topics
- * have been seen in the open interval, further NEW topics fall into the
- * other-scalars instead of growing the map. Keeps the batch path O(1) and the
- * map bounded regardless of topic cardinality.
+ * Space-Saving counters held for the open interval (see heavy-hitters.ts).
+ * This is what bounds the per-topic engine now: no admission cap, no unbounded
+ * map, and ranking no longer depends on which topic happened to arrive first.
+ * Wide enough that ordinary brokers never evict at all, so their counts are
+ * exact; past that, a counter over-states by at most the interval's total / k
+ * and the reading corrects it back out.
  */
-export const TOPIC_ADMISSION_CAP = 512;
-/** Per-second top-K captured off each interval into the ring. */
-export const TOPIC_TOP_K = 16;
+export const TOPIC_SUMMARY_K = 512;
+/**
+ * Counters frozen into each ring record. The record also carries the
+ * interval's exact totals, so the topics dropped here are still accounted for
+ * in "other topics", just not named. Chosen by count, ties broken by topic
+ * name so the same topics are captured second after second (an arrival-order
+ * tie-break would sample a flat tree differently every second and under-report
+ * every one of them).
+ */
+export const TOPIC_CAPTURE_K = 32;
+/**
+ * Distinct topics a window merge will track. Records are folded newest first,
+ * so past the cap it is the oldest records that stop contributing new names.
+ * Only the top LOUDEST_ROWS are shown and "other" comes from the exact totals,
+ * so this bounds the merge without touching either number's honesty.
+ */
+export const TOPIC_MERGE_CAP = 4096;
 /** Depth of the per-second ring: 900 s = 15 m at 1 Hz. */
 export const TOPIC_RING_CAP = 900;
 /**
@@ -300,7 +317,7 @@ interface ObservedBucket {
   bytes: number;
 }
 
-/** One captured entry inside a per-second top-K ring record. */
+/** One topic's captured totals inside a ring record. Corrected, not inflated. */
 interface TopicRingEntry {
   topic: string;
   count: number;
@@ -308,8 +325,12 @@ interface TopicRingEntry {
 }
 
 /**
- * A frozen capture: the interval's top-K topics plus the collapsed other-bucket
- * totals. Pushed onto the ring by the tick; never mutated after.
+ * A frozen capture: the interval's heavy-hitter counters plus its EXACT totals.
+ * Pushed onto the ring by the tick; never mutated after.
+ *
+ * The totals are counted per message and are never approximate, which is what
+ * makes "other topics" exact: it is the window total minus the rows shown,
+ * rather than a leftover the summary happened to keep.
  *
  * `secs` is how many wall seconds the record accounts for. Per-second records
  * always carry 1; a minute rollup carries however many of its seconds were
@@ -319,8 +340,8 @@ interface TopicRingEntry {
 interface TopicRingRecord {
   sec: number;
   entries: TopicRingEntry[];
-  otherCount: number;
-  otherBytes: number;
+  totalCount: number;
+  totalBytes: number;
   secs: number;
 }
 
@@ -396,15 +417,13 @@ export const createBrokerStatusStore = (
   let lastObservedSec = -1;
 
   // --- Per-topic engine (loudest topics) -------------------------------------
-  // Current open interval's per-topic counters. Admission-capped: at
-  // TOPIC_ADMISSION_CAP distinct topics, further NEW topics fall into the
-  // other-scalars. Reset every tick. Buckets are tick-interval, not exact wall
-  // seconds — a batch straddling a boundary lands wholly in the open interval,
-  // which is fine at display grain.
-  const curCount = new Map<string, number>();
-  const curBytes = new Map<string, number>();
-  let otherCount = 0;
-  let otherBytes = 0;
+  // Current open interval: a bounded heavy-hitter summary plus exact totals.
+  // Reset every tick. Buckets are tick-interval, not exact wall seconds — a
+  // batch straddling a boundary lands wholly in the open interval, which is
+  // fine at display grain.
+  const curSummary = createHeavyHitters(TOPIC_SUMMARY_K);
+  let curTotalCount = 0;
+  let curTotalBytes = 0;
   // Fixed-size ring of frozen per-second records (a plain circular buffer).
   const topicRing: (TopicRingRecord | null)[] = new Array(TOPIC_RING_CAP).fill(
     null
@@ -688,33 +707,28 @@ export const createBrokerStatusStore = (
   // O(1) admission-capped count of one received message. No scans, no per-entry
   // objects beyond the (bounded) map keys.
   const addTopicCount = (topic: string, bytes: number) => {
-    const c = curCount.get(topic);
-    if (c !== undefined) {
-      curCount.set(topic, c + 1);
-      curBytes.set(topic, (curBytes.get(topic) ?? 0) + bytes);
-    } else if (curCount.size < TOPIC_ADMISSION_CAP) {
-      curCount.set(topic, 1);
-      curBytes.set(topic, bytes);
-    } else {
-      // Cap reached: absent topics collapse into the other-scalars.
-      otherCount += 1;
-      otherBytes += bytes;
-    }
+    curTotalCount += 1;
+    curTotalBytes += bytes;
+    curSummary.add(topic, bytes);
   };
 
-  // Folds `add` into `base`, keeping the strongest TOPIC_TOP_K topics and
-  // collapsing everything it drops into the other-scalars. Used when two ticks
-  // land in the same wall second: replacing the head record would discard the
-  // first tick's counts outright.
+  // Ranks captured entries the way records store them: loudest first, ties by
+  // topic name so the capture is stable second after second.
+  const captureTop = (entries: TopicRingEntry[]): TopicRingEntry[] =>
+    entries
+      .filter((e) => e.count > 0)
+      .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic))
+      .slice(0, TOPIC_CAPTURE_K);
+
+  // Folds `add` into `base`: captured topics add up and the exact totals add
+  // up. Used when two ticks land in the same wall second, and to roll a
+  // minute's seconds into one record.
   const mergeRingRecords = (
     base: TopicRingRecord,
     add: TopicRingRecord
   ): TopicRingRecord => {
     const byTopic = new Map<string, TopicRingEntry>();
-    for (const e of base.entries) {
-      byTopic.set(e.topic, { topic: e.topic, count: e.count, bytes: e.bytes });
-    }
-    for (const e of add.entries) {
+    for (const e of [...base.entries, ...add.entries]) {
       const cur = byTopic.get(e.topic);
       if (cur) {
         cur.count += e.count;
@@ -723,46 +737,26 @@ export const createBrokerStatusStore = (
         byTopic.set(e.topic, { topic: e.topic, count: e.count, bytes: e.bytes });
       }
     }
-    // At most 2 × TOPIC_TOP_K entries, so a plain sort is cheap and exact.
-    const all = Array.from(byTopic.values()).sort((a, b) => b.count - a.count);
-    const entries = all.slice(0, TOPIC_TOP_K);
-    let dropCount = base.otherCount + add.otherCount;
-    let dropBytes = base.otherBytes + add.otherBytes;
-    for (let i = TOPIC_TOP_K; i < all.length; i++) {
-      dropCount += all[i].count;
-      dropBytes += all[i].bytes;
-    }
     return {
       sec: base.sec,
-      entries,
-      otherCount: dropCount,
-      otherBytes: dropBytes,
+      entries: captureTop(Array.from(byTopic.values())),
+      totalCount: base.totalCount + add.totalCount,
+      totalBytes: base.totalBytes + add.totalBytes,
       secs: base.secs + add.secs,
     };
   };
 
-  // Partial-select the interval's top-K topics by count (O(cap × K)), freeze
-  // them plus the other-bucket into a ring record, then reset the interval.
-  // Deduped by sec: a second tick landing in the same wall second merges into
-  // the head record rather than replacing it.
+  // Freeze the open interval (its counters and its exact totals) into a ring
+  // record, then reset it. Deduped by sec: a second tick landing in the same
+  // wall second merges into the head record rather than replacing it.
   const rotateTopicInterval = (sec: number) => {
-    const top: TopicRingEntry[] = [];
-    for (const [topic, count] of curCount) {
-      if (top.length < TOPIC_TOP_K) {
-        top.push({ topic, count, bytes: curBytes.get(topic) ?? 0 });
-        // Keep the running list sorted ascending by count so index 0 is the
-        // weakest incumbent — an O(K) insertion, no full sort.
-        top.sort((a, b) => a.count - b.count);
-      } else if (count > top[0].count) {
-        top[0] = { topic, count, bytes: curBytes.get(topic) ?? 0 };
-        top.sort((a, b) => a.count - b.count);
-      }
-    }
     const record: TopicRingRecord = {
       sec,
-      entries: top,
-      otherCount,
-      otherBytes,
+      entries: captureTop(
+        curSummary.entries().map((e) => ({ topic: e.topic, ...lowerBound(e) }))
+      ),
+      totalCount: curTotalCount,
+      totalBytes: curTotalBytes,
       secs: 1,
     };
     const head = topicRingHead >= 0 ? topicRing[topicRingHead] : null;
@@ -777,16 +771,15 @@ export const createBrokerStatusStore = (
     // A second tick inside the same wall second adds counts but no new second,
     // so it must not inflate the minute's divisor.
     rollUpMinute(sameSecond ? { ...record, secs: 0 } : record);
-    curCount.clear();
-    curBytes.clear();
-    otherCount = 0;
-    otherBytes = 0;
+    curSummary.clear();
+    curTotalCount = 0;
+    curTotalBytes = 0;
   };
 
   // Folds a frozen second into the open minute, pushing the previous minute
   // onto the minute ring when the wall minute turns over. The fold keeps the
-  // strongest TOPIC_TOP_K topics of the minute and collapses the rest into the
-  // other-bucket, exactly as the per-second capture does within a second.
+  // minute's strongest captured topics and its exact totals, exactly as the
+  // per-second capture does within a second.
   const rollUpMinute = (record: TopicRingRecord) => {
     const minuteSec = Math.floor(record.sec / 60) * 60;
     if (minuteOpen && minuteOpen.sec !== minuteSec) {
@@ -799,8 +792,8 @@ export const createBrokerStatusStore = (
       minuteOpen = {
         sec: minuteSec,
         entries: [],
-        otherCount: 0,
-        otherBytes: 0,
+        totalCount: 0,
+        totalBytes: 0,
         secs: 0,
       };
     }
@@ -816,8 +809,10 @@ export const createBrokerStatusStore = (
     // the scan. Without this age gate a ring frozen by an outage keeps feeding
     // "over the last 5m" rates from traffic that stopped long ago.
     const oldestSec = Math.floor(now / 1000) - windowSec;
-    const merged = new Map<string, { count: number; bytes: number }>();
-    let mergedOtherCount = 0;
+    // Per-topic totals for the window, bounded by TOPIC_MERGE_CAP, alongside
+    // the window's exact totals.
+    const merged = new Map<string, TopicRingEntry>();
+    let totalCount = 0;
     let seen = 0;
     // Oldest second the second-grain scan reached. Minute records overlapping
     // it are already accounted for and must not be counted twice.
@@ -825,16 +820,20 @@ export const createBrokerStatusStore = (
 
     const foldRecord = (rec: TopicRingRecord) => {
       seen += rec.secs;
+      totalCount += rec.totalCount;
       for (const e of rec.entries) {
         const cur = merged.get(e.topic);
         if (cur) {
           cur.count += e.count;
           cur.bytes += e.bytes;
-        } else {
-          merged.set(e.topic, { count: e.count, bytes: e.bytes });
+        } else if (merged.size < TOPIC_MERGE_CAP) {
+          merged.set(e.topic, {
+            topic: e.topic,
+            count: e.count,
+            bytes: e.bytes,
+          });
         }
       }
-      mergedOtherCount += rec.otherCount;
     };
 
     for (let i = 0; i < topicRingLen && seen < windowSec; i++) {
@@ -871,21 +870,19 @@ export const createBrokerStatusStore = (
     // reads a true per-second rate.
     const divisor = Math.max(1, seen);
 
-    // Partial-select the top rows by count (O(distinct × rows)).
-    const rows: LoudestTopic[] = [];
-    let totalCount = mergedOtherCount;
+    // Partial-select the top rows by count (O(topics × rows)).
     const topEntries: TopicRingEntry[] = [];
-    for (const [topic, v] of merged) {
-      totalCount += v.count;
+    for (const e of merged.values()) {
       if (topEntries.length < LOUDEST_ROWS) {
-        topEntries.push({ topic, count: v.count, bytes: v.bytes });
+        topEntries.push(e);
         topEntries.sort((a, b) => a.count - b.count);
-      } else if (v.count > topEntries[0].count) {
-        topEntries[0] = { topic, count: v.count, bytes: v.bytes };
+      } else if (e.count > topEntries[0].count) {
+        topEntries[0] = e;
         topEntries.sort((a, b) => a.count - b.count);
       }
     }
     // topEntries is ascending; present strongest first.
+    const rows: LoudestTopic[] = [];
     let shownCount = 0;
     for (let i = topEntries.length - 1; i >= 0; i--) {
       const e = topEntries[i];
@@ -897,8 +894,12 @@ export const createBrokerStatusStore = (
       });
     }
 
+    // Everything the rows do not name, from the exact totals rather than from
+    // whatever the capture happened to keep. A row can in theory over-state
+    // (an evicted counter's correction is a lower bound, not a certainty), so
+    // clamp at zero rather than reporting a negative remainder.
     const overflowTopics = Math.max(0, merged.size - rows.length);
-    const overflowMsgPerSec = (totalCount - shownCount) / divisor;
+    const overflowMsgPerSec = Math.max(0, totalCount - shownCount) / divisor;
     const elapsedSec = (now - openedAt) / 1000;
     return {
       rows,
@@ -1096,7 +1097,8 @@ export const createBrokerStatusStore = (
       healthStates,
       now,
       learnedIntervalMs,
-      trendFloorMs
+      trendFloorMs,
+      sysLastSeenMs
     );
     healthStates = result.states;
     healthChips = result.chips;
@@ -1185,10 +1187,9 @@ export const createBrokerStatusStore = (
     longSeriesCache = null;
 
     // Per-topic engine: current interval, both rings, and cached merge.
-    curCount.clear();
-    curBytes.clear();
-    otherCount = 0;
-    otherBytes = 0;
+    curSummary.clear();
+    curTotalCount = 0;
+    curTotalBytes = 0;
     topicRing.fill(null);
     topicRingHead = -1;
     topicRingLen = 0;

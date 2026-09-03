@@ -631,13 +631,13 @@ describe("createBrokerStatusStore — loudest topics", () => {
     store.destroy();
   });
 
-  it("admission-caps the interval map at 512 distinct topics", async () => {
+  it("accounts for every message on a wide topic tree", async () => {
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
 
-    // 600 distinct topics, one message each. 512 admitted to the map, the
-    // remaining 88 collapse into the other-scalars; the per-second capture keeps
-    // its top 16.
+    // 600 distinct topics, one message each: far more than the per-interval
+    // summary holds. Whatever it keeps, the traffic it does not attribute to a
+    // row has to show up in the overflow rate, exactly.
     const batch = Array.from({ length: 600 }, (_, i) =>
       msg(`wide/topic${i}`, "x", Date.now())
     );
@@ -647,11 +647,61 @@ describe("createBrokerStatusStore — loudest topics", () => {
     const loud = get(store).loudest;
     expect(loud.rows).toHaveLength(6);
     expect(loud.rows[0].msgPerSec).toBe(1);
-    // 16 captured topics − 6 shown = 10 (a lower bound; the table renders the
-    // exact overflow RATE rather than this count).
-    expect(loud.overflowTopics).toBe(10);
-    // Exact: (16 captured + 88 other − 6 shown) msgs over 1 s.
-    expect(loud.overflowMsgPerSec).toBe(98);
+    const shown = loud.rows.reduce((n, r) => n + r.msgPerSec, 0);
+    // 600 messages over 1 s, no matter how they are summarised.
+    expect(shown + loud.overflowMsgPerSec).toBeCloseTo(600, 6);
+    store.destroy();
+  });
+
+  it("rates a busy tree of equals without losing seconds", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // 300 topics at 7 msg/s each for 10 s: 2100 msg/s in total, and no topic is
+    // ever in a small per-second top-K. Each shown row must still read ~7/s,
+    // and the overflow must carry the rest of the 2100.
+    for (let s = 0; s < 10; s++) {
+      const batch: any[] = [];
+      for (let t = 0; t < 300; t++) {
+        for (let i = 0; i < 7; i++) {
+          batch.push(msg(`busy/topic${t}`, "x", Date.now()));
+        }
+      }
+      emit("msgs", batch);
+      vi.advanceTimersByTime(1000);
+    }
+
+    const loud = get(store).loudest;
+    expect(loud.rows).toHaveLength(6);
+    for (const row of loud.rows) {
+      expect(row.msgPerSec).toBeGreaterThan(6);
+      expect(row.msgPerSec).toBeLessThan(9);
+    }
+    const shown = loud.rows.reduce((n, r) => n + r.msgPerSec, 0);
+    expect(shown + loud.overflowMsgPerSec).toBeCloseTo(2100, 1);
+    store.destroy();
+  });
+
+  it("ranks a loud latecomer above the quiet topics that arrived first", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // 600 quiet topics fill the interval before the loud one publishes a single
+    // message. Arrival order must not decide the ranking.
+    for (let s = 0; s < 5; s++) {
+      const batch: any[] = Array.from({ length: 600 }, (_, i) =>
+        msg(`quiet/topic${i}`, "x", Date.now())
+      );
+      for (let i = 0; i < 500; i++) {
+        batch.push(msg("loud/firehose", "x", Date.now()));
+      }
+      emit("msgs", batch);
+      vi.advanceTimersByTime(1000);
+    }
+
+    const loud = get(store).loudest;
+    expect(loud.rows[0].topic).toBe("loud/firehose");
+    expect(loud.rows[0].msgPerSec).toBeGreaterThan(450);
     store.destroy();
   });
 });

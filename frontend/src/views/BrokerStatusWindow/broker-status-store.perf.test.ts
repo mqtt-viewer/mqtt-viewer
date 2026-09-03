@@ -17,7 +17,8 @@
 //   - Message mix: ~2% $SYS topics with numeric payloads (drive the tiles),
 //     ~98% regular topics across a wide, mostly-distinct topic tree with
 //     realistic base64 payloads (~100–300 decoded bytes) — ~9k distinct topics
-//     exercise the per-topic engine's 512 admission cap.
+//     exercise the per-topic engine's 512-counter summary and its eviction
+//     path.
 //
 // What it asserts:
 //   - mean per-batch handler time < 5 ms, total handler time < 5.5 s

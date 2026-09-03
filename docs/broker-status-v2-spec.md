@@ -178,7 +178,7 @@ New builtin metrics (all `hidden`, chip/facts/legend consumers):
 
 | id | candidates | kind | scale |
 | --- | --- | --- | --- |
-| `msgs_dropped` | `$SYS/broker/load/publish/dropped/1min`; `$SYS/broker/mqtt/publish/dropped`*; `$SYS/broker/publish/messages/dropped`*; `$SYS/broker/messages/publish/dropped`*; `$SYS/broker/messages/dropped`*; `$SYS/brokers/+/metrics/messages/dropped`* | gauge; * cumulative | 1/60 on the load candidate |
+| `msgs_dropped` | `$SYS/broker/load/publish/dropped/1min`; `$SYS/broker/mqtt/publish/dropped`*; `$SYS/broker/publish/messages/dropped`*; `$SYS/broker/messages/dropped`*; `$SYS/brokers/+/metrics/messages/dropped`* | gauge; * cumulative | 1/60 on the load candidate |
 | `delivery_backlog` | `$SYS/broker/packet/out/count` | gauge | — |
 | `heap_current` | `$SYS/broker/heap/current`; `$SYS/+/memory/heap/current` | gauge | — |
 | `heap_max` | `$SYS/broker/heap/maximum`; `$SYS/+/memory/heap/maximum` | gauge | — |
@@ -198,24 +198,39 @@ invalidates that interval for ratios.
 
 ## Store additions (`broker-status-store.ts`)
 
-- **Per-topic engine** (loudest topics), O(1) per message:
-  - Current-interval maps `curCount/curBytes: Map<topic, number>`;
-    admission-only cap: at 512 distinct topics, absent topics increment
-    `otherCount/otherBytes` scalars. No eviction, no scans, no per-entry
-    objects in the batch path. Buckets are tick-interval, not exact wall
-    seconds (a 300 ms batch spanning a boundary lands in the open
+- **Per-topic engine** (loudest topics), O(log k) per message:
+  - Current interval: a Space-Saving summary of 512 counters
+    (`heavy-hitters.ts`) plus the interval's EXACT total count and bytes.
+    An untracked topic evicts the smallest counter and inherits its
+    count, so a loud latecomer displaces quiet incumbents and ranking
+    never depends on arrival order; each counter records what it
+    inherited, and the reading subtracts it again, so a counter never
+    reports more than the topic sent. Error is bounded by the interval's
+    total / 512, and is zero whenever the broker publishes fewer than 512
+    distinct topics in a second. Buckets are tick-interval, not exact
+    wall seconds (a 300 ms batch spanning a boundary lands in the open
     interval) — fine at display grain, comment it.
-  - On the 1 s tick: O(512 x 16) partial-select of top 16, push frozen
-    record into a 900-deep ring (dedupe by sec), fresh Maps.
+  - On the 1 s tick: capture the strongest 32 counters (ties broken by
+    topic name, so the same topics are captured second after second) into
+    a frozen record with the interval's exact totals, push it into a
+    900-deep ring (dedupe by sec), and roll it into the 1,440-deep minute
+    ring that serves ranges past 15 m.
+  - "Other topics" is the window's exact total minus the rows shown, so
+    it is right by construction rather than a leftover of the capture.
   - Top-6 display: merge ring records over the selected window on the
-    tick (15 m worst case: 14,400 map ops ~1-2 ms, on the tick, never
+    tick (15 m worst case: 900 records x 32 entries, on the tick, never
     the batch path), cache on the store; `buildState` reuses the cache.
-  - Memory: the ring can hold ~14,400 entry objects and non-interned
-    topic strings, ~1-2 MB worst case — accepted, documented. No string
-    interning (an interning map is unbounded under adversarial
-    cardinality).
-  - Known bias: a topic never in any per-second top-16 undercounts;
-    invisible at top-6 grain.
+    Ranges past 15 m read the minute ring instead and re-merge every 5 s,
+    since a day-long average does not move in a second.
+  - Memory: both rings together hold at most (900 + 1,440) x 32 entry
+    objects and non-interned topic strings, a few MB worst case —
+    accepted, documented. No string interning (an interning map is
+    unbounded under adversarial cardinality).
+  - Known bias: a topic never captured in any interval contributes to the
+    exact totals (so "other topics" still counts it) but is never named,
+    and a topic captured in only some intervals reads low. Both are
+    invisible at top-6 grain, where the rows are the topics that are
+    captured consistently.
 - **Observed instantaneous series** (hero): on each tick push the rate
   of bucket `sec(now) - 2` (fully settled: batches arrive up to ~300 ms
   late), dedupe by sec, backfill any skipped sec from the 61-bucket ring,
@@ -255,12 +270,13 @@ invalidates that interval for ratios.
 
 ## Performance bar (extended)
 
-- Batch handler adds one map get + add per message, admission-capped.
+- Batch handler adds one map get plus a bounded heap fix-up per message
+  (O(log 512) worst case, no allocation).
   Store writes stay coalesced (one per batch + one per tick).
 - Perf test: timed flood case grows to ~1,100 batches (proportional time
   budget ~5 s) so the 900 sparkline cap is actually exceeded and
   asserted; per-topic engine runs under the same flood (~9.4k distinct
-  topics exercises the 512 admission cap); 5 ms/batch bar holds. A
+  topics exercises the summary's eviction path); 5 ms/batch bar holds. A
   separate fake-timer test fills and wraps the 900-deep per-topic ring
   with near-empty batches (cheap), asserting bounded state.
 - Hero: setOption at most 1 Hz.
