@@ -50,10 +50,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
-        title: "See what the MQTT client is doing",
-        body: "Pick View logs from the connection menu for a live, terminal-style view of connects, reconnects, subscriptions and errors, with a filter, level chips, copy and clear. Turn on debug logging per connection when you need the library's full output; it is also written to a rotating file.",
-      },
-      {
         title: "Start a message inside a collection",
         body: "Every collection folder's menu now has New message, and an empty folder shows one as a row. The message is filed there when you save it. A saved message shows its collection in the top right; pick another one there to move it.",
       },
