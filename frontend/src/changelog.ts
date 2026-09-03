@@ -253,7 +253,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Fewer stray tab stops",
-        body: "Tabbing through a button that had a tooltip used to stop twice: once on an invisible wrapper, then again on the button itself. It now stops once.",
+        body: "Tabbing through a button with a tooltip used to stop twice, once on an invisible wrapper and once on the button; now it stops just once.",
       },
     ],
   },

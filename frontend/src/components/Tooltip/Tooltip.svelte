@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createTooltip, melt } from "@melt-ui/svelte";
+  import { onDestroy } from "svelte";
   import { fade } from "svelte/transition";
   import { twMerge } from "tailwind-merge";
   import type { Placement } from "./placement";
@@ -13,13 +14,15 @@
   export let forceOpen = false;
   export let closeOnPointerDown = true;
   // Set this when the slotted content already provides its own tab stop (a
-  // button, link, or other focusable element, or when this Tooltip is nested
-  // inside an already-focusable ancestor). Skips the wrapper's own tabindex so
-  // keyboard users don't hit two stops for one control. The tooltip still
-  // opens when the inner element gets focus: focus/blur don't bubble, so this
-  // is wired up by hand below via focusin/focusout rather than relying on
-  // melt's own trigger focus/blur listeners (which only fire on the exact
-  // node use:melt is applied to).
+  // button, link, or other focusable element). Skips the wrapper's own
+  // tabindex so keyboard users don't hit two stops for one control. The
+  // tooltip still opens when the inner element gets focus: focus/blur don't
+  // bubble, so this is wired up by hand below via focusin/focusout rather
+  // than relying on melt's own trigger focus/blur listeners (which only fire
+  // on the exact node use:melt is applied to). This only works when the
+  // focusable element is a DESCENDANT of the slot content: wrap the focusable
+  // ancestor itself with this Tooltip rather than nesting the Tooltip inside
+  // it, or the focus event will never reach this wrapper.
   export let focusable = false;
 
   $: forceOpen,
@@ -48,6 +51,8 @@
 
   let openTimeout: ReturnType<typeof setTimeout> | null = null;
   let suppressFocusOpen = false;
+  let focusInside = false;
+  let pointerInside = false;
 
   function clearOpenTimeout() {
     if (openTimeout) {
@@ -56,8 +61,26 @@
     }
   }
 
+  // Mirrors melt's own "don't close while the pointer is still over the
+  // trigger" guard, which our hand-rolled focus handling below would
+  // otherwise bypass (e.g. tabbing away right after a hover-opened tooltip,
+  // with the pointer left resting on the trigger).
+  function maybeClose() {
+    if (focusInside || pointerInside) return;
+    clearOpenTimeout();
+    suppressFocusOpen = false;
+    open.set(false);
+  }
+
   function handleFocusIn() {
-    if (suppressFocusOpen) return;
+    focusInside = true;
+    // Swallow exactly the one focus that immediately follows a pointerdown
+    // (e.g. a click that also focuses the trigger), then let every
+    // subsequent focus behave normally.
+    if (suppressFocusOpen) {
+      suppressFocusOpen = false;
+      return;
+    }
     clearOpenTimeout();
     openTimeout = setTimeout(() => open.set(true), openDelay);
   }
@@ -66,9 +89,17 @@
     const next = event.relatedTarget as Node | null;
     const wrapper = event.currentTarget as Node;
     if (next && wrapper.contains(next)) return;
-    clearOpenTimeout();
-    suppressFocusOpen = false;
-    open.set(false);
+    focusInside = false;
+    maybeClose();
+  }
+
+  function handlePointerEnter() {
+    pointerInside = true;
+  }
+
+  function handlePointerLeave() {
+    pointerInside = false;
+    maybeClose();
   }
 
   function handlePointerDown() {
@@ -77,6 +108,8 @@
     clearOpenTimeout();
     open.set(false);
   }
+
+  onDestroy(clearOpenTimeout);
 </script>
 
 {#if !$$slots["tooltip-content"] && text === ""}
@@ -91,6 +124,8 @@
     use:melt={$trigger}
     on:focusin={focusable ? handleFocusIn : undefined}
     on:focusout={focusable ? handleFocusOut : undefined}
+    on:pointerenter={focusable ? handlePointerEnter : undefined}
+    on:pointerleave={focusable ? handlePointerLeave : undefined}
     on:pointerdown={focusable ? handlePointerDown : undefined}
   >
     <slot />

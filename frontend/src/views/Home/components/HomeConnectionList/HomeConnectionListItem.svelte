@@ -126,23 +126,23 @@
         </Tooltip>
       {/if}
     </div>
-    <button
-      class={`absolute right-0 top-0 p-2
-      opacity-0 group-hover:opacity-100
-      transition-opacity duration-200`}
-      on:click={(e) => {
-        e.stopPropagation();
-        onEditConnection();
-      }}
-    >
-      <Tooltip text="Edit connection details" placement="top" focusable>
+    <Tooltip text="Edit connection details" placement="top" focusable>
+      <button
+        class={`absolute right-0 top-0 p-2
+        opacity-0 group-hover:opacity-100
+        transition-opacity duration-200`}
+        on:click={(e) => {
+          e.stopPropagation();
+          onEditConnection();
+        }}
+      >
         <div
           class="rounded-full transition-colors text-secondary-text hover:text-emphasis"
         >
           <Icon type="edit" size={15} />
         </div>
-      </Tooltip>
-    </button>
+      </button>
+    </Tooltip>
   </div>
   <div class="relative">
     <ConnectionIdenticon {connection} />
