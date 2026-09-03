@@ -68,6 +68,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels. The message search dialog got the same treatment: its search field and results now have proper padding instead of sitting flush against the edges.",
       },
       {
+        title: "Settings says what memory it will use",
+        body: "The memory budget now shows the estimate as a sum, Total = connections × budget + 300 MB app, and the retention fields sit on an even rhythm instead of drifting apart.",
+      },
+      {
         title: "Dropdowns inside dialogs work again",
         body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
       },

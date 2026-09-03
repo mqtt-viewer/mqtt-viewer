@@ -19,9 +19,13 @@
     MB,
     GB,
     MIN_MEMORY_MB,
+    BASE_APP_BYTES,
     formatBytes,
     estimateTotalBytes,
   } from "@/util/memory-budget";
+
+  // The fixed part of the estimate, so the figure only lives in one place.
+  const baseAppLabel = formatBytes(BASE_APP_BYTES);
 
   export let open = writable(false);
 
@@ -108,6 +112,7 @@
   // A cleared Svelte number input binds null, which is also invalid.
   $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
   $: shownConnections = Math.max(1, activeConnections);
+  $: budgetMb = memoryBudgetMb ?? MIN_MEMORY_MB;
 
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
@@ -173,48 +178,40 @@
 
 <Dialog title="Settings" isOpen={open}>
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
-    <section class="flex flex-col gap-4">
+    <section class="flex flex-col gap-5">
       <h3 class="text-emphasis font-medium">Message retention</h3>
 
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1.5">
         <BaseNumberInput
           name="memory-budget"
           label="Memory budget (MB)"
           min={MIN_MEMORY_MB}
-          class="mb-[17px]"
           hasError={memoryBelowMin}
-          errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
-        <p class="text-sm text-secondary-text">
-          Caps the message history I keep in memory for each connection,
-          including the newest message per topic that the topic tree shows.
-        </p>
-        <p class="text-sm text-secondary-text">
-          Expect up to about {formatBytes(
-            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, activeConnections)
-          )} in total across {shownConnections} connection{shownConnections === 1
-            ? ""
-            : "s"}. That's this budget for each connection plus around 300 MB
-          for the interface and runtime.
-        </p>
-      </div>
-
-      <div class="flex flex-col gap-2">
-        <Switch
-          name="recording-enabled"
-          label="Record history to disk"
-          checked={recordingChecked}
-          checkedBool={recordingEnabled}
-          onChange={onRecordingChange}
-        />
-        <p class="text-sm text-secondary-text">
-          Durable history survives restarts and is bounded by the disk budget
-          below.
+        {#if memoryBelowMin}
+          <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
+        {:else}
+          <p class="text-sm text-secondary-text">
+            Cap on message history kept in memory, per connection.
+          </p>
+        {/if}
+        <p class="font-mono text-sm text-secondary-text">
+          Total = {shownConnections} × {budgetMb} MB + {baseAppLabel} app = {formatBytes(
+            estimateTotalBytes(budgetMb, activeConnections)
+          )}
         </p>
       </div>
 
-      <div class="flex flex-col gap-1">
+      <Switch
+        name="recording-enabled"
+        label="Record history to disk"
+        checked={recordingChecked}
+        checkedBool={recordingEnabled}
+        onChange={onRecordingChange}
+      />
+
+      <div class="flex flex-col gap-1.5">
         <BaseNumberInput
           name="disk-budget"
           label="Disk budget (GB)"
@@ -225,7 +222,7 @@
       </div>
     </section>
 
-    <section class="flex flex-col gap-3 border-t border-outline pt-4">
+    <section class="flex flex-col gap-2 border-t border-outline pt-4">
       <div class="flex items-center justify-between">
         <span class="text-secondary-text"
           >History in memory: {formatBytes(historyBytes)}</span

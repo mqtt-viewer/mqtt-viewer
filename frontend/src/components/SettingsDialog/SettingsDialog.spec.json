@@ -23,7 +23,8 @@
     "secondary",
     "emphasis",
     "secondary-text",
-    "outline"
+    "outline",
+    "error"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet."
