@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T02:42:02.260Z",
+  "generatedAt": "2026-09-03T08:31:44.241Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1245,6 +1245,13 @@
           "type": "function",
           "required": false,
           "default": "() => {}"
+        },
+        {
+          "name": "iconType",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Optional leading icon, keyed to the Icon component's icon names. Items without one keep their plain text layout."
         }
       ],
       "tokens": [

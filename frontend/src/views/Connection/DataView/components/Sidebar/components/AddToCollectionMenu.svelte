@@ -66,28 +66,30 @@
     {#if connectionMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Connection</div>
       {#each connectionMatches as collection (collection.id)}
-        <DropdownMenuItem onClick={() => onSelect(collection.id)}>
-          <div class="flex items-center gap-2 w-full">
-            <Icon type="folder" size={14} />
-            <span class="truncate grow">{collection.name}</span>
-            {#if collection.id === currentCollectionId}
-              <Icon type="tick" size={14} />
-            {/if}
-          </div>
+        <DropdownMenuItem
+          iconType="folder"
+          class="w-full"
+          onClick={() => onSelect(collection.id)}
+        >
+          <span class="truncate grow">{collection.name}</span>
+          {#if collection.id === currentCollectionId}
+            <Icon type="tick" size={14} />
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}
     {#if globalMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Global</div>
       {#each globalMatches as collection (collection.id)}
-        <DropdownMenuItem onClick={() => onSelect(collection.id)}>
-          <div class="flex items-center gap-2 w-full">
-            <Icon type="folder" size={14} />
-            <span class="truncate grow">{collection.name}</span>
-            {#if collection.id === currentCollectionId}
-              <Icon type="tick" size={14} />
-            {/if}
-          </div>
+        <DropdownMenuItem
+          iconType="folder"
+          class="w-full"
+          onClick={() => onSelect(collection.id)}
+        >
+          <span class="truncate grow">{collection.name}</span>
+          {#if collection.id === currentCollectionId}
+            <Icon type="tick" size={14} />
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}
@@ -97,19 +99,13 @@
       </div>
     {/if}
     {#if query.trim() && !connectionExactMatch}
-      <DropdownMenuItem onClick={() => create("connection")}>
-        <div class="flex items-center gap-2">
-          <Icon type="plus" size={14} />
-          <span class="truncate">Create “{query.trim()}”</span>
-        </div>
+      <DropdownMenuItem iconType="plus" onClick={() => create("connection")}>
+        <span class="truncate">Create “{query.trim()}”</span>
       </DropdownMenuItem>
     {/if}
     {#if query.trim() && !globalExactMatch}
-      <DropdownMenuItem onClick={() => create("global")}>
-        <div class="flex items-center gap-2">
-          <Icon type="plus" size={14} />
-          <span class="truncate">Create “{query.trim()}” (global)</span>
-        </div>
+      <DropdownMenuItem iconType="plus" onClick={() => create("global")}>
+        <span class="truncate">Create “{query.trim()}” (global)</span>
       </DropdownMenuItem>
     {/if}
     <slot name="extra-items" />

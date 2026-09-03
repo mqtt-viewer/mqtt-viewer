@@ -144,8 +144,10 @@
       </div>
       <svelte:fragment slot="extra-items">
         <div class="border-t border-divider my-1"></div>
-        <DropdownMenuItem class="hover:text-error" onClick={deleteEntry}
-          >Delete</DropdownMenuItem
+        <DropdownMenuItem
+          iconType="delete"
+          class="text-error"
+          onClick={deleteEntry}>Delete</DropdownMenuItem
         >
       </svelte:fragment>
     </AddToCollectionMenu>

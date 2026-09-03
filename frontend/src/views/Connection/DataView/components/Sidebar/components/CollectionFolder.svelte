@@ -142,14 +142,18 @@
             <Icon type="menuDots" size={16} />
           </div>
           <div class="flex flex-col" slot="menu-content">
-            <DropdownMenuItem onClick={() => onNewMessage(collection.id)}
+            <DropdownMenuItem
+              iconType="plus"
+              onClick={() => onNewMessage(collection.id)}
               >New message</DropdownMenuItem
             >
-            <DropdownMenuItem onClick={() => (isRenaming = true)}
-              >Rename</DropdownMenuItem
+            <DropdownMenuItem
+              iconType="edit"
+              onClick={() => (isRenaming = true)}>Rename</DropdownMenuItem
             >
             <DropdownMenuItem
-              class="hover:text-error"
+              iconType="delete"
+              class="text-error"
               onClick={() => ($isDeleteOpen = true)}>Delete</DropdownMenuItem
             >
           </div>
@@ -166,15 +170,13 @@
             <span class={lineClass} style="top: -3px"></span>
           {/if}
           <button
-            class="flex items-center gap-2 grow px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+            class="flex items-center gap-2 grow px-1 -mx-1 py-[2px] rounded text-secondary-text hover:bg-hovered hover:text-emphasis"
             on:click={() => onNewMessage(collection.id)}
           >
-            <span
-              class="w-5 shrink-0 flex items-center justify-center text-primary"
-            >
-              <Icon type="plusCircle" size={16} />
+            <span class="w-5 shrink-0 flex items-center justify-center">
+              <Icon type="plus" size={16} />
             </span>
-            <span class="text-base">New message</span>
+            <span class="text-base">Add a new message</span>
           </button>
         </div>
       {:else}

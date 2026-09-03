@@ -383,7 +383,7 @@
       <!-- Hugs the name plus pencil; min-w-0 lets a long name truncate. -->
       <Tooltip text="Rename" class="flex min-w-0 max-w-full">
         <button
-          class="group inline-flex items-center gap-1 min-w-0 max-w-full px-1 -mx-1 py-[2px] rounded hover:bg-hovered cursor-pointer text-left"
+          class="group inline-flex items-center gap-1 min-w-0 px-1 -mx-1 py-[2px] rounded hover:bg-hovered cursor-pointer text-left"
           on:click={() => (isRenaming = true)}
         >
           <span class="text-base text-emphasis truncate">{displayName}</span>
