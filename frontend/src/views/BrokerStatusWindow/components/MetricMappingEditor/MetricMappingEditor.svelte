@@ -186,10 +186,13 @@
 </script>
 
 <Dialog {isOpen} title="Metric tiles">
-  <div class="flex max-h-[70vh] w-[520px] max-w-[86vw] flex-col gap-5 overflow-y-auto">
-    <!-- Draft form: add mode, or edit when a row was picked. The floating
-         labels sit above each input's box, so the first row needs top padding
-         inside the scroll container's clip box or their tops render cut off. -->
+  <!-- pt-3 clears the first field's floating label. It sits ~16px above its
+       input's box, and overflow-y-auto makes this element a clip box, so
+       without the padding that label renders with its top cut off. -->
+  <div
+    class="flex max-h-[70vh] w-[520px] max-w-[86vw] flex-col gap-5 overflow-y-auto pt-3"
+  >
+    <!-- Draft form: add mode, or edit when a row was picked. -->
     <div class="flex flex-col gap-8 pt-2">
       <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
