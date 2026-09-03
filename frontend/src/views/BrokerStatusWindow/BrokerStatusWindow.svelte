@@ -28,7 +28,8 @@
   // the connections store, which the backend keeps up to date via events.
   $: connectionState =
     $connections.connections[connectionId]?.connectionState ?? "disconnected";
-  $: isDisconnected = connectionState === "disconnected";
+  $: isDisconnected =
+    connectionState === "disconnected" || connectionState === "error";
 
   onMount(async () => {
     // Init subscriptions too so BrokerStatusView's hasSysSubscription reflects

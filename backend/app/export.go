@@ -67,7 +67,7 @@ func (a *App) ExportAllMessagesData(connId uint) (ExportedMessagesPayload, error
 }
 
 func (a *App) collectTopicMessages(connId uint, topic string) ([]exportedMessage, string, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, "", fmt.Errorf("connection not found")
 	}
@@ -81,7 +81,7 @@ func (a *App) collectTopicMessages(connId uint, topic string) ([]exportedMessage
 }
 
 func (a *App) collectAllMessages(connId uint) ([]exportedMessage, string, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, "", fmt.Errorf("connection not found")
 	}

@@ -19,6 +19,12 @@
       "default": false
     },
     {
+      "name": "open",
+      "type": "boolean",
+      "required": false,
+      "default": "writable(false)"
+    },
+    {
       "name": "triggerText",
       "type": "string",
       "required": false,

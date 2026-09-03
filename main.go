@@ -61,18 +61,7 @@ func main() {
 		},
 	})
 
-	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "MQTT Viewer",
-		Width:            900,
-		Height:           700,
-		MinWidth:         825,
-		MinHeight:        660,
-		BackgroundColour: application.NewRGB(35, 33, 32),
-		Mac: application.MacWindow{
-			TitleBar: application.MacTitleBarHiddenInset,
-		},
-		URL: "/",
-	})
+	createMainWindow(wailsApp)
 
 	err := wailsApp.Run()
 
@@ -85,10 +74,8 @@ func main() {
 	// and fires the last will on every restart.
 	if env.IsServerBuild {
 		slog.Info("shutting down, disconnecting mqtt clients")
-		for _, appConnection := range mqttViewer.AppConnections {
-			if appConnection != nil && appConnection.MqttManager != nil {
-				appConnection.MqttManager.Disconnect(nil)
-			}
+		for id := range mqttViewer.GetAllConnections().Connections {
+			_ = mqttViewer.DisconnectMqtt(id)
 		}
 		slog.Info("shutdown complete")
 	}

@@ -148,7 +148,13 @@ beforeEach(() => {
   // aged-out by accident.
   GetReceivedMessageById.mockImplementation(
     async (_connId: number, topic: string, id: number) => [
-      { id: String(id), topic, payload: btoa("auto"), timeMs: 0, retain: false },
+      {
+        id: String(id),
+        topic,
+        payload: btoa("auto"),
+        timeMs: 0,
+        retain: false,
+      },
       true,
     ]
   );
@@ -520,14 +526,24 @@ describe("ensurePayload", () => {
     GetReceivedTimelineWindow.mockResolvedValue(makeStubs(2, 1));
     GetReceivedMessageCount.mockResolvedValue(1);
     GetReceivedMessageById.mockResolvedValueOnce([
-      { id: "2", topic: "a/b", payload: btoa("hello"), timeMs: 2000, retain: true },
+      {
+        id: "2",
+        topic: "a/b",
+        payload: btoa("hello"),
+        timeMs: 2000,
+        retain: true,
+      },
       true,
     ]);
     await store.selectTopic("a/b");
     await store.loadRecordedHistory();
     await flushMicrotasks();
 
-    expect(GetReceivedMessageById).toHaveBeenCalledWith(CONNECTION_ID, "a/b", 2);
+    expect(GetReceivedMessageById).toHaveBeenCalledWith(
+      CONNECTION_ID,
+      "a/b",
+      2
+    );
     expect(GetReceivedMessagesByIds).not.toHaveBeenCalled();
     const s = get(store);
     const msg = s.history.find((m) => m.id === "2");
@@ -545,7 +561,13 @@ describe("ensurePayload", () => {
 
     GetMessageTimeline.mockResolvedValue(makeStubs(3, 1));
     GetMessageById.mockResolvedValueOnce([
-      { id: "3", topic: "a/b", payload: btoa("mem-hello"), timeMs: 3000, retain: false },
+      {
+        id: "3",
+        topic: "a/b",
+        payload: btoa("mem-hello"),
+        timeMs: 3000,
+        retain: false,
+      },
       true,
     ]);
     await store.selectTopic("a/b");
@@ -553,7 +575,12 @@ describe("ensurePayload", () => {
 
     // The hint is the stub's own timeMs, letting the backend binary-search
     // its window instead of scanning it.
-    expect(GetMessageById).toHaveBeenCalledWith(CONNECTION_ID, "a/b", "3", 3000);
+    expect(GetMessageById).toHaveBeenCalledWith(
+      CONNECTION_ID,
+      "a/b",
+      "3",
+      3000
+    );
     expect(GetMessagesByIds).not.toHaveBeenCalled();
     const s = get(store);
     const msg = s.history.find((m) => m.id === "3");
@@ -585,7 +612,8 @@ describe("ensurePayload", () => {
     // The live stub carries payloadB64, so ensurePayload must resolve it
     // synchronously in the frontend, never across the bridge.
     const backendCalls = () =>
-      GetReceivedMessageById.mock.calls.length + GetMessageById.mock.calls.length;
+      GetReceivedMessageById.mock.calls.length +
+      GetMessageById.mock.calls.length;
     const callsBefore = backendCalls();
     await store.ensurePayload("live-1");
     expect(backendCalls()).toBe(callsBefore);
@@ -766,8 +794,9 @@ describe("loadOlderWindow", () => {
     );
 
     const s = get(store);
-    expect(s.history).toHaveLength(10000);
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
     expect(s.history[0].id).toBe("1");
+    expect(s.history.at(-1)?.id).toBe("5000");
     expect(s.history[0].payload).toBeNull();
     for (let i = 1; i < s.history.length; i++) {
       expect(Number(s.history[i].id)).toBeGreaterThan(
@@ -775,13 +804,19 @@ describe("loadOlderWindow", () => {
       );
     }
     expect(s.window?.oldestId).toBe(1);
+    expect(s.window?.newestId).toBe(5000);
+    expect(s.window?.isNewest).toBe(false);
     expect(s.window?.atOldest).toBe(false);
     expect(s.isLoadingWindow).toBeNull();
 
-    expect(deltas).toHaveLength(1);
+    expect(deltas).toHaveLength(2);
     expect(deltas[0].kind).toBe("prepend");
+    expect(deltas[1].kind).toBe("trim");
     if (deltas[0].kind === "prepend") {
       expect(deltas[0].messages).toHaveLength(HISTORY_WINDOW_SIZE);
+    }
+    if (deltas[1].kind === "trim") {
+      expect(deltas[1].ids).toHaveLength(HISTORY_WINDOW_SIZE);
     }
 
     unsub();
@@ -859,17 +894,15 @@ describe("cap eviction on prepend", () => {
     await store.loadOlderWindow();
 
     let s = get(store);
-    expect(s.history).toHaveLength(20000);
-    // Before the fourth load, ids run 1..20000 in order; the newest 5000
-    // (ids 15001..20000) are what the eviction below must remove.
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
     expect(s.history[0].id).toBe("1");
-    expect(s.history[s.history.length - 1].id).toBe("20000");
+    expect(s.history.at(-1)?.id).toBe("5000");
 
     const deltas: HistoryDelta[] = [];
     store.setOnHistoryDelta((d) => deltas.push(d));
 
-    // A fourth loadOlderWindow of 5000 (ids -4999..0) pushes total to 25000,
-    // triggering eviction of 5000 from the newest end.
+    // Another full older window replaces the loaded window at the 5,000-item
+    // renderer cap, evicting from the newest end.
     GetReceivedTimelineWindow.mockResolvedValueOnce(
       makeStubs(1 - HISTORY_WINDOW_SIZE, HISTORY_WINDOW_SIZE)
     );
@@ -877,10 +910,8 @@ describe("cap eviction on prepend", () => {
 
     s = get(store);
     expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
-    // Kept: the oldest MAX_LOADED_MESSAGES of the 25000 total, i.e. ids
-    // (1 - HISTORY_WINDOW_SIZE) .. 15000. The newest 5000 (15001..20000) are evicted.
     expect(s.history[0].id).toBe(String(1 - HISTORY_WINDOW_SIZE));
-    expect(s.history[s.history.length - 1].id).toBe("15000");
+    expect(s.history.at(-1)?.id).toBe("0");
 
     // loadOlderWindow emits its own "prepend" delta first, then enforceCap
     // emits the "trim" delta for the evicted newest messages.
@@ -890,12 +921,12 @@ describe("cap eviction on prepend", () => {
     const trim = deltas[1];
     if (trim.kind === "trim") {
       expect(trim.ids).toHaveLength(HISTORY_WINDOW_SIZE);
-      expect(trim.ids[0]).toBe("15001");
-      expect(trim.ids[trim.ids.length - 1]).toBe("20000");
+      expect(trim.ids[0]).toBe("1");
+      expect(trim.ids.at(-1)).toBe("5000");
     }
 
     expect(s.window?.isNewest).toBe(false);
-    expect(s.window?.newestId).toBe(15000);
+    expect(s.window?.newestId).toBe(-1);
 
     unsub();
   });

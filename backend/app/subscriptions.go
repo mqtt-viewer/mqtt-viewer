@@ -2,7 +2,17 @@ package app
 
 import (
 	"mqtt-viewer/backend/models"
+	"time"
 )
+
+// touchConnection bumps the parent connection's updated_at so "last saved"
+// reflects subscription edits across restarts, not just connection edits.
+func (a *App) touchConnection(connectionId uint) error {
+	if res := a.Db.Model(&models.Connection{}).Where("id = ?", connectionId).Update("updated_at", time.Now()); res.Error != nil {
+		return res.Error
+	}
+	return nil
+}
 
 func (a *App) GetAllSubscriptionsByConnectionId() map[uint][]models.Subscription {
 	result := make(map[uint][]models.Subscription)
@@ -29,12 +39,18 @@ func (a *App) AddSubscription(connectionId uint) (*models.Subscription, error) {
 	if res := a.Db.Create(&sub); res.Error != nil {
 		return nil, res.Error
 	}
+	if err := a.touchConnection(connectionId); err != nil {
+		return nil, err
+	}
 	return &sub, nil
 }
 
 func (a *App) UpdateSubscription(connId uint, sub models.Subscription) (*models.Subscription, error) {
 	if res := a.Db.Model(&sub).Updates(&sub); res.Error != nil {
 		return nil, res.Error
+	}
+	if err := a.touchConnection(connId); err != nil {
+		return nil, err
 	}
 	return &sub, nil
 }
@@ -43,5 +59,5 @@ func (a *App) DeleteSubscription(connId uint, id uint) error {
 	if res := a.Db.Delete(&models.Subscription{}, id); res.Error != nil {
 		return res.Error
 	}
-	return nil
+	return a.touchConnection(connId)
 }

@@ -16,7 +16,7 @@ test("mqtt data is not filtered with empty search string", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 0,
@@ -25,7 +25,7 @@ test("mqtt data is not filtered with empty search string", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -55,7 +55,7 @@ test("mqtt data is filtered completely with no matches", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 0,
@@ -64,7 +64,7 @@ test("mqtt data is filtered completely with no matches", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -94,7 +94,7 @@ test("parents are kept when child matches", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -103,7 +103,7 @@ test("parents are kept when child matches", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -134,7 +134,7 @@ test("non-matching children on the same level as a matching child are not kept",
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -143,7 +143,7 @@ test("non-matching children on the same level as a matching child are not kept",
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -153,7 +153,7 @@ test("non-matching children on the same level as a matching child are not kept",
             world: {
               topic: "aaaaa/aaaaa/world",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               messageCount: 1,
               subtopicCount: 0,
@@ -179,7 +179,7 @@ test("non-matching children on the same level as a matching child are not kept",
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -188,7 +188,7 @@ test("non-matching children on the same level as a matching child are not kept",
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -218,7 +218,7 @@ test("parent that matches is kept when no children match", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           latestMessageTime: new Date(),
           message: "test-message",
           messageCount: 1,
@@ -227,7 +227,7 @@ test("parent that matches is kept when no children match", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -237,7 +237,7 @@ test("parent that matches is kept when no children match", () => {
             world: {
               topic: "aaaaa/aaaaa/world",
               isDecodedProto: false,
-              isRetained: false,
+      isRetained: false,
               latestMessageTime: new Date(),
               messageCount: 1,
               subtopicCount: 0,
@@ -262,7 +262,7 @@ test("parent that matches is kept when no children match", () => {
       children: {
         aaaaa: {
           isDecodedProto: false,
-          isRetained: false,
+      isRetained: false,
           topic: "aaaaa/aaaaa",
           latestMessageTime: new Date(),
           message: "test-message",
@@ -277,11 +277,7 @@ test("parent that matches is kept when no children match", () => {
   expect(filteredData).toEqual(expectedResult);
 });
 
-// A5: the top node "house" (topic "house", one level) does NOT itself
-// wildcard-match "house/+", yet the tree keeps it because its child leaf
-// "house/kitchen" matches. A shallow sibling "garage" that matches neither is
-// pruned. Prune semantics: parents of matches are retained.
-test("wildcard pattern keeps a parent via a matching leaf, prunes non-matches", () => {
+test("wildcard pattern keeps matching descendants and prunes siblings", () => {
   const unfilteredData: MqttData = {
     house: {
       topic: "house",
@@ -319,6 +315,104 @@ test("wildcard pattern keeps a parent via a matching leaf, prunes non-matches", 
   const filteredData = filterData(unfilteredData, "house/+");
   expect(Object.keys(filteredData)).toEqual(["house"]);
   expect(Object.keys(filteredData.house.children)).toEqual(["kitchen"]);
+});
+
+test("input data is not mutated by filtering", () => {
+  const unfilteredData: MqttData = {
+    aaaaa: {
+      topic: "aaaaa",
+      isDecodedProto: false,
+      isRetained: false,
+      latestMessageTime: new Date(),
+      message: undefined,
+      messageCount: 5,
+      subtopicCount: 2,
+      children: {
+        hello: {
+          topic: "aaaaa/hello",
+          isDecodedProto: false,
+          isRetained: false,
+          latestMessageTime: new Date(),
+          message: "hello",
+          messageCount: 1,
+          subtopicCount: 0,
+          children: {},
+        },
+        world: {
+          topic: "aaaaa/world",
+          isDecodedProto: false,
+          isRetained: false,
+          latestMessageTime: new Date(),
+          message: "world",
+          messageCount: 4,
+          subtopicCount: 0,
+          children: {},
+        },
+      },
+    },
+  };
+  const snapshot = structuredClone(unfilteredData);
+  filterData(unfilteredData, "hello");
+  expect(unfilteredData).toEqual(snapshot);
+});
+
+test("filtering a large tree is fast (no per-level deep clone)", () => {
+  // Three levels, 40 x 40 x 5 = 8000 leaves. The old implementation
+  // structuredClone'd every subtree at every recursion level, which made
+  // this take hundreds of milliseconds.
+  const buildLeaf = (topic: string, message: string): MqttData[string] => ({
+    topic,
+    isDecodedProto: false,
+    isRetained: false,
+    latestMessageTime: new Date(),
+    message,
+    messageCount: 1,
+    subtopicCount: 0,
+    children: {},
+  });
+  const root: MqttData = {};
+  for (let i = 0; i < 40; i++) {
+    const midChildren: MqttData = {};
+    for (let j = 0; j < 40; j++) {
+      const leafChildren: MqttData = {};
+      for (let k = 0; k < 5; k++) {
+        leafChildren[`leaf${k}`] = buildLeaf(
+          `top${i}/mid${j}/leaf${k}`,
+          i === 0 && j === 0 && k === 0 ? "needle" : "hay",
+        );
+      }
+      midChildren[`mid${j}`] = {
+        topic: `top${i}/mid${j}`,
+        isDecodedProto: false,
+        isRetained: false,
+        latestMessageTime: new Date(),
+        message: undefined,
+        messageCount: 5,
+        subtopicCount: 5,
+        children: leafChildren,
+      };
+    }
+    root[`top${i}`] = {
+      topic: `top${i}`,
+      isDecodedProto: false,
+      isRetained: false,
+      latestMessageTime: new Date(),
+      message: undefined,
+      messageCount: 200,
+      subtopicCount: 40,
+      children: midChildren,
+    };
+  }
+
+  const start = performance.now();
+  const filtered = filterData(root, "needle");
+  const elapsed = performance.now() - start;
+
+  expect(Object.keys(filtered)).toEqual(["top0"]);
+  expect(filtered.top0.children.mid0.children.leaf0.message).toEqual("needle");
+  // Generous bound to avoid CI flake; the old clone-per-level version
+  // exceeded this by an order of magnitude.
+  expect(elapsed).toBeLessThan(250);
 });
 
 test("search string with trailing empty space filters correctly", () => {

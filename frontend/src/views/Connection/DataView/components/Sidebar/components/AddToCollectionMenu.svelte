@@ -4,11 +4,14 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import type { CollectionScope, CollectionsStore } from "../stores/collections";
   import { filterByScope } from "../stores/collections";
+  import { writable } from "svelte/store";
 
   export let collectionsStore: CollectionsStore;
+  // Menu open state, shared with the parent so it can react to it.
+  export let open = writable(false);
   // Collection currently holding the message (checked in the list), if any.
   export let currentCollectionId: number | null = null;
-  export let placeholder = "Add message to...";
+  export let placeholder = "Type to add new collection";
   export let onSelect: (collectionId: number) => void;
   // Creates the collection, then selects it.
   export let onCreate: (
@@ -89,7 +92,7 @@
   };
 </script>
 
-<DropdownMenu bind:this={menu} placement="bottom-end">
+<DropdownMenu bind:this={menu} placement="bottom-end" {open}>
   <slot name="trigger" slot="trigger" />
   <div class="flex flex-col min-w-[220px]" slot="menu-content" use:resetOnOpen>
     <!-- svelte-ignore a11y_autofocus -->
@@ -104,28 +107,30 @@
     {#if !isCreating && connectionMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Connection</div>
       {#each connectionMatches as collection (collection.id)}
-        <DropdownMenuItem onClick={() => onSelect(collection.id)}>
-          <div class="flex items-center gap-2 w-full">
-            <Icon type="folder" size={14} />
-            <span class="truncate grow">{collection.name}</span>
-            {#if collection.id === currentCollectionId}
-              <Icon type="tick" size={14} />
-            {/if}
-          </div>
+        <DropdownMenuItem
+          iconType="folder"
+          class="w-full"
+          onClick={() => onSelect(collection.id)}
+        >
+          <span class="truncate grow">{collection.name}</span>
+          {#if collection.id === currentCollectionId}
+            <Icon type="tick" size={14} />
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}
     {#if !isCreating && globalMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Global</div>
       {#each globalMatches as collection (collection.id)}
-        <DropdownMenuItem onClick={() => onSelect(collection.id)}>
-          <div class="flex items-center gap-2 w-full">
-            <Icon type="folder" size={14} />
-            <span class="truncate grow">{collection.name}</span>
-            {#if collection.id === currentCollectionId}
-              <Icon type="tick" size={14} />
-            {/if}
-          </div>
+        <DropdownMenuItem
+          iconType="folder"
+          class="w-full"
+          onClick={() => onSelect(collection.id)}
+        >
+          <span class="truncate grow">{collection.name}</span>
+          {#if collection.id === currentCollectionId}
+            <Icon type="tick" size={14} />
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}
@@ -140,19 +145,13 @@
       </div>
     {/if}
     {#if query.trim() && !connectionExactMatch}
-      <DropdownMenuItem onClick={() => create("connection")}>
-        <div class="flex items-center gap-2">
-          <Icon type="plus" size={14} />
-          <span class="truncate">Create “{query.trim()}”</span>
-        </div>
+      <DropdownMenuItem iconType="plus" onClick={() => create("connection")}>
+        <span class="truncate">Create “{query.trim()}”</span>
       </DropdownMenuItem>
     {/if}
     {#if query.trim() && !globalExactMatch}
-      <DropdownMenuItem onClick={() => create("global")}>
-        <div class="flex items-center gap-2">
-          <Icon type="plus" size={14} />
-          <span class="truncate">Create “{query.trim()}” (global)</span>
-        </div>
+      <DropdownMenuItem iconType="plus" onClick={() => create("global")}>
+        <span class="truncate">Create “{query.trim()}” (global)</span>
       </DropdownMenuItem>
     {/if}
     {#if !isCreating && !query.trim()}
