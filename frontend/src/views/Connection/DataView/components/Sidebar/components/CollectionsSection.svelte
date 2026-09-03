@@ -11,6 +11,7 @@
     type CollectionsStore,
   } from "../stores/collections";
   import CollectionFolder from "./CollectionFolder.svelte";
+  import { collectionDropIndex, dragState } from "../dnd/drag-store";
 
   export let scope: CollectionScope;
   export let collectionsStore: CollectionsStore;
@@ -21,6 +22,11 @@
   $: title = scope === "global" ? "Global Collections" : "Connection Collections";
 
   let isCreating = false;
+
+  $: dropIndex = collectionDropIndex($dragState, scope);
+
+  const lineClass =
+    "absolute left-0 right-0 h-[2px] rounded-full bg-primary pointer-events-none";
 
   const commitCreate = async (name: string) => {
     isCreating = false;
@@ -63,13 +69,24 @@
       No collections yet
     </div>
   {:else}
-    {#each collections as collection (collection.id)}
-      <CollectionFolder
-        {collection}
-        {collectionsStore}
-        {onOpenMessage}
-        {onNewMessage}
-      />
-    {/each}
+    <div class="flex flex-col gap-2" data-dnd-section={scope}>
+      {#each collections as collection, index (collection.id)}
+        <div class="relative" data-dnd-folder={collection.id}>
+          {#if dropIndex === index}
+            <span class={lineClass} style="top: -5px"></span>
+          {/if}
+          {#if dropIndex === collections.length && index === collections.length - 1}
+            <span class={lineClass} style="bottom: -5px"></span>
+          {/if}
+          <CollectionFolder
+            {collection}
+            {collectionsStore}
+            {scope}
+            {onOpenMessage}
+            {onNewMessage}
+          />
+        </div>
+      {/each}
+    </div>
   {/if}
 </div>

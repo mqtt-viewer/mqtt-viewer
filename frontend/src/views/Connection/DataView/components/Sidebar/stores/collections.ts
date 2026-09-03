@@ -8,11 +8,14 @@ import {
   MoveCollectionMessage,
   DuplicateCollectionMessage,
   DeleteCollectionMessage,
+  ReorderCollectionMessages,
+  ReorderCollections,
 } from "bindings/mqtt-viewer/backend/app/app";
-import { writable } from "svelte/store";
+import { get, writable } from "svelte/store";
 import * as app from "bindings/mqtt-viewer/backend/app/models";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import { addToast } from "@/components/Toast/Toast.svelte";
+import { reorderIds } from "../dnd/drop-index";
 
 export type CollectionScope = "global" | "connection";
 
@@ -48,8 +51,12 @@ const notifyOtherStores = (self: () => void) => {
   }
 };
 
-const byName = (a: { name: string }, b: { name: string }) =>
-  a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+// Collections and messages carry an explicit Position, set by dragging. Ties
+// fall back to id, which is the order things were created in.
+const byPosition = (
+  a: { position: number; id: number },
+  b: { position: number; id: number }
+) => a.position - b.position || a.id - b.id;
 
 export const createCollectionsStore = (connId: number) => {
   const { subscribe, set, update } = writable<CollectionsState>(
@@ -80,18 +87,31 @@ export const createCollectionsStore = (connId: number) => {
     }
   };
 
-  // Applies a targeted change locally (matching the backend's name ordering)
-  // and tells other connections' stores to refetch shared state.
-  const apply = (fn: (collections: models.Collection[]) => void) => {
+  // Applies a targeted change locally, matching the backend's position
+  // ordering. Global collections are shared, so anything already written to
+  // the database is followed by notifyOtherStores.
+  const applyLocal = (fn: (collections: models.Collection[]) => void) => {
     update((store) => {
       fn(store.collections);
-      store.collections.sort(byName);
+      store.collections.sort(byPosition);
       for (const collection of store.collections) {
-        collection.messages?.sort(byName);
+        collection.messages?.sort(byPosition);
       }
       return store;
     });
+  };
+
+  const apply = (fn: (collections: models.Collection[]) => void) => {
+    applyLocal(fn);
     notifyOtherStores(load);
+  };
+
+  // Undoes an optimistic change by refetching, and says why.
+  const rollback = async (title: string, e: unknown) => {
+    await load();
+    addToast({
+      data: { title, description: e as string, type: "error" },
+    });
   };
 
   const removeMessageById = (
@@ -178,6 +198,78 @@ export const createCollectionsStore = (connId: number) => {
     });
   };
 
+  // Rewrites one folder's message order, and pulls in any message listed that
+  // currently lives elsewhere. One call covers a reorder and a cross-folder
+  // move; the source folder is left with gaps, which is harmless because only
+  // the relative order is read.
+  const reorderMessages = async (
+    collectionId: number,
+    orderedIds: number[]
+  ) => {
+    applyLocal((collections) => {
+      const target = collections.find((c) => c.id === collectionId);
+      if (!target) return;
+      const moved: models.CollectionMessage[] = [];
+      for (const id of orderedIds) {
+        const message = removeMessageById(collections, id);
+        if (message) moved.push(message);
+      }
+      moved.forEach((message, index) => {
+        message.collectionId = collectionId;
+        message.position = index;
+      });
+      target.messages = moved;
+    });
+    try {
+      await ReorderCollectionMessages(collectionId, orderedIds);
+      notifyOtherStores(load);
+    } catch (e) {
+      await rollback("Failed to reorder messages", e);
+    }
+  };
+
+  // Rewrites the folder order within one scope. Folders never change scope
+  // this way; the backend rejects an id that is not already in it.
+  const reorderCollections = async (
+    scope: CollectionScope,
+    orderedIds: number[]
+  ) => {
+    applyLocal((collections) => {
+      orderedIds.forEach((id, index) => {
+        const collection = collections.find((c) => c.id === id);
+        if (collection) collection.position = index;
+      });
+    });
+    try {
+      await ReorderCollections(
+        scope === "connection" ? connId : null,
+        orderedIds
+      );
+      notifyOtherStores(load);
+    } catch (e) {
+      await rollback("Failed to reorder collections", e);
+    }
+  };
+
+  // Saves a new message and puts it at a given place in its folder. Saving
+  // appends, so this is a save followed by a reorder; both are optimistic, so
+  // the row does not visibly jump.
+  const saveMessageAt = async (
+    params: SaveMessageParams,
+    index: number | null
+  ) => {
+    const saved = await saveMessage(params);
+    if (index === null) return saved;
+    const target = get({ subscribe }).collections.find(
+      (c) => c.id === params.collectionId
+    );
+    const ids = (target?.messages ?? []).map((m) => m.id);
+    const from = ids.indexOf(saved.id);
+    if (from < 0) return saved;
+    await reorderMessages(params.collectionId, reorderIds(ids, from, index));
+    return saved;
+  };
+
   const duplicateMessage = async (id: number) => {
     const copy = await DuplicateCollectionMessage(id);
     apply((collections) => {
@@ -200,8 +292,11 @@ export const createCollectionsStore = (connId: number) => {
     renameCollection,
     deleteCollection,
     saveMessage,
+    saveMessageAt,
     renameMessage,
     moveMessage,
+    reorderMessages,
+    reorderCollections,
     duplicateMessage,
     deleteMessage,
   };

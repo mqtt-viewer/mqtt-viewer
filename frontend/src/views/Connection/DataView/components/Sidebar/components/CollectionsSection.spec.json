@@ -35,9 +35,9 @@
     }
   ],
   "tokens": [
-    "secondary",
-    "secondary-text"
+    "secondary-text",
+    "primary"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet."
+  "notes": "Figma is not linked yet. Folder reordering is driven by the dnd drag store, not by props; the story sets that store directly. The insertion line between folders is bg-primary."
 }

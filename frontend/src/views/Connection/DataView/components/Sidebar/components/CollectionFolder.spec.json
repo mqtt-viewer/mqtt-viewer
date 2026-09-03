@@ -23,6 +23,16 @@
       "required": true
     },
     {
+      "name": "scope",
+      "type": "string",
+      "required": false,
+      "default": "global",
+      "options": [
+        "global",
+        "connection"
+      ]
+    },
+    {
       "name": "onOpenMessage",
       "type": "function",
       "required": false,
@@ -35,14 +45,14 @@
     }
   ],
   "tokens": [
-    "secondary",
     "white-text",
     "emphasis",
     "secondary-text",
     "hovered",
     "error",
-    "primary"
+    "primary",
+    "elevation-2"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook)."
+  "notes": "Figma is not linked yet. Collapse state is read from the global collection-collapse store (bindings are mocked in Storybook). Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2. The folder row highlights with bg-hovered and a ring-primary when the drop means \"into this folder\"; the insertion line between messages is bg-primary."
 }

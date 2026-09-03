@@ -557,6 +557,7 @@ export const createMockPublishStore = (
 export const mockCollectionMessage = {
   id: 1,
   collectionId: 1,
+  position: 0,
   name: "Doorbell ping",
   topic: "home/doorbell/ping",
   payload: '{"ding":"dong"}',
@@ -569,12 +570,14 @@ export const mockCollectionMessage = {
 export const mockCollections = [
   {
     id: 1,
+    position: 0,
     name: "Funzone",
     messages: [
       mockCollectionMessage,
       {
         id: 2,
         collectionId: 1,
+        position: 1,
         name: "All-lights off",
         topic: "home/lights/all",
         payload: '{"state":"off"}',
@@ -588,11 +591,13 @@ export const mockCollections = [
   {
     id: 2,
     connectionId: 1,
+    position: 0,
     name: "Development",
     messages: [
       {
         id: 3,
         collectionId: 2,
+        position: 0,
         name: "Backyard sensor",
         topic: "backyard/sensors/1",
         payload: '{"temp":45,"hello":"world"}',
@@ -632,8 +637,11 @@ export const createMockCollectionsStore = () => {
     renameCollection: asyncNoop,
     deleteCollection: asyncNoop,
     saveMessage: async () => mockCollectionMessage,
+    saveMessageAt: async () => mockCollectionMessage,
     renameMessage: asyncNoop,
     moveMessage: asyncNoop,
+    reorderMessages: asyncNoop,
+    reorderCollections: asyncNoop,
     duplicateMessage: async () => mockCollectionMessage,
     deleteMessage: asyncNoop,
   };

@@ -6,6 +6,9 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import type { CollectionsStore } from "../stores/collections";
+  import { draggable } from "../dnd/draggable";
+  import { dragState, isDraggedMessage, type DropTarget } from "../dnd/drag-store";
+  import { applyDrop } from "../dnd/handle-drop";
 
   export let message: models.CollectionMessage;
   export let collectionsStore: CollectionsStore;
@@ -13,6 +16,16 @@
 
   let isHovered = false;
   let isRenaming = false;
+
+  $: isDragged = isDraggedMessage($dragState, message.id);
+
+  const onDrop = (target: DropTarget) =>
+    applyDrop(
+      collectionsStore,
+      $collectionsStore.collections,
+      { kind: "message", id: message.id, collectionId: message.collectionId },
+      target
+    );
 
   $: otherCollections = $collectionsStore.collections.filter(
     (c) => c.id !== message.collectionId
@@ -47,7 +60,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex items-center"
+  class={`relative flex items-center ${isDragged ? "opacity-40" : ""}`}
   on:mouseenter={() => (isHovered = true)}
   on:mouseleave={() => (isHovered = false)}
 >
@@ -61,6 +74,14 @@
   {:else}
     <button
       class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+      use:draggable={{
+        payload: {
+          kind: "message",
+          id: message.id,
+          collectionId: message.collectionId,
+        },
+        onDrop,
+      }}
       on:click={() => onOpenMessage(message)}
     >
       <Icon type="message" size={16} />

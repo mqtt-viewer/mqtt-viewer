@@ -110,7 +110,10 @@
       <SidebarTopBar {connection} collapseSidebar={close} onSearch={openSearch} />
       <ConnectionRow {connection} />
       <NewMessageRow onClick={() => openNewMessage()} />
-      <div class="grow min-h-0 overflow-y-auto px-3 pb-3 flex flex-col gap-4">
+      <div
+        class="grow min-h-0 overflow-y-auto px-3 pb-3 flex flex-col gap-4"
+        data-dnd-scroll
+      >
         <CollectionsSection
           scope="global"
           {collectionsStore}
