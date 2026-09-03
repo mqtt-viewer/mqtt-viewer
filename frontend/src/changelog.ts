@@ -72,6 +72,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The memory budget now shows the estimate as a sum, Total = connections × budget + 300 MB app, and the retention fields sit on an even rhythm instead of drifting apart.",
       },
       {
+        title: "The edit button on a connection tile opens the details",
+        body: "Pressing the pencil on a connection, from Home or a new tab, opened its tab and left you to find the details dialog yourself. It now opens the dialog too.",
+      },
+      {
         title: "Dropdowns inside dialogs work again",
         body: "Dropdowns in the connection dialog, like Version and Protocol, opened invisibly behind the dialog itself, so clicking them appeared to do nothing. They now open on top where they belong.",
       },

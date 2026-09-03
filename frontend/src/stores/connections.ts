@@ -43,6 +43,10 @@ export type Connection = DeepOmit<
   // True only for a connection just created this session, until its details
   // dialog has been shown once (see acknowledgeConnectionCreated).
   justCreated?: boolean;
+  // Set when something outside the connection's tab asks for its details
+  // dialog, such as the edit button on a Home or new-tab tile. Cleared once
+  // the row has opened the dialog (see acknowledgeEditRequest).
+  editRequested?: boolean;
 };
 
 interface ConnectionStore {
@@ -365,17 +369,36 @@ const disconnect = async (connectionId: number) => {
   }
 };
 
-// Clears the just-created flag once the details dialog has auto-opened, so it
+// The two flags that ask a connection's row to open its details dialog once
+// the row is mounted. Each is cleared as soon as the dialog opens, so it
 // doesn't reopen on every remount.
-const acknowledgeConnectionCreated = (connectionId: number) => {
+type OpenDetailsFlag = "justCreated" | "editRequested";
+
+const setOpenDetailsFlag = (
+  connectionId: number,
+  flag: OpenDetailsFlag,
+  value: boolean
+) => {
   update((store) => {
     const connection = store.connections[connectionId];
-    if (connection?.justCreated) {
-      store.connections[connectionId] = { ...connection, justCreated: false };
-    }
+    if (!connection || !!connection[flag] === value) return store;
+    store.connections[connectionId] = { ...connection, [flag]: value };
     return store;
   });
 };
+
+// Clears the just-created flag once the details dialog has auto-opened.
+const acknowledgeConnectionCreated = (connectionId: number) =>
+  setOpenDetailsFlag(connectionId, "justCreated", false);
+
+// Asks the connection's row to open its details dialog. Used by the tiles on
+// Home and the new-tab page, which select the tab but don't own the dialog.
+const requestEdit = (connectionId: number) =>
+  setOpenDetailsFlag(connectionId, "editRequested", true);
+
+// Clears that request once the dialog has opened.
+const acknowledgeEditRequest = (connectionId: number) =>
+  setOpenDetailsFlag(connectionId, "editRequested", false);
 
 const toggleShowDataPageWhileDisconnected = (
   connectionId: number,
@@ -399,6 +422,8 @@ export default {
   deleteConnection,
   toggleShowDataPageWhileDisconnected,
   acknowledgeConnectionCreated,
+  requestEdit,
+  acknowledgeEditRequest,
   connect,
   disconnect,
 };

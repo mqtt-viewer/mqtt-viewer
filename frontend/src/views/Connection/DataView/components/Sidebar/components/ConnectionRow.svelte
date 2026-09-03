@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
@@ -40,13 +39,18 @@
       : capitalizeFirstLetter(state);
 
   // A connection just created this session opens straight into the details
-  // dialog so the user can configure it before connecting.
-  onMount(() => {
+  // dialog so the user can configure it before connecting, and so does one
+  // whose edit button was pressed on a Home or new-tab tile. Reactive rather
+  // than onMount only: the tab may already be mounted when the request lands.
+  $: if (connection.justCreated || connection.editRequested) {
+    $isEditOpen = true;
     if (connection.justCreated) {
-      $isEditOpen = true;
       connections.acknowledgeConnectionCreated(details.id);
     }
-  });
+    if (connection.editRequested) {
+      connections.acknowledgeEditRequest(details.id);
+    }
+  }
 
   const toggleConnect = async () => {
     // An unconfigured connection can't connect — send them to set it up first.
