@@ -283,6 +283,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Fewer stray tab stops",
         body: "Tabbing through a button with a tooltip used to stop twice, once on an invisible wrapper and once on the button; now it stops just once.",
       },
+      {
+        title: "Reach older messages on the timeline",
+        body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
+      },
     ],
   },
   {
