@@ -141,6 +141,48 @@ export class EnvInfo {
     }
 }
 
+/**
+ * MemoryLimitModel is the shape of the soft memory limit, exposed to the
+ * frontend so the estimate the settings dialog shows is derived from the same
+ * numbers the runtime is given (see frontend/src/util/memory-budget.ts).
+ */
+export class MemoryLimitModel {
+    /**
+     * BaseBytes covers heap usage outside the per-connection history budgets.
+     */
+    "baseBytes": number;
+
+    /**
+     * Each connected connection adds budget * BudgetFactorNumerator /
+     * BudgetFactorDenominator: headroom over the budget for churn.
+     */
+    "budgetFactorNumerator": number;
+    "budgetFactorDenominator": number;
+
+    /** Creates a new MemoryLimitModel instance. */
+    constructor($$source: Partial<MemoryLimitModel> = {}) {
+        if (!("baseBytes" in $$source)) {
+            this["baseBytes"] = 0;
+        }
+        if (!("budgetFactorNumerator" in $$source)) {
+            this["budgetFactorNumerator"] = 0;
+        }
+        if (!("budgetFactorDenominator" in $$source)) {
+            this["budgetFactorDenominator"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryLimitModel instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryLimitModel {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryLimitModel($$parsedSource as Partial<MemoryLimitModel>);
+    }
+}
+
 export class MemoryStats {
     "historyBytes": number;
     "activeConnections": number;

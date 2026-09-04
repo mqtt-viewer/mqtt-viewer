@@ -12,6 +12,7 @@
     GetDatabaseSizeBytes,
     ClearReceivedMessages,
     GetMemoryStats,
+    GetMemoryLimitModel,
   } from "bindings/mqtt-viewer/backend/app/app";
   import env from "@/stores/env";
   import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
@@ -19,8 +20,11 @@
     MB,
     GB,
     MIN_MEMORY_MB,
+    EXAMPLE_CONNECTION_COUNTS,
     formatBytes,
     estimateTotalBytes,
+    budgetFactor,
+    type MemoryLimitModel,
   } from "@/util/memory-budget";
 
   export let open = writable(false);
@@ -30,7 +34,7 @@
   let diskBudgetGb = 1;
   let dbSizeBytes: number | undefined = undefined;
   let historyBytes: number | undefined = undefined;
-  let activeConnections = 1;
+  let limitModel: MemoryLimitModel | undefined;
   let isSaving = false;
   let isClearing = false;
 
@@ -40,11 +44,9 @@
     try {
       const stats = await GetMemoryStats();
       historyBytes = stats.historyBytes;
-      activeConnections = stats.activeConnections;
     } catch (e) {
       console.error("Failed to read memory stats", e);
       historyBytes = undefined;
-      activeConnections = 1;
     }
   };
 
@@ -93,6 +95,13 @@
         },
       });
     }
+
+    // Not fatal: the estimate falls back to a placeholder without it.
+    try {
+      limitModel = await GetMemoryLimitModel();
+    } catch (e) {
+      console.error("Failed to read the memory limit model", e);
+    }
   };
 
   // Load fresh settings + db size whenever the dialog opens, and poll memory
@@ -107,7 +116,6 @@
 
   // A cleared Svelte number input binds null, which is also invalid.
   $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
-  $: shownConnections = Math.max(1, activeConnections);
 
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
@@ -191,13 +199,32 @@
           including the newest message per topic that the topic tree shows.
         </p>
         <p class="text-sm text-secondary-text">
-          Expect up to about {formatBytes(
-            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, activeConnections)
-          )} in total across {shownConnections} connection{shownConnections === 1
-            ? ""
-            : "s"}. That's this budget for each connection plus around 300 MB
-          for the interface and runtime.
+          I also set a soft memory limit for the runtime: {formatBytes(
+            limitModel?.baseBytes
+          )} for the runtime and database, plus {limitModel
+            ? budgetFactor(limitModel)
+            : "…"} times this budget for each connected connection so history
+          has room to churn. The garbage collector works towards it, and the
+          interface sits outside it. With this budget, expect up to about:
         </p>
+        <ul
+          class="grid grid-cols-[max-content_auto] gap-x-3 text-sm text-secondary-text"
+        >
+          {#each EXAMPLE_CONNECTION_COUNTS as count}
+            <li class="contents">
+              <span>{count} connection{count === 1 ? "" : "s"}:</span>
+              <span
+                >{formatBytes(
+                  estimateTotalBytes(
+                    limitModel,
+                    memoryBudgetMb ?? MIN_MEMORY_MB,
+                    count
+                  )
+                )}</span
+              >
+            </li>
+          {/each}
+        </ul>
       </div>
 
       <div class="flex flex-col gap-2">
