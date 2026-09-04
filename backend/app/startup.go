@@ -40,6 +40,14 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	var err error
 	if a.Mode == AppModes.Wails {
 		a.EventRuntime = eventRuntime.InitEventRuntime(application.Get())
+		// OnShutdown tasks run at the start of Wails' cleanup, before it
+		// closes windows, so the flag is reliably set by the time any
+		// WindowClosing handler fires during a quit.
+		if wailsApp := application.Get(); wailsApp != nil {
+			wailsApp.OnShutdown(func() {
+				a.shuttingDown.Store(true)
+			})
+		}
 		if !env.IsDev {
 			slog.Info("starting in production mode")
 			a.Mode = AppModes.Wails

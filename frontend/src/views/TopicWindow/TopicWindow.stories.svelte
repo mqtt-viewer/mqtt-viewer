@@ -1,16 +1,16 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import Component from "./ChartView.svelte";
+  import Component from "./TopicWindow.svelte";
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
 
-  const componentName = "ChartView";
-  const storyId = "Views/Connection/DataView/SelectedTopicPanel/Chart/ChartView";
-  const props: string[] = ["selectedTopicStore","chartSeriesStore","topic","onAddFromPayload","onPopOut","optionsStore"];
+  const componentName = "TopicWindow";
+  const storyId = "Views/TopicWindow";
+  const props: string[] = [];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
-    title: "Views/Connection/DataView/SelectedTopicPanel/Chart/ChartView",
+    title: "Views/TopicWindow",
     component: Component,
     tags: ["autodocs"],
     argTypes: getStoryArgTypes(componentName, props) as any,
