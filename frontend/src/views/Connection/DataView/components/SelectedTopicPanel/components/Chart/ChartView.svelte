@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { get } from "svelte/store";
+  import { get, writable, type Writable } from "svelte/store";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
@@ -8,6 +8,7 @@
   import chartWindows from "@/stores/chart-windows";
   import type { SelectedTopicStore } from "../../../../stores/selected-topic-store";
   import type { ChartSeriesStore } from "./chart-series-store";
+  import type { ChartViewOptions } from "../../../../stores/topic-panel-view-state";
   import TopicChart from "./TopicChart.svelte";
   import SeriesLegend from "./SeriesLegend.svelte";
   import ChartOptions from "./ChartOptions.svelte";
@@ -19,13 +20,21 @@
   // Pop-out control (shown in the docked panel, hidden in a popped-out window).
   export let onPopOut: (() => void) | null = null;
   // Whether the chart is actually on screen (the docked panel renders every
-  // tab slot, hidden or not). Gates payload loading and the 1 Hz ticker. The
+  // tab slot, hidden or not). Gates TopicChart's 1 Hz window ticker. The
   // pop-out window never passes it, so it defaults to visible there.
   export let visible = true;
+  // Owned by the panel so the controls survive a dock switch, which remounts
+  // the panel. The pop-out chart window and the stories own no panel state,
+  // so they fall back to a local store.
+  export let optionsStore: Writable<ChartViewOptions> | null = null;
 
-  let paused = false;
-  let style: "line" | "area" = "line";
-  let showPoints = true;
+  const options =
+    optionsStore ??
+    writable<ChartViewOptions>({
+      paused: false,
+      style: "line",
+      showPoints: true,
+    });
   let windowSeconds = 0;
 
   // ChartView is the shared host for both the docked chart and the pop-out
@@ -73,17 +82,20 @@
 
 <div class="flex flex-col size-full min-h-0">
   <div class="flex items-center gap-1 pb-1">
-    <Tooltip text={paused ? "Resume live updates" : "Pause live updates"} focusable>
-      <IconButton onClick={() => (paused = !paused)}>
-        <span class={paused ? "text-primary" : ""}>
-          <Icon type={paused ? "connect" : "pause"} size={16} />
+    <Tooltip
+      text={$options.paused ? "Resume live updates" : "Pause live updates"}
+      focusable
+    >
+      <IconButton onClick={() => ($options.paused = !$options.paused)}>
+        <span class={$options.paused ? "text-primary" : ""}>
+          <Icon type={$options.paused ? "connect" : "pause"} size={16} />
         </span>
       </IconButton>
     </Tooltip>
     {#if ready}
       <ChartOptions
-        bind:style
-        bind:showPoints
+        bind:style={$options.style}
+        bind:showPoints={$options.showPoints}
         bind:windowSeconds
         {onWindowSecondsChange}
       />
@@ -96,7 +108,7 @@
       </Tooltip>
     {/if}
     <div class="grow"></div>
-    {#if paused}
+    {#if $options.paused}
       <span class="text-sm text-primary">Paused</span>
     {/if}
   </div>
@@ -108,9 +120,9 @@
       <TopicChart
         {selectedTopicStore}
         {chartSeriesStore}
-        {paused}
-        {style}
-        {showPoints}
+        paused={$options.paused}
+        style={$options.style}
+        showPoints={$options.showPoints}
         {windowSeconds}
         {visible}
       />

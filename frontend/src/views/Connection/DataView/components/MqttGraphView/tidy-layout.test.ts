@@ -67,6 +67,23 @@ test("msgs sort orders topics by descending subtree message count", () => {
   expect(order).toEqual(["b", "c", "a"]);
 });
 
+test("count sort ranks by topic count, not message count", () => {
+  const model = new TopicModel(14000);
+  // one very chatty leaf: 1 topic, thousands of messages
+  for (let i = 0; i < 3000; i++) model.ingest("chatty", T);
+  // a quiet namespace: 12 topics, one message each
+  for (let i = 0; i < 12; i++) model.ingest(`namespace/sensor-${i}`, T);
+  // a smaller namespace, to check the ordering runs the whole way down
+  for (let i = 0; i < 3; i++) model.ingest(`small/sensor-${i}`, T);
+
+  const res = layoutTopicTree(model, { ...baseOpts, nowMs: T, sortKey: "count" });
+  const order = res.nodes
+    .filter((pn) => pn.node.depth === 0)
+    .sort((x, y) => x.y - y.y)
+    .map((pn) => pn.node.name);
+  expect(order).toEqual(["namespace", "small", "chatty"]);
+});
+
 test("equal-rate siblings are ordered alphabetically (deterministic tie-break)", () => {
   const model = new TopicModel(14000);
   // three siblings that all published exactly once at the same instant: equal

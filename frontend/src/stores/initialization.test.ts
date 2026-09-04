@@ -37,6 +37,9 @@ vi.mock("./default-sorts", () => ({
 vi.mock("./chart-windows", () => ({
   default: { init: mocks.otherStoreInit },
 }));
+vi.mock("./topic-panel-dock", () => ({
+  default: { init: mocks.otherStoreInit },
+}));
 
 describe("startup initialization", () => {
   it("initializes server environment before panels without native calls", async () => {

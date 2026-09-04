@@ -50,14 +50,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
-        title: "Run MQTT Viewer in your browser",
-        body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
-        thanks: [
-          {
-            name: "Jake W",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/119",
-          },
-        ],
+        title: "Security updates under the bonnet",
+        body: "I updated frontend and app dependencies to close 19 reported security issues.",
       },
       {
         title: "See what the MQTT client is doing",
@@ -112,6 +106,14 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "See your topics as a graph",
+        body: "There's a new graph view of the topic tree, where each node is sized and coloured by how much traffic it carries, so the busy corners of a broker stand out at a glance. Switch between list and graph above the tree.",
+      },
+      {
+        title: "Sort topics by how busy they are",
+        body: "The topic list can now order itself by what matters in the moment: busiest first, most messages, newest first or silent first, alongside the usual A to Z. The graph view offers the same choices and remembers the one you pick per connection. Its filter box also understands MQTT wildcards now, like sensors/+/temperature, just as the list does, and whatever you type in the filter follows you when you switch between list and graph.",
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
         thanks: [
@@ -141,7 +143,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Chart values that arrive as text",
-        body: 'Numeric readings often turn up wrapped in quotes, like "24.6". You can now chart those too, so a quoted number plots just like a plain one. Values that aren\'t really numbers stay out of the way.',
+        body: "Numeric readings often turn up wrapped in quotes, like \"24.6\". You can now chart those too, so a quoted number plots just like a plain one. Values that aren't really numbers stay out of the way.",
         thanks: [
           {
             name: "andyg2",
@@ -174,6 +176,16 @@ export const CHANGELOG: ChangelogEntry[] = [
           {
             name: "viktak",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/106",
+          },
+        ],
+      },
+      {
+        title: "Put the topic panel where you want it",
+        body: "The selected-topic panel no longer has to live on the right: the \"Dock side\" row in its menu can move it along the bottom instead. It can also pop out into its own window, which follows whatever topic you select.",
+        thanks: [
+          {
+            name: "ElectronicBattle",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/46",
           },
         ],
       },
@@ -259,7 +271,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Clearer memory settings",
-        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
+        body: "The settings dialog now shows how much memory message history is using, and what the app can grow to with one, two or three connections at your budget.",
       },
       {
         title: "The memory budget now covers every topic",
@@ -292,6 +304,32 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Fewer stray tab stops",
         body: "Tabbing through a button with a tooltip used to stop twice, once on an invisible wrapper and once on the button; now it stops just once.",
+      },
+      {
+        title: "Reach older messages on the timeline",
+        body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
+      },
+      {
+        title: "Right-click a topic",
+        body: "Topics now have a right-click menu, in the list and in the graph. Copy the topic path or the payload, export the message history, or clear the retained message. The selected topic panel offers the same actions, so wherever you are, the options are the same.",
+      },
+      {
+        title: "Clear retained messages in bulk",
+        body: "Right-click a branch and you can clear every retained message beneath it in one go. I'll list what I'm about to clear and ask first, since clearing a retained message reaches every other client on the broker, and afterwards I'll tell you how many actually went. Your broker's own $SYS topics are never offered or touched, and a single sweep is capped at 1000 topics. One caveat worth knowing: I can only clear retained messages I've seen, and on MQTT 3 brokers I only learn about them when I subscribe, so anything retained by another client mid-session won't be counted.",
+      },
+      {
+        title: "Spot retained topics at a glance",
+        body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages. The marker goes the moment you clear the message, on MQTT 3 as well as 5, and it starts again from what your broker replays each time you reconnect.",
+      },
+      {
+        title: "Run MQTT Viewer in your browser",
+        body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
+        thanks: [
+          {
+            name: "Jake W",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/119",
+          },
+        ],
       },
     ],
   },

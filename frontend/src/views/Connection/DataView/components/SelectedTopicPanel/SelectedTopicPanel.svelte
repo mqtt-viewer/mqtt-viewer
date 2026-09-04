@@ -19,13 +19,17 @@
   import IconButton from "@/components/Button/IconButton.svelte";
   import Topic from "./components/Topic.svelte";
   import ChartView from "./components/Chart/ChartView.svelte";
-  import { createChartSeriesStore } from "./components/Chart/chart-series-store";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
   import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { copyToClipboard } from "@/util/copy";
   import { decodePayload } from "@/components/CodeEditor/codec";
   import { formatPayload } from "@/components/CodeEditor/formatting";
+  import {
+    createTopicPanelViewState,
+    type TopicPanelViewState,
+  } from "../../stores/topic-panel-view-state";
+  import type { DockMode } from "@/stores/topic-panel-dock";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -39,23 +43,48 @@
   export let openChartWindow:
     | ((topic: string, fields: string[]) => void)
     | null = null;
+  // Dock-side control shown in the header menu. Optional so the panel keeps
+  // working anywhere it's used without wiring dock behaviour (e.g. tests).
+  export let dockMode: DockMode = "right";
+  export let onSetDockMode: ((mode: DockMode) => void) | null = null;
+  // Hidden in the popped-out window: the window's own close button is the
+  // way out there, rather than deselecting the topic.
+  export let showCloseButton = true;
+  // Window mode only: the panel header doubles as the pop-out window's drag
+  // region, so the window moves by its header like the chart and broker
+  // status pop-outs do.
+  export let headerDraggable = false;
+  // Window mode on macOS only: pixels of empty space at the header's left so
+  // the traffic lights don't sit on top of the topic path. Passed in rather
+  // than read from the env store so the panel still renders from props alone.
+  export let headerLeftInset = 0;
+  // Panel state that must outlive a remount: switching dock side reparents
+  // this component (bottom dock and right dock are different DOM parents),
+  // so DataView owns one instance per connection. The default keeps the
+  // pop-out window and the stories working with their own fresh state.
+  export let viewState: TopicPanelViewState = createTopicPanelViewState();
+
+  const { chartSeriesStore, activeTabIndex, chartOptions, chartedTopic } =
+    viewState;
 
   $: selectedTopicString = $selectedTopicStore.selectedTopic;
 
-  // Per-topic chart series; reset whenever the selected topic changes.
-  const chartSeriesStore = createChartSeriesStore();
-  let lastChartedTopic: string | null = null;
-  $: if ($selectedTopicStore.selectedTopic !== lastChartedTopic) {
-    lastChartedTopic = $selectedTopicStore.selectedTopic;
+  // Per-topic chart series; reset whenever the selected topic changes. The
+  // charted topic rides along in the view state so a remount does not read as
+  // a topic change and wipe the series.
+  $: if ($selectedTopicStore.selectedTopic !== $chartedTopic) {
+    chartedTopic.set($selectedTopicStore.selectedTopic);
     chartSeriesStore.clear();
   }
 
   // Tab control: the Chart tab is last (index 3 for v5 incl. Headers/Properties,
   // index 1 for v3 which only has Payload + Chart).
   let tabsRef: { setTab: (index: number) => void } | null = null;
-  let activeTabIndex = 0;
   $: chartTabIndex = mqttVersion === "3" ? 1 : 3;
-  $: isChartTabActive = activeTabIndex === chartTabIndex;
+  $: isChartTabActive = $activeTabIndex === chartTabIndex;
+  // Tabs reads defaultTab once on mount, which is how a remount lands back on
+  // the tab the user left. Clamped because the v3 panel only has two tabs.
+  $: initialTabIndex = Math.min($activeTabIndex, mqttVersion === "3" ? 1 : 3);
   const viewChart = () => tabsRef?.setTab(chartTabIndex);
   // Opens the payload field picker and switches to the Payload tab, so
   // "Add value from payload" lands the user on a ready-to-pick control.
@@ -209,17 +238,67 @@
     bg-elevation-1 border-l-[1px] border-l-outline p-4 pt-0"
 >
   <PanelHeader
-    ><div class="relative min-h-[50px] h-full">
+    ><div
+      class="relative min-h-[50px] h-full"
+      style={headerDraggable ? "--wails-draggable:drag" : ""}
+    >
       <div class="flex gap-1 items-center min-h-[50px] max-w-full h-full py-2">
-        <Topic topic={selectedTopicString ?? ""} />
+        {#if headerLeftInset > 0}
+          <!-- Clear the macOS traffic lights (frameless hidden-inset titlebar). -->
+          <div class="shrink-0" style={`width:${headerLeftInset}px`}></div>
+        {/if}
+        <div class="min-w-0" style="--wails-draggable:false">
+          <Topic topic={selectedTopicString ?? ""} />
+        </div>
         <div class="grow"></div>
         <DropdownMenu>
-          <div slot="trigger" class="">
+          <div slot="trigger" class="" style="--wails-draggable:false">
             <IconButton>
               <Icon type="menu" size={16} />
             </IconButton>
           </div>
-          <div slot="menu-content" class="flex flex-col gap-5 p-2">
+          <div
+            slot="menu-content"
+            class="flex flex-col gap-5 p-2"
+            style="--wails-draggable:false"
+          >
+            {#if onSetDockMode}
+              <div>
+                <div class="text-sm text-secondary-text mb-1">Dock side</div>
+                <div class="flex gap-1">
+                  <div
+                    class={`rounded ${dockMode === "right" ? "border-primary border-[1px]" : ""}`}
+                  >
+                    <IconButton
+                      tooltipText="Dock right"
+                      onClick={() => onSetDockMode?.("right")}
+                    >
+                      <Icon type="dockRight" size={18} />
+                    </IconButton>
+                  </div>
+                  <div
+                    class={`rounded ${dockMode === "bottom" ? "border-primary border-[1px]" : ""}`}
+                  >
+                    <IconButton
+                      tooltipText="Dock bottom"
+                      onClick={() => onSetDockMode?.("bottom")}
+                    >
+                      <Icon type="dockBottom" size={18} />
+                    </IconButton>
+                  </div>
+                  <div
+                    class={`rounded ${dockMode === "window" ? "border-primary border-[1px]" : ""}`}
+                  >
+                    <IconButton
+                      tooltipText="Open in window"
+                      onClick={() => onSetDockMode?.("window")}
+                    >
+                      <Icon type="popOut" size={18} />
+                    </IconButton>
+                  </div>
+                </div>
+              </div>
+            {/if}
             <Switch
               name="AutoSelectRecent"
               label="Auto-select most recent"
@@ -255,9 +334,11 @@
             {/if}
           </div>
         </DropdownMenu>
-        <IconButton onClick={selectedTopicStore.deselectTopic}>
-          <Icon type="close" size={18} />
-        </IconButton>
+        {#if showCloseButton}
+          <IconButton onClick={selectedTopicStore.deselectTopic}>
+            <Icon type="close" size={18} />
+          </IconButton>
+        {/if}
       </div>
     </div></PanelHeader
   >
@@ -345,7 +426,8 @@
       <Tabs
         class="w-full grow min-h-0"
         bind:this={tabsRef}
-        onTabChange={(i) => (activeTabIndex = i)}
+        defaultTab={initialTabIndex}
+        onTabChange={(i) => activeTabIndex.set(i)}
         tabs={[{ title: "Payload" }, { title: "Chart" }]}
       >
         <div slot="tab-1" class="size-full pt-2">
@@ -400,6 +482,7 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            optionsStore={chartOptions}
             visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
@@ -411,7 +494,8 @@
       <Tabs
         class="w-full grow min-h-0"
         bind:this={tabsRef}
-        onTabChange={(i) => (activeTabIndex = i)}
+        defaultTab={initialTabIndex}
+        onTabChange={(i) => activeTabIndex.set(i)}
         tabs={[
           { title: "Payload" },
           { title: "Headers" },
@@ -490,6 +574,7 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            optionsStore={chartOptions}
             visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}

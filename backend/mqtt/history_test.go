@@ -576,6 +576,8 @@ func TestTopicTimelineWindowReturnsStubsNewestInOrder(t *testing.T) {
 func TestTopicTimelineWindowFallsBackToLatestWhenAgedOut(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
 	h.SetBudgetBytes(int64(perMsg * 12))
 
 	h.addMessageToHistory(msg("low/traffic", 1024))
@@ -622,6 +624,8 @@ func TestGetMessageByIdFindsMessageInWindow(t *testing.T) {
 func TestGetMessageByIdFindsAgedOutMessageViaLatestFallback(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
 	h.SetBudgetBytes(int64(perMsg * 12))
 
 	m := msg("low/traffic", 1024)
@@ -645,6 +649,8 @@ func TestGetMessageByIdFindsAgedOutMessageViaLatestFallback(t *testing.T) {
 func TestGetMessageByIdReportsNotFoundWhenSupersededAndAgedOut(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
 	h.SetBudgetBytes(int64(perMsg * 12))
 
 	m := msg("low/traffic", 1024)
@@ -755,6 +761,8 @@ func TestGetMessageByIdWithHintFastAgedOutCheck(t *testing.T) {
 func TestGetMessageByIdWithHintFallsBackToLatest(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
 	h.SetBudgetBytes(int64(perMsg * 12))
 
 	old := msg("low/traffic", 1024)
@@ -935,5 +943,84 @@ func TestRetainedIndexClearedByClear(t *testing.T) {
 	}
 	if got := h.RetainedUnderPrefix(""); len(got) != 0 {
 		t.Errorf("expected no retained topics after Clear, got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixExcludesBrokerReservedTopics(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("factory/line1/s1", 10))
+	h.addMessageToHistory(retainedMsg("$SYS/broker/uptime", 10))
+	h.addMessageToHistory(retainedMsg("$SYS/broker/clients/connected", 10))
+
+	// Empty prefix matches everything else, but $SYS/... must never come back.
+	got := h.RetainedUnderPrefix("")
+	if len(got) != 1 || got[0] != "factory/line1/s1" {
+		t.Errorf("expected only the non-$ topic, got %v", got)
+	}
+
+	// Even asking for the $SYS branch directly must not surface it: a bulk
+	// clear can never be offered over broker internals.
+	if got := h.RetainedUnderPrefix("$SYS"); len(got) != 0 {
+		t.Errorf("expected no $SYS topics under any prefix, got %v", got)
+	}
+}
+
+func TestUnmarkRetainedRemovesFromIndex(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.addMessageToHistory(retainedMsg("a/c", 10))
+
+	h.UnmarkRetained("a/b")
+
+	if h.IsRetained("a/b") {
+		t.Error("expected a/b to be unmarked")
+	}
+	if !h.IsRetained("a/c") {
+		t.Error("expected a/c to remain marked")
+	}
+	got := h.RetainedUnderPrefix("")
+	if len(got) != 1 || got[0] != "a/c" {
+		t.Errorf("expected only a/c to remain, got %v", got)
+	}
+}
+
+func TestUnmarkRetainedNoopForUnknownTopic(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+
+	// Must not panic or otherwise disturb the index for a topic it never knew
+	// about.
+	h.UnmarkRetained("never/seen")
+
+	if !h.IsRetained("a/b") {
+		t.Error("expected a/b to be unaffected by unmarking an unrelated topic")
+	}
+}
+
+func TestClearRetainedIndexEmptiesIndexButKeepsHistory(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+
+	h.ClearRetainedIndex()
+
+	if h.IsRetained("a/b") {
+		t.Error("expected the retained index to be empty after ClearRetainedIndex")
+	}
+	if got := h.RetainedUnderPrefix(""); len(got) != 0 {
+		t.Errorf("expected no retained topics after ClearRetainedIndex, got %v", got)
+	}
+
+	// Message history itself must be untouched.
+	got, err := h.GetTopicHistory("a/b")
+	if err != nil {
+		t.Fatalf("expected message history to survive ClearRetainedIndex, got error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("expected 1 message still in history, got %d", len(got))
+	}
+	all := h.GetAllHistory()
+	if _, ok := all["a/b"]; !ok {
+		t.Error("expected a/b still present in GetAllHistory after ClearRetainedIndex")
 	}
 }

@@ -16,7 +16,7 @@ test("mqtt data is not filtered with empty search string", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 0,
@@ -25,7 +25,7 @@ test("mqtt data is not filtered with empty search string", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -55,7 +55,7 @@ test("mqtt data is filtered completely with no matches", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 0,
@@ -64,7 +64,7 @@ test("mqtt data is filtered completely with no matches", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -94,7 +94,7 @@ test("parents are kept when child matches", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -103,7 +103,7 @@ test("parents are kept when child matches", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -134,7 +134,7 @@ test("non-matching children on the same level as a matching child are not kept",
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -143,7 +143,7 @@ test("non-matching children on the same level as a matching child are not kept",
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -153,7 +153,7 @@ test("non-matching children on the same level as a matching child are not kept",
             world: {
               topic: "aaaaa/aaaaa/world",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               messageCount: 1,
               subtopicCount: 0,
@@ -179,7 +179,7 @@ test("non-matching children on the same level as a matching child are not kept",
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           latestMessageTime: new Date(),
           message: undefined,
           messageCount: 1,
@@ -188,7 +188,7 @@ test("non-matching children on the same level as a matching child are not kept",
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -218,7 +218,7 @@ test("parent that matches is kept when no children match", () => {
         aaaaa: {
           topic: "aaaaa/aaaaa",
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           latestMessageTime: new Date(),
           message: "test-message",
           messageCount: 1,
@@ -227,7 +227,7 @@ test("parent that matches is kept when no children match", () => {
             hello: {
               topic: "aaaaa/aaaaa/hello",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               message: "hello",
               messageCount: 1,
@@ -237,7 +237,7 @@ test("parent that matches is kept when no children match", () => {
             world: {
               topic: "aaaaa/aaaaa/world",
               isDecodedProto: false,
-      isRetained: false,
+              isRetained: false,
               latestMessageTime: new Date(),
               messageCount: 1,
               subtopicCount: 0,
@@ -262,7 +262,7 @@ test("parent that matches is kept when no children match", () => {
       children: {
         aaaaa: {
           isDecodedProto: false,
-      isRetained: false,
+          isRetained: false,
           topic: "aaaaa/aaaaa",
           latestMessageTime: new Date(),
           message: "test-message",
@@ -277,7 +277,11 @@ test("parent that matches is kept when no children match", () => {
   expect(filteredData).toEqual(expectedResult);
 });
 
-test("wildcard pattern keeps matching descendants and prunes siblings", () => {
+// A5: the top node "house" (topic "house", one level) does NOT itself
+// wildcard-match "house/+", yet the tree keeps it because its child leaf
+// "house/kitchen" matches. A shallow sibling "garage" that matches neither is
+// pruned. Prune semantics: parents of matches are retained.
+test("wildcard pattern keeps a parent via a matching leaf, prunes non-matches", () => {
   const unfilteredData: MqttData = {
     house: {
       topic: "house",

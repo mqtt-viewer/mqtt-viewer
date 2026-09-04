@@ -34,19 +34,39 @@
       "description": "Number of topics that will be cleared. 0 selects the single-topic wording."
     },
     {
+      "name": "topics",
+      "type": "array",
+      "required": false,
+      "default": "[]",
+      "description": "The exact topics a branch clear will publish tombstones to, so the count can be checked rather than taken on trust. Shows up to 10, then an 'and N more' line."
+    },
+    {
+      "name": "busy",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "True while the clear is in flight. Clear shows a busy label and disables with Cancel; the dialog does not close on its own until the parent closes it."
+    },
+    {
       "name": "onConfirm",
       "type": "function",
-      "required": true
+      "required": true,
+      "description": "Called on Clear; returns a promise. The dialog does not close itself — the parent awaits the call and closes isOpen once it resolves."
     }
   ],
   "tokens": [
     "emphasis",
     "error",
-    "error-light"
+    "error-light",
+    "outline",
+    "elevation-0",
+    "secondary-text"
   ],
   "dependencies": [
     "Button",
-    "Dialog"
+    "Dialog",
+    "IconButton",
+    "Icon"
   ],
   "notes": "Figma is not linked yet. The branch copy hedges deliberately: under MQTT 3 the retained flag only arrives on subscribe-time replay, so the count cannot claim to be the broker's complete retained set."
 }

@@ -19,6 +19,44 @@ import * as paths$0 from "../paths/models.js";
 import * as events$0 from "../../events/models.js";
 
 /**
+ * ClearRetainedResult reports what a bulk clear actually did. The UI states a
+ * number to the user, so it must come from attempted publishes rather than
+ * from the size of the list we were handed.
+ */
+export class ClearRetainedResult {
+    "cleared": number;
+    "failed": number;
+
+    /**
+     * FirstError names one failure so the user has something to act on.
+     */
+    "firstError": string;
+
+    /** Creates a new ClearRetainedResult instance. */
+    constructor($$source: Partial<ClearRetainedResult> = {}) {
+        if (!("cleared" in $$source)) {
+            this["cleared"] = 0;
+        }
+        if (!("failed" in $$source)) {
+            this["failed"] = 0;
+        }
+        if (!("firstError" in $$source)) {
+            this["firstError"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ClearRetainedResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ClearRetainedResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ClearRetainedResult($$parsedSource as Partial<ClearRetainedResult>);
+    }
+}
+
+/**
  * Used to represent a connection in the frontend
  */
 export class Connection {
@@ -175,6 +213,48 @@ export class ExportedMessagesPayload {
     }
 }
 
+/**
+ * MemoryLimitModel is the shape of the soft memory limit, exposed to the
+ * frontend so the estimate the settings dialog shows is derived from the same
+ * numbers the runtime is given (see frontend/src/util/memory-budget.ts).
+ */
+export class MemoryLimitModel {
+    /**
+     * BaseBytes covers heap usage outside the per-connection history budgets.
+     */
+    "baseBytes": number;
+
+    /**
+     * Each connected connection adds budget * BudgetFactorNumerator /
+     * BudgetFactorDenominator: headroom over the budget for churn.
+     */
+    "budgetFactorNumerator": number;
+    "budgetFactorDenominator": number;
+
+    /** Creates a new MemoryLimitModel instance. */
+    constructor($$source: Partial<MemoryLimitModel> = {}) {
+        if (!("baseBytes" in $$source)) {
+            this["baseBytes"] = 0;
+        }
+        if (!("budgetFactorNumerator" in $$source)) {
+            this["budgetFactorNumerator"] = 0;
+        }
+        if (!("budgetFactorDenominator" in $$source)) {
+            this["budgetFactorDenominator"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryLimitModel instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryLimitModel {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryLimitModel($$parsedSource as Partial<MemoryLimitModel>);
+    }
+}
+
 export class MemoryStats {
     "historyBytes": number;
     "activeConnections": number;
@@ -275,6 +355,39 @@ export class OpenChartWindowParams {
             $$parsedSource["fields"] = $$createField2_0($$parsedSource["fields"]);
         }
         return new OpenChartWindowParams($$parsedSource as Partial<OpenChartWindowParams>);
+    }
+}
+
+/**
+ * OpenTopicWindowParams carries the state needed to pop the selected-topic
+ * panel out into its own window: which connection it follows, and the topic
+ * selected at the moment of opening. The topic rides along in the URL so a
+ * freshly created window can seed itself: a TopicWindowSelect event emitted
+ * right after creation would be dropped by a webview whose JS runtime has
+ * not mounted yet.
+ */
+export class OpenTopicWindowParams {
+    "connectionId": number;
+    "topic": string;
+
+    /** Creates a new OpenTopicWindowParams instance. */
+    constructor($$source: Partial<OpenTopicWindowParams> = {}) {
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new OpenTopicWindowParams instance from a string or object.
+     */
+    static createFrom($$source: any = {}): OpenTopicWindowParams {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new OpenTopicWindowParams($$parsedSource as Partial<OpenTopicWindowParams>);
     }
 }
 

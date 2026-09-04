@@ -12,6 +12,7 @@
     GetDatabaseSizeBytes,
     ClearReceivedMessages,
     GetMemoryStats,
+    GetMemoryLimitModel,
   } from "bindings/mqtt-viewer/backend/app/app";
   import env from "@/stores/env";
   import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
@@ -19,8 +20,10 @@
     MB,
     GB,
     MIN_MEMORY_MB,
+    EXAMPLE_CONNECTION_COUNTS,
     formatBytes,
     estimateTotalBytes,
+    type MemoryLimitModel,
   } from "@/util/memory-budget";
 
   export let open = writable(false);
@@ -30,7 +33,7 @@
   let diskBudgetGb = 1;
   let dbSizeBytes: number | undefined = undefined;
   let historyBytes: number | undefined = undefined;
-  let activeConnections = 1;
+  let limitModel: MemoryLimitModel | undefined;
   let isSaving = false;
   let isClearing = false;
 
@@ -40,11 +43,9 @@
     try {
       const stats = await GetMemoryStats();
       historyBytes = stats.historyBytes;
-      activeConnections = stats.activeConnections;
     } catch (e) {
       console.error("Failed to read memory stats", e);
       historyBytes = undefined;
-      activeConnections = 1;
     }
   };
 
@@ -93,6 +94,13 @@
         },
       });
     }
+
+    // Not fatal: the estimate falls back to a placeholder without it.
+    try {
+      limitModel = await GetMemoryLimitModel();
+    } catch (e) {
+      console.error("Failed to read the memory limit model", e);
+    }
   };
 
   // Load fresh settings + db size whenever the dialog opens, and poll memory
@@ -107,7 +115,6 @@
 
   // A cleared Svelte number input binds null, which is also invalid.
   $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
-  $: shownConnections = Math.max(1, activeConnections);
 
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
@@ -172,10 +179,8 @@
 </script>
 
 <Dialog title="Settings" isOpen={open}>
-  <div class="flex flex-col gap-5 mt-3 w-[440px]">
+  <div class="flex flex-col gap-5 mt-3 pt-3 w-[440px]">
     <section class="flex flex-col gap-4">
-      <h3 class="text-emphasis font-medium">Message retention</h3>
-
       <div class="flex flex-col gap-1">
         <BaseNumberInput
           name="memory-budget"
@@ -186,18 +191,29 @@
           errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
+
         <p class="text-sm text-secondary-text">
-          Caps the message history I keep in memory for each connection,
-          including the newest message per topic that the topic tree shows.
+          With this budget, expect up to about:
         </p>
-        <p class="text-sm text-secondary-text">
-          Expect up to about {formatBytes(
-            estimateTotalBytes(memoryBudgetMb ?? MIN_MEMORY_MB, activeConnections)
-          )} in total across {shownConnections} connection{shownConnections === 1
-            ? ""
-            : "s"}. That's this budget for each connection plus around 300 MB
-          for the interface and runtime.
-        </p>
+        <ul
+          class="grid grid-cols-[max-content_auto] gap-x-3 text-sm text-secondary-text"
+        >
+          {#each EXAMPLE_CONNECTION_COUNTS as count}
+            <li class="contents">
+              <span>{count} connection{count === 1 ? "" : "s"}:</span>
+              <span
+                >{formatBytes(
+                  estimateTotalBytes(
+                    limitModel,
+                    memoryBudgetMb ?? MIN_MEMORY_MB,
+                    count
+                  )
+                )}</span
+              >
+            </li>
+          {/each}
+          <li>etc...</li>
+        </ul>
       </div>
 
       <div class="flex flex-col gap-2">
@@ -214,7 +230,7 @@
         </p>
       </div>
 
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1 mt-3">
         <BaseNumberInput
           name="disk-budget"
           label="Disk budget (GB)"
@@ -235,11 +251,7 @@
         <span class="text-secondary-text"
           >Database size: {formatBytes(dbSizeBytes)}</span
         >
-        <Button
-          variant="text"
-          disabled={isClearing}
-          on:click={onClearHistory}
-        >
+        <Button variant="text" disabled={isClearing} on:click={onClearHistory}>
           {isClearing ? "Clearing…" : "Clear recorded history"}
         </Button>
       </div>

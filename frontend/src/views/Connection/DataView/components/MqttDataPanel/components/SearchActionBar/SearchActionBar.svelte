@@ -78,7 +78,7 @@
           data: {
             title: "Messages exported",
             description: payload.filename,
-            descriptionIsLiteral: true,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -90,7 +90,7 @@
           data: {
             title: "Messages exported",
             description: path,
-            descriptionIsLiteral: true,
+            descriptionStyle: "code",
             type: "success",
           },
         });

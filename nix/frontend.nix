@@ -20,10 +20,10 @@
 # optional packages rather than just the host's. The resulting tarball is
 # therefore identical across Linux architectures.
 #
-# Verified, not assumed: building .#packages.<sys>.mqtt-viewer-frontend.pnpmDeps
-# on aarch64-linux and again on x86_64-linux reported the same hash
-# (sha256-hIQFX+RPOA9ETSWuJM3QcG+dwxZM1tEl0lNxU1kCESw=). Should a future
-# fetcherVersion drop --force, this becomes a per-system attrset again.
+# Verified on earlier lockfiles: building
+# .#packages.<sys>.mqtt-viewer-frontend.pnpmDeps on aarch64-linux and
+# x86_64-linux reported the same hash. Should a future fetcherVersion drop
+# --force, this becomes a per-system attrset again.
 
 # frontend/package.json pins packageManager to pnpm@10.28.0 while nixpkgs
 # pnpm_10 is currently 10.34.5. Both speak lockfileVersion 9.0, so the
@@ -51,7 +51,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     inherit (finalAttrs) pname version src;
     pnpm = pnpm_10;
     fetcherVersion = 4;
-    hash = "sha256-hIQFX+RPOA9ETSWuJM3QcG+dwxZM1tEl0lNxU1kCESw=";
+    hash = "sha256-oK5C/xVedG3MqnpP8G4Z/V8rf1RDnoFjQtMkFXCkNuw=";
   };
 
   # build/Taskfile.yml sets PRODUCTION=true for the frontend build. Nothing in
