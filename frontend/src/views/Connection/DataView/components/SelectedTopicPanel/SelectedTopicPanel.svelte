@@ -18,7 +18,10 @@
   import IconButton from "@/components/Button/IconButton.svelte";
   import Topic from "./components/Topic.svelte";
   import ChartView from "./components/Chart/ChartView.svelte";
-  import { createChartSeriesStore } from "./components/Chart/chart-series-store";
+  import {
+    createTopicPanelViewState,
+    type TopicPanelViewState,
+  } from "../../stores/topic-panel-view-state";
   import type { DockMode } from "@/stores/topic-panel-dock";
 
   export let connectionId: number;
@@ -46,23 +49,33 @@
   // the traffic lights don't sit on top of the topic path. Passed in rather
   // than read from the env store so the panel still renders from props alone.
   export let headerLeftInset = 0;
+  // Panel state that must outlive a remount: switching dock side reparents
+  // this component (bottom dock and right dock are different DOM parents),
+  // so DataView owns one instance per connection. The default keeps the
+  // pop-out window and the stories working with their own fresh state.
+  export let viewState: TopicPanelViewState = createTopicPanelViewState();
+
+  const { chartSeriesStore, activeTabIndex, chartOptions, chartedTopic } =
+    viewState;
 
   $: selectedTopicString = $selectedTopicStore.selectedTopic;
 
-  // Per-topic chart series; reset whenever the selected topic changes.
-  const chartSeriesStore = createChartSeriesStore();
-  let lastChartedTopic: string | null = null;
-  $: if ($selectedTopicStore.selectedTopic !== lastChartedTopic) {
-    lastChartedTopic = $selectedTopicStore.selectedTopic;
+  // Per-topic chart series; reset whenever the selected topic changes. The
+  // charted topic rides along in the view state so a remount does not read as
+  // a topic change and wipe the series.
+  $: if ($selectedTopicStore.selectedTopic !== $chartedTopic) {
+    chartedTopic.set($selectedTopicStore.selectedTopic);
     chartSeriesStore.clear();
   }
 
   // Tab control: the Chart tab is last (index 3 for v5 incl. Headers/Properties,
   // index 1 for v3 which only has Payload + Chart).
   let tabsRef: { setTab: (index: number) => void } | null = null;
-  let activeTabIndex = 0;
   $: chartTabIndex = mqttVersion === "3" ? 1 : 3;
-  $: isChartTabActive = activeTabIndex === chartTabIndex;
+  $: isChartTabActive = $activeTabIndex === chartTabIndex;
+  // Tabs reads defaultTab once on mount, which is how a remount lands back on
+  // the tab the user left. Clamped because the v3 panel only has two tabs.
+  $: initialTabIndex = Math.min($activeTabIndex, mqttVersion === "3" ? 1 : 3);
   const viewChart = () => tabsRef?.setTab(chartTabIndex);
   // Opens the payload field picker and switches to the Payload tab, so
   // "Add value from payload" lands the user on a ready-to-pick control.
@@ -295,7 +308,8 @@
       <Tabs
         class="w-full grow min-h-0"
         bind:this={tabsRef}
-        onTabChange={(i) => (activeTabIndex = i)}
+        defaultTab={initialTabIndex}
+        onTabChange={(i) => activeTabIndex.set(i)}
         tabs={[{ title: "Payload" }, { title: "Chart" }]}
       >
         <div slot="tab-1" class="size-full pt-2">
@@ -317,6 +331,7 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            optionsStore={chartOptions}
             visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}
@@ -328,7 +343,8 @@
       <Tabs
         class="w-full grow min-h-0"
         bind:this={tabsRef}
-        onTabChange={(i) => (activeTabIndex = i)}
+        defaultTab={initialTabIndex}
+        onTabChange={(i) => activeTabIndex.set(i)}
         tabs={[
           { title: "Payload" },
           { title: "Headers" },
@@ -374,6 +390,7 @@
           <ChartView
             {selectedTopicStore}
             {chartSeriesStore}
+            optionsStore={chartOptions}
             visible={isChartTabActive}
             topic={selectedTopicString ?? ""}
             onAddFromPayload={addFromPayload}

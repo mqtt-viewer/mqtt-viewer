@@ -88,6 +88,11 @@
       "type": "number",
       "required": false,
       "default": 0
+    },
+    {
+      "name": "viewState",
+      "type": "store",
+      "required": false
     }
   ],
   "tokens": [

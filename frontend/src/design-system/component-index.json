@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T23:29:35.765Z",
+  "generatedAt": "2026-09-03T23:59:57.642Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3585,6 +3585,11 @@
           "type": "number",
           "required": false,
           "default": 0
+        },
+        {
+          "name": "viewState",
+          "type": "store",
+          "required": false
         }
       ],
       "tokens": [
@@ -3694,6 +3699,12 @@
           "type": "function",
           "required": false,
           "default": "> void) | null = null"
+        },
+        {
+          "name": "optionsStore",
+          "type": "store",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
