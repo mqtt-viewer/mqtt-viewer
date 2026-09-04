@@ -14,6 +14,7 @@ export class ConnectionEventsSet {
     "mqttMessages": string;
     "mqttLatency": string;
     "mqttClearHistory": string;
+    "mqttLogs": string;
 
     /** Creates a new ConnectionEventsSet instance. */
     constructor($$source: Partial<ConnectionEventsSet> = {}) {
@@ -41,6 +42,9 @@ export class ConnectionEventsSet {
         if (!("mqttClearHistory" in $$source)) {
             this["mqttClearHistory"] = "";
         }
+        if (!("mqttLogs" in $$source)) {
+            this["mqttLogs"] = "";
+        }
 
         Object.assign(this, $$source);
     }
@@ -62,4 +66,6 @@ export enum GlobalEvent {
 
     ConnectionDeleted = "ConnectionDeleted",
     UpdateAvailable = "UpdateAvailable",
+    TopicWindowSelect = "TopicWindowSelect",
+    TopicPanelDockChanged = "TopicPanelDockChanged",
 };

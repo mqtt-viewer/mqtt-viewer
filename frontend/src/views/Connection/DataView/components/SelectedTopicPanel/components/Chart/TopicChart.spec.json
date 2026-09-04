@@ -45,10 +45,16 @@
       "default": true
     },
     {
-      "name": "windowMinutes",
-      "type": "string",
+      "name": "windowSeconds",
+      "type": "number",
       "required": false,
       "default": 0
+    },
+    {
+      "name": "visible",
+      "type": "boolean",
+      "required": false,
+      "default": true
     }
   ],
   "tokens": [

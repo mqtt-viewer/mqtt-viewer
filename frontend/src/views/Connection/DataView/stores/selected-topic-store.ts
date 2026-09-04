@@ -504,13 +504,20 @@ export const createSelectedTopicStore = (
     let stubs: Awaited<ReturnType<typeof GetMessageTimeline>>;
     try {
       stubs = await GetMessageTimeline(connectionId, topic, HISTORY_WINDOW_SIZE);
-    } catch {
+    } catch (e) {
       if (isStale(token, topic)) return;
       // Structural topics (e.g. an expanded parent selected in the graph)
-      // have no own messages, so the backend rejects the timeline fetch.
-      // Show an empty history rather than a stuck loading state — the live
-      // listener ignores appends while isLoadingHistory is true, so nothing
-      // would ever clear it.
+      // have no own messages, and at very high topic cardinality the backend
+      // trims its last-value cache so a topic still shown in the tree can
+      // have no history left. Both reject the timeline fetch with "not
+      // found"; an empty timeline is the right answer rather than a stuck
+      // loading state (the live listener ignores appends while
+      // isLoadingHistory is true, so nothing else would ever clear it).
+      // Anything else is a real failure, so log it rather than let the
+      // empty timeline hide it.
+      if (!String(e).includes("not found")) {
+        console.error("Failed to load message timeline", e);
+      }
       update((store) => ({
         ...store,
         history: [],

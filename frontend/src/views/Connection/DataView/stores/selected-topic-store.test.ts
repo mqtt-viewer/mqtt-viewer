@@ -436,6 +436,75 @@ describe("selectTopic (memory mode)", () => {
     unsub();
   });
 
+  // At very high topic cardinality the backend trims its last-value cache, so
+  // a topic still listed in the tree can have no history left and the
+  // timeline binding rejects with "topic not found in message history".
+  // Selecting it must show an empty, non-loading timeline, not fail.
+  it("selects a topic with no retained history as an empty timeline", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    GetMessageTimeline.mockRejectedValue(
+      new Error("topic not found in message history")
+    );
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    await expect(store.selectTopic("dropped/topic")).resolves.toBeUndefined();
+
+    const s = get(store);
+    expect(s.selectedTopic).toBe("dropped/topic");
+    expect(s.history).toEqual([]);
+    expect(s.totalCount).toBe(0);
+    expect(s.historySource).toBe("memory");
+    expect(s.isLoadingHistory).toBe(false);
+    // "Not found" is the expected case, so nothing is logged.
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+    unsub();
+  });
+
+  it("logs an unexpected timeline fetch failure but still clears the loading state", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    GetMessageTimeline.mockRejectedValue(new Error("bridge exploded"));
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    await store.selectTopic("a/b");
+
+    const s = get(store);
+    expect(s.history).toEqual([]);
+    expect(s.isLoadingHistory).toBe(false);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    errorSpy.mockRestore();
+    unsub();
+  });
+
+  it("still appends live messages to a topic selected with no history", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    GetMessageTimeline.mockRejectedValue(new Error("topic not found"));
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+    await store.selectTopic("dropped/topic");
+
+    fireLiveMessage({
+      id: "live-1",
+      topic: "dropped/topic",
+      payload: btoa("hi"),
+      timeMs: 999999,
+      retain: false,
+    });
+
+    const s = get(store);
+    expect(s.history).toHaveLength(1);
+    expect(s.history[0].id).toBe("live-1");
+    expect(s.totalCount).toBe(1);
+
+    unsub();
+  });
+
   it("lets live appends overshoot the cap by up to TRIM_SLACK without trimming", async () => {
     GetAppSettings.mockResolvedValue({ recordingEnabled: false });
     const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);

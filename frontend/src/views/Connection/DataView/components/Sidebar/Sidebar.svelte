@@ -16,6 +16,7 @@
   import HistorySection from "./components/HistorySection.svelte";
   import PublishView from "./components/PublishView.svelte";
   import SearchMessagesModal from "./components/SearchMessagesModal.svelte";
+  import collectionCollapse from "@/stores/collection-collapse";
   import { twMerge } from "tailwind-merge";
   import { writable } from "svelte/store";
 
@@ -40,11 +41,17 @@
   let isSearchOpen = writable(false);
   const openSearch = () => ($isSearchOpen = true);
 
-  const openNewMessage = () => {
+  // Opens the publish view on a draft. With a collectionId the draft is
+  // retargeted to that folder, which is expanded so the saved row is visible.
+  const openNewMessage = (collectionId?: number) => {
     // Keep an in-progress draft; only reset when the editor holds a saved
     // message's scratch copy (or has never been touched).
     if ($publishStore.sourceMessageId !== null) {
       publishStore.setSource(null);
+    }
+    if (collectionId !== undefined) {
+      publishStore.setPendingCollection(collectionId);
+      collectionCollapse.expand(collectionId);
     }
     page = "publish";
   };
@@ -102,17 +109,22 @@
     <div class="size-full flex flex-col min-h-0">
       <SidebarTopBar {connection} collapseSidebar={close} onSearch={openSearch} />
       <ConnectionRow {connection} />
-      <NewMessageRow onClick={openNewMessage} />
-      <div class="grow min-h-0 overflow-y-auto px-3 pb-3 flex flex-col gap-4">
+      <NewMessageRow onClick={() => openNewMessage()} />
+      <div
+        class="grow min-h-0 overflow-y-auto px-3 pb-3 flex flex-col gap-4"
+        data-dnd-scroll
+      >
         <CollectionsSection
           scope="global"
           {collectionsStore}
           onOpenMessage={openSavedMessage}
+          onNewMessage={openNewMessage}
         />
         <CollectionsSection
           scope="connection"
           {collectionsStore}
           onOpenMessage={openSavedMessage}
+          onNewMessage={openNewMessage}
         />
         <HistorySection
           {publishHistoryStore}

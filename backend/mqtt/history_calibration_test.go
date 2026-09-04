@@ -43,7 +43,7 @@ func TestHistoryCalibration(t *testing.T) {
 	runtime.ReadMemStats(&after)
 
 	realBytes := float64(after.HeapAlloc - before.HeapAlloc)
-	accounted := float64(h.totalBytes)
+	accounted := float64(h.TotalBytes())
 	ratio := realBytes / accounted
 
 	if ratio < 0.3 || ratio > 1.5 {

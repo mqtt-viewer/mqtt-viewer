@@ -24,6 +24,7 @@ export const mockEventSet = {
   mqttMessages: "storybook:mqttMessages",
   mqttLatency: "storybook:mqttLatency",
   mqttClearHistory: "storybook:mqttClearHistory",
+  mqttLogs: "storybook:mqttLogs",
 };
 
 export const mockSubscriptions = [
@@ -635,7 +636,9 @@ export const createBusyMockSelectedTopicStore = (
   return { store, startLiveAppends, stopLiveAppends };
 };
 
-export const createMockPublishStore = () => {
+export const createMockPublishStore = (
+  overrides: Record<string, unknown> = {}
+) => {
   const { subscribe, set, update } = writable({
     connectionId: 1,
     topic: "factory/line/command",
@@ -661,12 +664,18 @@ export const createMockPublishStore = () => {
     sourceMessageName: null,
     sourceCollectionId: null,
     baseline: null,
+    name: "",
+    pendingCollectionId: null as number | null,
+    ...overrides,
   });
   return {
     subscribe,
     set,
     setPartial: (partial: Record<string, unknown>) =>
       update((store) => ({ ...store, ...partial })),
+    setName: (name: string) => update((store) => ({ ...store, name })),
+    setPendingCollection: (id: number | null) =>
+      update((store) => ({ ...store, pendingCollectionId: id })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -682,6 +691,7 @@ export const createMockPublishStore = () => {
 export const mockCollectionMessage = {
   id: 1,
   collectionId: 1,
+  position: 0,
   name: "Doorbell ping",
   topic: "home/doorbell/ping",
   payload: '{"ding":"dong"}',
@@ -694,12 +704,14 @@ export const mockCollectionMessage = {
 export const mockCollections = [
   {
     id: 1,
+    position: 0,
     name: "Funzone",
     messages: [
       mockCollectionMessage,
       {
         id: 2,
         collectionId: 1,
+        position: 1,
         name: "All-lights off",
         topic: "home/lights/all",
         payload: '{"state":"off"}',
@@ -713,11 +725,13 @@ export const mockCollections = [
   {
     id: 2,
     connectionId: 1,
+    position: 0,
     name: "Development",
     messages: [
       {
         id: 3,
         collectionId: 2,
+        position: 0,
         name: "Backyard sensor",
         topic: "backyard/sensors/1",
         payload: '{"temp":45,"hello":"world"}',
@@ -757,8 +771,11 @@ export const createMockCollectionsStore = () => {
     renameCollection: asyncNoop,
     deleteCollection: asyncNoop,
     saveMessage: async () => mockCollectionMessage,
+    saveMessageAt: async () => mockCollectionMessage,
     renameMessage: asyncNoop,
     moveMessage: asyncNoop,
+    reorderMessages: asyncNoop,
+    reorderCollections: asyncNoop,
     duplicateMessage: async () => mockCollectionMessage,
     deleteMessage: asyncNoop,
   };
@@ -785,10 +802,11 @@ const propDefaults: Record<string, () => unknown> = {
   chartSeriesStore: () => createMockChartSeriesStore(),
   paused: () => false,
   showPoints: () => true,
-  windowMinutes: () => 0,
+  windowSeconds: () => 0,
   onToggle: () => noop,
   onAddFromPayload: () => noop,
   onPopOut: () => noop,
+  onWindowSecondsChange: () => noop,
   node: () => mockPayloadTree,
   allowPress: () => true,
   ariaLabel: () => "Storybook tabs",
@@ -818,6 +836,8 @@ const propDefaults: Record<string, () => unknown> = {
   onOpenMessage: () => noop,
   onSearch: () => noop,
   onSelect: () => noop,
+  onSetDockMode: () => noop,
+  openChartWindow: () => noop,
   scope: () => "global",
   connection: () => mockConnection,
   connectionId: () => 1,
@@ -838,6 +858,7 @@ const propDefaults: Record<string, () => unknown> = {
   defaultValueText: () => "mqtt",
   deleteRetainedMessage: () => asyncNoop,
   disabled: () => false,
+  dockMode: () => "right",
   errorMessage: () => "Field is required",
   expandedTopicsStore: () => {
     const store = createExpandedTopicsStore();
@@ -930,6 +951,7 @@ const propDefaults: Record<string, () => unknown> = {
   sameWidth: () => false,
   searchStore: () => createSearchStore(),
   searchString: () => "factory",
+  selectAll: () => false,
   searchTerm: () => "line",
   searchText: () => "line",
   selected: () => writable({ label: "MQTT", value: "mqtt" }),
@@ -1035,6 +1057,12 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     description: 'Delete "Funzone"? The 2 messages in it will also be deleted.',
   },
   InlineNameInput: { name: "inline-name" },
+  // Menus render closed; the global `open` default is for dialogs.
+  AddToCollectionMenu: {
+    placeholder: "Type to add new collection",
+    open: writable(false),
+  },
+  DropdownMenu: { open: writable(false) },
   PublishView: { isPublishDisabled: false },
   SavedMessageRow: { message: mockCollectionMessage },
   SearchMessagesModal: { isOpen: writable(true) },
@@ -1071,12 +1099,13 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
   const enumOptions: Record<string, string[]> = {
     as: ["button", "a", "div"],
     codec: ["none", "base64", "hex"],
+    dockMode: ["right", "bottom", "window"],
     format: ["none", "json", "json-prettier", "xml"],
     iconPlacement: ["left", "right"],
     kind: ["number", "text"],
     mqttVersion: ["3", "5"],
     placement: ["top", "right", "bottom", "left"],
-    resizeEdge: ["left", "right"],
+    resizeEdge: ["left", "right", "top"],
     size: ["small", "medium"],
     sortDir: ["asc", "desc"],
     sortKey: ["topic", "time"],

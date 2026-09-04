@@ -52,11 +52,14 @@ func (m *MqttMessage) Stub() MqttMessageStub {
 // heap (ratio 0.70), i.e. deliberately conservative — see
 // history_calibration_test.go.
 func (m *MqttMessage) estimatedBytes() int {
-	// Fixed per-message overhead: struct fields, id/uuid, time.Time, and the
-	// always-allocated property/middleware map headers for v5 messages.
+	// Fixed per-message overhead: struct fields, id/uuid and time.Time.
 	const baseOverhead = 256
 	n := baseOverhead + len(m.Topic) + len(m.Payload) + len(m.Id)
 	if m.Properties != nil {
+		// v5 always allocates the properties struct plus the UserProperties and
+		// MiddlewareProperties maps, measured at ~450 B beyond the counted strings.
+		const v5Overhead = 448
+		n += v5Overhead
 		n += len(m.Properties.CorrelationData) +
 			len(m.Properties.ContentType) +
 			len(m.Properties.ResponseTopic)

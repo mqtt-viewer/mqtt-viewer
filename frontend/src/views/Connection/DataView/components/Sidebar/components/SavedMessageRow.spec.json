@@ -30,13 +30,13 @@
     }
   ],
   "tokens": [
-    "secondary",
     "white-text",
     "emphasis",
     "secondary-text",
     "hovered",
-    "error"
+    "error",
+    "elevation-2"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet."
+  "notes": "Figma is not linked yet. Dragging is driven by the shared use:draggable action and the dnd drag store, not by props; the stories set that store directly. The drag ghost is a clone of the row on bg-elevation-2."
 }

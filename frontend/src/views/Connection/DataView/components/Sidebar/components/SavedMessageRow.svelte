@@ -6,6 +6,9 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import type { CollectionsStore } from "../stores/collections";
+  import { draggable } from "../dnd/draggable";
+  import { dragState, isDraggedMessage, type DropTarget } from "../dnd/drag-store";
+  import { applyDrop } from "../dnd/handle-drop";
 
   export let message: models.CollectionMessage;
   export let collectionsStore: CollectionsStore;
@@ -13,6 +16,16 @@
 
   let isHovered = false;
   let isRenaming = false;
+
+  $: isDragged = isDraggedMessage($dragState, message.id);
+
+  const onDrop = (target: DropTarget) =>
+    applyDrop(
+      collectionsStore,
+      $collectionsStore.collections,
+      { kind: "message", id: message.id, collectionId: message.collectionId },
+      target
+    );
 
   $: otherCollections = $collectionsStore.collections.filter(
     (c) => c.id !== message.collectionId
@@ -47,7 +60,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex items-center"
+  class={`relative flex items-center ${isDragged ? "opacity-40" : ""}`}
   on:mouseenter={() => (isHovered = true)}
   on:mouseleave={() => (isHovered = false)}
 >
@@ -60,11 +73,19 @@
     />
   {:else}
     <button
-      class="flex items-center gap-2 w-full min-w-0 px-1 py-[2px] rounded text-white-text hover:bg-hovered"
+      class="flex items-center gap-2 grow min-w-0 px-1 -mx-1 py-[2px] rounded text-white-text hover:bg-hovered"
+      use:draggable={{
+        payload: {
+          kind: "message",
+          id: message.id,
+          collectionId: message.collectionId,
+        },
+        onDrop,
+      }}
       on:click={() => onOpenMessage(message)}
     >
       <Icon type="message" size={16} />
-      <span class="text-base font-medium truncate grow text-left pr-5"
+      <span class="text-base font-medium truncate grow text-left pr-6"
         >{message.name}</span
       >
     </button>
@@ -82,14 +103,16 @@
         </div>
         <div class="flex flex-col" slot="menu-content">
           <DropdownMenuItem
+            iconType="copy"
             onClick={() =>
               run(
                 () => collectionsStore.duplicateMessage(message.id),
                 "Failed to duplicate message"
               )}>Duplicate</DropdownMenuItem
           >
-          <DropdownMenuItem onClick={() => (isRenaming = true)}
-            >Rename</DropdownMenuItem
+          <DropdownMenuItem
+            iconType="edit"
+            onClick={() => (isRenaming = true)}>Rename</DropdownMenuItem
           >
           {#if otherCollections.length > 0}
             <div class="px-2 pt-2 pb-1 text-sm text-secondary-text">
@@ -97,6 +120,7 @@
             </div>
             {#each otherCollections as collection (collection.id)}
               <DropdownMenuItem
+                iconType="folder"
                 onClick={() =>
                   run(
                     () =>
@@ -104,15 +128,13 @@
                     "Failed to move message"
                   )}
               >
-                <div class="flex items-center gap-2">
-                  <Icon type="folder" size={14} />
-                  <span class="truncate">{collection.name}</span>
-                </div>
+                <span class="truncate">{collection.name}</span>
               </DropdownMenuItem>
             {/each}
           {/if}
           <DropdownMenuItem
-            class="hover:text-error"
+            iconType="delete"
+            class="text-error"
             onClick={() =>
               run(
                 () => collectionsStore.deleteMessage(message.id),

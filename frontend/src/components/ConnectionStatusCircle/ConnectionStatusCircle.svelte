@@ -14,6 +14,7 @@
   ${state === "connecting" ? "bg-warning" : ""}
   ${state === "reconnecting" ? "bg-warning" : ""}
   ${state === "disconnected" ? "bg-error" : ""}
+  ${state === "error" ? "bg-error" : ""}
 `,
     className
   )}

@@ -110,7 +110,7 @@
   >
     <slot name="leading" />
     <SearchAndHistory bind:searchText />
-    <Tooltip placement="bottom">
+    <Tooltip placement="bottom" focusable>
       <Button on:click={onExpandClick}
         ><Icon
           type={$expandedTopicsStore.size > 0 ? "collapse" : "expand"}
@@ -121,14 +121,14 @@
       <span slot="tooltip-content">Expand/Collapse all topics</span>
     </Tooltip>
 
-    <Tooltip placement="bottom">
+    <Tooltip placement="bottom" focusable>
       <Button on:click={() => OpenBrokerStatusWindow(connectionId)}
         ><Icon type="pulse" width={20} height={20} /></Button
       >
       <span slot="tooltip-content">Broker status</span>
     </Tooltip>
 
-    <Tooltip placement="bottom">
+    <Tooltip placement="bottom" focusable>
       <DropdownMenu triggerText={sortButtonText} triggerClass="w-[110px]">
         <div class="flex flex-col" slot="menu-content">
           <DropdownMenuItem

@@ -19,6 +19,7 @@ func main() {
 		&models.Tab{},
 		&models.Subscription{},
 		&models.SortState{},
+		&models.ChartWindow{},
 		&models.FilterHistory{},
 		&models.PanelSize{},
 		&models.PublishHistory{},
@@ -27,6 +28,7 @@ func main() {
 		&models.ReceivedMessage{},
 		&models.Collection{},
 		&models.CollectionMessage{},
+		&models.CollectionCollapsedState{},
 		&models.SysMetricMapping{},
 	)
 	if err != nil {

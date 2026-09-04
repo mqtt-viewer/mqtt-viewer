@@ -66,8 +66,9 @@
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
-| Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
+| Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
+| Components/UpdateDialog/UpdateAvailableContent | [x] | [ ] | [x] | [x] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
 | Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
 
@@ -84,7 +85,7 @@
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
-| Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [ ] |
+| Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem | [x] | [ ] | [x] | [x] |
@@ -118,7 +119,8 @@
 | Views/Connection/DataView/Sidebar/CollectionFolder | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [ ] |
+| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/ConnectionLogsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
@@ -139,10 +141,11 @@
 | Views/NewTab/RecentConnectionsList | [x] | [ ] | [x] | [x] |
 | Views/NewTab/RecentConnectionsList/RecentConnectionsListItem | [x] | [ ] | [x] | [x] |
 | Views/PleaseUpdate | [x] | [ ] | [ ] | [ ] |
+| Views/TopicWindow | [x] | [ ] | [ ] | [x] |
 
 ## Summary
 
-- Components scanned: 116
-- Story present: 116
+- Components scanned: 119
+- Story present: 119
 - Figma-linked: 0
 - Missing specs: 0
