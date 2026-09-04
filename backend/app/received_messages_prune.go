@@ -115,3 +115,22 @@ func (a *App) ClearReceivedMessages(connectionID uint) error {
 	a.Db.Exec("PRAGMA incremental_vacuum")
 	return nil
 }
+
+// deleteReceivedMessagesChunked removes a connection's durable history in
+// bounded chunks so each DELETE is a short write transaction rather than one
+// multi-second sweep. Terminates when a chunk comes back short.
+func (a *App) deleteReceivedMessagesChunked(connectionID uint) error {
+	for {
+		res := a.Db.Exec(
+			`DELETE FROM received_messages
+			 WHERE id IN (SELECT id FROM received_messages WHERE connection_id = ? LIMIT ?)`,
+			connectionID, pruneChunkRows,
+		)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected < pruneChunkRows {
+			return nil
+		}
+	}
+}

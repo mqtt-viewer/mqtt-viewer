@@ -37,9 +37,12 @@ const init = async () => {
         isOpen: panelSize.isOpen,
       };
     }
+    // Window.Size() can report 0 before the native window is realised (and
+    // always does in browser mode); a 0 root size would clamp every panel to
+    // nothing on mount, so fall back to the viewport.
     set({
-      rootWindowHeight: windowSize.height,
-      rootWindowWidth: windowSize.width,
+      rootWindowHeight: windowSize.height || window.innerHeight,
+      rootWindowWidth: windowSize.width || window.innerWidth,
       resizablePanelSizes,
     });
   } catch (e) {
@@ -69,9 +72,17 @@ const updateAppWidth = (width: SizePx) => {
   });
 };
 
+const updateAppHeight = (height: SizePx) => {
+  update((store) => {
+    store.rootWindowHeight = height;
+    return store;
+  });
+};
+
 export default {
   subscribe,
   init,
   updatePanelSize,
   updateAppWidth,
+  updateAppHeight,
 };

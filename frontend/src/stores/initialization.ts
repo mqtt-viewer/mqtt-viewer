@@ -6,6 +6,8 @@ import connectionTabs from "./tabs";
 import subscriptions from "./subscriptions";
 import panelSizes from "./panel-sizes";
 import defaultSorts from "./default-sorts";
+import topicPanelDock from "./topic-panel-dock";
+import chartWindows from "./chart-windows";
 
 interface InitializationStore {
   appIsReady: boolean;
@@ -24,6 +26,8 @@ const init = async () => {
       connectionTabs.init(),
       panelSizes.init(),
       defaultSorts.init(),
+      topicPanelDock.init(),
+      chartWindows.init(),
     ]);
     set({
       appIsReady: true,

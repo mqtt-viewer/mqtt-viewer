@@ -179,6 +179,73 @@ export class EnvInfo {
     }
 }
 
+/**
+ * MemoryLimitModel is the shape of the soft memory limit, exposed to the
+ * frontend so the estimate the settings dialog shows is derived from the same
+ * numbers the runtime is given (see frontend/src/util/memory-budget.ts).
+ */
+export class MemoryLimitModel {
+    /**
+     * BaseBytes covers heap usage outside the per-connection history budgets.
+     */
+    "baseBytes": number;
+
+    /**
+     * Each connected connection adds budget * BudgetFactorNumerator /
+     * BudgetFactorDenominator: headroom over the budget for churn.
+     */
+    "budgetFactorNumerator": number;
+    "budgetFactorDenominator": number;
+
+    /** Creates a new MemoryLimitModel instance. */
+    constructor($$source: Partial<MemoryLimitModel> = {}) {
+        if (!("baseBytes" in $$source)) {
+            this["baseBytes"] = 0;
+        }
+        if (!("budgetFactorNumerator" in $$source)) {
+            this["budgetFactorNumerator"] = 0;
+        }
+        if (!("budgetFactorDenominator" in $$source)) {
+            this["budgetFactorDenominator"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryLimitModel instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryLimitModel {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryLimitModel($$parsedSource as Partial<MemoryLimitModel>);
+    }
+}
+
+export class MemoryStats {
+    "historyBytes": number;
+    "activeConnections": number;
+
+    /** Creates a new MemoryStats instance. */
+    constructor($$source: Partial<MemoryStats> = {}) {
+        if (!("historyBytes" in $$source)) {
+            this["historyBytes"] = 0;
+        }
+        if (!("activeConnections" in $$source)) {
+            this["activeConnections"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryStats instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryStats {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryStats($$parsedSource as Partial<MemoryStats>);
+    }
+}
+
 export class MqttStats {
     "totalMessagesReceived": number;
     "totalMessagesSent": number;
@@ -254,6 +321,39 @@ export class OpenChartWindowParams {
             $$parsedSource["fields"] = $$createField2_0($$parsedSource["fields"]);
         }
         return new OpenChartWindowParams($$parsedSource as Partial<OpenChartWindowParams>);
+    }
+}
+
+/**
+ * OpenTopicWindowParams carries the state needed to pop the selected-topic
+ * panel out into its own window: which connection it follows, and the topic
+ * selected at the moment of opening. The topic rides along in the URL so a
+ * freshly created window can seed itself: a TopicWindowSelect event emitted
+ * right after creation would be dropped by a webview whose JS runtime has
+ * not mounted yet.
+ */
+export class OpenTopicWindowParams {
+    "connectionId": number;
+    "topic": string;
+
+    /** Creates a new OpenTopicWindowParams instance. */
+    constructor($$source: Partial<OpenTopicWindowParams> = {}) {
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new OpenTopicWindowParams instance from a string or object.
+     */
+    static createFrom($$source: any = {}): OpenTopicWindowParams {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new OpenTopicWindowParams($$parsedSource as Partial<OpenTopicWindowParams>);
     }
 }
 

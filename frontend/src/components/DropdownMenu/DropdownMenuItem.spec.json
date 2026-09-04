@@ -29,6 +29,13 @@
       "type": "boolean",
       "required": false,
       "default": false
+    },
+    {
+      "name": "iconType",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Optional leading icon, keyed to the Icon component's icon names. Items without one keep their plain text layout."
     }
   ],
   "tokens": [

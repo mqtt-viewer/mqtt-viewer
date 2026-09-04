@@ -49,7 +49,11 @@ func TestRetainedIndexRebuildsFromReplayOnReconnect(t *testing.T) {
 	if err := app.ConnectMqtt(connId); err != nil {
 		t.Fatalf("subscriber connect: %v", err)
 	}
-	hist := app.AppConnections[connId].MqttManager.MessageHistory
+	appConnection, ok := app.appConnection(connId)
+	if !ok {
+		t.Fatalf("subscriber connection %d not registered", connId)
+	}
+	hist := appConnection.MqttManager.MessageHistory
 
 	waitFor := func(want int) []string {
 		deadline := time.Now().Add(5 * time.Second)

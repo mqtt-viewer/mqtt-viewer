@@ -16,12 +16,16 @@ const updateMessage = (u: wailsupdate.UpdateResponse): string => {
 interface UpdatesStore {
   isUpdateDialogOpen: boolean;
   availableUpdate: null | wailsupdate.UpdateResponse;
+  // True once the first CheckForUpdates has completed (success or failure),
+  // so startup gating can distinguish "no update" from "not checked yet".
+  hasCheckedOnce: boolean;
 }
 
 const { subscribe, set, update } = writable<UpdatesStore>(
   {
     isUpdateDialogOpen: false,
     availableUpdate: null,
+    hasCheckedOnce: false,
   },
   (set) => {
     setTimeout(async () => {
@@ -60,21 +64,25 @@ const getAvailableUpdate = async () => {
           notificationStore.addNotification(notification);
         }
         return {
-          isUpdateDialogOpen: store.isUpdateDialogOpen,
+          ...store,
           availableUpdate,
         };
       });
     }
   } catch (e) {
     console.error(e);
+  } finally {
+    // Mark the first check as complete even on failure, so startup gating
+    // that waits on it never deadlocks when the network is down.
+    update((store) => ({ ...store, hasCheckedOnce: true }));
   }
 };
 
 const openUpdateDialog = () => {
   update((store) => {
     return {
+      ...store,
       isUpdateDialogOpen: true,
-      availableUpdate: store.availableUpdate,
     };
   });
 };
@@ -82,8 +90,8 @@ const openUpdateDialog = () => {
 const closeUpdateDialog = () => {
   update((store) => {
     return {
+      ...store,
       isUpdateDialogOpen: false,
-      availableUpdate: store.availableUpdate,
     };
   });
 };

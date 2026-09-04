@@ -161,7 +161,10 @@ func TestDeleteRetainedMessageUnmarksIndexUnderV3(t *testing.T) {
 	}
 	defer app.DisconnectMqtt(connId)
 
-	appConnection := app.AppConnections[connId]
+	appConnection, ok := app.appConnection(connId)
+	if !ok {
+		t.Fatalf("connection %d not registered", connId)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	for {

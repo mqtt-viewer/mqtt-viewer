@@ -1,0 +1,23 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "TopicWindow",
+  "tier": "view",
+  "description": "Storybook coverage for TopicWindow.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [],
+  "tokens": [
+    "secondary",
+    "white-text",
+    "secondary-text",
+    "elevation-0"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet."
+}

@@ -10,20 +10,28 @@ import (
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
+	"sync"
 	"sync/atomic"
 )
 
 type App struct {
-	ctx            context.Context
-	Mode           AppMode
-	Paths          paths.Paths
-	Db             *db.DB
-	EventRuntime   *eventRuntime.EventRuntime
-	Events         *events.ConnectionEvents
-	Version        string
-	AppConnections map[uint]*AppConnection
-	Updater        *update.Updater
-	ProtoRegistry  *protobuf.ProtoRegistry
+	ctx          context.Context
+	Mode         AppMode
+	Paths        paths.Paths
+	Db           *db.DB
+	EventRuntime *eventRuntime.EventRuntime
+	Events       *events.ConnectionEvents
+	Version      string
+	Updater      *update.Updater
+	// Loaded in the background by Startup while binding calls are already
+	// being served, so reads have to be atomic. Use protoRegistry() /
+	// setProtoRegistry rather than touching it directly.
+	protoRegistryPtr atomic.Pointer[protobuf.ProtoRegistry]
+	// Guarded by appConnectionsMu; reach it only through the helpers in
+	// app_connections.go. Binding calls arrive on separate goroutines, so an
+	// unlocked add/delete against a concurrent poll is a fatal map race.
+	appConnections   map[uint]*AppConnection
+	appConnectionsMu sync.RWMutex
 	// Cached so the 300ms message-buffer drain doesn't hit the DB to decide
 	// whether to persist; kept in sync by loadRetentionSettings / UpdateAppSettings.
 	recordingEnabled atomic.Bool
@@ -31,6 +39,10 @@ type App struct {
 	// Throttles the (PRAGMA-based) disk-size check so it doesn't run on every
 	// 300ms drain. Unix-nano of the last prune check.
 	lastPruneCheckNanos atomic.Int64
+	// Set from the Wails OnShutdown hook, which runs before cleanup closes
+	// windows: lets WindowClosing handlers tell an app quit apart from the
+	// user closing a window by hand (see OpenTopicWindow).
+	shuttingDown atomic.Bool
 	// recordQueue hands drained batches to the single recording-worker
 	// goroutine so DB writes never happen on the buffer-drain hot path.
 	recordQueue chan recordBatch
@@ -60,6 +72,15 @@ type AppConnection struct {
 	// guaranteed to be serialised onto one goroutine, so counting is gated by
 	// a CompareAndSwap rather than trusting callback alternation.
 	connUp atomic.Bool
+}
+
+// protoRegistry returns the loaded registry, or nil while it is still loading.
+func (a *App) protoRegistry() *protobuf.ProtoRegistry {
+	return a.protoRegistryPtr.Load()
+}
+
+func (a *App) setProtoRegistry(registry *protobuf.ProtoRegistry) {
+	a.protoRegistryPtr.Store(registry)
 }
 
 func NewApp(appMode AppMode, version string) *App {

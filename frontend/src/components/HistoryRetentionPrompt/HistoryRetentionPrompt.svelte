@@ -9,16 +9,22 @@
   import {
     GetAppSettings,
     UpdateAppSettings,
+    GetMemoryLimitModel,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
   import {
     estimateRetentionSeconds,
     formatRetentionDuration,
   } from "./retention-estimates";
-
-  const MB = 1024 * 1024;
-  const GB = 1024 * 1024 * 1024;
-  const MIN_MEMORY_MB = 64;
+  import {
+    MB,
+    GB,
+    MIN_MEMORY_MB,
+    EXAMPLE_CONNECTION_COUNTS,
+    formatBytes,
+    estimateTotalBytes,
+    type MemoryLimitModel,
+  } from "@/util/memory-budget";
 
   const isOpen = writable(false);
 
@@ -26,10 +32,24 @@
   let recordingEnabled = false;
   let diskBudgetGb = 1;
   let isSaving = false;
+  let wasShown = false;
+  let limitModel: MemoryLimitModel | undefined;
 
   const recordingChecked = writable(false);
 
+  // A cleared Svelte number input binds null, which is also invalid.
+  $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
+
   onMount(async () => {
+    // Deliberately not awaited: this only feeds an estimate, so a slow or
+    // hanging call must never hold up the prompt or the first-run gate behind
+    // it. The copy shows a placeholder until it lands, and nothing if it fails.
+    GetMemoryLimitModel()
+      .then((model) => {
+        limitModel = model;
+      })
+      .catch((e) => console.error("Failed to read the memory limit model", e));
+
     try {
       const settings = await GetAppSettings();
       if (!settings.hasSeenHistoryPrompt) {
@@ -40,6 +60,7 @@
         recordingChecked.set(settings.recordingEnabled);
         diskBudgetGb =
           Math.round((settings.diskBudgetBytes / GB) * 100) / 100 || 1;
+        wasShown = true;
         isOpen.set(true);
       } else {
         // No prompt needed — the What's New dialog may show straight away.
@@ -64,6 +85,16 @@
     { label: "Medium", detail: "about 100 msg/s", messagesPerSecond: 100 },
     { label: "Light", detail: "about 10 msg/s", messagesPerSecond: 10 },
   ];
+
+  // Runs on every close path (Escape, overlay click, or after apply) via the
+  // Dialog's onClose. The Dialog invokes onClose once during init because the
+  // store starts false, so no-op until the prompt has actually been shown.
+  // Deliberately does not persist hasSeenHistoryPrompt: dismissing without
+  // choosing should re-prompt on the next launch.
+  const handleClosed = () => {
+    if (!wasShown) return;
+    firstRunGateCleared.set(true);
+  };
 
   // Persist the chosen (or default) values and mark the prompt as seen so it
   // never shows again, then close.
@@ -109,12 +140,15 @@
     });
 </script>
 
-<Dialog title="Message history retention" {isOpen} showCloseButton={false}>
+<Dialog
+  title="Message history retention"
+  {isOpen}
+  onClose={handleClosed}
+  showCloseButton={false}
+>
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
     <p class="text-secondary-text">
-      MQTT Viewer now bounds how much message history it keeps in memory so long
-      subscriptions don't grow RAM. You can also record history to disk so it
-      survives restarts.
+      You can decide how much memory MQTT Viewer uses.
     </p>
 
     <div class="flex flex-col gap-4">
@@ -123,8 +157,34 @@
           name="prompt-memory-budget"
           label="Memory budget (MB)"
           min={MIN_MEMORY_MB}
+          class="mb-[17px]"
+          hasError={memoryBelowMin}
+          errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
+
+        <p class="text-sm text-secondary-text">
+          With this budget, expect up to about:
+        </p>
+        <ul
+          class="grid grid-cols-[max-content_auto] gap-x-3 text-sm text-secondary-text"
+        >
+          {#each EXAMPLE_CONNECTION_COUNTS as count}
+            <li class="contents">
+              <span>{count} connection{count === 1 ? "" : "s"}:</span>
+              <span
+                >{formatBytes(
+                  estimateTotalBytes(
+                    limitModel,
+                    memoryBudgetMb ?? MIN_MEMORY_MB,
+                    count
+                  )
+                )}</span
+              >
+            </li>
+          {/each}
+          <li>etc...</li>
+        </ul>
       </div>
 
       <div class="flex flex-col gap-2">
@@ -179,7 +239,11 @@
       <Button variant="text" disabled={isSaving} on:click={onNotNow}
         >Not now</Button
       >
-      <Button variant="primary" disabled={isSaving} on:click={onSave}>
+      <Button
+        variant="primary"
+        disabled={isSaving || memoryBelowMin}
+        on:click={onSave}
+      >
         {isSaving ? "Saving…" : "Save"}
       </Button>
     </div>

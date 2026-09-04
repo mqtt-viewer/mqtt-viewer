@@ -18,6 +18,12 @@ import * as time$0 from "../../../time/models.js";
  * user has dismissed, so it shows once per version. LaunchCount counts app
  * starts, used to gate one-time nudges past first run; HasSeenStarPrompt marks
  * the GitHub star prompt as shown so it only ever appears once.
+ * TopicPanelDockMode and TopicPanelLastDockedSide hold the dockable
+ * selected-topic panel's global dock state ("right" | "bottom" | "window",
+ * and "right" | "bottom" for the side to return to when a pop-out window
+ * closes).
+ * IgnoredUpdateVersion records an update the user chose to skip, so the
+ * update dialog stops auto-opening for it.
  */
 export class AppSettings {
     "id": number;
@@ -28,6 +34,9 @@ export class AppSettings {
     "lastSeenChangelogVersion": string;
     "launchCount": number;
     "hasSeenStarPrompt": boolean;
+    "topicPanelDockMode": string;
+    "topicPanelLastDockedSide": string;
+    "ignoredUpdateVersion": string;
 
     /** Creates a new AppSettings instance. */
     constructor($$source: Partial<AppSettings> = {}) {
@@ -55,6 +64,15 @@ export class AppSettings {
         if (!("hasSeenStarPrompt" in $$source)) {
             this["hasSeenStarPrompt"] = false;
         }
+        if (!("topicPanelDockMode" in $$source)) {
+            this["topicPanelDockMode"] = "";
+        }
+        if (!("topicPanelLastDockedSide" in $$source)) {
+            this["topicPanelLastDockedSide"] = "";
+        }
+        if (!("ignoredUpdateVersion" in $$source)) {
+            this["ignoredUpdateVersion"] = "";
+        }
 
         Object.assign(this, $$source);
     }
@@ -68,6 +86,36 @@ export class AppSettings {
     }
 }
 
+/**
+ * ChartWindow persists the chart time-window selection per connection. ID is
+ * the connection id (string). WindowSeconds is the selected window in seconds;
+ * 0 means "All history". A custom interval is stored as its resolved seconds.
+ */
+export class ChartWindow {
+    "id": string;
+    "windowSeconds": number;
+
+    /** Creates a new ChartWindow instance. */
+    constructor($$source: Partial<ChartWindow> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("windowSeconds" in $$source)) {
+            this["windowSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChartWindow instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChartWindow {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ChartWindow($$parsedSource as Partial<ChartWindow>);
+    }
+}
+
 export class Collection {
     "id": number;
 
@@ -76,6 +124,11 @@ export class Collection {
      */
     "connectionId": number | null;
     "name": string;
+
+    /**
+     * order within its scope: the global list, or this connection's list
+     */
+    "position": number;
     "createdAt": time$0.Time;
     "updatedAt": time$0.Time;
     "messages": CollectionMessage[];
@@ -90,6 +143,9 @@ export class Collection {
         }
         if (!("name" in $$source)) {
             this["name"] = "";
+        }
+        if (!("position" in $$source)) {
+            this["position"] = 0;
         }
         if (!("createdAt" in $$source)) {
             this["createdAt"] = null;
@@ -108,12 +164,41 @@ export class Collection {
      * Creates a new Collection instance from a string or object.
      */
     static createFrom($$source: any = {}): Collection {
-        const $$createField5_0 = $$createType1;
+        const $$createField6_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("messages" in $$parsedSource) {
-            $$parsedSource["messages"] = $$createField5_0($$parsedSource["messages"]);
+            $$parsedSource["messages"] = $$createField6_0($$parsedSource["messages"]);
         }
         return new Collection($$parsedSource as Partial<Collection>);
+    }
+}
+
+/**
+ * CollectionCollapsedState remembers whether a sidebar collection folder is
+ * collapsed. Keyed by collection id; a missing row means expanded.
+ */
+export class CollectionCollapsedState {
+    "id": number;
+    "collapsed": boolean;
+
+    /** Creates a new CollectionCollapsedState instance. */
+    constructor($$source: Partial<CollectionCollapsedState> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("collapsed" in $$source)) {
+            this["collapsed"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CollectionCollapsedState instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CollectionCollapsedState {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CollectionCollapsedState($$parsedSource as Partial<CollectionCollapsedState>);
     }
 }
 
@@ -121,6 +206,11 @@ export class CollectionMessage {
     "id": number;
     "collectionId": number;
     "name": string;
+
+    /**
+     * order within its collection
+     */
+    "position": number;
     "topic": string;
     "qos": number;
     "retain": boolean;
@@ -152,6 +242,9 @@ export class CollectionMessage {
         }
         if (!("name" in $$source)) {
             this["name"] = "";
+        }
+        if (!("position" in $$source)) {
+            this["position"] = 0;
         }
         if (!("topic" in $$source)) {
             this["topic"] = "";
@@ -237,6 +330,13 @@ export class Connection {
     "subscriptions": Subscription[];
     "lastConnectedAt": time$0.Time | null;
     "customIconSeed": string | null;
+
+    /**
+     * Opt-in verbose MQTT-library debug logging for this connection's client
+     * logs. false = only always-on lifecycle/error lines are captured.
+     * Non-pointer so GORM never inserts NULL into the NOT NULL column.
+     */
+    "debugLoggingEnabled": boolean;
     "filterHistories": FilterHistory[];
     "publishHistories": PublishHistory[];
 
@@ -308,6 +408,9 @@ export class Connection {
         if (!("customIconSeed" in $$source)) {
             this["customIconSeed"] = null;
         }
+        if (!("debugLoggingEnabled" in $$source)) {
+            this["debugLoggingEnabled"] = false;
+        }
         if (!("filterHistories" in $$source)) {
             this["filterHistories"] = [];
         }
@@ -323,17 +426,17 @@ export class Connection {
      */
     static createFrom($$source: any = {}): Connection {
         const $$createField19_0 = $$createType3;
-        const $$createField22_0 = $$createType5;
-        const $$createField23_0 = $$createType7;
+        const $$createField23_0 = $$createType5;
+        const $$createField24_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("subscriptions" in $$parsedSource) {
             $$parsedSource["subscriptions"] = $$createField19_0($$parsedSource["subscriptions"]);
         }
         if ("filterHistories" in $$parsedSource) {
-            $$parsedSource["filterHistories"] = $$createField22_0($$parsedSource["filterHistories"]);
+            $$parsedSource["filterHistories"] = $$createField23_0($$parsedSource["filterHistories"]);
         }
         if ("publishHistories" in $$parsedSource) {
-            $$parsedSource["publishHistories"] = $$createField23_0($$parsedSource["publishHistories"]);
+            $$parsedSource["publishHistories"] = $$createField24_0($$parsedSource["publishHistories"]);
         }
         return new Connection($$parsedSource as Partial<Connection>);
     }

@@ -19,10 +19,14 @@ const (
 )
 
 type MessageBuffer struct {
-	mu           *sync.Mutex
-	buffer       []MqttMessage
-	bytes        int64
-	dropped      uint64
+	mu      *sync.Mutex
+	buffer  []MqttMessage
+	bytes   int64
+	dropped uint64
+
+	// handleMu guards the two lifecycle fields below. The handler goroutine
+	// never reads them; it works off locals captured at start.
+	handleMu     sync.Mutex
 	handleTicker *time.Ticker
 	handleChan   chan bool
 }
@@ -35,15 +39,25 @@ func newMessageBuffer() *MessageBuffer {
 }
 
 func (mb *MessageBuffer) StartHandlingBuffer(handleInterval time.Duration, cb func(messages []MqttMessage)) {
-	mb.handleTicker = time.NewTicker(handleInterval)
-	mb.handleChan = make(chan bool)
+	mb.handleMu.Lock()
+	defer mb.handleMu.Unlock()
+
+	if mb.handleChan != nil {
+		// Already running; callers stop before restarting.
+		return
+	}
+
+	ticker := time.NewTicker(handleInterval)
+	done := make(chan bool)
+	mb.handleTicker = ticker
+	mb.handleChan = done
 
 	go func() {
 		for {
 			select {
-			case <-mb.handleChan:
+			case <-done:
 				return
-			case <-mb.handleTicker.C:
+			case <-ticker.C:
 				mb.useBufferContents(cb)
 			}
 		}
@@ -51,14 +65,19 @@ func (mb *MessageBuffer) StartHandlingBuffer(handleInterval time.Duration, cb fu
 }
 
 func (mb *MessageBuffer) StopHandlingBuffer() {
-	if mb.handleTicker != nil {
-		mb.handleTicker.Stop()
-		mb.handleTicker = nil
+	mb.handleMu.Lock()
+	defer mb.handleMu.Unlock()
+
+	if mb.handleChan == nil {
+		return
 	}
-	if mb.handleChan != nil {
-		mb.handleChan <- true
-		mb.handleChan = nil
-	}
+
+	// The unbuffered send blocks until the handler goroutine takes it, so the
+	// goroutine is guaranteed out of its select before the fields are cleared.
+	mb.handleChan <- true
+	mb.handleTicker.Stop()
+	mb.handleTicker = nil
+	mb.handleChan = nil
 }
 
 func (mb *MessageBuffer) useBufferContents(useContentsFunc func(messages []MqttMessage)) {
