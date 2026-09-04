@@ -66,6 +66,35 @@ func TestBuildChartWindowURLNoFields(t *testing.T) {
 	}
 }
 
+func TestBuildTopicWindowURL(t *testing.T) {
+	u := buildTopicWindowURL(OpenTopicWindowParams{ConnectionID: 7, Topic: "a b/c&d=e?f#g"})
+	if !strings.HasPrefix(u, "/?") {
+		t.Fatalf("expected /? prefix, got %s", u)
+	}
+	parsed, err := url.Parse(u)
+	if err != nil {
+		t.Fatalf("url did not parse: %v", err)
+	}
+	q := parsed.Query()
+	if q.Get("view") != "topic" {
+		t.Errorf("expected view=topic, got %q", q.Get("view"))
+	}
+	if q.Get("conn") != "7" {
+		t.Errorf("expected conn=7, got %q", q.Get("conn"))
+	}
+	if q.Get("topic") != "a b/c&d=e?f#g" {
+		t.Errorf("topic not preserved through encoding, got %q", q.Get("topic"))
+	}
+}
+
+func TestBuildTopicWindowURLNoTopic(t *testing.T) {
+	u := buildTopicWindowURL(OpenTopicWindowParams{ConnectionID: 1})
+	parsed, _ := url.Parse(u)
+	if parsed.Query().Has("topic") {
+		t.Error("expected no topic param when nothing selected")
+	}
+}
+
 func TestBuildStatusWindowURL(t *testing.T) {
 	u := buildStatusWindowURL(42)
 	if !strings.HasPrefix(u, "/?") {

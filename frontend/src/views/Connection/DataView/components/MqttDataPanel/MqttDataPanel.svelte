@@ -43,6 +43,18 @@
     connection.eventSet
   );
 
+  // The graph is only mounted in graph mode (see the {#if view === "list"}
+  // below), so callers optional-chain when forwarding to it.
+  let graphView: MqttGraphView | undefined;
+
+  // Invalidates the retained marker on both views after a clear succeeds.
+  // The tree store is always live regardless of which view is showing; the
+  // graph keeps its own separate model, so it needs telling too.
+  export const markRetainedCleared = (topics: string[]) => {
+    mqttDataStore.markRetainedCleared(topics);
+    graphView?.clearRetainedMarks(topics);
+  };
+
   // Reads the tree store rather than fetching: it already holds the latest
   // payload per topic, utf8-decoded by the same path the selected-topic panel
   // uses. Shared with the graph so both views copy identical text.
@@ -96,18 +108,48 @@
         // own retained message (already offered separately) is not counted.
         if (menuTopic === topic) {
           menuRetainedBelowCount = topics.filter((t) => t !== topic).length;
+          // The model's own value is the optimistic immediate paint; the
+          // backend's retained index is the truth. The frontend message
+          // stream is a capped drop-oldest buffer, so under flood the
+          // message that would have set isRetained can be lost, and this
+          // call is already in flight to get the below-count anyway.
+          menuIsRetained = topics.includes(topic);
         }
       })
-      .catch(() => {
+      .catch((e) => {
         // A count we cannot fetch just means the bulk action stays hidden;
-        // the rest of the menu still works, so this is not worth a toast.
+        // the rest of the menu still works. Still worth a warning: a
+        // silently missing bulk-clear item is indistinguishable from a
+        // logic bug.
+        console.warn(`failed to fetch retained topics under "${topic}"`, e);
       });
     return true;
   };
 
   const defaultSortState = $defaultSorts[DEFAULT_SORT_PERSIST_KEY];
 
-  let view: "list" | "graph" = "list";
+  // Which of the two views you last used, kept per connection alongside the
+  // graph's own preferences, so a connection you work on in the graph opens in
+  // the graph next time.
+  const viewKey = `mqtt-viewer-topicpanel-view:${connection.connectionDetails.id}`;
+  const loadView = (): "list" | "graph" => {
+    try {
+      return localStorage.getItem(viewKey) === "graph" ? "graph" : "list";
+    } catch (e) {
+      console.error("topic panel view load failed", e);
+      return "list";
+    }
+  };
+  const setView = (v: "list" | "graph") => {
+    view = v;
+    try {
+      localStorage.setItem(viewKey, v);
+    } catch (e) {
+      console.error("topic panel view save failed", e);
+    }
+  };
+
+  let view: "list" | "graph" = loadView();
 
   const expandedTopicsStore = createExpandedTopicsStore();
   const searchStore = createSearchStore();
@@ -129,7 +171,7 @@
       {expandedTopicsStore}
       {sortStore}
     >
-      <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
+      <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
     </SearchActionBar>
     <!-- One menu for the whole tree, not one per row: rows are virtualised, so
          a menu instance per row would multiply floating-ui instances across the
@@ -176,6 +218,7 @@
   {:else}
     <div class="grow min-h-0 w-full">
       <MqttGraphView
+        bind:this={graphView}
         {connection}
         {selectedTopicStore}
         {width}
@@ -188,7 +231,7 @@
         {onClearRetainedBelow}
         {searchStore}
       >
-        <ViewToggle slot="leading" {view} onChange={(v) => (view = v)} />
+        <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
       </MqttGraphView>
     </div>
   {/if}

@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"path/filepath"
+
 	db "mqtt-viewer/backend/db"
 	"mqtt-viewer/backend/env"
 	eventRuntime "mqtt-viewer/backend/event-runtime"
@@ -38,8 +40,16 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	var err error
 	if a.Mode == AppModes.Wails {
 		a.EventRuntime = eventRuntime.InitEventRuntime(application.Get())
-		if !env.IsDev {
-			slog.Info("starting in production mode")
+		// OnShutdown tasks run at the start of Wails' cleanup, before it
+		// closes windows, so the flag is reliably set by the time any
+		// WindowClosing handler fires during a quit.
+		if wailsApp := application.Get(); wailsApp != nil {
+			wailsApp.OnShutdown(func() {
+				a.shuttingDown.Store(true)
+			})
+		}
+		if !env.IsDev || env.IsServerBuild {
+			slog.Info("starting application")
 			a.Mode = AppModes.Wails
 			a.Paths = paths.GetPaths()
 			// Containers log to stdout, so a server build uses console logging
@@ -101,6 +111,13 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 	// the message-buffer drain hot path.
 	a.loadRetentionSettings()
 
+	// Single writer for received_messages: the drain path only enqueues.
+	a.startRecordingWorker()
+
+	// Active from launch even with zero connections up, so the base limit
+	// (SQLite/GORM, event marshalling, runtime slack) is enforced immediately.
+	a.recomputeMemoryLimit()
+
 	// Count this launch so one-time nudges (e.g. the GitHub star prompt) only
 	// fire once the app has clearly been used, never on a first-run install.
 	// Skipped in test mode to keep seeded-settings fixtures deterministic.
@@ -121,7 +138,7 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 			slog.ErrorContext(a.ctx, fmt.Sprintf("error loading proto registry: %v", err))
 			return
 		}
-		a.ProtoRegistry = registry
+		a.setProtoRegistry(registry)
 	}()
 
 	// Initialise the updater everywhere but test mode. Server (Docker) builds
@@ -153,7 +170,7 @@ func (a *App) buildAppConnections() error {
 		}
 		appConnections[conn.ID] = appConnection
 	}
-	a.AppConnections = appConnections
+	a.replaceAppConnections(appConnections)
 	return nil
 }
 
@@ -183,6 +200,16 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	mqttManager := mqtt.NewMqttManager(withMqttModule, onLatencyUpdate)
 	mqttManager.SetMessageMemoryBudget(a.memoryBudgetBytes())
 
+	// Wire per-connection client logs: capture MQTT-library output into a
+	// bounded ring + rotating text file, and emit batches to the frontend.
+	debugLogging := conn.DebugLoggingEnabled
+	logPath := filepath.Join(a.Paths.ResourcePath, "logs", "connections", fmt.Sprintf("conn-%d.txt", conn.ID))
+	mqttManager.InitLogging(conn.ID, logPath, debugLogging, func(entries []mqtt.LogEntry) {
+		if a.Mode != AppModes.Test {
+			a.EventRuntime.EventsEmit(connEvents.MqttLogs, entries)
+		}
+	})
+
 	appConnection := AppConnection{
 		ctx:          &withName,
 		ConnectionId: conn.ID,
@@ -198,6 +225,10 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnConnectionUp: func() {
+				if appConnection.connUp.CompareAndSwap(false, true) {
+					a.connectedConnCount.Add(1)
+					a.recomputeMemoryLimit()
+				}
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				appConnection.MqttManager.MessageBuffer.StartHandlingBuffer(MQTT_BUFFER_EMIT_INTERVAL, func(messages []mqtt.MqttMessage) {
 					if len(messages) == 0 {
@@ -206,9 +237,9 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					if a.Mode != AppModes.Test {
 						a.EventRuntime.EventsEmit(appConnection.EventSet.MqttMessages, messages)
 					}
-					// Durably persist the batch when recording is enabled.
-					// One transaction per drain — no per-message fsync.
-					a.recordReceivedMessages(appConnection.ConnectionId, messages)
+					// Hand the batch to the recording worker when enabled.
+					// Async, single-writer: the drain never blocks on SQLite.
+					a.enqueueRecordBatch(appConnection.ConnectionId, messages)
 				})
 				if a.Mode != AppModes.Test {
 					a.EventRuntime.EventsEmit(appConnection.EventSet.MqttConnected, nil)
@@ -220,6 +251,10 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnConnectionDown: func(reason *error) {
+				if appConnection.connUp.CompareAndSwap(true, false) {
+					a.connectedConnCount.Add(-1)
+					a.recomputeMemoryLimit()
+				}
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("connection down: %v", (*reason).Error()))

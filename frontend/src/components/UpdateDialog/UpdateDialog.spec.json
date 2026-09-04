@@ -2,7 +2,7 @@
   "$schema": "../../design-system/component-spec.schema.json",
   "name": "UpdateDialog",
   "tier": "component",
-  "description": "Storybook coverage for UpdateDialog.",
+  "description": "Update-available dialog; auto-opens when a non-skipped update is found, once the first-run and changelog dialogs have resolved.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -19,5 +19,5 @@
     "emphasis"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent."
 }

@@ -6,6 +6,8 @@ import connectionTabs from "./tabs";
 import subscriptions from "./subscriptions";
 import panelSizes from "./panel-sizes";
 import defaultSorts from "./default-sorts";
+import topicPanelDock from "./topic-panel-dock";
+import chartWindows from "./chart-windows";
 
 interface InitializationStore {
   appIsReady: boolean;
@@ -17,13 +19,17 @@ const { subscribe, set } = writable<InitializationStore>({
 
 const init = async () => {
   try {
+    // Environment decides whether native window calls are available. Finish it
+    // before stores such as panelSizes choose their browser fallback.
+    await os.init();
     await Promise.all([
-      os.init(),
       connections.init(),
       subscriptions.init(),
       connectionTabs.init(),
       panelSizes.init(),
       defaultSorts.init(),
+      topicPanelDock.init(),
+      chartWindows.init(),
     ]);
     set({
       appIsReady: true,

@@ -278,5 +278,38 @@ export const createMqttDataStore = (
     set({});
   };
 
-  return { subscribe, getAllTopics, resetMqttData };
+  // Walk the topic path and return that exact node, or undefined if any
+  // level along the way is missing. Never creates nodes.
+  const findNode = (
+    mqttData: MqttData,
+    topic: string
+  ): MqttData[string] | undefined => {
+    let children = mqttData;
+    let node: MqttData[string] | undefined;
+    for (const level of topic.split("/")) {
+      node = children[level];
+      if (node === undefined) return undefined;
+      children = node.children;
+    }
+    return node;
+  };
+
+  // Invalidate the retained marker after a successful clear. The tombstone
+  // does come back to us as a message, but only MQTT 5 keeps its Retain flag
+  // set (RetainAsPublished); under MQTT 3 the broker clears the flag on
+  // forwarding [MQTT-3.3.1-9], so retainedStateOf reads it as "says nothing"
+  // and the marker would sit there until the next reconnect. The clear call
+  // resolving is the only signal this store gets. Topics it cannot find are
+  // left alone rather than created: a clear only ever targets known topics.
+  const markRetainedCleared = (topics: string[]) => {
+    update((mqttData) => {
+      for (const topic of topics) {
+        const node = findNode(mqttData, topic);
+        if (node !== undefined) node.isRetained = false;
+      }
+      return mqttData;
+    });
+  };
+
+  return { subscribe, getAllTopics, resetMqttData, markRetainedCleared };
 };

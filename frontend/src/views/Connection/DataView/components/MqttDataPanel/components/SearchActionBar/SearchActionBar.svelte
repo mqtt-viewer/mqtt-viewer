@@ -78,7 +78,7 @@
           data: {
             title: "Messages exported",
             description: payload.filename,
-            descriptionIsLiteral: true,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -90,7 +90,7 @@
           data: {
             title: "Messages exported",
             description: path,
-            descriptionIsLiteral: true,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -130,7 +130,7 @@
   >
     <slot name="leading" />
     <SearchAndHistory bind:searchText />
-    <Tooltip placement="bottom">
+    <Tooltip placement="bottom" focusable>
       <Button on:click={onExpandClick}
         ><Icon
           type={$expandedTopicsStore.size > 0 ? "collapse" : "expand"}
@@ -141,14 +141,17 @@
       <span slot="tooltip-content">Expand/Collapse all topics</span>
     </Tooltip>
 
-    <Tooltip placement="bottom">
-      <Button on:click={() => openBrokerStatusWindow(connectionId)}
-        ><Icon type="pulse" width={20} height={20} /></Button
-      >
-      <span slot="tooltip-content">Broker status</span>
-    </Tooltip>
+    <!-- ponytail: browser status needs an in-page route before this control returns. -->
+    {#if !$envStore.isServerMode}
+      <Tooltip placement="bottom" focusable>
+        <Button on:click={() => openBrokerStatusWindow(connectionId)}
+          ><Icon type="pulse" width={20} height={20} /></Button
+        >
+        <span slot="tooltip-content">Broker status</span>
+      </Tooltip>
+    {/if}
 
-    <Tooltip placement="bottom">
+    <Tooltip placement="bottom" focusable>
       <DropdownMenu triggerText={sortButtonText} triggerClass="w-[110px]">
         <div class="flex flex-col" slot="menu-content">
           <DropdownMenuItem

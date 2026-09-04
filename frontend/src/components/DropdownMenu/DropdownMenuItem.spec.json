@@ -23,11 +23,25 @@
       "type": "function",
       "required": false,
       "default": "() => {}"
+    },
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "iconType",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Optional leading icon, keyed to the Icon component's icon names. Items without one keep their plain text layout."
     }
   ],
   "tokens": [
     "primary",
     "white-text",
+    "secondary-text",
     "elevation-2",
     "elevation-2-hover"
   ],

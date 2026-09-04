@@ -196,7 +196,9 @@ connection settings.
 ## What differs from the desktop app
 
 - Exports download through the browser instead of a save dialog.
-- Pop-out chart and broker status windows open as browser tabs.
+- Chart pop-outs open as browser tabs.
+- Broker status and device monitoring controls are hidden for now. They need an
+  in-page route before they can work in the browser.
 - No self-update. The app tells you when a newer image is available and shows
   the pull command, but it never replaces itself. You update by pulling a new
   image: `docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest` and recreating the

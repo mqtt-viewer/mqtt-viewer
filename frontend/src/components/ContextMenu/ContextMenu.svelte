@@ -73,8 +73,24 @@
 </div>
 
 {#if $open}
+  <!--
+    WHY flex-col: melt's menu container is `display: block` and
+    DropdownMenuItem renders an inline-block <button>, so without an
+    explicit vertical layout the items flow onto one horizontal row
+    (measured 570-640px wide) and floating-ui then flips the menu far from
+    the pointer. flex-col forces the vertical menu; min/max-w keep it from
+    growing back into a single wide row or overflowing with long labels.
+
+    outline-none / focus:outline-none: melt gives the menu `tabindex="-1"`
+    and focuses it programmatically for keyboard nav (see
+    @melt-ui/svelte/dist/builders/menu/create.js), which makes Chromium
+    paint its default focus *outline* around the whole box. That is a plain
+    CSS outline, not a Tailwind `ring` (box-shadow), so `focus:!ring-0` alone
+    never silenced it. Neutralise only the outline here, on the container -
+    items keep their own focus affordance via DropdownMenuItem.
+  -->
   <div
-    class="z-30 min-w-[100px] rounded bg-elevation-2 p-1 py-1.5 shadow focus:!ring-0"
+    class="z-30 flex min-w-[180px] max-w-[320px] flex-col rounded bg-elevation-2 p-1 py-1.5 shadow outline-none focus:outline-none focus:!ring-0 focus:!ring-offset-0"
     use:melt={$menu}
     transition:fly={{ duration: 150, y: -10 }}
   >

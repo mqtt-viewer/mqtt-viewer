@@ -4,10 +4,13 @@
     description: string;
     type: "error" | "info" | "success";
     hideCloseButton?: boolean;
-    // Descriptions are sentence-cased by default, which is right for messages
-    // but wrong for anything literal. Set this for filenames and paths, where
-    // the exact string is the point.
-    descriptionIsLiteral?: boolean;
+    // Descriptions that are identifiers (topics, paths) are not sentences:
+    // reshaping them with capitalizeFirstLetter changes what they name (MQTT
+    // topics are case sensitive, so "rev121/a/config" becomes a topic that
+    // doesn't exist). "code" renders the description verbatim in monospace,
+    // matching how topics render elsewhere in the app. "text" (the default,
+    // and today's behaviour when this field is absent) keeps capitalising.
+    descriptionStyle?: "text" | "code";
   };
 
   const {
@@ -66,8 +69,8 @@
             />
           </h3>
           <div use:melt={$description(id)}>
-            {#if data.descriptionIsLiteral}
-              {data.description}
+            {#if data.descriptionStyle === "code"}
+              <span class="break-all font-mono">{data.description}</span>
             {:else}
               {capitalizeFirstLetter(
                 data?.description ??

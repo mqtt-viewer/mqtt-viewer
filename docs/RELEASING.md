@@ -1,13 +1,15 @@
 # Releasing MQTT Viewer
 
 One release = one annotated GitHub release on `main`. Publishing the release
-fires three workflows (mac / windows / linux) that build, sign, upload assets,
-and register the version with the portal. Nothing reaches users until you flip
-the `released` toggle in the portal admin.
+fires five workflows: mac, Windows, Linux, Flatpak publishing and Docker. Desktop artifacts register
+with the portal and stay out of in-app update checks until you flip `released`.
+The Docker workflow publishes its image to GHCR immediately.
 
-The `/release` skill drives this whole runbook (changelog promotion, release
-creation, workflow watching, and the go-live handoff). This doc is the
-reference it follows.
+The `/release` skill drives this whole runbook. Its first step is always a
+changelog draft presented for approval, so you see and shape what the release
+will say before any mechanics run; then changelog promotion, release creation,
+workflow watching, and the go-live handoff. This doc is the reference it
+follows.
 
 ## TL;DR
 
@@ -17,37 +19,72 @@ reference it follows.
 #    ruleset separately blocks force-pushes and deletion on main)
 git checkout main && git merge --ff-only origin/develop && ALLOW_MAIN_PUSH=1 git push
 
-# 2. dry-run with a prerelease (optional but recommended for risky changes)
-gh release create v0.X.Y-beta1 --target main --prerelease --generate-notes \
-  --notes-start-tag <previous-tag> --title "v0.X.Y-beta1"
+# 2. read what the release will actually say
+just release-notes v0.X.Y <previous-tag>
 
-# 3. the real thing
-gh release create v0.X.Y --target main --generate-notes \
-  --notes-start-tag <previous-tag> --title "v0.X.Y"
+# 3. dry-run with a prerelease (optional but recommended for risky changes)
+just release v0.X.Y-beta1 <previous-tag> --prerelease
 
-# 4. watch the three workflows
-gh run list --limit 5
+# 4. the real thing
+just release v0.X.Y <previous-tag>
 
-# 5. flip `released` on the new release_v3 record in the PocketBase admin UI
-#    (https://cloud.mqttviewer.app/_/) once you're happy — this is what makes
+# 5. watch the five workflows, including Publish Docker image
+gh run list --limit 6
+
+# 6. flip `released` on the new release_v3 record in the PocketBase admin UI
+#    (https://cloud.mqttviewer.app/_/) once you're happy. This is what makes
 #    in-app update checks see the version.
 ```
 
-To re-run a failed release after fixing CI: delete + recreate the release —
-workflows run from the tag's commit, so a plain "re-run" would use the old
+To re-run a failed release after fixing CI: delete + recreate the release.
+Workflows run from the tag's commit, so a plain "re-run" would use the old
 workflow definitions.
 
 ```sh
-gh release delete v0.X.Y --cleanup-tag --yes && gh release create v0.X.Y ...
+just release-retry v0.X.Y <previous-tag>
 ```
+
+## Where the release notes come from
+
+The release body is the app's own changelog entry for the version, rendered as
+markdown by `scripts/release-notes.mjs` from `frontend/src/changelog.ts`. It is
+not GitHub's generated list of merged pull requests.
+
+That matters because the notes travel: each workflow POSTs
+`github.event.release.body` to the portal as `release_notes`, and the in-app
+update dialog shows that text under "What's changed". So a user reads the same
+words before updating that they read in "What's new" afterwards.
+
+The practical consequence: **promote the changelog entry, with `released: true`
+and the bare semver, and get it onto `develop` before you create the release.**
+`just release` renders the notes first and stops if the entry is missing, so a
+forgotten promotion fails loudly instead of shipping an empty dialog.
+
+`just release` is a one-liner over `scripts/release.sh`, which runs three
+pre-flight checks before it touches anything. It aborts if the working tree is
+dirty, if `HEAD` is not `origin/develop` after a fetch, and if the changelog has
+no promoted entry for the version. The first two exist because the notes are
+rendered from the tree you are standing on, and that tree is what becomes
+`main` a moment later, so the two have to be the same commit. Every step is its
+own command, so a failed checkout or merge stops there instead of falling
+through to `gh release create`. `scripts/test-release-recipe.sh` covers those
+paths with shimmed `git` and `gh`.
+
+```sh
+just release-notes v0.X.Y <previous-tag>   # preview, exactly what gets posted
+```
+
+A prerelease tag (`v0.X.Y-beta1`) uses the entry for the version it rehearses,
+so a dry run shows the real notes.
 
 ## What each workflow needs (and where it breaks)
 
 | Platform | Signing | Gotchas |
 |---|---|---|
 | mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. |
-| windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions — pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
+| windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions, so pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
 | linux (`release-linux.yaml`) | none | Runs on `ubuntu-latest` + `ubuntu-24.04-arm`. gtk3/webkit2gtk-4.1 dev packages must install **before** the wails3 CLI (`-tags gtk3`). |
+| Docker (`docker-publish.yaml`) | none | Publishes one `linux/amd64` + `linux/arm64` manifest to GHCR. Release builds fail if any shared app secret is missing; prereleases never move `latest`. |
 
 Shared foundations that have bitten before:
 
@@ -75,11 +112,23 @@ Shared foundations that have bitten before:
 - darwin: `MQTT_Viewer_<tag>_darwin_{arm64,amd64}.zip` (+ `.sha256`)
 - windows: `..._windows_amd64.zip` + `..._installer.exe` (+ `.sha256`)
 - linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm,flatpak}` (+ `.sha256`)
+- Docker: `ghcr.io/mqtt-viewer/mqtt-viewer:<version>` multi-architecture image
+
+For the first Docker publication, GHCR creates the package as private. Open the
+package settings, connect it to this repository, change visibility to public,
+then verify anonymous access and both architectures:
+
+```sh
+docker buildx imagetools inspect ghcr.io/mqtt-viewer/mqtt-viewer:<version>
+```
+
+Later releases inherit package visibility. Home Assistant cannot install a
+private image, so this check blocks publishing its app repository.
 
 Linux distro guidance: deb/rpm use the system WebKit and are the most
-compatible (Fedora needs the rpm — the AppImage bundles Ubuntu-built WebKit
-whose helper paths don't exist elsewhere). AppImage works on Debian/Ubuntu
-family with `libwebkit2gtk-4.1-0` installed.
+compatible (Fedora needs the rpm, because the AppImage bundles Ubuntu-built
+WebKit whose helper paths don't exist elsewhere). AppImage works on the
+Debian/Ubuntu family with `libwebkit2gtk-4.1-0` installed.
 
 ### Flatpak
 

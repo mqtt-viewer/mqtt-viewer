@@ -9,6 +9,7 @@ import (
 	"mqtt-viewer/backend/security"
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -16,7 +17,7 @@ const MQTT_BUFFER_EMIT_INTERVAL = 300 * time.Millisecond
 
 func (a *App) ConnectMqtt(connId uint) error {
 	var err error
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -36,15 +37,18 @@ func (a *App) ConnectMqtt(connId uint) error {
 	// Always reload the sub matcher / proto matcher, subscriptions may have changed
 	appConnection.SubscriptionMatcher = topicmatching.NewSubscriptionMatcher(subscriptions)
 
-	// Add protobuf middlewares if enabled
-	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && a.ProtoRegistry != nil {
+	// Add protobuf middlewares if enabled. Load the registry once: it is
+	// populated by a background goroutine at startup, so re-reading it could
+	// hand the encode and decode middleware different registries.
+	protoRegistry := a.protoRegistry()
+	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && protoRegistry != nil {
 		// TODO: load sparkplug proto registry
 		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{
 			BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
-				mqttmiddleware.NewProtoEncodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoEncodeMiddleware(protoRegistry).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				mqttmiddleware.NewProtoDecodeMiddleware(a.ProtoRegistry).Middleware,
+				mqttmiddleware.NewProtoDecodeMiddleware(protoRegistry).Middleware,
 			},
 		})
 	} else {
@@ -74,18 +78,19 @@ func (a *App) ConnectMqtt(connId uint) error {
 }
 
 func (a *App) DisconnectMqtt(connId uint) error {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
 	appConnection.MqttManager.Disconnect(nil)
 	return nil
 }
 
 // GetMessageHistory returns up to `limit` of the newest retained messages for
-// a topic (limit <= 0 returns everything). The UI passes its window size:
-// returning a busy topic's entire RAM history serializes an unbounded JSON
-// blob across the webview bridge, which crashed the app on huge
-// public-broker topics.
+// a topic (limit <= 0 returns everything). The UI passes its window size to
+// avoid serialising an unbounded payload across the bridge.
 func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.MqttMessage, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -102,7 +107,7 @@ func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.Mq
 // a topic fetches stubs to draw the timeline, then fetches individual
 // payloads on demand via GetMessageById.
 func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.MqttMessageStub, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -121,7 +126,7 @@ func (a *App) GetMessageTimeline(connId uint, topic string, limit int) ([]mqtt.M
 // frontend can render a graceful "no longer available" state instead of an
 // error.
 func (a *App) GetMessageById(connId uint, topic string, id string, timeMs int64) (msg mqtt.MqttMessage, found bool) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		// a call racing connection teardown: treat as aged out, not a panic
 		return mqtt.MqttMessage{}, false
@@ -135,7 +140,7 @@ func (a *App) GetMessageById(connId uint, topic string, id string, timeMs int64)
 // the messages still retained are returned; the frontend treats any omitted
 // id as aged out.
 func (a *App) GetMessagesByIds(connId uint, topic string, ids []string, timesMs []int64) ([]mqtt.MqttMessage, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -146,7 +151,7 @@ func (a *App) GetMessagesByIds(connId uint, topic string, ids []string, timesMs 
 // connection, flattened across topics and sorted by arrival time, so a
 // broker-status window opened mid-session starts populated.
 func (a *App) GetSysMessageHistory(connId uint) ([]mqtt.MqttMessage, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
@@ -167,9 +172,61 @@ func sortMessagesByTimeAsc(messages []mqtt.MqttMessage) {
 }
 
 func (a *App) ClearConnectionHistory(connId uint) error {
-	appConnection := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
 	appConnection.MqttManager.ClearConnectionHistory()
 	a.EventRuntime.EventsEmit(appConnection.EventSet.MqttClearHistory, nil)
+	return nil
+}
+
+// GetConnectionLogs returns the buffered client-log lines for a connection
+// (snapshot of the in-RAM ring that backs the logs dialog).
+func (a *App) GetConnectionLogs(connId uint) ([]mqtt.LogEntry, error) {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection.MqttManager.GetLogs(), nil
+}
+
+// SetLogsStreaming starts or stops forwarding a connection's client-log
+// batches to the frontend. The logs dialog switches this on while open; the
+// ring and durable file keep capturing regardless, so nothing is lost while
+// streaming is off.
+func (a *App) SetLogsStreaming(connId uint, streaming bool) error {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.MqttManager.SetLogsStreaming(streaming)
+	return nil
+}
+
+// ClearConnectionLogs empties a connection's client-log ring and truncates its
+// durable log file.
+func (a *App) ClearConnectionLogs(connId uint) error {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.MqttManager.ClearLogs()
+	return nil
+}
+
+// SetConnectionDebugLogging persists and applies the per-connection verbose
+// debug-logging toggle. Takes effect immediately for v5; for v3 it (de)registers
+// the process-global debug dispatcher.
+func (a *App) SetConnectionDebugLogging(connId uint, enabled bool) error {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return fmt.Errorf("connection not found (%d)", connId)
+	}
+	if err := a.Db.Model(&models.Connection{}).Where("id = ?", connId).Update("debug_logging_enabled", enabled).Error; err != nil {
+		return err
+	}
+	appConnection.MqttManager.SetDebugLoggingEnabled(enabled)
 	return nil
 }
 
@@ -218,10 +275,37 @@ func (a *App) PublishMqtt(connId uint, message PublishParams) error {
 	return nil
 }
 
+// MaxBulkRetainedClear caps a single bulk clear. Each topic is a separate QoS 1
+// publish with its own round trip, so an unbounded sweep is minutes of blocked
+// work with no way out. Above this the caller is told to narrow the branch.
+const MaxBulkRetainedClear = 1000
+
+// bulkClearBatch bounds how many publishes DeleteRetainedMessages fires before
+// yielding. Each publish blocks on its PUBACK, so the yield keeps a long sweep
+// from monopolising the caller for its whole duration.
+const bulkClearBatch = 50
+
+// isBrokerReservedTopic reports whether a topic sits in the broker's own
+// namespace. Topic names beginning with $ are reserved for the server
+// ($SYS/... on most brokers), and are never ours to retain or clear. Mirrors
+// mqtt.isBrokerReservedTopic, which is unexported to that package.
+func isBrokerReservedTopic(topic string) bool {
+	return strings.HasPrefix(topic, "$")
+}
+
+// DeleteRetainedMessage clears the retained message on a topic by publishing
+// a zero-length retained payload to it.
 func (a *App) DeleteRetainedMessage(connId uint, topic string) error {
+	if isBrokerReservedTopic(topic) {
+		return fmt.Errorf("won't clear %s: topics under $ belong to the broker", topic)
+	}
+
 	publishParams := PublishParams{
-		Topic:   topic,
-		QoS:     0,
+		Topic: topic,
+		// QoS 1, not 0: with QoS 0, "cleared" is a guess, since a dropped or
+		// ACL-denied publish looks exactly like success. QoS 1 means the
+		// broker acknowledged it.
+		QoS:     1,
 		Payload: "",
 		Retain:  true,
 	}
@@ -229,23 +313,40 @@ func (a *App) DeleteRetainedMessage(connId uint, topic string) error {
 	if err != nil {
 		return err
 	}
+	// Clearing a retained message is only echoed back to us on MQTT 5
+	// (RetainAsPublished), so under MQTT 3 the index would stay marked
+	// forever unless we unmark it here ourselves. See
+	// MessageHistory.UnmarkRetained.
+	if appConnection, ok := a.appConnection(connId); ok {
+		appConnection.MqttManager.MessageHistory.UnmarkRetained(topic)
+	}
 	return nil
 }
 
 // GetRetainedTopicsUnderPrefix returns the known-retained topics at or below a
-// topic prefix, sorted. It backs the count shown before a bulk retained
-// cleanup.
+// topic prefix, sorted, excluding broker-reserved ($) topics. It backs the
+// count shown before a bulk retained cleanup.
 //
 // "Known" is doing real work here: this reflects the retained messages this
 // session has seen, not the broker's true retained set (see
 // mqtt.MessageHistory's retained field). UI copy must not present it as
 // complete.
 func (a *App) GetRetainedTopicsUnderPrefix(connId uint, prefix string) ([]string, error) {
-	appConnection, ok := a.AppConnections[connId]
+	appConnection, ok := a.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
 	return appConnection.MqttManager.MessageHistory.RetainedUnderPrefix(prefix), nil
+}
+
+// ClearRetainedResult reports what a bulk clear actually did. The UI states a
+// number to the user, so it must come from attempted publishes rather than
+// from the size of the list we were handed.
+type ClearRetainedResult struct {
+	Cleared int `json:"cleared"`
+	Failed  int `json:"failed"`
+	// FirstError names one failure so the user has something to act on.
+	FirstError string `json:"firstError"`
 }
 
 // DeleteRetainedMessages clears the retained message on each of the given
@@ -259,21 +360,41 @@ func (a *App) GetRetainedTopicsUnderPrefix(connId uint, prefix string) ([]string
 //
 // Every topic is attempted even if earlier ones fail, because a half-cleared
 // branch that reports nothing is worse than a full attempt that reports what
-// broke. The error names how many succeeded and how many failed.
-func (a *App) DeleteRetainedMessages(connId uint, topics []string) error {
-	var failed []string
-	for _, topic := range topics {
-		if err := a.DeleteRetainedMessage(connId, topic); err != nil {
-			failed = append(failed, topic)
-		}
+// broke. The result carries how many succeeded and how many failed; a non-nil
+// error means the call was refused outright and nothing was attempted.
+func (a *App) DeleteRetainedMessages(connId uint, topics []string) (ClearRetainedResult, error) {
+	if len(topics) == 0 {
+		return ClearRetainedResult{}, nil
 	}
-	if len(failed) > 0 {
-		return fmt.Errorf(
-			"cleared %d of %d retained messages, %d failed (first failure: %s)",
-			len(topics)-len(failed), len(topics), len(failed), failed[0],
+	if len(topics) > MaxBulkRetainedClear {
+		return ClearRetainedResult{}, fmt.Errorf(
+			"won't clear %d retained messages at once, the limit is %d: pick a narrower branch",
+			len(topics), MaxBulkRetainedClear,
 		)
 	}
-	return nil
+	for _, topic := range topics {
+		// GetRetainedTopicsUnderPrefix already excludes these, so one arriving
+		// here means the list did not come from us.
+		if isBrokerReservedTopic(topic) {
+			return ClearRetainedResult{}, fmt.Errorf("won't clear %s: topics under $ belong to the broker", topic)
+		}
+	}
+
+	var result ClearRetainedResult
+	for i, topic := range topics {
+		if i > 0 && i%bulkClearBatch == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if err := a.DeleteRetainedMessage(connId, topic); err != nil {
+			result.Failed++
+			if result.FirstError == "" {
+				result.FirstError = fmt.Sprintf("%s: %s", topic, err.Error())
+			}
+			continue
+		}
+		result.Cleared++
+	}
+	return result, nil
 }
 
 func (a *App) GetMatchingSubscriptionForTopic(connId uint, topic string) (*models.Subscription, error) {
@@ -286,11 +407,11 @@ func (a *App) GetMatchingSubscriptionForTopic(connId uint, topic string) (*model
 }
 
 func getConnectedConnection(app *App, connId uint) (*AppConnection, error) {
-	conn, ok := app.AppConnections[connId]
+	conn, ok := app.appConnection(connId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found")
 	}
-	if conn.MqttManager.ConnectionState != mqtt.ConnectionStates.Connected {
+	if conn.MqttManager.GetConnectionState() != mqtt.ConnectionStates.Connected {
 		return nil, fmt.Errorf("specified connection not connected")
 	}
 	return conn, nil
