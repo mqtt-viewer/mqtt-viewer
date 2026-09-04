@@ -31,7 +31,15 @@ But wait, there's more:
 | Web UI | The full app served over HTTP from a Docker image, and a Home Assistant add-on. |
 | Light and dark themes | |
 
-Screenshots of most of these are on [mqttviewer.app/features](https://mqttviewer.app/features).
+Every one of these has its own page, with screenshots, at [mqttviewer.app/features](https://mqttviewer.app/features). A few of them:
+
+![The broker status window: health strip, traffic chart, loudest topics and metric tiles from $SYS](docs/images/broker-status.png)
+
+![Charting a numeric payload field with the time window menu open](docs/images/chart.png)
+
+![Client logs for a connection in a terminal-style view](docs/images/client-logs.png)
+
+![Collections in the sidebar, global and per connection, with publish history below](docs/images/collections.png)
 
 Still thinking about, and would love to hear whether you'd use them:
 
