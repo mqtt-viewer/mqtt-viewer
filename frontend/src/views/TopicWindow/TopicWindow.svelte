@@ -19,6 +19,7 @@
   } from "@/views/Connection/DataView/stores/selected-topic-store";
   import SelectedTopicPanel from "@/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import { timelineStartMs } from "./topic-window-timeline";
 
   // State comes from the window URL the backend opened:
   // /?view=topic&conn=<id>&topic=<encoded>. The topic seeds the first render:
@@ -30,7 +31,14 @@
 
   let selectedTopicStore: SelectedTopicStore | null = null;
   let selectedTopic: string | null = null;
+  // Oldest message this window holds, for the timeline's lower bound.
+  let oldestMessageMs: number | null = null;
   let storesInitialised = false;
+  // A selection emitted while this window is still booting has nowhere to go
+  // yet, so it is held here and applied once the stores exist. Only the
+  // latest is kept: an earlier topic applied afterwards would be wrong.
+  let pendingTopic: string | null = null;
+  let storesReady = false;
   let unlistenTopicSelect: (() => void) | null = null;
   let unsubscribeSelectedTopicStore: (() => void) | null = null;
 
@@ -71,7 +79,36 @@
     }
   };
 
+  const applySelection = (topic: string) => {
+    if (!selectedTopicStore) return;
+    if (topic) {
+      selectedTopicStore.selectTopic(topic);
+    } else {
+      selectedTopicStore.deselectTopic();
+    }
+  };
+
   onMount(async () => {
+    // Registered before the store init below, not after: an event arriving
+    // during that await would otherwise be dropped and the window would sit
+    // on a stale topic.
+    //
+    // Follows topic selection in the main window, like DevTools follows the
+    // page: the main window emits this whenever the mode is "window" and the
+    // selected topic changes there (including deselect, with an empty topic).
+    unlistenTopicSelect = Events.On(
+      events.GlobalEvent.TopicWindowSelect,
+      (e) => {
+        const data = e.data as { connectionId: number; topic: string };
+        if (data.connectionId !== connectionId) return;
+        if (!storesReady) {
+          pendingTopic = data.topic;
+          return;
+        }
+        applySelection(data.topic);
+      }
+    );
+
     // env feeds the macOS traffic-light inset in the panel header.
     await Promise.all([os.init(), connections.init(), topicPanelDock.init()]);
     storesInitialised = true;
@@ -85,27 +122,20 @@
     );
     unsubscribeSelectedTopicStore = selectedTopicStore.subscribe((store) => {
       selectedTopic = store.selectedTopic;
+      // History is oldest-first, so [0] is the earliest message held.
+      oldestMessageMs = store.history[0]?.timeMs ?? null;
     });
 
     if (initialTopic) {
       selectedTopicStore.selectTopic(initialTopic);
     }
 
-    // Follows topic selection in the main window, like DevTools follows the
-    // page: the main window emits this whenever the mode is "window" and the
-    // selected topic changes there (including deselect, with an empty topic).
-    unlistenTopicSelect = Events.On(
-      events.GlobalEvent.TopicWindowSelect,
-      (e) => {
-        const data = e.data as { connectionId: number; topic: string };
-        if (data.connectionId !== connectionId || !selectedTopicStore) return;
-        if (data.topic) {
-          selectedTopicStore.selectTopic(data.topic);
-        } else {
-          selectedTopicStore.deselectTopic();
-        }
-      }
-    );
+    storesReady = true;
+    if (pendingTopic !== null) {
+      const topic = pendingTopic;
+      pendingTopic = null;
+      applySelection(topic);
+    }
   });
 
   onDestroy(() => {
@@ -148,7 +178,11 @@
             {selectedTopicStore}
             {deleteRetainedMessage}
             {exportTopicMessages}
-            firstConnectedAtMs={connection?.firstConnectedThisSessionAtMs ?? 0}
+            firstConnectedAtMs={timelineStartMs(
+              connection?.firstConnectedThisSessionAtMs,
+              oldestMessageMs,
+              Date.now()
+            )}
             {mqttVersion}
             openChartWindow={(topic, fields) =>
               OpenChartWindow({ connectionId, topic, fields })}
