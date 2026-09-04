@@ -5,6 +5,8 @@
   import SelectedTopicDisplay from "./components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import MqttDataPanel from "./components/MqttDataPanel/MqttDataPanel.svelte";
   import { createSelectedTopicStore } from "./stores/selected-topic-store";
+  import { createTopicPanelViewState } from "./stores/topic-panel-view-state";
+  import { topicWindowSyncAction } from "./topic-window-sync";
   import type { Connection } from "@/stores/connections";
   import ResizableContainer from "@/components/ResizableContainer/ResizableContainer.svelte";
   import { createMatchedTopicsStore } from "./stores/matched-topics";
@@ -34,6 +36,12 @@
     connection.connectionDetails.id,
     connection.eventSet
   );
+
+  // One instance per connection, owned here rather than by the panel: the
+  // bottom and right docks are different DOM parents, so a dock switch
+  // remounts SelectedTopicPanel and would otherwise lose the charted series,
+  // the active tab and the chart controls.
+  const topicPanelViewState = createTopicPanelViewState();
 
   const matchedTopicsStore = createMatchedTopicsStore(
     connection.connectionDetails.id
@@ -68,8 +76,10 @@
   $: isDockedBottom = renderedDockSide === "bottom";
   // Escape hatch while the panel lives in its own window: without it the
   // main window has no dock UI at all, and a lost pop-out would strand the
-  // user. Rendered where the panel would dock on the right.
-  $: showWindowModeHatch = dockMode === "window" && isSelectedTopicPanelOpen;
+  // user. Shown for the whole of "window" mode, selection or not, because
+  // with nothing selected there is no other dock UI to reach for. Rendered
+  // where the panel would dock on the right.
+  $: showWindowModeHatch = dockMode === "window";
   const WINDOW_MODE_HATCH_WIDTH = 36;
   $: isPublishDisabled = connection.connectionState !== "connected";
   $: isConnecting =
@@ -140,37 +150,55 @@
   // params so a freshly created window can seed itself from its URL; the
   // event alone would be dropped by a webview that hasn't mounted yet.
   let lastEmittedTopic: string | null | undefined = undefined;
-  $: if (dockMode === "window" && isActiveTab) {
+
+  const emitTopicWindowSelect = (topic: string | null) =>
+    Events.Emit(events.GlobalEvent.TopicWindowSelect, {
+      connectionId: connection.connectionDetails.id,
+      topic: topic ?? "",
+    });
+
+  $: {
     const topic = $selectedTopicStore.selectedTopic;
-    if (topic !== lastEmittedTopic) {
-      lastEmittedTopic = topic;
-      OpenTopicWindow({
-        connectionId: connection.connectionDetails.id,
-        topic: topic ?? "",
+    switch (
+      topicWindowSyncAction({
+        dockMode,
+        isActiveTab,
+        topic,
+        lastEmittedTopic,
       })
-        .then(() => {
-          Events.Emit(events.GlobalEvent.TopicWindowSelect, {
-            connectionId: connection.connectionDetails.id,
-            topic: topic ?? "",
-          });
+    ) {
+      case "reset":
+        // Reset so switching back to "window" mode (or back to this tab)
+        // re-sends the current topic.
+        lastEmittedTopic = undefined;
+        break;
+      case "emit":
+        // Deselect, or "window" mode restored with nothing selected: tell a
+        // pop-out that is already open, but never open one for no topic.
+        lastEmittedTopic = topic;
+        emitTopicWindowSelect(topic);
+        break;
+      case "open-and-emit":
+        lastEmittedTopic = topic;
+        OpenTopicWindow({
+          connectionId: connection.connectionDetails.id,
+          topic: topic ?? "",
         })
-        .catch((e) => {
-          addToast({
-            data: {
-              title: "Failed to open topic window",
-              description: e as string,
-              type: "error",
-            },
+          .then(() => emitTopicWindowSelect(topic))
+          .catch((e) => {
+            addToast({
+              data: {
+                title: "Failed to open topic window",
+                description: e as string,
+                type: "error",
+              },
+            });
+            // Never strand the user in "window" mode with no window: fall
+            // back to the last docked side so the panel comes back here.
+            topicPanelDock.setMode($topicPanelDock.lastDockedSide);
           });
-          // Never strand the user in "window" mode with no window: fall
-          // back to the last docked side so the panel comes back here.
-          topicPanelDock.setMode($topicPanelDock.lastDockedSide);
-        });
+        break;
     }
-  } else {
-    // Reset so switching back to "window" mode (or back to this tab) re-sends
-    // the current topic.
-    lastEmittedTopic = undefined;
   }
 
   const focusTopicWindow = async () => {
@@ -288,6 +316,7 @@
           <SelectedTopicDisplay
             connectionId={connection.connectionDetails.id}
             {selectedTopicStore}
+            viewState={topicPanelViewState}
             {deleteRetainedMessage}
             {exportTopicMessages}
             firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
@@ -319,6 +348,7 @@
         <SelectedTopicDisplay
           connectionId={connection.connectionDetails.id}
           {selectedTopicStore}
+          viewState={topicPanelViewState}
           {deleteRetainedMessage}
           {exportTopicMessages}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
@@ -342,13 +372,17 @@
           border-l-[1px] border-l-outline bg-elevation-1"
         style:width={`${WINDOW_MODE_HATCH_WIDTH}px`}
       >
-        <IconButton
-          tooltipText="Focus window"
-          tooltipPlacement="left"
-          onClick={focusTopicWindow}
-        >
-          <Icon type="popOut" size={16} />
-        </IconButton>
+        {#if isSelectedTopicPanelOpen}
+          <!-- Only with a topic selected: with none there is no pop-out to
+               focus, and focusing would open an empty one. -->
+          <IconButton
+            tooltipText="Focus window"
+            tooltipPlacement="left"
+            onClick={focusTopicWindow}
+          >
+            <Icon type="popOut" size={16} />
+          </IconButton>
+        {/if}
         <IconButton
           tooltipText="Dock here"
           tooltipPlacement="left"
@@ -365,7 +399,7 @@
           <span
             class="text-xs text-secondary-text whitespace-nowrap [writing-mode:vertical-rl]"
           >
-            Topic panel is in its own window
+            Topic panel opens in its own window
           </span>
         </div>
       </div>
