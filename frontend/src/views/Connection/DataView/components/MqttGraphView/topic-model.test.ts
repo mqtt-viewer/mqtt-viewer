@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { rateFromScore } from "@/util/decay-score";
 import { TopicModel } from "./topic-model";
 
 test("ingest of a brand-new top-level topic marks visibleDirty", () => {
@@ -269,4 +270,73 @@ test("seedTopic does not copy the subtree rate into own for a non-leaf publisher
   // counts stay exact regardless
   expect(parent.ownCount).toBe(3);
   expect(parent.aggCount).toBe(5); // 3 own + 2 from child
+});
+
+test("setTau rescales scores so the implied rate survives a smoothing change", () => {
+  const model = new TopicModel(40000);
+  // steady 10 msg/s for long enough to converge (score -> rate x tau)
+  const start = SEED_T;
+  for (let i = 0; i < 2000; i++) {
+    model.ingest("plant/line1/temp", start + i * 100);
+  }
+  // read at the last arrival: past it the two taus decay at different speeds,
+  // which is the point of the setting. What must not change is the reading at
+  // the moment the smoothing is switched.
+  const now = start + 1999 * 100;
+  const node = model.root.children.get("plant")!;
+  const before = rateFromScore(model.peekAggScore(node, now), model.tauMs);
+
+  model.setTau(5000);
+  const after = rateFromScore(model.peekAggScore(node, now), model.tauMs);
+
+  // the reported rate is what the user sees in the hover inspector: it must
+  // not jump 8x just because they picked a different smoothing
+  expect(after).toBeCloseTo(before, 6);
+  // and the raw score (which drives node radius) is rescaled, not left alone
+  expect(node.agg.score).toBeCloseTo((before * 5000) / 1000, 6);
+});
+
+test("clearRetained clears ownRetained on an existing topic and reports it was found", () => {
+  const m = new TopicModel();
+  m.ingest("a/b", 1000, true);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(true);
+
+  const found = m.clearRetained("a/b");
+
+  expect(found).toBe(true);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(false);
+});
+
+test("clearRetained leaves a sibling and an ancestor alone", () => {
+  const m = new TopicModel();
+  m.ingest("a/b", 1000, true);
+  m.ingest("a/c", 1000, true);
+
+  m.clearRetained("a/b");
+
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(false);
+  expect(m.root.children.get("a")!.children.get("c")!.ownRetained).toBe(true);
+});
+
+test("clearRetained is a no-op and reports not-found for an unknown topic", () => {
+  const m = new TopicModel();
+  m.ingest("a/b", 1000, true);
+
+  const found = m.clearRetained("a/x");
+
+  expect(found).toBe(false);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(true);
+  expect(m.root.children.get("a")!.children.has("x")).toBe(false);
+});
+
+test("setTau ignores a no-op or invalid tau", () => {
+  const model = new TopicModel(14000);
+  model.ingest("a", SEED_T);
+  const score = model.root.children.get("a")!.agg.score;
+
+  model.setTau(14000);
+  expect(model.root.children.get("a")!.agg.score).toBe(score);
+  model.setTau(0);
+  expect(model.tauMs).toBe(14000);
+  expect(model.root.children.get("a")!.agg.score).toBe(score);
 });

@@ -38,6 +38,12 @@
       "type": "function",
       "required": false,
       "default": "> void) | null = null"
+    },
+    {
+      "name": "optionsStore",
+      "type": "store",
+      "required": false,
+      "default": null
     }
   ],
   "tokens": [

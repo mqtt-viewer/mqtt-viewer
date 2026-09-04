@@ -76,24 +76,31 @@ type latestEntry struct {
 //     least its current value. Bounded by its share of the memory budget:
 //     on a broker with hundreds of thousands of topics the least recently
 //     updated topics are dropped from it (see latestBudgetDivisor).
-//   - retained: topics currently believed to hold a retained message. This
-//     index is bounded by topic cardinality and independent of byte eviction.
+//   - retained: the topics we currently believe hold a retained message.
+//     Bounded by topic cardinality and never evicted by the byte budget. See
+//     the field comment for what it can and cannot tell you.
 //
 // Every retained message is charged exactly once: to recentBytes while it is
 // in the recent window, then to latestBytes if the latest map pins it after
 // eviction. recentBytes + latestBytes is what the budget bounds.
 type MessageHistory struct {
-	mutex       sync.Mutex
-	recent      []*MqttMessage
-	head        int
-	latest      map[string]*latestEntry
-	recentBytes int64
-	latestBytes int64
+	mutex  sync.Mutex
+	recent []*MqttMessage
+	head   int
+	latest map[string]*latestEntry
 	// retained holds the topics we believe currently have a retained message,
 	// maintained from the Retain flag: a retained message with a payload marks
-	// its topic, a retained zero-length payload (the MQTT tombstone) unmarks it.
-	// This is observed state, not complete broker truth.
+	// its topic, a retained zero-length payload (the MQTT tombstone) unmarks
+	// it.
+	//
+	// This is "retained messages we know about", NOT broker truth. Under MQTT 3
+	// the flag is only set on subscribe-time replay, because subscribe.go has no
+	// RetainAsPublished equivalent for v3, so a topic another client retains
+	// mid-session goes undetected. Callers must not present this as a complete
+	// picture of the broker.
 	retained    map[string]struct{}
+	recentBytes int64
+	latestBytes int64
 	budgetBytes int64
 	// lruOldest/lruNewest bound the list of pinned latest entries, ordered by
 	// when each topic last received a message: lruOldest is the least recently
@@ -331,9 +338,14 @@ func (m *MessageHistory) compactLocked() {
 }
 
 // GetTopicHistory returns every retained message for a topic in arrival
-// order. Unbounded: only for paths that genuinely need the full window (for
-// example export). UI paths must use GetTopicHistoryWindow. If recent messages
-// aged out, the latest value is returned unless cardinality pressure dropped it.
+// order. Unbounded: only for paths that genuinely need the full window (e.g.
+// export). UI paths must use GetTopicHistoryWindow: copying a busy topic's
+// entire history while holding the mutex stalls every concurrent receive.
+//
+// If the topic's messages have all aged out of the recent window, its latest
+// value is still returned so a tree-click is never empty, unless the topic
+// was also dropped from the latest map under budget pressure, which only
+// happens at extreme topic cardinality.
 func (m *MessageHistory) GetTopicHistory(topic string) ([]MqttMessage, error) {
 	return m.GetTopicHistoryWindow(topic, 0)
 }
@@ -392,8 +404,8 @@ func (m *MessageHistory) GetTopicTimelineWindow(topic string, limit int) ([]Mqtt
 		result[i], result[j] = result[j], result[i]
 	}
 	if len(result) == 0 {
-		if latest, ok := m.latest[topic]; ok {
-			return []MqttMessageStub{latest.msg.Stub()}, nil
+		if entry, ok := m.latest[topic]; ok {
+			return []MqttMessageStub{entry.msg.Stub()}, nil
 		}
 		return nil, fmt.Errorf("topic not found in message history")
 	}
@@ -401,13 +413,12 @@ func (m *MessageHistory) GetTopicTimelineWindow(topic string, limit int) ([]Mqtt
 }
 
 // SLACK_MS bounds how far a message's position in `recent` can disagree with
-// its TimeMs. Appends run on per-message goroutines (see receiveMessage in
-// receive.go), so under load a message can land in the slice a few
-// milliseconds before or after its neighbours by receive time. The slice is
-// therefore only near-sorted by TimeMs; any time-hinted lookup must widen its
-// search window by this slack. 2s is orders of magnitude more than the
-// observed reordering while still keeping hinted lookups tiny relative to
-// the full window.
+// its TimeMs. Appends now run in order on the receiving goroutine (see
+// receiveMessage in receive.go), but the slice is only guaranteed near-sorted
+// by TimeMs (clock adjustments, and messages stamped before they are
+// appended), so any time-hinted lookup widens its search window by this
+// slack. 2s is orders of magnitude more than any observed reordering while
+// still keeping hinted lookups tiny relative to the full window.
 const SLACK_MS int64 = 2000
 
 // GetMessageById looks up a single message by id within a topic's retained
@@ -483,7 +494,8 @@ func (m *MessageHistory) IsRetained(topic string) bool {
 
 // RetainedUnderPrefix returns the known-retained topics at or below prefix, in
 // sorted order so a confirmation dialog lists them stably. An empty prefix
-// matches every retained topic.
+// matches every retained topic. Broker-reserved ($) topics are always
+// excluded, so a bulk clear can never be offered over broker internals.
 //
 // Matching is on topic-level boundaries, not raw string prefix: "a/b" matches
 // "a/b" and "a/b/c", but never "a/bc".
@@ -492,12 +504,39 @@ func (m *MessageHistory) RetainedUnderPrefix(prefix string) []string {
 	defer m.mutex.Unlock()
 	result := make([]string, 0, 16)
 	for topic := range m.retained {
+		if isBrokerReservedTopic(topic) {
+			// $SYS/... and friends are the broker's own namespace, never ours
+			// to retain or clear.
+			continue
+		}
 		if matchesTopicPrefix(topic, prefix) {
 			result = append(result, topic)
 		}
 	}
 	sort.Strings(result)
 	return result
+}
+
+// UnmarkRetained drops topics from the retained index. Clearing a retained
+// message is only echoed back to us on MQTT 5 (RetainAsPublished), so under
+// MQTT 3 the index would stay marked forever unless the clear updates it
+// directly.
+func (m *MessageHistory) UnmarkRetained(topics ...string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	for _, topic := range topics {
+		delete(m.retained, topic)
+	}
+}
+
+// ClearRetainedIndex empties the retained index without touching message
+// history. Called when a connection (re)subscribes: the broker replays its
+// current retained set immediately afterwards, so rebuilding from that replay
+// is the only way to drop topics tombstoned while we were away.
+func (m *MessageHistory) ClearRetainedIndex() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.retained = make(map[string]struct{})
 }
 
 // matchesTopicPrefix reports whether topic is at or below prefix, respecting
@@ -508,6 +547,13 @@ func matchesTopicPrefix(topic string, prefix string) bool {
 		return true
 	}
 	return topic == prefix || strings.HasPrefix(topic, prefix+"/")
+}
+
+// isBrokerReservedTopic reports whether a topic sits in the broker's own
+// namespace. Topic names beginning with $ are reserved for the server
+// ($SYS/... on most brokers), and are never ours to retain or clear.
+func isBrokerReservedTopic(topic string) bool {
+	return strings.HasPrefix(topic, "$")
 }
 
 // getMessageByIdLocked implements the per-id lookup. Caller holds mutex.
@@ -545,8 +591,8 @@ func (m *MessageHistory) getMessageByIdLocked(topic string, id string, timeMsHin
 // latestByIdLocked checks the latest-per-topic fallback for an exact id
 // match. Caller holds mutex.
 func (m *MessageHistory) latestByIdLocked(topic string, id string) (MqttMessage, bool) {
-	if latest, ok := m.latest[topic]; ok && latest.msg.Id == id {
-		return *latest.msg, true
+	if entry, ok := m.latest[topic]; ok && entry.msg.Id == id {
+		return *entry.msg, true
 	}
 	return MqttMessage{}, false
 }

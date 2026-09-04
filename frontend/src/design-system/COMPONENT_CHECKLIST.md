@@ -143,10 +143,11 @@
 | Views/NewTab/RecentConnectionsList | [x] | [ ] | [x] | [x] |
 | Views/NewTab/RecentConnectionsList/RecentConnectionsListItem | [x] | [ ] | [x] | [x] |
 | Views/PleaseUpdate | [x] | [ ] | [ ] | [ ] |
+| Views/TopicWindow | [x] | [ ] | [ ] | [x] |
 
 ## Summary
 
-- Components scanned: 120
-- Story present: 120
+- Components scanned: 121
+- Story present: 121
 - Figma-linked: 0
 - Missing specs: 0

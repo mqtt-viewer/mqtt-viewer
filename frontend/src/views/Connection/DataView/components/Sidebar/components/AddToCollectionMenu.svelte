@@ -19,18 +19,7 @@
     scope: CollectionScope
   ) => Promise<void>;
 
-  let menu: DropdownMenu;
-  let inputEl: HTMLInputElement;
   let query = "";
-  // Explicit create mode: the search input doubles as the new collection's
-  // name field and the matches list is hidden.
-  let isCreating = false;
-
-  // The menu body remounts on every open; clear leftovers from the last one.
-  const resetOnOpen = (_node: HTMLElement) => {
-    query = "";
-    isCreating = false;
-  };
 
   $: collections = $collectionsStore.collections;
   $: matches = query.trim()
@@ -53,25 +42,15 @@
     if (!name) return;
     await onCreate(name, scope);
     query = "";
-    isCreating = false;
-  };
-
-  const startCreating = () => {
-    isCreating = true;
-    query = "";
-    inputEl.focus();
   };
 
   const onKeydown = async (event: KeyboardEvent) => {
+    // stopPropagation keeps melt's typeahead off the input but also hides
+    // Escape from it, so close the menu here.
     if (event.key === "Escape") {
-      if (isCreating) {
-        // Back out of create mode before closing the whole menu.
-        isCreating = false;
-        query = "";
-      } else {
-        query = "";
-        menu.close();
-      }
+      event.preventDefault();
+      query = "";
+      $open = false;
       return;
     }
     if (event.key !== "Enter") return;
@@ -88,23 +67,22 @@
     } else {
       await create("connection");
     }
-    menu.close();
+    $open = false;
   };
 </script>
 
-<DropdownMenu bind:this={menu} placement="bottom-end" {open}>
+<DropdownMenu placement="bottom-end" {open}>
   <slot name="trigger" slot="trigger" />
-  <div class="flex flex-col min-w-[220px]" slot="menu-content" use:resetOnOpen>
+  <div class="flex flex-col min-w-[220px]" slot="menu-content">
     <!-- svelte-ignore a11y_autofocus -->
     <input
-      bind:this={inputEl}
       class="bg-transparent outline-none border-b border-divider px-2 pb-2 pt-1 mb-1 text-base text-white-text placeholder:text-secondary-text"
       autofocus
-      placeholder={isCreating ? "New collection name..." : placeholder}
+      {placeholder}
       bind:value={query}
       on:keydown|stopPropagation={onKeydown}
     />
-    {#if !isCreating && connectionMatches.length > 0}
+    {#if connectionMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Connection</div>
       {#each connectionMatches as collection (collection.id)}
         <DropdownMenuItem
@@ -119,7 +97,7 @@
         </DropdownMenuItem>
       {/each}
     {/if}
-    {#if !isCreating && globalMatches.length > 0}
+    {#if globalMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Global</div>
       {#each globalMatches as collection (collection.id)}
         <DropdownMenuItem
@@ -134,14 +112,9 @@
         </DropdownMenuItem>
       {/each}
     {/if}
-    {#if !isCreating && matches.length === 0 && query.trim()}
+    {#if matches.length === 0 && query.trim()}
       <div class="px-2 py-1 text-base text-secondary-text">
         Collection not found
-      </div>
-    {/if}
-    {#if isCreating && !query.trim()}
-      <div class="px-2 py-1 text-base text-secondary-text">
-        Type a name for the new collection
       </div>
     {/if}
     {#if query.trim() && !connectionExactMatch}
@@ -153,20 +126,6 @@
       <DropdownMenuItem iconType="plus" onClick={() => create("global")}>
         <span class="truncate">Create “{query.trim()}” (global)</span>
       </DropdownMenuItem>
-    {/if}
-    {#if !isCreating && !query.trim()}
-      {#if collections.length > 0}
-        <div class="border-t border-divider my-1"></div>
-      {/if}
-      <!-- Plain button (not a melt menu item) so clicking keeps the menu open. -->
-      <button
-        type="button"
-        class="flex items-center gap-2 text-left rounded py-[6px] px-2 text-white-text hover:bg-elevation-2-hover hover:text-emphasis"
-        on:click={startCreating}
-      >
-        <Icon type="plus" size={14} />
-        <span class="truncate">New collection...</span>
-      </button>
     {/if}
     <slot name="extra-items" />
   </div>

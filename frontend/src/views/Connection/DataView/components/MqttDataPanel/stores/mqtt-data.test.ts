@@ -282,6 +282,61 @@ describe("retained tracking", () => {
   });
 });
 
+describe("markRetainedCleared", () => {
+  it("clears the flag for a known topic", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    expect(get(store).home.children.a.isRetained).toBe(true);
+
+    store.markRetainedCleared(["home/a"]);
+
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    unsub();
+  });
+
+  it("leaves a sibling and an ancestor's flag alone", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([
+      makeRetainedMessage("1", "home/a/b", "value", 1),
+      makeRetainedMessage("2", "home/a/c", "value", 2),
+    ]);
+    // an intermediate level is never itself retained, but set it explicitly
+    // via a retained message on the shorter path too, to prove clearing a
+    // deeper topic doesn't touch it
+    fireMessages([makeRetainedMessage("3", "home", "value", 3)]);
+
+    store.markRetainedCleared(["home/a/b"]);
+
+    expect(get(store).home.children.a.children.b.isRetained).toBe(false);
+    expect(get(store).home.children.a.children.c.isRetained).toBe(true);
+    expect(get(store).home.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("is a no-op for a topic it does not know about", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+
+    expect(() =>
+      store.markRetainedCleared(["home/does-not-exist"])
+    ).not.toThrow();
+    expect(get(store).home.children.a.isRetained).toBe(true);
+    unsub();
+  });
+});
+
 describe("rate score bumps", () => {
   it("initialises and bumps rate on the leaf and every ancestor by the batch count", () => {
     const highlightStore = createHighlightedMqttTopicsStore();

@@ -80,3 +80,47 @@
 {/snippet}
 
 <Story name="Suppressed on empty space" args={{}} template={suppressed} />
+
+{#snippet manyItems(args: any)}
+  <div class="p-4 text-white-text">
+    <Component {...args}>
+      <div
+        slot="trigger"
+        class="flex h-32 w-80 items-center justify-center rounded border border-dashed border-secondary-text text-secondary-text"
+      >
+        Right-click anywhere in this box
+      </div>
+      <svelte:fragment slot="menu-content">
+        <DropdownMenuItem onClick={() => (lastAction = "Copy topic")}>
+          Copy topic
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => (lastAction = "Copy payload")}>
+          Copy payload
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => (lastAction = "Rename")}>
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => (lastAction = "Add to collection")}>
+          Add to collection
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => (lastAction = "Clear retained message")}
+        >
+          Clear retained message
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => (lastAction = "Delete")}>
+          Delete
+        </DropdownMenuItem>
+      </svelte:fragment>
+    </Component>
+    <div class="mt-3 text-xs text-secondary-text">
+      Last action: {lastAction || "none"}
+    </div>
+  </div>
+{/snippet}
+
+<Story
+  name="Many items stack vertically"
+  args={{}}
+  template={manyItems}
+/>

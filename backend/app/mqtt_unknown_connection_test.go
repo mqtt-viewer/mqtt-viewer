@@ -31,7 +31,7 @@ func TestDisconnectMqttUnknownConnection(t *testing.T) {
 func TestGetMessageHistoryUnknownConnection(t *testing.T) {
 	app := getTestApp(t)
 
-	messages, err := app.GetMessageHistory(unknownConnId, "some/topic", 0)
+	messages, err := app.GetMessageHistory(unknownConnId, "some/topic", 100)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}

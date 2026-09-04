@@ -41,7 +41,7 @@ buildGoModule (finalAttrs: {
   # proxyVendor keeps the module download cache instead, so embeds are only
   # resolved for the packages this build actually compiles.
   proxyVendor = true;
-  vendorHash = "sha256-zunXLYg9pTeBZ58PR0siy9wgFhXgGTEQFsRGeZrFIHs=";
+  vendorHash = "sha256-+PDkkQRRg4RSegjFZXxitF0tdEzNUDmuIf97f0ALrro=";
 
   # Mirrors build/linux/Taskfile.yml's production build:
   #   -tags production,gtk3, CGO_ENABLED=1, -ldflags "-w -s -X ...env.Version"

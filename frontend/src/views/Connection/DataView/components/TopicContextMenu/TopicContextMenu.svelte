@@ -72,9 +72,13 @@
   </DropdownMenuItem>
 {/if}
 
+<!-- Offered even when there is nothing to clear, so the action's place in the
+     menu doesn't move around between topics. Genuinely disabled, not just
+     dimmed: DropdownMenuItem's disabled prop is what keeps it out of keyboard
+     navigation and off the activation path. -->
 <DropdownMenuItem
-  onClick={() => (isRetained ? onClearRetained(topic) : undefined)}
-  class={isRetained ? "" : "cursor-default opacity-40"}
+  disabled={!isRetained}
+  onClick={() => onClearRetained(topic)}
 >
   <span class="flex items-center gap-2">
     <Icon type="delete" size={16} />

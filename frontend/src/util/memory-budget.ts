@@ -5,9 +5,17 @@ export const MB = 1024 * 1024;
 export const GB = 1024 * 1024 * 1024;
 export const MIN_MEMORY_MB = 64;
 
-// Measured ~320 MB baseline on macOS (Go process + webview helpers) with no
-// history; rounded to a cross-platform figure.
-export const BASE_APP_BYTES = 300 * MB;
+// Connection counts the estimate is shown for.
+export const EXAMPLE_CONNECTION_COUNTS = [1, 2, 3] as const;
+
+// The shape of the backend's soft memory limit, fetched via
+// GetMemoryLimitModel. Structurally compatible with the generated binding
+// class, so nothing here has to import it.
+export interface MemoryLimitModel {
+  baseBytes: number;
+  budgetFactorNumerator: number;
+  budgetFactorDenominator: number;
+}
 
 // Human-readable byte formatting (e.g. "240 MB", "1.2 GB").
 export const formatBytes = (bytes: number | undefined): string => {
@@ -24,9 +32,30 @@ export const formatBytes = (bytes: number | undefined): string => {
   return `${rounded} ${units[unitIndex]}`;
 };
 
-// Rough total app memory: baseline plus the per-connection history budget for
-// each active connection (at least one, so an idle app still shows a figure).
+// The headroom multiplier each connected connection gets over its budget, for
+// use in copy (1.5 for the real model). Rounded to two decimals: this goes
+// straight into a sentence, so a ratio like 7/3 must not print 17 digits.
+export const budgetFactor = (model: MemoryLimitModel): number =>
+  Math.round(
+    (model.budgetFactorNumerator / model.budgetFactorDenominator) * 100
+  ) / 100;
+
+// The ceiling the runtime gives itself for this budget and connection count.
+// This mirrors MemoryLimitModel.Limit in backend/app/memlimit.go, including its
+// integer division, and must stay identical to it. Undefined until the model
+// has been fetched, so callers can show a placeholder.
 export const estimateTotalBytes = (
+  model: MemoryLimitModel | undefined,
   budgetMb: number,
-  activeConnections: number
-): number => BASE_APP_BYTES + budgetMb * MB * Math.max(1, activeConnections);
+  connections: number
+): number | undefined => {
+  if (model === undefined) return undefined;
+  return (
+    model.baseBytes +
+    connections *
+      Math.floor(
+        (budgetMb * MB * model.budgetFactorNumerator) /
+          model.budgetFactorDenominator
+      )
+  );
+};

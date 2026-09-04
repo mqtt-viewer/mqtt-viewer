@@ -99,6 +99,8 @@ let mockAppSettings = new models.AppSettings({
   lastSeenChangelogVersion: "",
   launchCount: 0,
   hasSeenStarPrompt: false,
+  topicPanelDockMode: "right",
+  topicPanelLastDockedSide: "right",
   ignoredUpdateVersion: "",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
@@ -135,6 +137,18 @@ export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
   return mockAppSettings;
 }
 
+export async function SetTopicPanelDock(
+  mode: string,
+  lastDockedSide: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    topicPanelDockMode: mode,
+    topicPanelLastDockedSide: lastDockedSide,
+  });
+  return mockAppSettings;
+}
+
 export async function SkipUpdateVersion(
   version: string
 ): Promise<models.AppSettings> {
@@ -144,6 +158,14 @@ export async function SkipUpdateVersion(
   });
   return mockAppSettings;
 }
+
+export async function OpenTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
+
+export async function FocusTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
 
 export async function GetDatabaseSizeBytes(): Promise<number> {
   return mockDatabaseSizeBytes;
@@ -529,7 +551,7 @@ export async function GetMatchingSubscriptionForTopic(
 export async function GetMessageHistory(
   _connectionId: number,
   _topic: string,
-  _limit: number
+  _limit?: number
 ): Promise<any[]> {
   return mockMqttMessages;
 }
@@ -622,6 +644,14 @@ export async function GetReceivedMessagesByIds(
   return mockMqttMessages
     .filter((m) => wanted.includes(m.id))
     .map((m) => ({ ...m, topic }));
+}
+
+export async function GetMemoryLimitModel(): Promise<app.MemoryLimitModel> {
+  return new app.MemoryLimitModel({
+    baseBytes: 1024 * 1024 * 1024,
+    budgetFactorNumerator: 3,
+    budgetFactorDenominator: 2,
+  });
 }
 
 export async function GetMemoryStats(): Promise<app.MemoryStats> {

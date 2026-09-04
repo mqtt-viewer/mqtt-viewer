@@ -65,7 +65,7 @@
 
   // This component is always mounted, even behind an inactive tab (Tabs.svelte
   // renders every panel), so it must not fetch every payload just because it
-  // exists. Only once the Chart tab is genuinely visible does the full
+  // exists. Only once the chart is genuinely visible does the full
   // window actually get read. ensureChartHistory itself no-ops once loaded
   // or already loading, so this is cheap to re-evaluate.
   $: if (visible) {

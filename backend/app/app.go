@@ -39,6 +39,10 @@ type App struct {
 	// Throttles the (PRAGMA-based) disk-size check so it doesn't run on every
 	// 300ms drain. Unix-nano of the last prune check.
 	lastPruneCheckNanos atomic.Int64
+	// Set from the Wails OnShutdown hook, which runs before cleanup closes
+	// windows: lets WindowClosing handlers tell an app quit apart from the
+	// user closing a window by hand (see OpenTopicWindow).
+	shuttingDown atomic.Bool
 	// recordQueue hands drained batches to the single recording-worker
 	// goroutine so DB writes never happen on the buffer-drain hot path.
 	recordQueue chan recordBatch

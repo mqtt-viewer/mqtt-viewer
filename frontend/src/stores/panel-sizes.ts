@@ -23,9 +23,9 @@ const { subscribe, set, update } = writable<PanelSizes>({
 });
 
 const init = async () => {
-  // Window.Size() is a native call: in server mode it is a no-op that either
-  // rejects or answers 0x0. It gets its own try/catch so a failure here cannot
-  // skip GetPanelSizes below and leave every panel at its default size.
+  // Window.Size() is a native call: in server mode there is no native window,
+  // so it is never called there. It gets its own try/catch so a failure here
+  // cannot skip GetPanelSizes below and leave every panel at its default size.
   let rootWindowWidth = 0;
   let rootWindowHeight = 0;
   if (!get(envStore).isServerMode) {
@@ -37,11 +37,12 @@ const init = async () => {
       console.error(e);
     }
   }
-  // In the browser the viewport is the window.
-  if (!rootWindowWidth || !rootWindowHeight) {
-    rootWindowWidth = rootWindowWidth || window.innerWidth;
-    rootWindowHeight = rootWindowHeight || window.innerHeight;
-  }
+  // Window.Size() can report 0 before the native window is realised, and in
+  // server mode the size is never read at all; a 0 root size would clamp every
+  // panel to nothing on mount, so fall back to the viewport, which in the
+  // browser is the window.
+  rootWindowWidth = rootWindowWidth || window.innerWidth;
+  rootWindowHeight = rootWindowHeight || window.innerHeight;
 
   try {
     const panelSizes = await GetPanelSizes();
@@ -90,9 +91,17 @@ const updateAppWidth = (width: SizePx) => {
   });
 };
 
+const updateAppHeight = (height: SizePx) => {
+  update((store) => {
+    store.rootWindowHeight = height;
+    return store;
+  });
+};
+
 export default {
   subscribe,
   init,
   updatePanelSize,
   updateAppWidth,
+  updateAppHeight,
 };
