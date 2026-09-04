@@ -19,7 +19,6 @@
     EXAMPLE_CONNECTION_COUNTS,
     formatBytes,
     estimateTotalBytes,
-    budgetFactor,
     type MemoryLimitModel,
   } from "@/util/memory-budget";
 
@@ -135,9 +134,7 @@
 >
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
     <p class="text-secondary-text">
-      I cap how much message history I keep in memory so long sessions don't
-      eat your RAM. You can also record history to disk so it survives
-      restarts.
+      You can decide how much memory MQTT Viewer uses.
     </p>
 
     <div class="flex flex-col gap-4">
@@ -151,14 +148,9 @@
           errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
+
         <p class="text-sm text-secondary-text">
-          I also set a soft memory limit for the runtime: {formatBytes(
-            limitModel?.baseBytes
-          )} for the runtime and database, plus {limitModel
-            ? budgetFactor(limitModel)
-            : "…"} times this budget for each connected connection so history
-          has room to churn. The garbage collector works towards it, and the
-          interface sits outside it. With this budget, expect up to about:
+          With this budget, expect up to about:
         </p>
         <ul
           class="grid grid-cols-[max-content_auto] gap-x-3 text-sm text-secondary-text"
@@ -177,6 +169,7 @@
               >
             </li>
           {/each}
+          <li>etc...</li>
         </ul>
       </div>
 
