@@ -169,7 +169,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Put the topic panel where you want it",
-        body: "The selected-topic panel can now dock on the right as before, sit along the bottom under the message area, or pop out into its own window that follows whatever topic you select. Switch between them from the \"Dock side\" row in the panel's menu.",
+        body: "The selected-topic panel no longer has to live on the right: the \"Dock side\" row in its menu can move it along the bottom instead. It can also pop out into its own window, which follows whatever topic you select.",
         thanks: [
           {
             name: "ElectronicBattle",

@@ -130,8 +130,15 @@ Backend, in `backend/app/windows.go`, following `OpenChartWindow`:
   it runs on every topic selection and focusing would yank the user away
   from the tree they are clicking in. Suggested size 700x600, min 400x400,
   same background and Mac titlebar options.
-- On `WindowClosing`, in addition to map cleanup, emit a global event so the
-  main window can revert dock mode (below).
+- On `WindowClosing`, in addition to map cleanup, the handler reverts the
+  dock mode itself when the mode is still `window`: it writes the AppSettings
+  singleton back to `TopicPanelLastDockedSide`, closes any other connection's
+  pop-out (nothing follows selection into them once the mode has changed) and
+  emits the existing `TopicPanelDockChanged`, which every window already
+  listens to. Two cases skip the revert. A silent close, where the app closed
+  the window because the connection was deleted or its tab was closed, since
+  the user did not close it. And shutdown, where Wails closes every window
+  and reverting would wipe a deliberate `window` mode before the next launch.
 
 Events, following the `events` package pattern in `events/global.go` and the
 frontend event-runtime wrapper:
@@ -139,8 +146,10 @@ frontend event-runtime wrapper:
 - `TopicWindowSelect`: emitted by the main window when the mode is `window`
   and the selected topic changes (including deselect, with an empty topic).
   Payload: connection id and topic.
-- `TopicWindowClosed`: emitted by the backend `WindowClosing` handler.
-  Payload: connection id.
+
+There is no separate close event: a pop-out closing reaches the frontend as
+the `TopicPanelDockChanged` emitted by the revert above, which the dock store
+already handles.
 
 Frontend, new view `frontend/src/views/TopicWindow/TopicWindow.svelte`
 modelled on `ChartWindow.svelte`:
