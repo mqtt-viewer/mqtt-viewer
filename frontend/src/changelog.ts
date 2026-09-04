@@ -301,6 +301,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Reach older messages on the timeline",
         body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
       },
+      {
+        title: "The update dialog opens on the right button",
+        body: "Pressing Enter on the update dialog used to skip the version, since that button had focus first. It now lands on Update now (or Open releases page).",
+      },
     ],
   },
   {

@@ -163,7 +163,16 @@
 </script>
 
 {#if $updateStore.availableUpdate}
-  <Dialog title="Update available" {isOpen} {onClose} showCloseButton>
+  <!-- openFocus lands initial focus on the primary action (Update now /
+       Open releases page) instead of melt's default of the first focusable
+       element, which would otherwise be Skip this version. -->
+  <Dialog
+    title="Update available"
+    {isOpen}
+    {onClose}
+    showCloseButton
+    openFocus="[data-update-primary-focus]"
+  >
     <UpdateAvailableContent
       update={$updateStore.availableUpdate}
       currentVersion={$env.version}
