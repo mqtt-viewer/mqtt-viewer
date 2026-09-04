@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Security updates under the bonnet",
+        body: "I updated frontend and app dependencies to close 19 reported security issues.",
+      },
+      {
         title: "See what the MQTT client is doing",
         body: "Pick View logs from the connection menu for a live, terminal-style view of connects, reconnects, subscriptions and errors, with a filter, level chips, copy and clear. Turn on debug logging per connection when you need the library's full output; it is also written to a rotating file.",
       },
