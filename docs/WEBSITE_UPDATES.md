@@ -10,13 +10,16 @@ docs/WRITING_STYLE.md.
 
 ## Pending
 
-- 2026-07-16 · Broker status window ($SYS metrics) merged (#118). Add
-  to features list; screenshot candidate. Also: README feature table
-  still marks it "Potential" — fix alongside.
-- Standing issue: third-party summaries describe MQTT Viewer as "free,
-  open-source". Review site framing/pricing clarity so aggregators
-  stop mislabelling.
+(nothing)
 
 ## Done
 
-(nothing yet)
+- 2026-09-04. Feature pages for everything on develop after 1.0.0, plus
+  broker status v2 (#125), written and screenshotted in the website PR
+  "Feature pages and style pass". README feature table refreshed in the
+  same pass, and the install section now covers Flatpak, Nix and Windows
+  ARM64.
+- 2026-07-16. Broker status window ($SYS metrics) merged (#118). Covered
+  by the broker status feature page and the README table above.
+- The "free, open-source" mislabelling issue resolved itself: the licence
+  is GPL-3.0 since 0.7.0, so the description is now correct.
