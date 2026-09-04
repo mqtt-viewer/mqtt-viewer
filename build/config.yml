@@ -35,8 +35,12 @@ dev_mode:
       - "*.go"
     git_ignore: true
   executes:
-    - cmd: wails3 build DEV=true
-      type: blocking
+    # No blocking `wails3 build DEV=true` step here. The primary execute below
+    # ends in `wails3 task run`, which already depends on darwin:build with
+    # DEV=true, and that task declares no sources/generates so Task cannot skip
+    # it. Running both meant every start and every hot reload paid for two full
+    # CGO links of the same binary, roughly 45s each, with no output in between.
+    # That silent minute is what made `just dev` look like it had hung.
     - cmd: wails3 task common:dev:frontend
       type: background
     # dev-run.sh gates the app launch on the Vite dev server being up (so the
