@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Security updates under the bonnet",
+        body: "I updated frontend and app dependencies to close 19 reported security issues.",
+      },
+      {
         title: "See what the MQTT client is doing",
         body: "Pick View logs from the connection menu for a live, terminal-style view of connects, reconnects, subscriptions and errors, with a filter, level chips, copy and clear. Turn on debug logging per connection when you need the library's full output; it is also written to a rotating file.",
       },
@@ -164,6 +168,16 @@ export const CHANGELOG: ChangelogEntry[] = [
           {
             name: "viktak",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/106",
+          },
+        ],
+      },
+      {
+        title: "Put the topic panel where you want it",
+        body: "The selected-topic panel no longer has to live on the right: the \"Dock side\" row in its menu can move it along the bottom instead. It can also pop out into its own window, which follows whatever topic you select.",
+        thanks: [
+          {
+            name: "ElectronicBattle",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/46",
           },
         ],
       },

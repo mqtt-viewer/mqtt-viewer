@@ -12,6 +12,8 @@ export class AppSettings {
   lastSeenChangelogVersion = "";
   launchCount = 0;
   hasSeenStarPrompt = false;
+  topicPanelDockMode = "right";
+  topicPanelLastDockedSide = "right";
   ignoredUpdateVersion = "";
 
   static createFrom(source: any = {}) {

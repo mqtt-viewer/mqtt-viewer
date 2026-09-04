@@ -15,6 +15,7 @@ export {
     MemoryStats,
     MqttStats,
     OpenChartWindowParams,
+    OpenTopicWindowParams,
     PublishParams,
     PublishProperties,
     SaveCollectionMessageParams,

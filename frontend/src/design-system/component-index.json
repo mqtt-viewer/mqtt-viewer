@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-03T09:37:30.653Z",
+  "generatedAt": "2026-09-03T23:59:57.642Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2067,12 +2067,25 @@
           "required": false,
           "options": [
             "left",
-            "right"
+            "right",
+            "top"
           ],
           "default": "right"
         },
         {
+          "name": "defaultSize",
+          "type": "number",
+          "required": false,
+          "default": null
+        },
+        {
           "name": "width",
+          "type": "number",
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "height",
           "type": "number",
           "required": false,
           "default": 0
@@ -3531,12 +3544,59 @@
           "type": "function",
           "required": false,
           "default": "> Promise<void>"
+        },
+        {
+          "name": "openChartWindow",
+          "type": "function",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "dockMode",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "right",
+            "bottom",
+            "window"
+          ],
+          "default": "right"
+        },
+        {
+          "name": "onSetDockMode",
+          "type": "function",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "showCloseButton",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "headerDraggable",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "headerLeftInset",
+          "type": "number",
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "viewState",
+          "type": "store",
+          "required": false
         }
       ],
       "tokens": [
         "secondary",
         "secondary-text",
-        "elevation-1"
+        "elevation-1",
+        "primary"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
@@ -3639,6 +3699,12 @@
           "type": "function",
           "required": false,
           "default": "> void) | null = null"
+        },
+        {
+          "name": "optionsStore",
+          "type": "store",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
@@ -5323,6 +5389,33 @@
       "specPath": "src/views/PleaseUpdate/PleaseUpdate.spec.json",
       "storyPath": "src/views/PleaseUpdate/PleaseUpdate.stories.svelte",
       "storyId": "Views/PleaseUpdate",
+      "specMissing": false
+    },
+    {
+      "name": "TopicWindow",
+      "tier": "view",
+      "description": "Storybook coverage for TopicWindow.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "white-text",
+        "secondary-text",
+        "elevation-0"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/views/TopicWindow/TopicWindow.svelte",
+      "specPath": "src/views/TopicWindow/TopicWindow.spec.json",
+      "storyPath": "src/views/TopicWindow/TopicWindow.stories.svelte",
+      "storyId": "Views/TopicWindow",
       "specMissing": false
     }
   ]
