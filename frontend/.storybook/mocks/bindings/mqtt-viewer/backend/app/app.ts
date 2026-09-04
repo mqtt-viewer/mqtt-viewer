@@ -526,6 +526,14 @@ export async function GetReceivedMessageCount(
   return mockMqttMessages.length;
 }
 
+export async function GetMemoryLimitModel(): Promise<app.MemoryLimitModel> {
+  return new app.MemoryLimitModel({
+    baseBytes: 1024 * 1024 * 1024,
+    budgetFactorNumerator: 3,
+    budgetFactorDenominator: 2,
+  });
+}
+
 export async function GetMemoryStats(): Promise<app.MemoryStats> {
   return new app.MemoryStats({
     historyBytes: 34 * 1024 * 1024,
