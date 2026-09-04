@@ -160,6 +160,15 @@ export function ExportTopicMessages(connId: number, topic: string): $Cancellable
     return $Call.ByID(2895564909, connId, topic);
 }
 
+/**
+ * FocusTopicWindow focuses the connection's topic pop-out if one is open, and
+ * opens one otherwise. Used by the main window's "window" mode affordance;
+ * unlike OpenTopicWindow it always brings the pop-out to the front.
+ */
+export function FocusTopicWindow(params: $models.OpenTopicWindowParams): $CancellablePromise<void> {
+    return $Call.ByID(2936015555, params);
+}
+
 export function GetAllConnections(): $CancellablePromise<$models.Connections> {
     return $Call.ByID(3922339528).then(($result: any) => {
         return $$createType9($result);
@@ -362,6 +371,15 @@ export function OpenChartWindow(params: $models.OpenChartWindowParams): $Cancell
     return $Call.ByID(1350566632, params);
 }
 
+/**
+ * OpenTopicWindow opens (or focuses) a separate window rendering the
+ * selected-topic panel for a connection, following topic selection in the
+ * main window like Chrome DevTools follows the page.
+ */
+export function OpenTopicWindow(params: $models.OpenTopicWindowParams): $CancellablePromise<void> {
+    return $Call.ByID(398361403, params);
+}
+
 export function PublishMqtt(connId: number, message: $models.PublishParams): $CancellablePromise<void> {
     return $Call.ByID(3575117605, connId, message);
 }
@@ -449,6 +467,19 @@ export function SetConnectionDebugLogging(connId: number, enabled: boolean): $Ca
  */
 export function SetLogsStreaming(connId: number, streaming: boolean): $CancellablePromise<void> {
     return $Call.ByID(1857653305, connId, streaming);
+}
+
+/**
+ * SetTopicPanelDock validates and persists the dockable selected-topic
+ * panel's global dock state, then emits TopicPanelDockChanged so every
+ * window converges. If the new mode is no longer "window", any open topic
+ * pop-out windows are closed (their own WindowClosing handler sees the mode
+ * has already left "window" and so does not revert it again).
+ */
+export function SetTopicPanelDock(mode: string, lastDockedSide: string): $CancellablePromise<models$0.AppSettings> {
+    return $Call.ByID(4192099940, mode, lastDockedSide).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 /**

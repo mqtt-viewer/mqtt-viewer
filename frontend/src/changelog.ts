@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "Security updates under the bonnet",
+        body: "I updated frontend and app dependencies to close 19 reported security issues.",
+      },
+      {
         title: "See what the MQTT client is doing",
         body: "Pick View logs from the connection menu for a live, terminal-style view of connects, reconnects, subscriptions and errors, with a filter, level chips, copy and clear. Turn on debug logging per connection when you need the library's full output; it is also written to a rotating file.",
       },
@@ -172,6 +176,16 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Put the topic panel where you want it",
+        body: "The selected-topic panel no longer has to live on the right: the \"Dock side\" row in its menu can move it along the bottom instead. It can also pop out into its own window, which follows whatever topic you select.",
+        thanks: [
+          {
+            name: "ElectronicBattle",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/46",
+          },
+        ],
+      },
+      {
         title: "Windows on ARM",
         body: "Releases now include a native Windows ARM64 build, installer and auto-updates included, so Snapdragon laptops no longer need emulation.",
         thanks: [
@@ -286,6 +300,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Fewer stray tab stops",
         body: "Tabbing through a button with a tooltip used to stop twice, once on an invisible wrapper and once on the button; now it stops just once.",
+      },
+      {
+        title: "Reach older messages on the timeline",
+        body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
       },
     ],
   },
