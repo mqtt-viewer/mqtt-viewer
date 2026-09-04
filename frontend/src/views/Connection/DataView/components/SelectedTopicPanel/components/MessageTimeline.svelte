@@ -26,6 +26,11 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import { buildPayloadPreview, computePopoverPosition } from "./hover-preview";
+  import {
+    computeInitialWindow,
+    computeTimelineBounds,
+    nextSelectionIndex,
+  } from "./timeline-window";
 
   export let connectionId: number;
   export let selectedTopicStore: SelectedTopicStore;
@@ -36,13 +41,15 @@
   let timelineIsFocused = true;
   let timelineDataSet: DataSet<DataItem, "id">;
   let timeline: Timeline;
-  let minTimelineTime = moment(firstConnectedAtMs).add(-1, "minutes").toDate();
-  let maxTimelineTime = moment().add(10, "minutes").toDate();
+  const initialWindow = computeInitialWindow(firstConnectedAtMs, Date.now());
+  // The bounds currently applied to the timeline; the intervals below compare
+  // and refresh them as time moves on.
+  let currentMaxTime = initialWindow.end;
   let timelineEnsureNowVisibleInterval: NodeJS.Timeout;
   let timelineUpdateMaxInteral: NodeJS.Timeout;
   let defaultTimelineOptions: TimelineOptions = {
-    min: minTimelineTime,
-    max: maxTimelineTime,
+    min: initialWindow.start,
+    max: initialWindow.end,
     stack: false,
     rollingMode: {
       follow: false,
@@ -86,6 +93,11 @@
   // payload/qos/retain and a linear history scan per hover is wasteful.
   let messageById = new Map<string, MqttHistoryMessage>();
 
+  // The time span of the loaded history, tracked as messages are added so the
+  // bounds never need a rescan of the whole dataset.
+  let oldestMessageMs: number | null = null;
+  let newestMessageMs: number | null = null;
+
   $: hoveredPreview = hoveredMessage
     ? buildPayloadPreview(hoveredMessage.payload, hoveredMessage.payloadB64)
     : null;
@@ -94,6 +106,12 @@
     const timelineData: DataItemCollectionType = [];
     messages.forEach((message) => {
       messageById.set(message.id, message);
+      if (oldestMessageMs === null || message.timeMs < oldestMessageMs) {
+        oldestMessageMs = message.timeMs;
+      }
+      if (newestMessageMs === null || message.timeMs > newestMessageMs) {
+        newestMessageMs = message.timeMs;
+      }
       timelineData.push({
         id: message.id,
         content: `Message ${message.id}`,
@@ -102,6 +120,28 @@
       });
     });
     return timelineData;
+  };
+
+  // vis-timeline hard-clamps panning to [min, max], so the bounds have to cover
+  // every message in the loaded history. Recorded history from an earlier
+  // session is older than this session's first connect, and keyboard navigation
+  // walks it; without this the selection lands on markers the timeline can never
+  // pan into view.
+  // The bounds are written back into defaultTimelineOptions so the periodic
+  // setOptions calls below keep them, which means that object no longer holds
+  // the pristine defaults once this has run.
+  const applyTimelineBounds = () => {
+    if (!timeline) return;
+    const bounds = computeTimelineBounds({
+      firstConnectedAtMs,
+      oldestMessageMs,
+      newestMessageMs,
+      nowMs: Date.now(),
+    });
+    currentMaxTime = bounds.end;
+    defaultTimelineOptions.min = bounds.start;
+    defaultTimelineOptions.max = bounds.end;
+    timeline.setOptions(defaultTimelineOptions);
   };
 
   const hideHover = () => {
@@ -204,6 +244,17 @@
     selectedTopicStore.setOnNewMessages((messages) => {
       timelineDataSet.add(getTimelineData(messages));
     });
+    // The dataset is built first so the bounds already take in the loaded
+    // history when the timeline is constructed.
+    const initialBounds = computeTimelineBounds({
+      firstConnectedAtMs,
+      oldestMessageMs,
+      newestMessageMs,
+      nowMs: Date.now(),
+    });
+    currentMaxTime = initialBounds.end;
+    defaultTimelineOptions.min = initialBounds.start;
+    defaultTimelineOptions.max = initialBounds.end;
     timeline = new Timeline(container, timelineDataSet, defaultTimelineOptions);
     if (timelineDataSet.length > 0) {
       const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
@@ -213,7 +264,10 @@
       onMessageSelect(lastMessage.id.toString());
     }
 
-    timeline.setWindow(minTimelineTime, maxTimelineTime, {
+    // The bounds may now stretch well before the first connect, but the
+    // timeline still opens on this session's span.
+    const openingWindow = computeInitialWindow(firstConnectedAtMs, Date.now());
+    timeline.setWindow(openingWindow.start, openingWindow.end, {
       animation: false,
     });
 
@@ -258,23 +312,15 @@
 
     timelineUpdateMaxInteral = setInterval(
       () => {
-        maxTimelineTime = moment().add(10, "minutes").toDate();
-        timeline.setOptions({
-          ...defaultTimelineOptions,
-          max: maxTimelineTime,
-        });
+        applyTimelineBounds();
       },
       9 * 60 * 1000
     );
     // If eg. a laptop is closed, we don't want the timeline to not show the current time
     // once the app resumes
     timelineEnsureNowVisibleInterval = setInterval(() => {
-      if (maxTimelineTime.getMilliseconds() < new Date().getTime()) {
-        maxTimelineTime = moment().add(10, "minutes").toDate();
-        timeline.setOptions({
-          ...defaultTimelineOptions,
-          max: maxTimelineTime,
-        });
+      if (currentMaxTime.getMilliseconds() < new Date().getTime()) {
+        applyTimelineBounds();
       }
     }, 1000);
   });
@@ -357,18 +403,34 @@
   const rebuildTimelineFromHistory = () => {
     hideHover();
     messageById = new Map<string, MqttHistoryMessage>();
+    oldestMessageMs = null;
+    newestMessageMs = null;
     timelineDataSet = new DataSet<DataItem, "id">();
     timelineDataSet.add(getTimelineData($selectedTopicStore.history));
     selectedTopicStore.setOnNewMessages((messages) => {
       timelineDataSet.add(getTimelineData(messages));
     });
     timeline.setItems(timelineDataSet);
+    // The new window can reach further back than the old bounds allowed, so
+    // widen them before panning or the move is clamped.
+    applyTimelineBounds();
     // Select the most recent message in the (re)loaded window by default.
     if (timelineDataSet.length > 0) {
       const lastMessage = timelineDataSet.get()[timelineDataSet.length - 1];
+      // setSelection doesn't emit select, so the navigation index has to be
+      // kept in step here or it stays stale from the previous topic.
+      selectedMessageId = lastMessage.id;
+      selectedMessageIndex = timelineDataSet.length - 1;
       timeline.setSelection([lastMessage.id]);
       onMessageSelect(lastMessage.id.toString());
       animatedMoveTo(lastMessage.start);
+    } else {
+      // A topic with no history clears the selection outright rather than
+      // leaving the panel holding the previous topic's message id.
+      selectedMessageId = null;
+      selectedMessageIndex = null;
+      timeline.setSelection([]);
+      onMessageSelect(null);
     }
     timelineIsFocused = true;
     document.getElementById("timeline")?.focus();
@@ -391,16 +453,14 @@
 
   $: selectNextOrPreviousMessage = (action: "next" | "previous") => {
     if (!timeline || !timelineDataSet) return;
-    if (selectedMessageIndex === null) return;
-    let nextMessageIndex =
-      action === "next" ? selectedMessageIndex + 1 : selectedMessageIndex - 1;
-    if (nextMessageIndex >= timelineDataSet.length) {
-      nextMessageIndex = 0;
-    }
-    if (nextMessageIndex < 0) {
-      nextMessageIndex = timelineDataSet.length - 1;
-    }
+    const nextMessageIndex = nextSelectionIndex(
+      selectedMessageIndex,
+      timelineDataSet.length,
+      action
+    );
+    if (nextMessageIndex === null) return;
     const nextMessage = timelineDataSet.get()[nextMessageIndex];
+    if (!nextMessage) return;
     selectedMessageId = nextMessage.id;
     selectedMessageIndex = nextMessageIndex;
     timeline.setSelection([nextMessage.id]);
