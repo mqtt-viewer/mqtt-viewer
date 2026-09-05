@@ -32,6 +32,12 @@
   export let connection: Connection;
   export let selectedTopicStore: SelectedTopicStore;
   export let width: number;
+  // Measured width of the tree's scroll container. The `width` prop is derived
+  // arithmetically in DataView (window minus the side panels) and drifts by a
+  // few pixels from the real box when the selected-topic panel is docked, which
+  // left the row's ellipsis short of the edge. Rows size from the measurement
+  // and fall back to the prop until the first layout.
+  let treeWidth = 0;
   export let copyTopicPath: (topic: string) => void;
   export let exportTopicMessages: (topic: string) => void;
   export let onClearRetained: (topic: string) => void;
@@ -180,9 +186,10 @@
       <div
         slot="trigger"
         class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
+        bind:clientWidth={treeWidth}
       >
         <MqttTopicTree
-          {width}
+          width={treeWidth || width}
           selectedTopic={$selectedTopicStore.selectedTopic}
           mqttData={$mqttDataStore}
           highlightedTopicStore={mqttHighlightStore}
