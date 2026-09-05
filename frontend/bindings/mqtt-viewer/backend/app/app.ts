@@ -269,27 +269,90 @@ export function GetMemoryStats(): $CancellablePromise<$models.MemoryStats> {
     });
 }
 
-export function GetMessageHistory(connId: number, topic: string): $CancellablePromise<mqtt$0.MqttMessage[]> {
-    return $Call.ByID(3700437937, connId, topic).then(($result: any) => {
+/**
+ * GetMessageById fetches a single full message (with its payload) by id from
+ * a topic's in-RAM history. timeMs is the message's receive time from its
+ * stub; it lets the lookup binary-search the history window instead of
+ * scanning it (pass 0 when unknown). found=false (no error) means the message
+ * has aged out of the RAM window (evicted by the memory budget), so the
+ * frontend can render a graceful "no longer available" state instead of an
+ * error.
+ */
+export function GetMessageById(connId: number, topic: string, id: string, timeMs: number): $CancellablePromise<[mqtt$0.MqttMessage, boolean]> {
+    return $Call.ByID(2592571623, connId, topic, id, timeMs).then(($result: any) => {
+        $result[0] = $$createType24($result[0]);
+        return $result;
+    });
+}
+
+/**
+ * GetMessageHistory returns up to `limit` of the newest retained messages for
+ * a topic (limit <= 0 returns everything). The UI passes its window size:
+ * returning a busy topic's entire RAM history serializes an unbounded JSON
+ * blob across the webview bridge, which crashed the app on huge
+ * public-broker topics.
+ */
+export function GetMessageHistory(connId: number, topic: string, limit: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
+    return $Call.ByID(3700437937, connId, topic, limit).then(($result: any) => {
+        return $$createType25($result);
+    });
+}
+
+/**
+ * GetMessageTimeline returns up to `limit` of the newest retained messages
+ * for a topic as lightweight stubs (id, timeMs, qos, retain, no payload).
+ * This is the memory-mode counterpart to GetReceivedTimelineWindow: selecting
+ * a topic fetches stubs to draw the timeline, then fetches individual
+ * payloads on demand via GetMessageById.
+ */
+export function GetMessageTimeline(connId: number, topic: string, limit: number): $CancellablePromise<mqtt$0.MqttMessageStub[]> {
+    return $Call.ByID(3329510004, connId, topic, limit).then(($result: any) => {
+        return $$createType27($result);
+    });
+}
+
+/**
+ * GetMessagesByIds fetches a batch of full messages (with payloads) by id
+ * from a topic's in-RAM history. ids and timesMs are parallel slices (the
+ * stubs' receive times drive the same fast lookup as GetMessageById). Only
+ * the messages still retained are returned; the frontend treats any omitted
+ * id as aged out.
+ */
+export function GetMessagesByIds(connId: number, topic: string, ids: string[], timesMs: number[]): $CancellablePromise<mqtt$0.MqttMessage[]> {
+    return $Call.ByID(1309585445, connId, topic, ids, timesMs).then(($result: any) => {
         return $$createType25($result);
     });
 }
 
 export function GetMqttStats(): $CancellablePromise<$models.MqttStats> {
     return $Call.ByID(2888945465).then(($result: any) => {
-        return $$createType26($result);
+        return $$createType28($result);
     });
 }
 
 export function GetPanelSizes(): $CancellablePromise<models$0.PanelSize[]> {
     return $Call.ByID(3836927596).then(($result: any) => {
-        return $$createType28($result);
+        return $$createType30($result);
     });
 }
 
 export function GetPublishHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.PublishHistory[]> {
     return $Call.ByID(3102818020, connectionID).then(($result: any) => {
-        return $$createType30($result);
+        return $$createType32($result);
+    });
+}
+
+/**
+ * GetReceivedMessageById fetches a single durable message (with its full
+ * payload) by numeric row id, scoped to the connection/topic. Used for the
+ * on-demand payload fetch when a timeline stub is selected or clicked.
+ * found=false (no error) means the row no longer exists (e.g. pruned), so the
+ * frontend can render a graceful "no longer available" state.
+ */
+export function GetReceivedMessageById(connectionID: number, topic: string, id: number): $CancellablePromise<[mqtt$0.MqttMessage, boolean]> {
+    return $Call.ByID(2888436030, connectionID, topic, id).then(($result: any) => {
+        $result[0] = $$createType24($result[0]);
+        return $result;
     });
 }
 
@@ -318,9 +381,35 @@ export function GetReceivedMessageWindow(connectionID: number, topic: string, be
     });
 }
 
+/**
+ * GetReceivedMessagesByIds fetches a batch of durable messages (with full
+ * payloads) by numeric row id, scoped to the connection/topic, in ascending
+ * id order. Ids with no matching row are simply omitted from the result, so
+ * the frontend can treat them as pruned ("aged out").
+ */
+export function GetReceivedMessagesByIds(connectionID: number, topic: string, ids: number[]): $CancellablePromise<mqtt$0.MqttMessage[]> {
+    return $Call.ByID(508166040, connectionID, topic, ids).then(($result: any) => {
+        return $$createType25($result);
+    });
+}
+
+/**
+ * GetReceivedTimelineWindow mirrors GetReceivedMessageWindow's keyset paging
+ * (same beforeID/afterID/limit semantics) but selects only the stub columns
+ * (id, timeMs, qos, retain), never the payload. This is what the timeline
+ * pages through when browsing a busy topic's durable history: a window of
+ * 5000 stubs is a few hundred KB at most, versus potentially tens of MB if
+ * every row's payload were included.
+ */
+export function GetReceivedTimelineWindow(connectionID: number, topic: string, beforeID: number, afterID: number, limit: number): $CancellablePromise<mqtt$0.MqttMessageStub[]> {
+    return $Call.ByID(3455009092, connectionID, topic, beforeID, afterID, limit).then(($result: any) => {
+        return $$createType27($result);
+    });
+}
+
 export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
     return $Call.ByID(2748919454).then(($result: any) => {
-        return $$createType32($result);
+        return $$createType34($result);
     });
 }
 
@@ -337,13 +426,13 @@ export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType33($result);
+        return $$createType35($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType35($result);
+        return $$createType37($result);
     });
 }
 
@@ -359,7 +448,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType37($result);
+        return $$createType39($result);
     });
 }
 
@@ -420,7 +509,7 @@ export function RenameCollectionMessage(id: number, name: string): $CancellableP
  */
 export function ReorderCollectionMessages(collectionID: number, orderedIDs: number[]): $CancellablePromise<models$0.CollectionMessage[]> {
     return $Call.ByID(1139884023, collectionID, orderedIDs).then(($result: any) => {
-        return $$createType38($result);
+        return $$createType40($result);
     });
 }
 
@@ -452,7 +541,7 @@ export function SaveFilterHistoryEntry(connectionId: number, text: string): $Can
 
 export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): $CancellablePromise<models$0.PublishHistory> {
     return $Call.ByID(3794014424, params).then(($result: any) => {
-        return $$createType29($result);
+        return $$createType31($result);
     });
 }
 
@@ -575,16 +664,18 @@ const $$createType22 = $models.MemoryLimitModel.createFrom;
 const $$createType23 = $models.MemoryStats.createFrom;
 const $$createType24 = mqtt$0.MqttMessage.createFrom;
 const $$createType25 = $Create.Array($$createType24);
-const $$createType26 = $models.MqttStats.createFrom;
-const $$createType27 = models$0.PanelSize.createFrom;
-const $$createType28 = $Create.Array($$createType27);
-const $$createType29 = models$0.PublishHistory.createFrom;
+const $$createType26 = mqtt$0.MqttMessageStub.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = $models.MqttStats.createFrom;
+const $$createType29 = models$0.PanelSize.createFrom;
 const $$createType30 = $Create.Array($$createType29);
-const $$createType31 = models$0.SortState.createFrom;
+const $$createType31 = models$0.PublishHistory.createFrom;
 const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = $Create.Array($$createType3);
-const $$createType34 = models$0.Tab.createFrom;
-const $$createType35 = $Create.Array($$createType34);
-const $$createType36 = $models.Connection.createFrom;
-const $$createType37 = $Create.Nullable($$createType36);
-const $$createType38 = $Create.Array($$createType8);
+const $$createType33 = models$0.SortState.createFrom;
+const $$createType34 = $Create.Array($$createType33);
+const $$createType35 = $Create.Array($$createType3);
+const $$createType36 = models$0.Tab.createFrom;
+const $$createType37 = $Create.Array($$createType36);
+const $$createType38 = $models.Connection.createFrom;
+const $$createType39 = $Create.Nullable($$createType38);
+const $$createType40 = $Create.Array($$createType8);

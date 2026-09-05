@@ -10,6 +10,7 @@
     formatPayload,
     type SupportedCodeEditorFormat,
   } from "@/components/CodeEditor/formatting";
+  import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import FieldPicker from "./Chart/FieldPicker.svelte";
@@ -25,6 +26,21 @@
   export let isComparing: boolean;
   export let payload: string;
   export let payloadLeftForCompare: string | null = null;
+  // True while the previous message's payload is still being fetched
+  // (ensurePayload in flight): distinguishes "loading" from "genuinely no
+  // previous message" (both otherwise look like payloadLeftForCompare===null).
+  export let payloadLeftLoading = false;
+  // True when the previous message existed but its payload aged out of the
+  // backend's retention window before it could be fetched.
+  export let payloadLeftAgedOut = false;
+  // Where the current history came from; drives the aged-out explanation
+  // (session memory vs recorded disk history).
+  export let historySource: "memory" | "disk" = "memory";
+  // Whether durable recording is enabled, for the aged-out copy in memory
+  // mode.
+  export let recordingEnabled = false;
+  // Optional: lets the aged-out state offer switching to recorded history.
+  export let onLoadRecordedHistory: (() => void) | null = null;
   // Raw base64 payload; when its bytes are an image, a preview is rendered.
   export let payloadB64: string | null = null;
   export let codec: SupportedCodeEditorCodec;
@@ -166,8 +182,33 @@
         <CodeEditor text={processedPayload} {format} readOnly />
       {:else if payloadLeftForCompare == null}
         <div class="w-full flex">
-          <div class="w-1/2 flex justify-center pt-4 text-secondary-text">
-            No message
+          <div
+            class="w-1/2 flex flex-col items-center gap-2 pt-4 px-2 text-center text-secondary-text"
+          >
+            {#if payloadLeftLoading}
+              Loading message...
+            {:else if payloadLeftAgedOut}
+              {#if historySource === "disk"}
+                <span>
+                  No longer on disk. Recorded history prunes the oldest
+                  messages to stay within its storage budget.
+                </span>
+              {:else if recordingEnabled}
+                <span>No longer in session memory.</span>
+                {#if onLoadRecordedHistory}
+                  <Button variant="text" on:click={onLoadRecordedHistory}
+                    >Load recorded history</Button
+                  >
+                {/if}
+              {:else}
+                <span>
+                  No longer in session memory. Enable recording in settings to
+                  keep messages across restarts.
+                </span>
+              {/if}
+            {:else}
+              No message
+            {/if}
           </div>
           <div class="w-1/2">
             <CodeEditor text={processedPayload} {format} readOnly />

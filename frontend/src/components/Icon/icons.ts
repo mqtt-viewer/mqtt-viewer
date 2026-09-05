@@ -55,6 +55,8 @@ import {
   ArrowSquareOut,
   Pause,
   Image,
+  FrameCorners,
+  CornersOut,
   SquareSplitHorizontal,
   SquareSplitVertical,
   Pulse,
@@ -117,6 +119,8 @@ export const ICON_MAP = {
   popOut: ArrowSquareOut,
   pause: Pause,
   image: Image,
+  fit: FrameCorners,
+  fullscreen: CornersOut,
   dockRight: SquareSplitHorizontal,
   dockBottom: SquareSplitVertical,
 

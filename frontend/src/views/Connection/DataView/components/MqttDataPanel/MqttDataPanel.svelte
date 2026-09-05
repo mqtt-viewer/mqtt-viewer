@@ -2,6 +2,8 @@
   import { twMerge } from "tailwind-merge";
   import SearchActionBar from "./components/SearchActionBar/SearchActionBar.svelte";
   import MqttTopicTree from "./components/MqttTopicTree/MqttTopicTree.svelte";
+  import MqttGraphView from "../MqttGraphView/MqttGraphView.svelte";
+  import ViewToggle from "./components/ViewToggle/ViewToggle.svelte";
 
   import { createMqttDataStore } from "./stores/mqtt-data";
   import { createExpandedTopicsStore } from "./stores/expanded-topics";
@@ -9,8 +11,7 @@
   import {
     createSortStore,
     DEFAULT_SORT_PERSIST_KEY,
-    type MqttDataSortDirection,
-    type MqttDataSortKey,
+    validateSort,
   } from "./stores/sort";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
@@ -29,44 +30,83 @@
 
   const defaultSortState = $defaultSorts[DEFAULT_SORT_PERSIST_KEY];
 
+  // Which of the two views you last used, kept per connection alongside the
+  // graph's own preferences, so a connection you work on in the graph opens in
+  // the graph next time.
+  const viewKey = `mqtt-viewer-topicpanel-view:${connection.connectionDetails.id}`;
+  const loadView = (): "list" | "graph" => {
+    try {
+      return localStorage.getItem(viewKey) === "graph" ? "graph" : "list";
+    } catch (e) {
+      console.error("topic panel view load failed", e);
+      return "list";
+    }
+  };
+  const setView = (v: "list" | "graph") => {
+    view = v;
+    try {
+      localStorage.setItem(viewKey, v);
+    } catch (e) {
+      console.error("topic panel view save failed", e);
+    }
+  };
+
+  let view: "list" | "graph" = loadView();
+
   const expandedTopicsStore = createExpandedTopicsStore();
   const searchStore = createSearchStore();
   const sortStore = createSortStore(
     defaultSortState
-      ? {
-          key: defaultSortState.sortCriteria as MqttDataSortKey,
-          dir: defaultSortState.sortDirection as MqttDataSortDirection,
-        }
+      ? validateSort(
+          defaultSortState.sortCriteria,
+          defaultSortState.sortDirection
+        )
       : undefined
   );
 </script>
 
 <div class={twMerge("bg-elevation-0 h-full w-full min-w-0 flex flex-col")}>
-  <SearchActionBar
-    getAllTopics={mqttDataStore.getAllTopics}
-    {searchStore}
-    {expandedTopicsStore}
-    {sortStore}
-  />
-  <div
-    class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
-  >
-    <MqttTopicTree
-      {width}
-      selectedTopic={$selectedTopicStore.selectedTopic}
-      mqttData={$mqttDataStore}
-      highlightedTopicStore={mqttHighlightStore}
+  {#if view === "list"}
+    <SearchActionBar
+      getAllTopics={mqttDataStore.getAllTopics}
+      {searchStore}
       {expandedTopicsStore}
-      sortKey={$sortStore.key}
-      sortDir={$sortStore.dir}
-      searchText={$searchStore.text}
-      onTopicSelect={(row) => {
-        if (row.message === undefined) {
-          expandedTopicsStore.toggleMqttTopicExpansion(row.topic);
-        } else if ($selectedTopicStore.selectedTopic !== row.topic) {
-          selectedTopicStore.selectTopic(row.topic);
-        }
-      }}
-    />
-  </div>
+      {sortStore}
+    >
+      <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
+    </SearchActionBar>
+    <div
+      class="grow min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden pl-2 overscroll-none"
+    >
+      <MqttTopicTree
+        {width}
+        selectedTopic={$selectedTopicStore.selectedTopic}
+        mqttData={$mqttDataStore}
+        highlightedTopicStore={mqttHighlightStore}
+        {expandedTopicsStore}
+        sortKey={$sortStore.key}
+        sortDir={$sortStore.dir}
+        searchText={$searchStore.text}
+        onTopicSelect={(row) => {
+          if (row.message === undefined) {
+            expandedTopicsStore.toggleMqttTopicExpansion(row.topic);
+          } else if ($selectedTopicStore.selectedTopic !== row.topic) {
+            selectedTopicStore.selectTopic(row.topic);
+          }
+        }}
+      />
+    </div>
+  {:else}
+    <div class="grow min-h-0 w-full">
+      <MqttGraphView
+        {connection}
+        {selectedTopicStore}
+        {width}
+        initialData={$mqttDataStore}
+        {searchStore}
+      >
+        <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
+      </MqttGraphView>
+    </div>
+  {/if}
 </div>

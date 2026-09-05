@@ -12,6 +12,7 @@
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import _ from "lodash";
+  import { onDestroy } from "svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import {
     ClearConnectionHistory,
@@ -29,6 +30,10 @@
 
   let searchText = $searchStore.text;
   const debouncedSetSearchText = _.debounce(searchStore.setSearchText, 200);
+  // Flush any pending debounced text on unmount so a List -> Graph toggle within
+  // 200ms of typing doesn't leave the graph opening unfiltered (the filter would
+  // otherwise flash in late once the trailing call fires against a dead view).
+  onDestroy(() => debouncedSetSearchText.flush());
   $: searchText,
     (() => {
       if (searchText === "") {
@@ -86,7 +91,11 @@
     dir: MqttDataSortDirection
   ) => {
     if (key === "time") {
-      return dir === "desc" ? "Newest" : "Oldest";
+      return dir === "desc" ? "Newest" : "Silent";
+    } else if (key === "rate") {
+      return "Busiest";
+    } else if (key === "msgs") {
+      return "Messages";
     } else {
       return dir === "desc" ? "A → Z" : "Z → A";
     }
@@ -99,6 +108,7 @@
   <div
     class="flex flex-row items-center h-full gap-2 px-2 text-emphasis overflow-hidden"
   >
+    <slot name="leading" />
     <SearchAndHistory bind:searchText />
     <Tooltip placement="bottom" focusable>
       <Button on:click={onExpandClick}
@@ -119,7 +129,7 @@
     </Tooltip>
 
     <Tooltip placement="bottom" focusable>
-      <DropdownMenu triggerText={sortButtonText} triggerClass="w-[100px]">
+      <DropdownMenu triggerText={sortButtonText} triggerClass="w-[110px]">
         <div class="flex flex-col" slot="menu-content">
           <DropdownMenuItem
             isSelected={$sortStore.key === "topic" && $sortStore.dir === "desc"}
@@ -139,7 +149,17 @@
           <DropdownMenuItem
             isSelected={$sortStore.key === "time" && $sortStore.dir === "asc"}
             onClick={() => sortStore.setSort("time", "asc")}
-            >Oldest first</DropdownMenuItem
+            >Silent first</DropdownMenuItem
+          >
+          <DropdownMenuItem
+            isSelected={$sortStore.key === "rate"}
+            onClick={() => sortStore.setSort("rate", "desc")}
+            >Busiest first</DropdownMenuItem
+          >
+          <DropdownMenuItem
+            isSelected={$sortStore.key === "msgs"}
+            onClick={() => sortStore.setSort("msgs", "desc")}
+            >Most messages</DropdownMenuItem
           >
         </div>
       </DropdownMenu>

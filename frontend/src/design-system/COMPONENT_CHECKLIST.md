@@ -62,6 +62,7 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
@@ -94,6 +95,7 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/MqttGraphView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -143,7 +145,7 @@
 
 ## Summary
 
-- Components scanned: 117
-- Story present: 117
+- Components scanned: 119
+- Story present: 119
 - Figma-linked: 0
 - Missing specs: 0
