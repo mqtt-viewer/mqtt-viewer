@@ -23,7 +23,7 @@
     AcknowledgeStarPrompt,
   } from "bindings/mqtt-viewer/backend/app/app";
 
-  const STARGAZERS_URL = "https://github.com/mqtt-viewer/mqtt-viewer/stargazers";
+  const STARGAZERS_URL = "https://github.com/mqtt-viewer/mqtt-viewer";
 
   // Only nudge once the app has clearly been used a few times, so a fresh
   // install never sees this on first run.
@@ -270,8 +270,7 @@
     /* Deep night sky, dimmed down so it sits behind the copy rather than
        competing with it, then graded across: darkest under the text on the
        left, lifting toward the button on the right. */
-    background:
-      linear-gradient(
+    background: linear-gradient(
         90deg,
         rgba(6, 7, 20, 0.58) 0%,
         rgba(6, 7, 20, 0.36) 38%,
@@ -340,11 +339,7 @@
     inset: 0 auto auto 0;
     width: 62%;
     height: 32px;
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      #000 40%,
-      transparent 94%
-    );
+    -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 94%);
     mask-image: linear-gradient(to bottom, #000 40%, transparent 94%);
   }
   .streak {
@@ -495,7 +490,9 @@
     height: 26px;
     border-radius: 6px;
     color: rgba(226, 228, 245, 0.6);
-    transition: color 120ms ease, background-color 120ms ease;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease;
   }
   .close:hover {
     color: #ffffff;

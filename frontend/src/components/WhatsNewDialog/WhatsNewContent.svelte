@@ -9,8 +9,7 @@
   export let initialVersion: string | null = null;
   export let onClose: () => void = () => {};
 
-  const STARGAZERS_URL =
-    "https://github.com/mqtt-viewer/mqtt-viewer/stargazers";
+  const STARGAZERS_URL = "https://github.com/mqtt-viewer/mqtt-viewer";
 
   const startIndex = (() => {
     const i = entries.findIndex((e) => e.version === initialVersion);

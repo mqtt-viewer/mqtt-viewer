@@ -355,6 +355,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "The chart's Y-axis rescales with its time window",
         body: "Narrowing a chart's time window could leave the Y-axis stretched to an old value elsewhere in that topic's history, squashing the visible points to the bottom. It now ranges over only what the window shows.",
       },
+      {
+        title: "Topic previews truncate at the edge",
+        body: "With the selected topic panel docked on the right, a long payload preview in the topic list cut off a few pixels short of the edge. The list now measures its own width, so the ellipsis sits where it should.",
+      },
     ],
   },
   {

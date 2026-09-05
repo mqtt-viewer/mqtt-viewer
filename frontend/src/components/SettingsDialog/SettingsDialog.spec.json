@@ -27,5 +27,5 @@
     "error"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet."
+  "notes": "Figma is not linked yet. The footer section carries a \"Star on GitHub\" row that closes settings and opens the StarPromptDialog."
 }
