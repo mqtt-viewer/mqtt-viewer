@@ -16,14 +16,10 @@
   import FilePathPicker from "@/components/InputFields/FilePathPicker.svelte";
   import envStore from "@/stores/env";
   import { getConnectionIsValidContext } from "@/views/Connection/contexts/connection-is-valid.js";
-  import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
-  import Button from "@/components/Button/Button.svelte";
-  import DropdownCloseOnClick from "@/components/DropdownMenu/DropdownCloseOnClick.svelte";
+  import IconButton from "@/components/Button/IconButton.svelte";
   import ConfirmDeleteConnectionDialog from "../ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte";
   import { writable } from "svelte/store";
   import Icon from "@/components/Icon/Icon.svelte";
-  import IconButton from "@/components/Button/IconButton.svelte";
-  import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
 
   export let connection: Connection;
@@ -114,51 +110,30 @@
 </script>
 
 <form use:form class="flex flex-col gap-8 w-full">
-  <div class="flex items-center gap-1">
-    <span class="text-sm font-medium text-secondary-text"
-      >Connection details</span
+  <div class="flex items-center gap-3">
+    <div class="size-9 shrink-0">
+      <ConnectionIdenticon {connection} />
+    </div>
+    <div class="w-1/2">
+      <BaseInput
+        disabled={isAllFieldsDisabled}
+        name="customIconSeed"
+        label="Icon seed"
+        placeholder="Leave blank for default"
+        bind:value={$data.customIconSeed}
+      />
+    </div>
+    <div class="grow"></div>
+    <IconButton
+      tooltipText="Delete connection"
+      tooltipPlacement="left"
+      class="-mr-1"
+      onClick={onDeleteClick}
     >
-    <DropdownMenu disabled={isAllFieldsDisabled}>
-      <div slot="trigger">
-        <IconButton disabled={isAllFieldsDisabled}>
-          <Icon type="options" size={16} />
-        </IconButton>
-      </div>
-      <div slot="menu-content" class="flex flex-col px-2 py-2 gap-4">
-        <div class="flex">
-          <div class="size-9 mr-2">
-            <ConnectionIdenticon {connection} />
-          </div>
-          <BaseInput
-            class="w-[170px]"
-            name="customIconSeed"
-            placeholder="Custom Icon Seed"
-            bind:value={$data.customIconSeed}
-          />
-        </div>
-        <DropdownCloseOnClick>
-          <Button
-            variant="text"
-            class="mt-2 text-error enabled:hover:text-error-light enabled:group-hover:text-error-light"
-            on:click={onDeleteClick}
-            ><div class="flex mr-[18px] ml-2">
-              <Icon type="delete" size={20} />
-            </div>
-            <span>Delete Connection</span></Button
-          >
-        </DropdownCloseOnClick>
-      </div>
-    </DropdownMenu>
-    {#if isAllFieldsDisabled}
-      <Tooltip>
-        <span slot="tooltip-content"
-          >Disconnect if you want to modify connection details</span
-        >
-        <div class="text-secondary-text flex gap-1 items-center">
-          <Icon type="info" size={14} />Disabled while connected
-        </div>
-      </Tooltip>
-    {/if}
+      <span class="flex text-error group-hover:text-error-light">
+        <Icon type="delete" size={18} />
+      </span>
+    </IconButton>
   </div>
   <div class="flex w-full gap-3 relative">
     <div class="w-3/4">

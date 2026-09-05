@@ -50,7 +50,7 @@ behind the `server` build tag. It runs a real `http.Server` that:
 Run it:
 
 ```sh
-scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500
+scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500, data in _dev_resources/server
 SKIP_FRONTEND=1 scripts/serve-browser.sh 9500   # reuse an existing frontend/dist
 ```
 

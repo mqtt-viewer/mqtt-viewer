@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        title: "No more phantom scroll",
+        body: "The main window could scroll by a line and show a blank strip under the status bar, caused by an empty dialog button in the sidebar.",
+      },
+      {
         title: "Security updates under the bonnet",
         body: "I updated frontend and app dependencies to close 19 reported security issues.",
       },
@@ -90,6 +94,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "A tidier sidebar and forms",
         body: "The sidebar's rows, icons and hover highlights now line up on a shared grid, and form fields across the app breathe properly instead of crowding their labels. The message search dialog got the same treatment: its search field and results now have proper padding instead of sitting flush against the edges.",
+      },
+      {
+        title: "Settings and the first-run prompt now match",
+        body: "Both show the same memory estimate, from one shared piece of the interface, and sit on the same spacing rhythm.",
+      },
+      {
+        title: "Icon seed and delete are out in the open",
+        body: "The connection dialog used to hide its icon seed field and delete action behind a cog menu. They now sit in a row at the top of the form, and the sidebar's Edit connection item shows a pencil instead of a cog.",
+      },
+      {
+        title: "The edit button on a connection tile opens the details",
+        body: "Pressing the pencil on a connection, from Home or a new tab, opened its tab and left you to find the details dialog yourself. It now opens the dialog too.",
       },
       {
         title: "Dropdowns inside dialogs work again",

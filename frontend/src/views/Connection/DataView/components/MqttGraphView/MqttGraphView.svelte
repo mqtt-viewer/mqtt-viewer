@@ -1211,7 +1211,7 @@
             <div class="size-2.5 rounded-full bg-secondary-text"></div>
             <div class="size-3.5 rounded-full bg-secondary-text"></div>
           </div>
-          <span>size = msg rate · ring = collapsed subtree</span>
+          <span>size = msg rate</span>
         </div>
       </div>
     {/if}

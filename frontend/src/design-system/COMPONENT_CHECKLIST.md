@@ -67,6 +67,7 @@
 | Components/Connection/DataView/TopicContextMenu | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
+| Components/MemoryFormula | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [x] |
@@ -153,7 +154,7 @@
 
 ## Summary
 
-- Components scanned: 127
-- Story present: 127
+- Components scanned: 128
+- Story present: 128
 - Figma-linked: 0
 - Missing specs: 0

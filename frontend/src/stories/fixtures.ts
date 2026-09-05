@@ -1237,6 +1237,17 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     getOptionLabel: (option: unknown) => String(option).toUpperCase(),
   },
   Switch: { name: "tls", label: "TLS enabled" },
+  MemoryFormula: {
+    budgetMb: 512,
+    // Mirrors memoryLimitModel in backend/app/memlimit.go and the Storybook
+    // mock of GetMemoryLimitModel: 1 GiB base plus 3/2 of the budget per
+    // connected connection.
+    limitModel: {
+      baseBytes: 1024 * 1024 * 1024,
+      budgetFactorNumerator: 3,
+      budgetFactorDenominator: 2,
+    },
+  },
 };
 
 export const getStoryArgs = (

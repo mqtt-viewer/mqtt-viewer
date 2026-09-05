@@ -96,24 +96,37 @@
   since everything is already persisted (it disables while a field is
   invalid, because invalid edits are never saved). Fields disable themselves
   while the connection is connected (handled inside ConnectionForm, which
-  also owns the section heading + options menu).
+  also owns the icon-seed + delete row; the locked-while-connected note lives
+  in this header).
 -->
 <Dialog {isOpen} startEmpty let:meltTitle>
   <div class="flex flex-col w-[550px] max-w-[78vw] max-h-[78vh]">
-    <div
-      class="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-outline"
-    >
-      <div class="flex items-center gap-4">
-        <span class="text-lg" use:melt={meltTitle}>Connection settings</span>
-        <Button variant="secondary" disabled={isToggling} on:click={toggleConnect}>
-          {isConnected || isBusy ? "Disconnect" : "Connect"}
-        </Button>
+    <div class="flex flex-col px-6 pt-5 pb-4 shrink-0 border-b border-outline">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <span class="text-lg" use:melt={meltTitle}>Connection settings</span>
+          <Button
+            variant="secondary"
+            disabled={isToggling}
+            on:click={toggleConnect}
+          >
+            {isConnected || isBusy ? "Disconnect" : "Connect"}
+          </Button>
+        </div>
+        <IconButton onClick={() => isOpen.set(false)}>
+          <Icon type="close" size={16} />
+        </IconButton>
       </div>
-      <IconButton onClick={() => isOpen.set(false)}>
-        <Icon type="close" size={16} />
-      </IconButton>
+      {#if isConnected || isBusy}
+        <div
+          class="mt-3 flex items-center gap-1 text-sm text-secondary-text"
+        >
+          <Icon type="info" size={14} />Fields are locked while connected.
+          Disconnect to edit.
+        </div>
+      {/if}
     </div>
-    <div class="grow min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6 pt-4">
+    <div class="grow min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6 pt-7">
       <div class="flex flex-col gap-6">
         <ConnectionForm {connection} />
         <SubscriptionsForm {connection} />
