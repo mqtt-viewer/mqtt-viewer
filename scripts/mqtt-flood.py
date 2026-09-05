@@ -16,6 +16,7 @@ Ctrl-C to stop. Prints achieved msg/s once per second.
 """
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -56,7 +57,10 @@ def main():
     topics = build_topics(args.topics)
     pad = "x" * max(0, args.payload_bytes - 60)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"flood-{args.port}")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"flood-{args.port}-{os.getpid()}")
+    # The pid keeps ids unique when several floods share a broker; a broker
+    # drops the previous session for a duplicate client id, so identical ids
+    # silently cap the total at one process's rate.
     client.connect(args.host, args.port)
     client.loop_start()
 
