@@ -77,10 +77,11 @@ tasks:
     cmds:
       # macOS expects a transparent safe-area margin so the icon matches sibling dock
       # icons; appicon-mac.png has that padding, appicon.png is full-bleed for Windows.
-      - wails3 generate icons -input appicon-mac.png -macfilename darwin/icons.icns
-      - wails3 generate icons -input appicon.png -windowsfilename windows/icon.ico
-      # Each invocation also emits the other platform's default file in this dir; drop them.
-      - rm -f icon.ico icons.icns
+      # The other platform's filename is passed empty on purpose: the CLI
+      # defaults it to build/<os>/..., which resolves to build/build/... from
+      # this directory and fails, and an empty name skips that output.
+      - wails3 generate icons -input appicon-mac.png -macfilename darwin/icons.icns -windowsfilename ""
+      - wails3 generate icons -input appicon.png -windowsfilename windows/icon.ico -macfilename ""
 
   dev:frontend:
     summary: Runs the frontend in development mode

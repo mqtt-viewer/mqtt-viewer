@@ -35,7 +35,10 @@ const init = async () => {
       appIsReady: true,
     });
   } catch (e) {
+    // Rethrow so the {#await} in App.svelte can render the startup error
+    // instead of leaving a blank window.
     console.error(e);
+    throw e;
   }
 };
 
