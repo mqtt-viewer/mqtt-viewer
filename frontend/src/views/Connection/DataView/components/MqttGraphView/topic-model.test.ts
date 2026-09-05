@@ -340,3 +340,35 @@ test("setTau ignores a no-op or invalid tau", () => {
   expect(model.tauMs).toBe(14000);
   expect(model.root.children.get("a")!.agg.score).toBe(score);
 });
+
+test("ingest records every node on the path in touched until the caller drains it", () => {
+  const model = new TopicModel();
+  expect(model.touched.size).toBe(0);
+  model.ingest("a/b/c", 1000);
+  const a = model.root.children.get("a")!;
+  const b = a.children.get("b")!;
+  const c = b.children.get("c")!;
+  expect(model.touched.has(a)).toBe(true);
+  expect(model.touched.has(b)).toBe(true);
+  expect(model.touched.has(c)).toBe(true);
+  expect(model.touched.has(model.root)).toBe(false);
+  expect(model.touched.size).toBe(3);
+
+  // the same topic again keeps one entry per node, not one per message
+  model.ingest("a/b/c", 1001);
+  expect(model.touched.size).toBe(3);
+
+  // the renderer drains the set after spawning pulses
+  model.touched.clear();
+  expect(model.touched.size).toBe(0);
+  model.ingest("a/b/c", 1002);
+  expect(model.touched.size).toBe(3);
+});
+
+test("clear empties touched", () => {
+  const model = new TopicModel();
+  model.ingest("a/b", 1000);
+  expect(model.touched.size).toBe(2);
+  model.clear();
+  expect(model.touched.size).toBe(0);
+});

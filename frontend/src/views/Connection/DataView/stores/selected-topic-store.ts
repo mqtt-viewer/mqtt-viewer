@@ -80,6 +80,11 @@ interface HistoryWindow {
   // true once we know there is nothing older on disk than history[0] (the
   // last older-fetch returned fewer than HISTORY_WINDOW_SIZE rows).
   atOldest: boolean;
+  // Receive time of the newest DISK row loaded in the window. Live UUID
+  // appends never move it: like newestId it describes what came off disk,
+  // and the live listener uses it to drop a live copy of a row the read
+  // already returned (see the listener).
+  newestMs: number;
 }
 
 interface SelectedTopicData {
@@ -171,6 +176,14 @@ const toUndecoded = (m: mqtt.MqttMessage): MqttHistoryMessage => ({
   payloadState: "unfetched",
 });
 
+// Decodes a live entry from the bytes toUndecoded kept on it, the local
+// counterpart of `decode` for entries that never went across the bridge as
+// stubs. A true stub (no local bytes) is returned untouched.
+const decodeLocal = (m: MqttHistoryMessage): MqttHistoryMessage =>
+  m.payloadB64 === null
+    ? m
+    : { ...m, payload: base64ToUtf8(m.payloadB64), payloadState: "loaded" };
+
 const yieldToEventLoop = () => new Promise<void>((r) => setTimeout(r, 0));
 
 // Decodes a large message batch without blocking the main thread: decoding
@@ -192,9 +205,58 @@ const decodeChunked = async (
   return result;
 };
 
-const numericId = (id: string): number => {
-  const n = parseInt(id, 10);
-  return Number.isNaN(n) ? 0 : n;
+// Disk rows carry numeric ids and live messages carry UUIDs; only the former
+// ever move the disk window cursor. An id counts as numeric only when it is
+// digits end to end: parseInt would read a UUID such as "9876abcd-..." as
+// 9876 and drag the cursor with it.
+const numericId = (id: string): number =>
+  /^\d+$/.test(id) ? Number(id) : 0;
+
+// How far back from a live batch's oldest message the loaded history is
+// scanned for ids the batch repeats. Mirrors the backend's SLACK_MS: the
+// history is time ordered, so anything older than this cannot share an id
+// with the batch and the scan stops there.
+const DEDUPE_SLACK_MS = 2000;
+
+// The scan always covers at least this many of the newest entries before the
+// time cutoff is allowed to stop it. History is ordered by arrival, not
+// strictly by receive time: a clock step between two messages can leave one
+// entry older than the cutoff sitting in front of entries the batch does
+// repeat, and stopping at it would let those through as duplicates. Steps
+// like that are rare, and the scan is cheap at this size.
+const DEDUPE_MIN_SCAN = 1000;
+
+// Filters a live batch down to the messages `history` does not already hold.
+// The backend appends to its RAM history the moment a message arrives but
+// emits the batched mqttMessages event up to 300ms later, so a timeline
+// fetch issued in that gap already contains the head of the next batch;
+// appending it again would give `history` a duplicate id (which the vis
+// DataSet rejects). Only the tail of history is scanned: the newest
+// DEDUPE_MIN_SCAN entries unconditionally, then on until an entry older than
+// the batch's oldest message less DEDUPE_SLACK_MS. Ids repeated within the
+// batch itself are dropped too.
+const dropAlreadyLoaded = (
+  history: MqttHistoryMessage[],
+  batch: mqtt.MqttMessage[]
+): mqtt.MqttMessage[] => {
+  let oldestMs = Infinity;
+  for (const m of batch) {
+    if (m.timeMs < oldestMs) oldestMs = m.timeMs;
+  }
+  const cutoff = oldestMs - DEDUPE_SLACK_MS;
+  const scanFloor = Math.max(0, history.length - DEDUPE_MIN_SCAN);
+  const seen = new Set<string>();
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (i < scanFloor && history[i].timeMs < cutoff) break;
+    seen.add(history[i].id);
+  }
+  const fresh: mqtt.MqttMessage[] = [];
+  for (const m of batch) {
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    fresh.push(m);
+  }
+  return fresh;
 };
 
 // How many neighbours on each side of an ensured message get their payloads
@@ -247,6 +309,107 @@ export const createSelectedTopicStore = (
     return token !== requestToken || store.selectedTopic !== topic;
   };
 
+  // Token of the wholesale load (selectTopic, loadRecordedHistory,
+  // jumpToLatest) whose fetch is in flight right now, or null when none
+  // is. The live listener holds messages while this matches requestToken.
+  // Kept apart from isLoadingHistory on purpose: that flag drives the
+  // panel's loading state, and a jump must hold live messages without
+  // unmounting the timeline for the duration.
+  let holdToken: number | null = null;
+
+  // Until when (frontend clock) the disk-mode listener treats a live message
+  // at or before window.newestMs as a copy of a row the last disk read
+  // already returned. The race that produces such copies lasts one drain:
+  // the event for a row can only trail the read that returned it by the
+  // 300ms emit interval. Without a bound the gate would be permanent, and a
+  // backwards clock step on the broker host after a window loaded would
+  // silently drop every live message from the disk view until the clock
+  // caught up again.
+  let diskGateUntil = 0;
+
+  // Live messages for the selected topic that arrived while a wholesale
+  // load (selectTopic, loadRecordedHistory, jumpToLatest) was in flight.
+  // The fetch replaces `history` wholesale when it lands, so appending to
+  // the store in the meantime would be clobbered; instead the live listener
+  // parks them here and the landing load merges them into the same update,
+  // minus any id the fetched rows already cover. Tagged with the token of
+  // the load they belong to: every token bump (see invalidateInFlight)
+  // discards the holder, so a batch held for a superseded selection can
+  // never leak into a later one.
+  let pendingWhileLoading: {
+    token: number;
+    topic: string;
+    entries: MqttHistoryMessage[];
+  } | null = null;
+
+  // Bumps requestToken so every in-flight load lands stale, and drops any
+  // live messages held for the load being superseded. Every wholesale
+  // replacement of `history` goes through here.
+  const invalidateInFlight = () => {
+    pendingWhileLoading = null;
+    holdToken = null;
+    return ++requestToken;
+  };
+
+  // Hands back the live entries held for the load identified by `token`,
+  // minus ids the fetched rows already contain (and repeats within the
+  // hold), and clears the holder. A hold for any other load is discarded.
+  //
+  // `newerThanMs` is for disk reads, where id dedupe is blind: a disk row
+  // carries the numeric id SQLite assigned it while the live copy of the
+  // same message carries its UUID, so a held message the read already
+  // returned cannot be told apart by id. Arrival order can, while the
+  // recorder keeps up: it writes each connection's batches in the order
+  // they arrived (a single writer), so if a held message is not yet on
+  // disk, neither is anything that arrived after it. Everything the read
+  // missed is therefore newer than everything it returned, and only held
+  // entries strictly newer than the newest fetched row are kept. A
+  // same-millisecond sibling goes with the duplicate; that is the price of
+  // never showing a message twice. When the recorder's queue overflows it
+  // drops whole batches and the disk view is lossy by design; a shed
+  // message is genuinely not on disk, so dropping its held copy from the
+  // disk view is consistent with what a reload would show.
+  const takeHeldWhileLoading = (
+    token: number,
+    topic: string,
+    fetched: MqttHistoryMessage[],
+    newerThanMs?: number
+  ): MqttHistoryMessage[] => {
+    const held = pendingWhileLoading;
+    pendingWhileLoading = null;
+    if (held === null || held.token !== token || held.topic !== topic) {
+      return [];
+    }
+    const seen = new Set(fetched.map((m) => m.id));
+    const extra: MqttHistoryMessage[] = [];
+    for (const m of held.entries) {
+      if (seen.has(m.id)) continue;
+      if (newerThanMs !== undefined && m.timeMs <= newerThanMs) continue;
+      seen.add(m.id);
+      extra.push(m);
+    }
+    return extra;
+  };
+
+  // The largest receive time among a set of rows, or undefined when there
+  // are none. The maximum, not the last row's: rows are ordered by id
+  // (arrival), and a backwards clock step between two arrivals can leave
+  // the last row older than one before it.
+  const maxTimeMs = (rows: MqttHistoryMessage[]): number | undefined => {
+    if (rows.length === 0) return undefined;
+    let max = -Infinity;
+    for (const m of rows) {
+      if (m.timeMs > max) max = m.timeMs;
+    }
+    return max;
+  };
+
+  // The `newerThanMs` bound for a disk read: the newest receive time among
+  // the fetched rows, or undefined for an empty read, when nothing on disk
+  // can overlap the hold and every held entry is kept.
+  const newestFetchedMs = (fetched: MqttHistoryMessage[]) =>
+    maxTimeMs(fetched);
+
   const { subscribe, set, update } = writable<SelectedTopicData>(
     {
       connectionId,
@@ -287,24 +450,91 @@ export const createSelectedTopicStore = (
       const messages: mqtt.MqttMessage[] = e.data;
       const store = get({ subscribe });
       if (store.selectedTopic === null) return;
-      // Only the newest view receives live messages; older windows are frozen.
-      if (store.historySource === "disk" && !store.window?.isNewest) return;
-      // While the initial history/window fetch is in flight, its result will
-      // replace `history` wholesale once it lands. Rather than buffer and
-      // reconcile live messages against it, we simply ignore live appends
-      // during the load: the fetched window is the newest data on disk (or
-      // the full bounded RAM history in memory mode) anyway, so nothing is
-      // lost, and this keeps the loading path simple and race-free.
-      if (store.isLoadingHistory) return;
+      // Only the newest view receives live messages; older windows are
+      // frozen. Checked after the hold below on purpose: a jumpToLatest
+      // started from an older window is the common way to get back to the
+      // newest one, and the messages that arrive during its fetch belong to
+      // the window it lands on.
+      const frozenWindow =
+        store.historySource === "disk" && !store.window?.isNewest;
+      if (frozenWindow && holdToken !== requestToken) return;
 
       const forTopic = messages.filter((m) => m.topic === store.selectedTopic);
       if (forTopic.length === 0) return;
-      const entries = forTopic.map(toUndecoded);
+
+      // While a wholesale load (selectTopic, loadRecordedHistory,
+      // jumpToLatest) is in flight, its result will replace `history`
+      // wholesale once it lands, so appending now would be clobbered. The
+      // fetch is not guaranteed to include these either: a batch drained
+      // after the backend built the response but before it was applied here
+      // is in neither. Hold them for the landing load, which merges them in
+      // after dropping whatever the fetch did return. Keyed to the request
+      // token rather than isLoadingHistory so a jump can hold without
+      // putting the panel into its loading state.
+      if (holdToken === requestToken) {
+        if (
+          pendingWhileLoading === null ||
+          pendingWhileLoading.token !== requestToken
+        ) {
+          pendingWhileLoading = {
+            token: requestToken,
+            topic: store.selectedTopic,
+            entries: [],
+          };
+        }
+        const entries = pendingWhileLoading.entries;
+        entries.push(...forTopic.map(toUndecoded));
+        // Bound the hold the same way enforceCap bounds `history`: anything
+        // past MAX_LOADED_MESSAGES would be trimmed from the oldest end on
+        // landing anyway, so drop it now rather than let a hung fetch at
+        // flood rates grow the holder without limit. Same slack as
+        // enforceCap so a busy topic is not re-spliced on every drain.
+        if (entries.length > MAX_LOADED_MESSAGES + TRIM_SLACK) {
+          entries.splice(0, entries.length - MAX_LOADED_MESSAGES);
+        }
+        return;
+      }
+      if (frozenWindow) return;
+
+      // In disk mode id dedupe is blind: a disk row carries the numeric id
+      // SQLite gave it while the live copy of the same message carries its
+      // UUID. A live event for a row the window read already returned can
+      // still be processed after that read landed (the backend emits the
+      // batched event up to 300ms after appending), and it would append
+      // the row a second time. Receive time tells the two apart: the
+      // recorder writes in arrival order, so anything genuinely new is
+      // after the newest disk row in the window, and a live copy of a row
+      // the read returned is at or before it. Same-millisecond siblings
+      // are dropped with the duplicate; that is the documented price (see
+      // takeHeldWhileLoading). The guard above already returned unless
+      // this is the newest window, and the gate only stays up for the
+      // moment after a disk read lands (see diskGateUntil).
+      let candidates = forTopic;
+      if (
+        store.historySource === "disk" &&
+        store.window !== null &&
+        Date.now() < diskGateUntil
+      ) {
+        const newestMs = store.window.newestMs;
+        candidates = candidates.filter((m) => m.timeMs > newestMs);
+        if (candidates.length === 0) return;
+      }
+
+      // The fetched window can already hold the head of this batch (see
+      // dropAlreadyLoaded); only genuinely new messages go any further.
+      const fresh = dropAlreadyLoaded(store.history, candidates);
+      if (fresh.length === 0) return;
+      const entries = fresh.map(toUndecoded);
       // The Chart tab is the one consumer that genuinely needs every payload
       // decoded (it draws a numeric series over the whole window), so decode
       // for its cache only while it's loaded; skipped entirely otherwise.
+      // The chart fetch runs after the timeline fetch, so its cache can
+      // already hold messages `history` does not; dedupe against it on its
+      // own rather than trust the stub history's verdict.
       const decodedForChart =
-        store.chartHistory !== null ? forTopic.map(decode) : null;
+        store.chartHistory !== null
+          ? dropAlreadyLoaded(store.chartHistory, fresh).map(decode)
+          : null;
       update((s) => {
         // Live messages carry their receive-time UUID, while disk rows carry
         // numeric ids. We only ever page the keyset by disk id, so a live
@@ -353,7 +583,7 @@ export const createSelectedTopicStore = (
       enforceCap("append");
     });
     const offClear = Events.On(connectionEventSet.mqttClearHistory, () => {
-      requestToken++;
+      invalidateInFlight();
       update((s) => ({
         ...s,
         history: [],
@@ -414,16 +644,25 @@ export const createSelectedTopicStore = (
       if (changeEnd === "prepend") {
         // Evicted from the newest end: no longer the newest window: recompute
         // newestId as the largest numeric id among kept messages, scanning
-        // from the end and skipping non-numeric (UUID) ids.
+        // from the end and skipping non-numeric (UUID) ids. newestMs is
+        // recomputed alongside as the largest receive time among the kept
+        // disk rows (a full scan, since time is not strictly ordered by id).
         let newestId = window.newestId;
+        let newestMs = window.newestMs;
+        let found = false;
         for (let i = kept.length - 1; i >= 0; i--) {
-          const n = numericId(kept[i].id);
-          if (n !== 0) {
+          const m = kept[i];
+          const n = numericId(m.id);
+          if (n === 0) continue;
+          if (!found) {
+            found = true;
             newestId = n;
-            break;
+            newestMs = m.timeMs;
+          } else if (m.timeMs > newestMs) {
+            newestMs = m.timeMs;
           }
         }
-        window = { ...window, isNewest: false, newestId };
+        window = { ...window, isNewest: false, newestId, newestMs };
       } else {
         // Evicted from the oldest end: recompute oldestId as the first kept
         // message's numeric id, scanning forward past non-numeric ids.
@@ -453,16 +692,23 @@ export const createSelectedTopicStore = (
     onHistoryDelta?: (delta: HistoryDelta) => void
   ) => {
     const { connectionId } = get({ subscribe });
-    const token = ++requestToken;
+    const token = invalidateInFlight();
+    holdToken = token;
 
     // Open the panel and show a loading state immediately, synchronously,
     // before any await below — the panel's visibility is driven by
     // `selectedTopic !== null`, so this is what makes selecting a topic feel
     // instant even when the fetch below takes a while.
+    // historySource resets here too, not only when the fetch lands: the
+    // live listener drops batches while the source is "disk" and the window
+    // is not the newest, and window is null for the whole load, so a
+    // selection made from a disk view would otherwise lose every message
+    // that should have been held for it.
     update((store) => ({
       ...store,
       selectedTopic: topic,
       history: [],
+      historySource: "memory",
       window: null,
       totalCount: 0,
       isLoadingHistory: true,
@@ -511,27 +757,41 @@ export const createSelectedTopicStore = (
       // trims its last-value cache so a topic still shown in the tree can
       // have no history left. Both reject the timeline fetch with "not
       // found"; an empty timeline is the right answer rather than a stuck
-      // loading state (the live listener ignores appends while
-      // isLoadingHistory is true, so nothing else would ever clear it).
+      // loading state (the live listener holds appends while this load's
+      // token is the hold token, so nothing else would ever release it).
       // Anything else is a real failure, so log it rather than let the
-      // empty timeline hide it.
+      // empty timeline hide it. Either way, live messages held during the
+      // fetch are still real messages for this topic, so they become the
+      // history rather than being lost.
       if (!String(e).includes("not found")) {
         console.error("Failed to load message timeline", e);
       }
+      holdToken = null;
+      const held = takeHeldWhileLoading(token, topic, []);
       update((store) => ({
         ...store,
-        history: [],
+        history: held,
         historySource: "memory",
         window: null,
-        totalCount: 0,
+        totalCount: held.length,
         isLoadingHistory: false,
         historyRevision: store.historyRevision + 1,
         isLoadingWindow: null,
+        chartHistory: mergeHeldIntoChart(store.chartHistory, held),
       }));
+      // Held messages bypassed the live listener's cap check, so apply it
+      // here; a no-op unless the hold overshot the cap.
+      if (held.length > 0) enforceCap("append");
       return;
     }
     if (isStale(token, topic)) return;
-    const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+    holdToken = null;
+    const fetched = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+    // Live messages held while the fetch was in flight land in the same
+    // update, so the revision bump below covers them and no separate append
+    // delta is needed (the timeline rebuilds from `history` on a bump).
+    const held = takeHeldWhileLoading(token, topic, fetched);
+    const history = fetched.concat(held);
     update((store) => ({
       ...store,
       history,
@@ -541,9 +801,36 @@ export const createSelectedTopicStore = (
       isLoadingHistory: false,
       historyRevision: store.historyRevision + 1,
       isLoadingWindow: null,
+      // The Chart tab calls ensureChartHistory whenever it is visible, so
+      // its fetch can land during this one; the held entries then belong
+      // in that cache too, same as a live drain would have put them.
+      chartHistory: mergeHeldIntoChart(store.chartHistory, held),
     }));
+    // Held messages bypassed the live listener's cap check, so apply it
+    // here; a no-op unless fetched plus held overshot the cap.
+    if (held.length > 0) enforceCap("append");
     const newest = history[history.length - 1];
     if (newest) ensurePayload(newest.id);
+  };
+
+  // Pushes held live entries into a loaded chart cache, decoded (the chart
+  // draws from decoded payloads), minus ids it already holds: the chart
+  // fetch runs independently of the timeline fetch, so it can already
+  // carry ids `history` did not. A null cache (Chart tab never opened for
+  // this selection) stays null. Mutates and returns the same array, like
+  // the live listener's in-place append.
+  const mergeHeldIntoChart = (
+    chartHistory: MqttHistoryMessage[] | null,
+    held: MqttHistoryMessage[]
+  ): MqttHistoryMessage[] | null => {
+    if (chartHistory === null || held.length === 0) return chartHistory;
+    const inChart = new Set(chartHistory.map((m) => m.id));
+    for (const m of held) {
+      if (inChart.has(m.id)) continue;
+      inChart.add(m.id);
+      chartHistory.push(decodeLocal(m));
+    }
+    return chartHistory;
   };
 
   // stubToHistoryMessage doesn't know the topic (the backend stub type omits
@@ -728,13 +1015,20 @@ export const createSelectedTopicStore = (
     isNewest: boolean
   ): HistoryWindow | null => {
     if (messages.length === 0) {
-      return { oldestId: 0, newestId: 0, isNewest, atOldest: true };
+      return {
+        oldestId: 0,
+        newestId: 0,
+        isNewest,
+        atOldest: true,
+        newestMs: 0,
+      };
     }
     return {
       oldestId: numericId(messages[0].id),
       newestId: numericId(messages[messages.length - 1].id),
       isNewest,
       atOldest: messages.length < HISTORY_WINDOW_SIZE,
+      newestMs: maxTimeMs(messages) ?? 0,
     };
   };
 
@@ -839,6 +1133,7 @@ export const createSelectedTopicStore = (
     }
     const newer = newerStubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     const reachedLatest = newer.length < HISTORY_WINDOW_SIZE;
+    diskGateUntil = Date.now() + DEDUPE_SLACK_MS;
     update((s) => {
       const history = [...s.history, ...newer];
       const window =
@@ -847,6 +1142,9 @@ export const createSelectedTopicStore = (
           : {
               ...s.window,
               newestId: numericId(newer[newer.length - 1].id),
+              // Never lower than before: the appended rows are newer by id,
+              // and a clock step among them must not move the bound back.
+              newestMs: Math.max(s.window.newestMs, maxTimeMs(newer) ?? 0),
               isNewest: reachedLatest,
             };
       // Same reasoning as loadOlderWindow: stub-only growth the chart cache
@@ -870,26 +1168,81 @@ export const createSelectedTopicStore = (
     // A jump replaces the loaded history wholesale, so bump the token to
     // invalidate any in-flight older/newer load: with accumulation, a stale
     // prepend landing after the jump would corrupt the fresh window.
-    const token = ++requestToken;
-    const stubs = await GetReceivedTimelineWindow(
-      store.connectionId,
-      topic,
-      0,
-      0,
-      HISTORY_WINDOW_SIZE
-    );
+    const token = invalidateInFlight();
+    // Live messages that arrive during the fetch must be held for it, not
+    // appended: the replacement below would discard them, and the disk read
+    // is not guaranteed to include them either (see the live listener).
+    // The hold is keyed to the token, not isLoadingHistory: that flag would
+    // unmount the timeline for the duration of every jump.
+    holdToken = token;
+    let stubs: Awaited<ReturnType<typeof GetReceivedTimelineWindow>>;
+    try {
+      stubs = await GetReceivedTimelineWindow(
+        store.connectionId,
+        topic,
+        0,
+        0,
+        HISTORY_WINDOW_SIZE
+      );
+    } catch (e) {
+      if (isStale(token, topic)) return;
+      holdToken = null;
+      console.error("Failed to load the newest recorded window", e);
+      // The loaded window stays as it was. Live messages held during the
+      // attempt belong to it only when it is the newest window, so merge
+      // them back there, minus ids already loaded; an older window stays
+      // frozen (the listener ignores live traffic there outside a hold), so
+      // for one the hold is simply dropped. The
+      // token bump above made any in-flight older/newer load return early
+      // without clearing its single-flight guard, so clear it here.
+      const current = get({ subscribe });
+      const held = takeHeldWhileLoading(token, topic, current.history);
+      const merged = current.window?.isNewest ? held : [];
+      update((s) => {
+        s.history.push(...merged);
+        return {
+          ...s,
+          history: s.history,
+          // The chart cache tracks `history` while it is loaded, so the
+          // merged entries go there too (see mergeHeldIntoChart).
+          chartHistory: mergeHeldIntoChart(s.chartHistory, merged),
+          totalCount: s.totalCount + merged.length,
+          isLoadingWindow: null,
+          historyRevision:
+            merged.length > 0 ? s.historyRevision + 1 : s.historyRevision,
+        };
+      });
+      if (merged.length > 0) enforceCap("append");
+      return;
+    }
     if (isStale(token, topic)) return;
-    const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+    holdToken = null;
+    const fetched = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+    // Same merge as loadRecordedHistory: held entries the disk read already
+    // returned under a numeric id are dropped by arrival time, the rest
+    // append after the window (see takeHeldWhileLoading).
+    const held = takeHeldWhileLoading(
+      token,
+      topic,
+      fetched,
+      newestFetchedMs(fetched)
+    );
+    const history = fetched.concat(held);
+    diskGateUntil = Date.now() + DEDUPE_SLACK_MS;
     update((s) => ({
       ...s,
       history,
-      window: windowFromMessages(history, true),
+      window: windowFromMessages(fetched, true),
+      totalCount: s.totalCount + held.length,
       historyRevision: s.historyRevision + 1,
       isLoadingWindow: null,
       // Wholesale replacement: the chart cache no longer matches `history`.
       chartHistory: null,
       isLoadingChartHistory: false,
     }));
+    // Held messages bypassed the live listener's cap check, so apply it
+    // here; a no-op unless the window plus held overshot the cap.
+    if (held.length > 0) enforceCap("append");
     const newest = history[history.length - 1];
     if (newest) ensurePayload(newest.id);
   };
@@ -906,7 +1259,8 @@ export const createSelectedTopicStore = (
     // Wholesale replacement of the loaded history, same rationale as
     // jumpToLatest: bump the token so any in-flight fetch for the memory
     // view lands stale instead of clobbering the disk window.
-    const token = ++requestToken;
+    const token = invalidateInFlight();
+    holdToken = token;
     update((s) => ({ ...s, isLoadingHistory: true }));
     try {
       const [count, stubs] = await Promise.all([
@@ -920,13 +1274,27 @@ export const createSelectedTopicStore = (
         ),
       ]);
       if (isStale(token, topic)) return;
-      const history = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+      holdToken = null;
+      const fetched = stubs.map((s) => stubToHistoryMessageForTopic(s, topic));
+      // Live messages held during the fetch append after the disk window,
+      // same as a live drain would have, minus any the disk read already
+      // returned under a numeric id (see takeHeldWhileLoading). The window
+      // cursor comes from the fetched rows only: live ids are UUIDs, which
+      // never move it.
+      const held = takeHeldWhileLoading(
+        token,
+        topic,
+        fetched,
+        newestFetchedMs(fetched)
+      );
+      const history = fetched.concat(held);
+      diskGateUntil = Date.now() + DEDUPE_SLACK_MS;
       update((s) => ({
         ...s,
         history,
         historySource: "disk",
-        window: windowFromMessages(history, true),
-        totalCount: count,
+        window: windowFromMessages(fetched, true),
+        totalCount: count + held.length,
         recordedCount: count,
         isLoadingHistory: false,
         historyRevision: s.historyRevision + 1,
@@ -934,18 +1302,46 @@ export const createSelectedTopicStore = (
         // Wholesale replacement: the chart cache no longer matches `history`.
         chartHistory: null,
       }));
+      // Held messages bypassed the live listener's cap check, so apply it
+      // here; a no-op unless the window plus held overshot the cap.
+      if (held.length > 0) enforceCap("append");
       // Fetch exactly one payload (the newest stub) so the auto-selected
       // message renders immediately. Token-guarded inside ensurePayload.
       const newest = history[history.length - 1];
       if (newest) ensurePayload(newest.id);
     } catch {
       if (isStale(token, topic)) return;
-      update((s) => ({ ...s, isLoadingHistory: false }));
+      holdToken = null;
+      // The disk fetch failed, so the memory view stays as it was; live
+      // messages held during the attempt still belong to it, so append them
+      // (minus anything already loaded) rather than strand them.
+      const held = takeHeldWhileLoading(
+        token,
+        topic,
+        get({ subscribe }).history
+      );
+      update((s) => {
+        s.history.push(...held);
+        return {
+          ...s,
+          history: s.history,
+          // The chart cache tracks `history` while it is loaded (the live
+          // listener appends to both), so the held entries go there too
+          // (see mergeHeldIntoChart).
+          chartHistory: mergeHeldIntoChart(s.chartHistory, held),
+          totalCount: s.totalCount + held.length,
+          isLoadingHistory: false,
+          historyRevision:
+            held.length > 0 ? s.historyRevision + 1 : s.historyRevision,
+        };
+      });
+      // Same cap check as the success path, for the same reason.
+      if (held.length > 0) enforceCap("append");
     }
   };
 
   const deselectTopic = () => {
-    requestToken++;
+    invalidateInFlight();
     update((store) => ({
       ...store,
       selectedTopic: null,

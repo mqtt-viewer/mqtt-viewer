@@ -321,6 +321,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Spot retained topics at a glance",
         body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages. The marker goes the moment you clear the message, on MQTT 3 as well as 5, and it starts again from what your broker replays each time you reconnect.",
       },
+      {
+        title: "The chart's Y-axis rescales with its time window",
+        body: "Narrowing a chart's time window could leave the Y-axis stretched to an old value elsewhere in that topic's history, squashing the visible points to the bottom. It now ranges over only what the window shows.",
+      },
     ],
   },
   {
