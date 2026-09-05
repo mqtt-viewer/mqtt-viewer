@@ -2114,6 +2114,38 @@ describe("live messages held during a load", () => {
 // the recorder writes in arrival order, so anything genuinely new is after
 // the newest disk row in the window.
 describe("disk-mode live dedupe against the loaded window", () => {
+  it("lets an older-stamped live message through once the read's race window has passed", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(3);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.loadRecordedHistory();
+
+    // A broker-host clock step backwards well after the window landed:
+    // live messages now stamp before window.newestMs. The gate against
+    // re-delivered rows only covers the drain that can trail the read, so
+    // these must not be dropped.
+    const realNow = Date.now;
+    const later = realNow() + 5000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => later);
+    try {
+      fireLiveMessageBatch([
+        { id: "uuid-old", topic: "a/b", payload: btoa("o"), timeMs: 2500, retain: false },
+      ]);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "uuid-old"]);
+    expect(s.window?.newestMs).toBe(3000);
+
+    unsub();
+  });
+
   it("drops a live copy of a row the window read already returned", async () => {
     const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
     const unsub = store.subscribe(() => {});

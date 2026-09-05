@@ -317,6 +317,16 @@ export const createSelectedTopicStore = (
   // unmounting the timeline for the duration.
   let holdToken: number | null = null;
 
+  // Until when (frontend clock) the disk-mode listener treats a live message
+  // at or before window.newestMs as a copy of a row the last disk read
+  // already returned. The race that produces such copies lasts one drain:
+  // the event for a row can only trail the read that returned it by the
+  // 300ms emit interval. Without a bound the gate would be permanent, and a
+  // backwards clock step on the broker host after a window loaded would
+  // silently drop every live message from the disk view until the clock
+  // caught up again.
+  let diskGateUntil = 0;
+
   // Live messages for the selected topic that arrived while a wholesale
   // load (selectTopic, loadRecordedHistory, jumpToLatest) was in flight.
   // The fetch replaces `history` wholesale when it lands, so appending to
@@ -497,9 +507,14 @@ export const createSelectedTopicStore = (
       // the read returned is at or before it. Same-millisecond siblings
       // are dropped with the duplicate; that is the documented price (see
       // takeHeldWhileLoading). The guard above already returned unless
-      // this is the newest window.
+      // this is the newest window, and the gate only stays up for the
+      // moment after a disk read lands (see diskGateUntil).
       let candidates = forTopic;
-      if (store.historySource === "disk" && store.window !== null) {
+      if (
+        store.historySource === "disk" &&
+        store.window !== null &&
+        Date.now() < diskGateUntil
+      ) {
         const newestMs = store.window.newestMs;
         candidates = candidates.filter((m) => m.timeMs > newestMs);
         if (candidates.length === 0) return;
@@ -1118,6 +1133,7 @@ export const createSelectedTopicStore = (
     }
     const newer = newerStubs.map((s) => stubToHistoryMessageForTopic(s, topic));
     const reachedLatest = newer.length < HISTORY_WINDOW_SIZE;
+    diskGateUntil = Date.now() + DEDUPE_SLACK_MS;
     update((s) => {
       const history = [...s.history, ...newer];
       const window =
@@ -1212,6 +1228,7 @@ export const createSelectedTopicStore = (
       newestFetchedMs(fetched)
     );
     const history = fetched.concat(held);
+    diskGateUntil = Date.now() + DEDUPE_SLACK_MS;
     update((s) => ({
       ...s,
       history,
@@ -1271,6 +1288,7 @@ export const createSelectedTopicStore = (
         newestFetchedMs(fetched)
       );
       const history = fetched.concat(held);
+      diskGateUntil = Date.now() + DEDUPE_SLACK_MS;
       update((s) => ({
         ...s,
         history,

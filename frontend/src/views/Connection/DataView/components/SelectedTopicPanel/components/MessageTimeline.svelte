@@ -614,7 +614,7 @@
   onMount(() => {
     timelineDataSet = new DataSet<DataItem, "id">();
     const timelineData = getBoundedTimelineData($selectedTopicStore.history);
-    timelineDataSet.add(timelineData);
+    timelineDataSet.update(timelineData);
     selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
     // The dataset is built first so the bounds already take in the drawn
     // history when the timeline is constructed.
@@ -756,7 +756,8 @@
     hideHover();
     resetDrawn();
     timelineDataSet = new DataSet<DataItem, "id">();
-    timelineDataSet.add(getBoundedTimelineData($selectedTopicStore.history));
+    // update, not add: same duplicate-id safety as flushAppends.
+    timelineDataSet.update(getBoundedTimelineData($selectedTopicStore.history));
     selectedTopicStore.setOnHistoryDelta(handleHistoryDelta);
     timeline.setItems(timelineDataSet);
     // The new window can reach further back than the old bounds allowed, so
