@@ -52,12 +52,28 @@ export async function ClearConnectionHistory(
 export async function GetConnectionLogs(_connId: number): Promise<any[]> {
   const base = 1_710_000_000_000;
   return [
-    { timestampMs: base, level: "info", message: "connection state changed from disconnected to connecting" },
-    { timestampMs: base + 500, level: "info", message: "connection state changed from connecting to connected" },
+    {
+      timestampMs: base,
+      level: "info",
+      message: "connection state changed from disconnected to connecting",
+    },
+    {
+      timestampMs: base + 500,
+      level: "info",
+      message: "connection state changed from connecting to connected",
+    },
     { timestampMs: base + 1200, level: "debug", message: "PINGREQ sent" },
     { timestampMs: base + 1400, level: "debug", message: "PINGRESP received" },
-    { timestampMs: base + 2600, level: "warn", message: "reconnecting to broker" },
-    { timestampMs: base + 3000, level: "error", message: "connect failed: connection refused" },
+    {
+      timestampMs: base + 2600,
+      level: "warn",
+      message: "reconnecting to broker",
+    },
+    {
+      timestampMs: base + 3000,
+      level: "error",
+      message: "connect failed: connection refused",
+    },
   ];
 }
 
@@ -191,6 +207,24 @@ export async function ExportTopicMessages(
   topic: string
 ): Promise<string> {
   return `/Users/sam/exports/mqtt-messages-${topic.replaceAll("/", "-")}.json`;
+}
+
+export async function ExportAllMessagesData(
+  _connectionId: number
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: "mqtt-messages-all.json",
+    json: "[]",
+  });
+}
+export async function ExportTopicMessagesData(
+  _connectionId: number,
+  topic: string
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: `mqtt-messages-${topic.replaceAll("/", "-")}.json`,
+    json: "[]",
+  });
 }
 
 export async function GetAllConnections(): Promise<app.Connections> {
@@ -486,6 +520,7 @@ export async function GetEnvInfo(): Promise<app.EnvInfo> {
     isDev: true,
     serverAddress: "localhost",
     version: "storybook",
+    isServerMode: false,
   });
 }
 
@@ -571,7 +606,8 @@ export async function GetReceivedTimelineWindow(
 export async function GetMessageById(
   _connectionId: number,
   topic: string,
-  id: string
+  id: string,
+  _timeMs: number
 ): Promise<[any, boolean]> {
   const found = mockMqttMessages.find((m) => m.id === id);
   if (!found) return [{}, false];

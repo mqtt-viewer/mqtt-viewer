@@ -12,6 +12,7 @@ export {
     Connections,
     CreateCollectionParams,
     EnvInfo,
+    ExportedMessagesPayload,
     MemoryLimitModel,
     MemoryStats,
     MqttStats,

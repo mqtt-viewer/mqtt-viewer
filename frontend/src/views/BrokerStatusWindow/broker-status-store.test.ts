@@ -36,8 +36,13 @@ vi.mock("bindings/mqtt-viewer/backend/app/app", () => ({
 
 import {
   createBrokerStatusStore,
+  LATEST_TOPIC_CAP,
   OBSERVED_MSG_KEY,
   OBSERVED_BYTE_KEY,
+  SPARKLINE_CAP,
+  TOPIC_RING_CAP,
+  TOPIC_MINUTE_RING_CAP,
+  MAX_RANGE_MINUTES,
   type BrokerStatusState,
   type BrokerTileView,
 } from "./broker-status-store";
@@ -87,6 +92,14 @@ const customTile = (state: BrokerStatusState): BrokerTileView => {
   return t;
 };
 
+// v2: the reclassified builtins are `hidden` and no longer render as gauge
+// tiles, so their live values are read from metricByKey instead of `tiles`.
+const metric = (state: BrokerStatusState, key: string) => {
+  const m = state.metricByKey.get(key);
+  if (!m) throw new Error(`no metric ${key}: have ${[...state.metricByKey.keys()]}`);
+  return m;
+};
+
 const BASE_MS = 1_000_000_000; // fixed epoch base for deterministic buckets
 
 beforeEach(() => {
@@ -118,8 +131,9 @@ describe("createBrokerStatusStore — backfill", () => {
 
     expect(tile(state, "clients_connected").display).toBe("5");
     expect(tile(state, "subscriptions").display).toBe("3");
-    expect(tile(state, "version").display).toBe("mosquitto 2.0.18");
-    expect(tile(state, "version").valueKind).toBe("text");
+    // version is hidden (feeds the facts row) — read it from metricByKey.
+    expect(metric(state, "version").text).toBe("mosquitto 2.0.18");
+    expect(metric(state, "version").value).toBeNull();
 
     expect(state.latestByTopic.get("$SYS/broker/clients/connected")).toEqual({
       value: "5",
@@ -332,7 +346,7 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     ]);
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
-    expect(tile(get(store), "msg_rate_in").value).toBeCloseTo(75, 6);
+    expect(metric(get(store), "msg_rate_in").value).toBeCloseTo(75, 6);
     store.destroy();
   });
 
@@ -345,7 +359,7 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     await store.init();
     // Broker restart: counter drops below the previous value.
     emit("msgs", [msg(EMQX, "50", BASE_MS + 2000)]);
-    expect(tile(get(store), "msg_rate_in").value).toBe(0);
+    expect(metric(get(store), "msg_rate_in").value).toBe(0);
     store.destroy();
   });
 
@@ -361,7 +375,7 @@ describe("createBrokerStatusStore — cumulative rate derivation", () => {
     ]);
     const store = createBrokerStatusStore(CONN, eventSet);
     await store.init();
-    const t = tile(get(store), "msg_rate_in");
+    const t = metric(get(store), "msg_rate_in");
     expect(t.samples.map((s) => s.v)).toEqual([100]);
     expect(t.value).toBeCloseTo(100, 6);
     store.destroy();
@@ -491,7 +505,10 @@ describe("createBrokerStatusStore — empty state & teardown", () => {
 
     emit("msgs", [msg("$SYS/broker/uptime", "60 seconds", BASE_MS)]);
     expect(get(store).sysEverSeen).toBe(true);
-    expect(tile(get(store), "uptime").display).toBe("1m");
+    // uptime is hidden (feeds the facts row) — read it from metricByKey.
+    const up = metric(get(store), "uptime");
+    expect(up.value).toBe(60);
+    expect(up.isDuration).toBe(true);
     store.destroy();
   });
 
@@ -531,5 +548,529 @@ describe("createBrokerStatusStore — empty state & teardown", () => {
     const snapshot = get(store);
     emit("msgs", [msg("$SYS/broker/clients/connected", "99", BASE_MS)]);
     expect(get(store)).toBe(snapshot);
+  });
+});
+
+// --- v2: hidden metrics, metricByKey, visible-tile predicate ------------------
+
+describe("createBrokerStatusStore — hidden metrics & metricByKey", () => {
+  it("omits every hidden metric from the gauges grid (v2 surfaces)", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    const keys = get(store).tiles.map((t) => t.key);
+    // v1 tiles reclassified hidden now leave the grid (they feed the hero and
+    // facts row via metricByKey instead).
+    for (const k of ["msg_rate_in", "msg_rate_out", "uptime", "version"]) {
+      expect(keys, k).not.toContain(k);
+    }
+    // Brand-new hidden diagnostic / derived metrics never surface as tiles.
+    for (const k of ["msgs_dropped", "delivery_backlog", "heap_current", "fan_out"]) {
+      expect(keys, k).not.toContain(k);
+    }
+    // Non-hidden gauges + observed computed tiles stay.
+    for (const k of ["clients_connected", "bytes_rate_in", OBSERVED_MSG_KEY]) {
+      expect(keys, k).toContain(k);
+    }
+    // ...but the hidden values remain available via metricByKey.
+    for (const k of ["msg_rate_in", "uptime", "version", "heap_current"]) {
+      expect(get(store).metricByKey.has(k), k).toBe(true);
+    }
+    store.destroy();
+  });
+
+  it("exposes every metric — hidden included — via metricByKey", async () => {
+    mocks.getSys.mockResolvedValue([
+      msg("$SYS/broker/heap/current", "8200000", BASE_MS),
+      msg("$SYS/broker/packet/out/count", "12", BASE_MS),
+    ]);
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    const m = get(store).metricByKey;
+
+    const heap = m.get("heap_current");
+    expect(heap?.value).toBe(8200000);
+    expect(heap?.hidden).toBe(true);
+    expect(heap?.samples.length).toBeGreaterThan(0);
+    expect(m.get("delivery_backlog")?.value).toBe(12);
+    // A visible tile is present in metricByKey too.
+    expect(m.get("clients_connected")?.hidden).toBe(false);
+    store.destroy();
+  });
+});
+
+// --- v2: loudest-topics engine -----------------------------------------------
+
+describe("createBrokerStatusStore — loudest topics", () => {
+  it("ranks the top rows by msg/s and reports exact overflow", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // 7 topics with counts 7..1 in one interval.
+    const batch: any[] = [];
+    for (let n = 7; n >= 1; n--) {
+      for (let i = 0; i < n; i++) {
+        batch.push(msg(`plant/topic${n}`, "x", Date.now()));
+      }
+    }
+    emit("msgs", batch);
+    vi.advanceTimersByTime(1000); // tick: rotate + merge
+
+    const loud = get(store).loudest;
+    expect(loud.rows.map((r) => r.topic)).toEqual([
+      "plant/topic7",
+      "plant/topic6",
+      "plant/topic5",
+      "plant/topic4",
+      "plant/topic3",
+      "plant/topic2",
+    ]);
+    expect(loud.rows[0].msgPerSec).toBe(7); // divisor = 1 s collected
+    expect(loud.overflowTopics).toBe(1); // topic1 beyond the 6 rows
+    expect(loud.overflowMsgPerSec).toBe(1); // exact: topic1's single message
+    expect(loud.collecting).toBe(true); // window not yet elapsed
+    store.destroy();
+  });
+
+  it("accounts for every message on a wide topic tree", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // 600 distinct topics, one message each: far more than the per-interval
+    // summary holds. Whatever it keeps, the traffic it does not attribute to a
+    // row has to show up in the overflow rate, exactly.
+    const batch = Array.from({ length: 600 }, (_, i) =>
+      msg(`wide/topic${i}`, "x", Date.now())
+    );
+    emit("msgs", batch);
+    vi.advanceTimersByTime(1000);
+
+    const loud = get(store).loudest;
+    expect(loud.rows).toHaveLength(6);
+    expect(loud.rows[0].msgPerSec).toBe(1);
+    const shown = loud.rows.reduce((n, r) => n + r.msgPerSec, 0);
+    // 600 messages over 1 s, no matter how they are summarised.
+    expect(shown + loud.overflowMsgPerSec).toBeCloseTo(600, 6);
+    store.destroy();
+  });
+
+  it("rates a busy tree of equals without losing seconds", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // 300 topics at 7 msg/s each for 10 s: 2100 msg/s in total, and no topic is
+    // ever in a small per-second top-K. Each shown row must still read ~7/s,
+    // and the overflow must carry the rest of the 2100.
+    for (let s = 0; s < 10; s++) {
+      const batch: any[] = [];
+      for (let t = 0; t < 300; t++) {
+        for (let i = 0; i < 7; i++) {
+          batch.push(msg(`busy/topic${t}`, "x", Date.now()));
+        }
+      }
+      emit("msgs", batch);
+      vi.advanceTimersByTime(1000);
+    }
+
+    const loud = get(store).loudest;
+    expect(loud.rows).toHaveLength(6);
+    for (const row of loud.rows) {
+      expect(row.msgPerSec).toBeGreaterThan(6);
+      expect(row.msgPerSec).toBeLessThan(9);
+    }
+    const shown = loud.rows.reduce((n, r) => n + r.msgPerSec, 0);
+    expect(shown + loud.overflowMsgPerSec).toBeCloseTo(2100, 1);
+    store.destroy();
+  });
+
+  it("ranks a loud latecomer above the quiet topics that arrived first", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // 600 quiet topics fill the interval before the loud one publishes a single
+    // message. Arrival order must not decide the ranking.
+    for (let s = 0; s < 5; s++) {
+      const batch: any[] = Array.from({ length: 600 }, (_, i) =>
+        msg(`quiet/topic${i}`, "x", Date.now())
+      );
+      for (let i = 0; i < 500; i++) {
+        batch.push(msg("loud/firehose", "x", Date.now()));
+      }
+      emit("msgs", batch);
+      vi.advanceTimersByTime(1000);
+    }
+
+    const loud = get(store).loudest;
+    expect(loud.rows[0].topic).toBe("loud/firehose");
+    expect(loud.rows[0].msgPerSec).toBeGreaterThan(450);
+    store.destroy();
+  });
+});
+
+// --- v2: observed instantaneous series ---------------------------------------
+
+describe("createBrokerStatusStore — observed instantaneous series", () => {
+  it("pushes the settled sec(now)-2 rate, skipping the partial open second", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // Advance one tick past the partial open second, then publish 7 messages in
+    // this second. Two more ticks later that second has settled (sec-2 lag) and
+    // its rate lands in the series.
+    vi.advanceTimersByTime(1000);
+    emit(
+      "msgs",
+      Array.from({ length: 7 }, () => msg("t", "hi", Date.now()))
+    );
+    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
+
+    const series = get(store).observedSeries;
+    expect(series.some((p) => p.v === 7)).toBe(true);
+    // Timestamps strictly increase (deduped by second).
+    for (let i = 1; i < series.length; i++) {
+      expect(series[i].t).toBeGreaterThan(series[i - 1].t);
+    }
+    store.destroy();
+  });
+});
+
+// --- v2: learned $SYS interval EMA -------------------------------------------
+
+describe("createBrokerStatusStore — learned interval EMA", () => {
+  const sys = (payload: string, timeMs: number) =>
+    msg("$SYS/broker/uptime", payload, timeMs);
+
+  it("seeds at 10 s until two burst gaps, then tracks burst spacing", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    expect(get(store).learnedIntervalMs).toBe(10_000); // seed
+
+    emit("msgs", [sys("1", BASE_MS)]); // burst 0
+    emit("msgs", [sys("2", BASE_MS + 20_000)]); // gap 1 = 20 s (still seed)
+    expect(get(store).learnedIntervalMs).toBe(10_000);
+
+    emit("msgs", [sys("3", BASE_MS + 40_000)]); // gap 2 = 20 s → EMA takes over
+    expect(get(store).learnedIntervalMs).toBe(20_000);
+    store.destroy();
+  });
+
+  it("collapses same-second arrivals into one burst", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    // Two messages in the same wall second are one burst → no gap folded.
+    emit("msgs", [sys("1", BASE_MS), sys("2", BASE_MS + 400)]);
+    emit("msgs", [sys("3", BASE_MS + 15_000)]); // gap 1 = 15 s
+    emit("msgs", [sys("4", BASE_MS + 30_000)]); // gap 2 = 15 s
+    expect(get(store).learnedIntervalMs).toBe(15_000);
+    store.destroy();
+  });
+
+  it("excludes a gap spanning a disconnect", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    emit("msgs", [sys("1", BASE_MS)]); // burst 0
+    emit("disc");
+    emit("conn");
+    // First burst after reconnect: its 30 s gap must NOT poison the EMA.
+    emit("msgs", [sys("2", BASE_MS + 30_000)]);
+    emit("msgs", [sys("3", BASE_MS + 40_000)]); // gap 1 = 10 s
+    emit("msgs", [sys("4", BASE_MS + 50_000)]); // gap 2 = 10 s
+    // Only the two 10 s gaps folded — a folded 30 s gap would read ~24 s.
+    expect(get(store).learnedIntervalMs).toBe(10_000);
+    store.destroy();
+  });
+});
+
+// --- v2: derived tiles (fan-out, avg msg size) -------------------------------
+
+describe("createBrokerStatusStore — derived tiles", () => {
+  it("computes fan-out and avg msg size from the cumulative totals + byte rate", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    // Two samples one second apart: received +100/s, sent +300/s, 100 bytes/s in.
+    emit("msgs", [
+      msg("$SYS/broker/messages/received", "1000", BASE_MS),
+      msg("$SYS/broker/messages/sent", "2000", BASE_MS),
+      msg("$SYS/broker/load/bytes/received/1min", "6000", BASE_MS),
+    ]);
+    emit("msgs", [
+      msg("$SYS/broker/messages/received", "1100", BASE_MS + 1000),
+      msg("$SYS/broker/messages/sent", "2300", BASE_MS + 1000),
+      msg("$SYS/broker/load/bytes/received/1min", "6000", BASE_MS + 1000),
+    ]);
+    vi.advanceTimersByTime(1000); // tick computes the derived tiles
+
+    const m = get(store).metricByKey;
+    expect(m.get("fan_out")?.value).toBeCloseTo(3, 6); // 300 out / 100 in
+    expect(m.get("avg_msg_size")?.value).toBeCloseTo(1, 6); // 100 bytes / 100 in
+    store.destroy();
+  });
+
+  it("reports no data until the derived-rate guards are satisfied", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    // A single cumulative sample yields no rate yet → guards fail.
+    emit("msgs", [
+      msg("$SYS/broker/messages/received", "1000", BASE_MS),
+      msg("$SYS/broker/messages/sent", "2000", BASE_MS),
+    ]);
+    vi.advanceTimersByTime(1000);
+    expect(get(store).metricByKey.get("fan_out")?.value).toBeNull();
+    store.destroy();
+  });
+});
+
+// --- v2: setRange & resetData extensions -------------------------------------
+
+describe("createBrokerStatusStore — setRange & reset", () => {
+  it("defaults to 5 m and updates the selected range", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    expect(get(store).rangeMinutes).toBe(5);
+    store.setRange(15);
+    expect(get(store).rangeMinutes).toBe(15);
+    store.setRange(1);
+    expect(get(store).rangeMinutes).toBe(1);
+    store.destroy();
+  });
+
+  it("clears the per-topic engine, observed series and interval EMA on reset", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit("msgs", [
+      msg("plant/a", "x", Date.now()),
+      msg("$SYS/broker/uptime", "1", BASE_MS),
+    ]);
+    emit("msgs", [msg("$SYS/broker/uptime", "2", BASE_MS + 20_000)]);
+    emit("msgs", [msg("$SYS/broker/uptime", "3", BASE_MS + 40_000)]);
+    vi.advanceTimersByTime(1000); // tick populates loudest + ring
+    expect(get(store).loudest.rows.length).toBeGreaterThan(0);
+    expect(store.topicRingSize()).toBeGreaterThan(0);
+    expect(get(store).learnedIntervalMs).toBe(20_000);
+
+    emit("clear");
+    const state = get(store);
+    expect(state.loudest.rows).toHaveLength(0);
+    expect(state.observedSeries).toHaveLength(0);
+    expect(state.learnedIntervalMs).toBe(10_000); // back to the seed
+    expect(store.topicRingSize()).toBe(0);
+    expect(store.topicMinuteRingSize()).toBe(0);
+    store.destroy();
+  });
+
+  it("accepts a seeded range and clamps anything beyond a day", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, {
+      rangeMinutes: 60,
+    });
+    await store.init();
+    expect(get(store).rangeMinutes).toBe(60);
+    store.setRange(5000); // longer than the rings retain
+    expect(get(store).rangeMinutes).toBe(MAX_RANGE_MINUTES);
+    store.setRange(0.5); // 30 s custom interval
+    expect(get(store).rangeMinutes).toBe(0.5);
+    store.destroy();
+  });
+});
+
+// --- v2: long ranges (minute rollups) ----------------------------------------
+
+describe("createBrokerStatusStore — ranges beyond the second-grain buffers", () => {
+  // Drives `minutes` of wall time, publishing one message a second on a fixed
+  // topic, so the per-second ring wraps and the minute ring fills behind it.
+  const runMinutes = (minutes: number) => {
+    for (let s = 0; s < minutes * 60; s++) {
+      emit("msgs", [msg("plant/a/temperature", "x", Date.now())]);
+      vi.advanceTimersByTime(1000);
+    }
+  };
+
+  it("rolls seconds into a bounded minute ring and rates the whole window", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, { rangeMinutes: 60 });
+    await store.init();
+
+    runMinutes(20); // past the 900 s second-ring depth
+
+    expect(store.topicRingSize()).toBe(TOPIC_RING_CAP); // capped, not growing
+    expect(store.topicMinuteRingSize()).toBeGreaterThan(15);
+    expect(store.topicMinuteRingSize()).toBeLessThanOrEqual(
+      TOPIC_MINUTE_RING_CAP
+    );
+
+    const row = get(store).loudest.rows.find(
+      (r) => r.topic === "plant/a/temperature"
+    );
+    expect(row).toBeDefined();
+    // One message a second across the whole window, however the window is
+    // assembled from the two rings.
+    expect(row!.msgPerSec).toBeGreaterThan(0.9);
+    expect(row!.msgPerSec).toBeLessThan(1.1);
+    store.destroy();
+  });
+
+  it("exposes stitched long series only while the range needs them", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet, { rangeMinutes: 60 });
+    await store.init();
+    runMinutes(20);
+
+    const long = get(store).longSeries;
+    expect(long).not.toBeNull();
+    const observed = long!.get("observed")!;
+    // Minute averages reach further back than the 900 raw seconds ever could.
+    const span = observed[observed.length - 1].t - observed[0].t;
+    expect(span).toBeGreaterThan(SPARKLINE_CAP * 1000);
+    // The live edge is still second-grain.
+    expect(Date.now() - observed[observed.length - 1].t).toBeLessThan(10_000);
+
+    store.setRange(5);
+    expect(get(store).longSeries).toBeNull();
+    store.destroy();
+  });
+});
+
+// --- v2: connection-loss contract --------------------------------------------
+
+describe("createBrokerStatusStore — connection loss", () => {
+  it("treats mqttReconnecting as a connection loss", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    expect(vi.getTimerCount()).toBe(1);
+
+    // An unexpected outage emits reconnecting, never disconnected.
+    emit("reconnecting");
+    expect(get(store).connected).toBe(false);
+    expect(vi.getTimerCount()).toBe(0); // ticker frozen, no fabricated samples
+
+    emit("conn");
+    expect(get(store).connected).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
+    store.destroy();
+  });
+
+  it("greys every rendered health chip when the connection drops", async () => {
+    mocks.getSys.mockResolvedValue([
+      msg("$SYS/broker/store/messages/count", "10", BASE_MS - 1000),
+    ]);
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    vi.advanceTimersByTime(1000); // tick evaluates health
+
+    const before = get(store).health.filter((c) => c.render);
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.some((c) => !c.stale)).toBe(true);
+
+    emit("reconnecting");
+    const after = get(store).health.filter((c) => c.render);
+    expect(after.every((c) => c.stale)).toBe(true);
+    expect(after.every((c) => c.qualifier === "")).toBe(true);
+    store.destroy();
+  });
+
+  it("does not backfill zeros across an outage", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    vi.advanceTimersByTime(1000);
+    emit("msgs", Array.from({ length: 4 }, () => msg("t", "hi", Date.now())));
+    vi.advanceTimersByTime(3000);
+    const beforeLen = get(store).observedSeries.length;
+    expect(beforeLen).toBeGreaterThan(0);
+
+    // 10 minutes offline. The ticker is stopped, so nothing is sampled; the
+    // resumed series must not invent one zero per silent second either.
+    emit("reconnecting");
+    vi.advanceTimersByTime(600_000);
+    emit("conn");
+    vi.advanceTimersByTime(3000);
+
+    const series = get(store).observedSeries;
+    // At most one sample per resumed tick: no 600-sample zero run.
+    expect(series.length).toBeLessThanOrEqual(beforeLen + 3);
+    // The outage shows as a time jump the view renders as a line break.
+    let maxGapMs = 0;
+    for (let i = 1; i < series.length; i++) {
+      maxGapMs = Math.max(maxGapMs, series[i].t - series[i - 1].t);
+    }
+    expect(maxGapMs).toBeGreaterThan(500_000);
+    store.destroy();
+  });
+
+  it("clamps the catch-up after a long suspend to the sparkline cap", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+    vi.advanceTimersByTime(1000);
+
+    // Simulate a suspended machine: the clock jumps hours while the connection
+    // stays nominally up, so one tick has to catch up ~28,800 seconds.
+    vi.setSystemTime(new Date(BASE_MS + 8 * 60 * 60_000));
+    vi.advanceTimersByTime(1000);
+
+    expect(get(store).observedSeries.length).toBeLessThanOrEqual(SPARKLINE_CAP);
+    store.destroy();
+  });
+});
+
+// --- v2: loudest-topics honesty ----------------------------------------------
+
+describe("createBrokerStatusStore — loudest topics honesty", () => {
+  it("age-gates the merge so a frozen ring cannot fabricate a live rate", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit("msgs", [msg("plant/a", "x", Date.now())]);
+    vi.advanceTimersByTime(1000);
+    expect(get(store).loudest.rows.length).toBe(1);
+
+    // 20 minutes offline, well past the default 5 m window, then back.
+    emit("reconnecting");
+    vi.advanceTimersByTime(1_200_000);
+    emit("conn");
+    vi.advanceTimersByTime(1000);
+
+    const loud = get(store).loudest;
+    expect(loud.rows).toHaveLength(0);
+    expect(loud.overflowMsgPerSec).toBe(0);
+    store.destroy();
+  });
+
+  it("keeps $SYS out of the loudest table", async () => {
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit("msgs", [
+      ...Array.from({ length: 20 }, () =>
+        msg("$SYS/broker/uptime", "1", Date.now())
+      ),
+      msg("plant/a", "x", Date.now()),
+    ]);
+    vi.advanceTimersByTime(1000);
+
+    const loud = get(store).loudest;
+    expect(loud.rows.map((r) => r.topic)).toEqual(["plant/a"]);
+    expect(loud.overflowMsgPerSec).toBe(0);
+    store.destroy();
+  });
+});
+
+// --- v2: browsed-topic cap ----------------------------------------------------
+
+describe("createBrokerStatusStore — browsed topic cap", () => {
+  it("stops admitting new topics past the cap", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = createBrokerStatusStore(CONN, eventSet);
+    await store.init();
+
+    emit(
+      "msgs",
+      Array.from({ length: LATEST_TOPIC_CAP + 100 }, (_, i) =>
+        msg(`$SYS/broker/clients/c${i}/count`, String(i), Date.now())
+      )
+    );
+
+    expect(get(store).latestByTopic.size).toBe(LATEST_TOPIC_CAP);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    store.destroy();
   });
 });

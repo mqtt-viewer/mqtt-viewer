@@ -12,7 +12,8 @@
   import { buildTree, type TreeRow } from "./build-tree";
   import type { HighlightedMqttTopicsStore } from "../../stores/highlighted-topics";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
-  import { OpenBrokerStatusWindow } from "bindings/mqtt-viewer/backend/app/app";
+  import { openBrokerStatusWindow } from "@/util/popout";
+  import envStore from "@/stores/env";
   import { findTopicNode } from "@/views/Connection/DataView/payload-copy";
   import Icon from "@/components/Icon/Icon.svelte";
   import { tick } from "svelte";
@@ -254,6 +255,7 @@
       <div class="flex">
         <div style:min-width={`${marginLeftPx}px`}></div>
         <div class="grow min-w-0 truncate" style:max-width={`${maxWidth}px`}>
+          <!-- ponytail: restore in web mode when broker status has an in-page route. -->
           <MqttTopicRow
             topic={item.expandKey}
             isDecodedProto={item.isDecodedProto}
@@ -268,9 +270,10 @@
             messageCount={item.countMessage}
             toggleExpansion={expandedTopicsStore.toggleMqttTopicExpansion}
             onTopicSelect={() => onTopicSelect(item)}
-            onOpenBrokerStatus={item.levelCount === 0 &&
+            onOpenBrokerStatus={!$envStore.isServerMode &&
+            item.levelCount === 0 &&
             item.topicLevel === "$SYS"
-              ? () => OpenBrokerStatusWindow(connectionId)
+              ? () => openBrokerStatusWindow(connectionId)
               : undefined}
             onUnpin={item.isPinned ? () => onUnpin(item.topic) : undefined}
             {highlightedTopicStore}

@@ -74,13 +74,34 @@ Caveats:
 - **Headless, not the native window.** It's the real Go backend + services (DB,
   MQTT, etc.), so bindings behave for real — but there's no OS window, menus,
   dialogs, screens, or native file pickers (those are no-ops in server mode).
-- **Backend→frontend live events need one extra step.** Events are pushed over a
-  WebSocket set up by `/wails/custom.js`, which server mode serves but does *not*
-  auto-inject. If you need live pushes (incoming MQTT messages, etc.), add
-  `<script src="/wails/custom.js"></script>` to the page. Plain request/response
-  binding calls need nothing extra.
+- **Live events already flow. Do not add a script tag for them.** Events are
+  pushed over a WebSocket set up by `/wails/custom.js`, and the pinned
+  `@wailsio/runtime` loads that script itself on every page: its index module
+  runs `loadOptionalScript('/wails/custom.js')`, which HEAD-probes the path and
+  appends the tag only where the route exists. So live pushes (incoming MQTT
+  messages, etc.) work in server mode with no extra markup, and in the native
+  webview the probe 404s and is a no-op. Adding
+  `<script src="/wails/custom.js"></script>` by hand loads it a second time,
+  opens a second WebSocket, and delivers every event twice: message counts and
+  rates then read double, which looks like a backend bug and is not one. Plain
+  request/response binding calls need nothing extra either.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
+
+To test the app behind a path-prefixing reverse proxy (Home Assistant ingress),
+put `scripts/ingress-sim.go` in front of the server-mode app: it serves
+everything under `/prefix/` and strips the prefix before forwarding, mirroring
+how ingress mounts an add-on.
+
+```sh
+go build -o bin/ingress-sim ./scripts && bin/ingress-sim   # then open :9600/prefix/
+bin/ingress-sim -listen :9601 -redirect=false              # no trailing-slash redirect
+```
+
+Build the binary, don't `go run` it: `go run`'s temp binaries have been seen to
+die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
+mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
+trailing-slash self-heal (see the file's header for the rest).
 
 ### Fallback for human/visual verification
 

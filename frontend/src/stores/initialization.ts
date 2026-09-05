@@ -19,8 +19,10 @@ const { subscribe, set } = writable<InitializationStore>({
 
 const init = async () => {
   try {
+    // Environment decides whether native window calls are available. Finish it
+    // before stores such as panelSizes choose their browser fallback.
+    await os.init();
     await Promise.all([
-      os.init(),
       connections.init(),
       subscriptions.init(),
       connectionTabs.init(),

@@ -21,15 +21,21 @@
   import tabs from "@/stores/tabs";
   import {
     ExportTopicMessages,
-    FocusTopicWindow,
-    OpenChartWindow,
-    OpenTopicWindow,
+    ExportTopicMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
   import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
   import { createClearRetainedFlow, onRetainedCleared } from "./clear-retained";
   import { onDestroy, onMount } from "svelte";
+  import { get } from "svelte/store";
   import { copyToClipboard } from "@/util/copy";
   import { errorMessage } from "@/util/strings";
+  import {
+    openChartWindow,
+    openTopicWindow,
+    focusTopicWindow as focusTopicWindowPopout,
+  } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
+  import envStore from "@/stores/env";
 
   export let connection: Connection;
 
@@ -194,7 +200,7 @@
         break;
       case "open-and-emit":
         lastEmittedTopic = topic;
-        OpenTopicWindow({
+        openTopicWindow({
           connectionId: connection.connectionDetails.id,
           topic: topic ?? "",
         })
@@ -203,7 +209,7 @@
             addToast({
               data: {
                 title: "Failed to open topic window",
-                description: e as string,
+                description: errorMessage(e),
                 type: "error",
               },
             });
@@ -217,7 +223,7 @@
 
   const focusTopicWindow = async () => {
     try {
-      await FocusTopicWindow({
+      await focusTopicWindowPopout({
         connectionId: connection.connectionDetails.id,
         topic: $selectedTopicStore.selectedTopic ?? "",
       });
@@ -225,7 +231,7 @@
       addToast({
         data: {
           title: "Failed to focus topic window",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -277,6 +283,24 @@
 
   const exportTopicMessages = async (topic: string) => {
     try {
+      if (get(envStore).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportTopicMessagesData(
+          connection.connectionDetails.id,
+          topic
+        );
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            descriptionStyle: "code",
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportTopicMessages(
         connection.connectionDetails.id,
         topic
@@ -378,7 +402,7 @@
               ? "3"
               : "5"}
             openChartWindow={(topic, fields) =>
-              OpenChartWindow({
+              openChartWindow({
                 connectionId: connection.connectionDetails.id,
                 topic,
                 fields,
@@ -414,7 +438,7 @@
             ? "3"
             : "5"}
           openChartWindow={(topic, fields) =>
-            OpenChartWindow({
+            openChartWindow({
               connectionId: connection.connectionDetails.id,
               topic,
               fields,

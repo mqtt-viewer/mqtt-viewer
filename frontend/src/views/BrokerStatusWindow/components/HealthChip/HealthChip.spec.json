@@ -1,0 +1,67 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "HealthChip",
+  "tier": "view",
+  "description": "One broker-health chip: state dot (outline ok / filled warning / filled error), label, monospaced value, and a one-word qualifier. State is never colour-only; informational chips carry no dot; a stale chip keeps its value but drops the dot and qualifier.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "label",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "level",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "'ok' | 'attention' | 'problem', or null for an informational chip with no dot.",
+      "options": ["ok", "attention", "problem"]
+    },
+    {
+      "name": "informational",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Value-only chip (heap, churn) with no state dot."
+    },
+    {
+      "name": "qualifier",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "One-word text qualifier shown beside the value; '' hides it."
+    },
+    {
+      "name": "valueText",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Preformatted monospaced value (units and any peak already composed by the caller)."
+    },
+    {
+      "name": "stale",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Source silent past the stale threshold: greys the value and drops the dot and qualifier."
+    }
+  ],
+  "tokens": [
+    "outline",
+    "elevation-1",
+    "secondary-text",
+    "emphasis",
+    "warning",
+    "error"
+  ],
+  "dependencies": [],
+  "notes": "Figma is not linked yet. Value formatting per chip lives in HealthStrip; this component is purely presentational."
+}

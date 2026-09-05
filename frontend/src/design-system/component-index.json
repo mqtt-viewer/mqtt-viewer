@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-05T06:54:55.623Z",
+  "generatedAt": "2026-09-05T07:40:42.434Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1749,6 +1749,12 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "serverPlaceholder",
+          "type": "string",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
@@ -1758,7 +1764,7 @@
         "secondary-text"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Reads the env store to branch in server mode (no native file dialog behind HTTP): it renders a BaseInput for typing a container path instead of the browse button. Storybook's env store defaults to desktop, so stories show the browse variant. The BaseInput use is intra-primitive composition; the validator forbids listing it as a dependency.",
       "sourcePath": "src/components/InputFields/FilePathPicker.svelte",
       "specPath": "src/components/InputFields/FilePathPicker.spec.json",
       "storyPath": "src/components/InputFields/FilePathPicker.stories.svelte",
@@ -2429,7 +2435,12 @@
         "lastSyncedAt": null
       },
       "props": [],
-      "tokens": [],
+      "tokens": [
+        "outline",
+        "elevation-2",
+        "secondary-text",
+        "emphasis"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent.",
       "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",
@@ -2526,10 +2537,14 @@
         "emphasis",
         "secondary-text",
         "white-text",
-        "elevation-0"
+        "elevation-0",
+        "outline"
       ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "dependencies": [
+        "BrokerStatusView",
+        "TimeRangeSelector"
+      ],
+      "notes": "Figma is not linked yet. The header carries the connection name, the status dot, the staleness pill, the time-range selector and the metrics gear, and nothing else: the broker facts live in the health strip below. The shell wraps the body in an overflow-y-auto scroll container so that strip can pin. On macOS the header keeps its total height but shifts its content up (pt-2 pb-4) so the row centres on the traffic lights. The selected range is persisted per connection under a namespaced key in the chart-window table. Dividing lines use the outline token, matching how the main window's sidebar and data view divide themselves.",
       "sourcePath": "src/views/BrokerStatusWindow/BrokerStatusWindow.svelte",
       "specPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/BrokerStatusWindow.stories.svelte",
@@ -2539,7 +2554,7 @@
     {
       "name": "BrokerStatusView",
       "tier": "view",
-      "description": "Body of the Broker Status window: responsive stat-tile grid with an always-last add-tile '+', a no-$SYS empty state with an add-subscription CTA, and a collapsible raw $SYS topic browser. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
+      "description": "Body of the Broker Status window (v2): sticky health strip carrying the health chips and the broker facts (or a capability notice), traffic hero chart, loudest-topics table, gauges grid with an always-last '+', and a collapsible raw $SYS browser with a derived rate column. Keeps the v1 no-$SYS empty state + add-subscription CTA. Reads a BrokerStatusStore and drives the MetricMappingEditor.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -2564,26 +2579,308 @@
       ],
       "tokens": [
         "outline",
+        "elevation-0",
         "elevation-1",
         "secondary-text",
         "emphasis",
-        "hovered",
-        "divider"
+        "hovered"
       ],
       "dependencies": [
         "StatTile",
         "MetricMappingEditor",
+        "HealthStrip",
+        "HeroChart",
+        "LoudestTopics",
         "Icon",
         "IconButton",
         "Tooltip",
         "Button",
         "BaseInput"
       ],
-      "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed.",
+      "notes": "Figma is not linked yet; stories use a mock BrokerStatusStore from fixtures. The strip bleeds out of the body's p-4 (-mx-4/-mt-4) to sit flush under the window header and pays the inset back as its own px-4, so its content edge lines up with the body's and pinning looks identical to rest. Age labels in the raw browser derive from a single shared 1 s tick (raw-browser.ts) referenced only while expanded, so no per-row timers run when collapsed. The derived rate column tracks per-topic prev-values in a tracker owned here and reset on a history clear.",
       "sourcePath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.svelte",
       "specPath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/components/BrokerStatusView/BrokerStatusView.stories.svelte",
       "storyId": "Views/BrokerStatusWindow/BrokerStatusView",
+      "specMissing": false
+    },
+    {
+      "name": "FactsRow",
+      "tier": "view",
+      "description": "One-line broker facts in the broker-status health strip: broker/version, uptime, session counts with word labels ('17 live, 6 offline, 2 expired'), and average message size. Each part is omitted when its metric has no data. Renders as a single dot-separated text node so it moves onto the strip's next line whole, and ellipsises only when it is wider than the strip.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "version",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Broker/version string, or null when unpublished."
+        },
+        {
+          "name": "uptimeSeconds",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Uptime in seconds; rendered via humanizeDuration."
+        },
+        {
+          "name": "clientsConnected",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Live sessions."
+        },
+        {
+          "name": "clientsDisconnected",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Offline sessions."
+        },
+        {
+          "name": "clientsExpired",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Expired sessions."
+        },
+        {
+          "name": "avgMsgSize",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Average message size in bytes."
+        }
+      ],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet. Values are read from the store's metricByKey by BrokerStatusView and passed down through HealthStrip as plain props. It renders nothing at all when no metric has data, so a sparse broker leaves the strip to the chips.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/FactsRow/FactsRow.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/FactsRow/FactsRow.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/FactsRow/FactsRow.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/FactsRow",
+      "specMissing": false
+    },
+    {
+      "name": "HealthChip",
+      "tier": "view",
+      "description": "One broker-health chip: state dot (outline ok / filled warning / filled error), label, monospaced value, and a one-word qualifier. State is never colour-only; informational chips carry no dot; a stale chip keeps its value but drops the dot and qualifier.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "level",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "'ok' | 'attention' | 'problem', or null for an informational chip with no dot.",
+          "options": [
+            "ok",
+            "attention",
+            "problem"
+          ]
+        },
+        {
+          "name": "informational",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Value-only chip (heap, churn) with no state dot."
+        },
+        {
+          "name": "qualifier",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "One-word text qualifier shown beside the value; '' hides it."
+        },
+        {
+          "name": "valueText",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Preformatted monospaced value (units and any peak already composed by the caller)."
+        },
+        {
+          "name": "stale",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Source silent past the stale threshold: greys the value and drops the dot and qualifier."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-1",
+        "secondary-text",
+        "emphasis",
+        "warning",
+        "error"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet. Value formatting per chip lives in HealthStrip; this component is purely presentational.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/HealthChip/HealthChip.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/HealthChip/HealthChip.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/HealthChip/HealthChip.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/HealthChip",
+      "specMissing": false
+    },
+    {
+      "name": "HealthStrip",
+      "tier": "view",
+      "description": "The broker-status window's second bar: a wrapping row of health chips followed by the broker facts. Renders only chips that have their minimum samples (chip.render) and composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix). Chips and the facts are siblings in one wrapping row, so the facts sit at the end of the chip line when there is room and drop whole onto the next line when there is not, never squeezing the chips. The bar hides when there are neither chips nor facts.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "health",
+          "type": "object",
+          "required": false,
+          "default": [],
+          "description": "HealthChip[] from the store; only entries with render:true are shown."
+        },
+        {
+          "name": "facts",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "BrokerFacts from the store's metricByKey (version, uptimeSeconds, clientsConnected, clientsDisconnected, clientsExpired, avgMsgSize), or null. The segment is absent when every field is null."
+        }
+      ],
+      "tokens": [],
+      "dependencies": [
+        "HealthChip",
+        "FactsRow"
+      ],
+      "notes": "Figma is not linked yet; stories use local health-chip and facts fixtures. Stickiness, the surrounding padding and the capability-notice fallback are owned by BrokerStatusView, not this component. The chips' ARIA list wrapper is display:contents so the list survives being flattened into the shared wrapping row. A min-height of one chip row keeps the bar from resizing as chips arrive one at a time.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/HealthStrip/HealthStrip.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/HealthStrip/HealthStrip.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/HealthStrip/HealthStrip.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/HealthStrip",
+      "specMissing": false
+    },
+    {
+      "name": "HeroChart",
+      "tier": "view",
+      "description": "Broker-status traffic hero: msgs/s in and out co-plotted with a dashed client-observed series, ECharts line chart under a custom live-value legend row.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "series",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "HeroSeries[] — each { id, label, points: {t, v}[], dashed, emphasis?, tooltip? }. `v` null marks a gap (line break). ids are stable ('in'/'out'/'observed')."
+        },
+        {
+          "name": "windowMinutes",
+          "type": "number",
+          "required": false,
+          "default": 5,
+          "description": "Visible span in minutes; anchors the sliding x-axis window."
+        },
+        {
+          "name": "height",
+          "type": "number",
+          "required": false,
+          "default": 160,
+          "description": "Canvas height in pixels."
+        }
+      ],
+      "tokens": [
+        "secondary-text",
+        "emphasis"
+      ],
+      "dependencies": [
+        "Tooltip"
+      ],
+      "notes": "ECharts paints to canvas, so axis/tooltip chrome and series colours come from literal JS palettes (CHROME_COLORS, CHART_PALETTE) rather than tokens; the legend value swatch is coloured inline from the same shared palette. Stories inject a fixed `now` + static series for deterministic test-storybook.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/HeroChart/HeroChart.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/HeroChart/HeroChart.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/HeroChart/HeroChart.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/HeroChart",
+      "specMissing": false
+    },
+    {
+      "name": "LoudestTopics",
+      "tier": "view",
+      "description": "Collapsible client-side loudest-topics table for the broker-status window, collapsed by default with the loudest topic and its rate in the header. Expanded it lists the top rows over the selected range with msg/s, bytes/s and a share bar, a '(collecting)' suffix while the window fills, and an overflow footer line. Topics keep their last two segments and ellipsise the head, with the full topic in a tooltip and a copy button on row hover; at narrow widths the share bar drops first, then bytes/s.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "loudest",
+          "type": "object",
+          "required": false,
+          "default": null,
+          "description": "LoudestState from the store: { rows: {topic, msgPerSec, bytesPerSec}[], overflowTopics, overflowMsgPerSec, collecting }."
+        },
+        {
+          "name": "expanded",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Whether the section is open. Toggled internally by the header button; exposed so a story can force the open state. Per session, never persisted."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-1",
+        "elevation-2",
+        "secondary-text",
+        "emphasis",
+        "primary"
+      ],
+      "dependencies": [
+        "Tooltip",
+        "CopyToClipboard",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport. Topic truncation is CSS only (head span truncates, tail span shrink-0), so the full topic shows whenever it fits.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/LoudestTopics/LoudestTopics.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/LoudestTopics/LoudestTopics.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/LoudestTopics/LoudestTopics.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/LoudestTopics",
       "specMissing": false
     },
     {
@@ -2736,10 +3033,39 @@
           "required": false,
           "default": false,
           "description": "Shows a subdued 'no data yet' placeholder instead of the value."
+        },
+        {
+          "name": "deltaPct",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "Percentage change across the visible window (last vs first sample). A direction arrow shows only when |deltaPct| >= 2, so steady tiles carry no flicker."
+        },
+        {
+          "name": "exact",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Exact, unabbreviated value string for the hover panel; falls back to `value`."
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "One-line note shown at the top of the hover panel (e.g. an observed tile's measurement note)."
+        },
+        {
+          "name": "windowName",
+          "type": "string",
+          "required": false,
+          "default": "15m",
+          "description": "Window the sparkline and delta span; named in the hover panel."
         }
       ],
       "tokens": [
         "elevation-1",
+        "elevation-2",
         "outline",
         "secondary-text",
         "emphasis",
@@ -2748,11 +3074,71 @@
       "dependencies": [
         "Sparkline"
       ],
-      "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper.",
+      "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper. The tile owns its hover/focus panel (exact value, min/max, window name) so observed tiles no longer need an outer Tooltip wrapper; the panel opens on group-hover and group-focus-within.",
       "sourcePath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.svelte",
       "specPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.spec.json",
       "storyPath": "src/views/BrokerStatusWindow/components/StatTile/StatTile.stories.svelte",
       "storyId": "Views/BrokerStatusWindow/StatTile",
+      "specMissing": false
+    },
+    {
+      "name": "TimeRangeSelector",
+      "tier": "view",
+      "description": "Segmented control for the broker-status window: 1m / 5m / 15m / 60m presets plus a custom interval (value and unit, capped at one day) in a dropdown; emits a legacy `change` event with the selected minutes.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "value",
+          "type": "number",
+          "required": false,
+          "default": 5,
+          "description": "Selected window in minutes. May be fractional (30 seconds is 0.5) and may sit outside `options` when the custom interval is in use."
+        },
+        {
+          "name": "options",
+          "type": "object",
+          "required": false,
+          "default": [
+            1,
+            5,
+            15,
+            60
+          ],
+          "description": "Preset windows offered as segments, in minutes."
+        },
+        {
+          "name": "sparseNote",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Optional tooltip on the group explaining sparse broker series at short ranges. Nothing is ever disabled."
+        }
+      ],
+      "tokens": [
+        "outline",
+        "elevation-1",
+        "selected",
+        "emphasis",
+        "secondary-text",
+        "error"
+      ],
+      "dependencies": [
+        "Tooltip",
+        "DropdownMenu",
+        "BaseNumberInput"
+      ],
+      "notes": "Emits on:change (legacy createEventDispatcher) with the selected minutes as detail. The custom segment is the selected-looking one whenever `value` is not a preset, and it is labelled with the live interval (\"2h\") instead of \"Custom\". Custom edits debounce at 400 ms and commit on Enter, blur or a unit click; the window is clamped to one day, which is all the broker-status store retains. Parse, clamp and label rules live in the colocated time-range.ts, which shares its unit vocabulary with the chart's chart-custom-window.ts.",
+      "sourcePath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.svelte",
+      "specPath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.spec.json",
+      "storyPath": "src/views/BrokerStatusWindow/components/TimeRangeSelector/TimeRangeSelector.stories.svelte",
+      "storyId": "Views/BrokerStatusWindow/TimeRangeSelector",
       "specMissing": false
     },
     {
