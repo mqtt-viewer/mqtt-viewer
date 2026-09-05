@@ -12,7 +12,8 @@
   import { buildTree, type TreeRow } from "./build-tree";
   import type { HighlightedMqttTopicsStore } from "../../stores/highlighted-topics";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
-  import { OpenBrokerStatusWindow } from "bindings/mqtt-viewer/backend/app/app";
+  import { openBrokerStatusWindow } from "@/util/popout";
+  import envStore from "@/stores/env";
 
   const connectionId = getConnectionIdContext();
 
@@ -41,6 +42,7 @@
   <div class="flex">
     <div style:min-width={`${marginLeftPx}px`}></div>
     <div class="grow min-w-0 truncate" style:max-width={`${maxWidth}px`}>
+      <!-- ponytail: restore in web mode when broker status has an in-page route. -->
       <MqttTopicRow
         topic={item.expandKey}
         isDecodedProto={item.isDecodedProto}
@@ -54,8 +56,10 @@
         messageCount={item.countMessage}
         toggleExpansion={expandedTopicsStore.toggleMqttTopicExpansion}
         onTopicSelect={() => onTopicSelect(item)}
-        onOpenBrokerStatus={item.levelCount === 0 && item.topicLevel === "$SYS"
-          ? () => OpenBrokerStatusWindow(connectionId)
+        onOpenBrokerStatus={!$envStore.isServerMode &&
+        item.levelCount === 0 &&
+        item.topicLevel === "$SYS"
+          ? () => openBrokerStatusWindow(connectionId)
           : undefined}
         {highlightedTopicStore}
       />

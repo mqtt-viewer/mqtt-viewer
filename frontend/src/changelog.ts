@@ -131,7 +131,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "A status page for your broker",
-        body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
+        body: "There's a new broker status window on the pulse icon above the topic tree, with a health strip that warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart, and a table of the loudest topics over a window from a minute to a day. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and measures rates here as well, so a broker that publishes nothing still gives you numbers.",
         thanks: [
           {
             name: "m1dnight",
@@ -149,13 +149,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Make the status page your own",
-        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic too, and you can pin one as a tile straight from it. Your tiles are saved per connection.",
+        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic to pin from too, and your tiles are saved per connection.",
         thanks: [
           {
             name: "andyg2",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12604380",
           },
         ],
+      },
+      {
+        title: "Pop-out windows you can actually move",
+        body: "The pop-out chart window could not be dragged at all. Grab its header to move it now, and the same goes for the new broker status window, which on macOS also leaves room for the window buttons instead of hiding the connection name behind them.",
       },
       {
         title: "Chart values that arrive as text",
@@ -173,7 +177,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Adding a value to a chart is clearer",
-        body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
+        body: 'Choosing "Add value from payload" now opens the picker straight on the value, so it\'s obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.',
         thanks: [
           {
             name: "Daschi2",
@@ -183,7 +187,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "See what your connection is doing",
-        body: "There's a \"View logs\" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.",
+        body: 'There\'s a "View logs" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.',
       },
       {
         title: "Pick your own chart time window",
@@ -245,7 +249,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Chart and dropdown fixes",
-        body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
+        body: 'Switching a chart back to "All history" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.',
         thanks: [
           {
             name: "viktak",
@@ -275,7 +279,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Reconnecting when the network drops out",
-        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+        body: 'If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing "connected" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.',
       },
       {
         title: "Install it with Nix",
@@ -307,7 +311,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Connection failures no longer go unreported",
-        body: "On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting \"Connection failed\" indicator until you try again.",
+        body: 'On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting "Connection failed" indicator until you try again.',
       },
       {
         title: "Collapsible collections",
@@ -336,6 +340,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Spot retained topics at a glance",
         body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages. The marker goes the moment you clear the message, on MQTT 3 as well as 5, and it starts again from what your broker replays each time you reconnect.",
+      },
+      {
+        title: "Run MQTT Viewer in your browser",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and pop-out charts open as tabs; broker status stays desktop-only until it has an in-page web view. It lets you know when a newer image is available, with the pull command to update, and you can turn that check off if you'd rather it stayed off the network. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+        thanks: [
+          {
+            name: "Jake W",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/119",
+          },
+        ],
       },
       {
         title: "The chart's Y-axis rescales with its time window",

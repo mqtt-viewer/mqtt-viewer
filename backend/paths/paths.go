@@ -13,6 +13,17 @@ type Paths struct {
 }
 
 func GetPaths() Paths {
+	// MQTT_VIEWER_DATA_DIR overrides the per-OS location for containerised/server
+	// deployments, where the data lives on a mounted Docker volume.
+	if dataDir := os.Getenv("MQTT_VIEWER_DATA_DIR"); dataDir != "" {
+		if _, err := os.ReadDir(dataDir); os.IsNotExist(err) {
+			os.MkdirAll(dataDir, os.ModePerm)
+		}
+		return Paths{
+			ResourcePath: dataDir,
+		}
+	}
+
 	homeDir, err := os.UserHomeDir()
 	resourcePath := ""
 	switch runtime.GOOS {

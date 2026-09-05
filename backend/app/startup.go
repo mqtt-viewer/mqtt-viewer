@@ -48,15 +48,17 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 				a.shuttingDown.Store(true)
 			})
 		}
-		if !env.IsDev {
-			slog.Info("starting in production mode")
+		if !env.IsDev || env.IsServerBuild {
+			slog.Info("starting application")
 			a.Mode = AppModes.Wails
 			a.Paths = paths.GetPaths()
+			// Containers log to stdout, so a server build uses console logging
+			// instead of writing to a file in the data volume.
 			logging.InitLogger(logging.LoggerParams{
 				ResourceDir:          a.Paths.ResourcePath,
 				EnableDebugLogging:   false,
-				EnableFileLogging:    true,
-				EnableConsoleLogging: false,
+				EnableFileLogging:    !env.IsServerBuild,
+				EnableConsoleLogging: env.IsServerBuild,
 			})
 		} else {
 			slog.Info("starting in wails development mode")
@@ -139,6 +141,11 @@ func (a *App) Startup(ctx context.Context, options *StartupOptions) {
 		a.setProtoRegistry(registry)
 	}()
 
+	// Initialise the updater everywhere but test mode. Server (Docker) builds
+	// still run the check so users are told when a newer image exists; the
+	// self-update flow itself is gated off separately (canSelfUpdate is false
+	// for server builds, so StartUpdate refuses). The Wails updater's Init is
+	// headless-safe: it only validates config and opens no window here.
 	if a.Mode != AppModes.Test {
 		updater, err := update.InitUpdater(application.Get())
 		if err != nil {

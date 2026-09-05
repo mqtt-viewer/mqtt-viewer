@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import Button from "@/components/Button/Button.svelte";
   import type { ChangelogEntry } from "@/changelog";
 
@@ -70,7 +70,7 @@
                       : ", "}{/if}<a
                     href={t.url}
                     class="text-primary hover:underline"
-                    on:click|preventDefault={() => Browser.OpenURL(t.url)}
+                    on:click|preventDefault={() => openExternal(t.url)}
                     >@{t.name}</a
                   >{/each}.{/if}</span
             >
@@ -87,7 +87,7 @@
       <span class="text-sm text-secondary-text grow">{entry.date}</span>
       <Button
         variant="secondary"
-        on:click={() => Browser.OpenURL(STARGAZERS_URL)}
+        on:click={() => openExternal(STARGAZERS_URL)}
       >
         Star on GitHub
       </Button>

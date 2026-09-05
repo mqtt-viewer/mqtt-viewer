@@ -137,7 +137,7 @@ func (a *App) OpenBrokerStatusWindow(connectionId uint) error {
 	return focusOrCreateWindow(&statusWindowsMu, statusWindows, connectionId, func() application.WebviewWindowOptions {
 		return application.WebviewWindowOptions{
 			Title:            title,
-			Width:            760,
+			Width:            900,
 			Height:           560,
 			MinWidth:         520,
 			MinHeight:        380,
