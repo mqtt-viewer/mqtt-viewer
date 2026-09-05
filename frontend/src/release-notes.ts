@@ -47,7 +47,7 @@ const thanksLine = (section: ChangelogSection): string | null => {
   const thanks = section.thanks ?? [];
   if (thanks.length === 0) return null;
   const links = thanks.map((t) => `[${t.name}](${t.url})`);
-  return `Thanks to ${joinList(links)}.`;
+  return `Thanks ${joinList(links)}.`;
 };
 
 export interface ReleaseNotesOptions {
@@ -59,7 +59,7 @@ export interface ReleaseNotesOptions {
 }
 
 // A grouped entry renders as one "## Group" heading per group with a bullet
-// list beneath it: "- **Title.** Body. Thanks to ...". That keeps the release
+// list beneath it: "- **Title.** Body. Thanks ...". That keeps the release
 // page short. Ungrouped entries (written before groups existed) keep their
 // "## Section" layout byte for byte.
 const GROUP_HEADING = "##";

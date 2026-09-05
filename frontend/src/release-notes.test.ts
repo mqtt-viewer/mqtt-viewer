@@ -56,7 +56,7 @@ describe("renderReleaseNotes", () => {
   });
 
   it("omits the thanks line when a section has no credits", () => {
-    expect(renderReleaseNotes(entry(), opts)).not.toContain("Thanks to");
+    expect(renderReleaseNotes(entry(), opts)).not.toContain("Thanks ");
   });
 
   it("renders a single credit", () => {
@@ -78,7 +78,7 @@ describe("renderReleaseNotes", () => {
       opts
     );
     expect(notes).toContain(
-      "Thanks to [jeeftor](https://github.com/mqtt-viewer/mqtt-viewer/issues/124).\n"
+      "Thanks [jeeftor](https://github.com/mqtt-viewer/mqtt-viewer/issues/124).\n"
     );
   });
 
@@ -100,7 +100,7 @@ describe("renderReleaseNotes", () => {
       opts
     );
     expect(notes).toContain(
-      "Thanks to [one](https://github.com/one), [two](https://github.com/two) and [three](https://github.com/three)."
+      "Thanks [one](https://github.com/one), [two](https://github.com/two) and [three](https://github.com/three)."
     );
   });
 
@@ -272,7 +272,7 @@ describe("section groups", () => {
             links.length <= 1
               ? links.join("")
               : `${links.slice(0, -1).join(", ")} and ${links[links.length - 1]}`;
-          blocks.push(`Thanks to ${list}.`);
+          blocks.push(`Thanks ${list}.`);
         }
       }
       if (e.outro?.trim()) blocks.push(e.outro.trim());
