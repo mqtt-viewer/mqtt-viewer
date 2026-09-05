@@ -18,7 +18,6 @@
   } from "./broker-status-store";
   import BrokerStatusView from "./components/BrokerStatusView/BrokerStatusView.svelte";
   import TimeRangeSelector from "./components/TimeRangeSelector/TimeRangeSelector.svelte";
-  import FactsRow from "./components/FactsRow/FactsRow.svelte";
   import { nowTick, formatAge } from "./components/BrokerStatusView/raw-browser";
 
   // State comes from the window URL the backend opened:
@@ -42,25 +41,6 @@
   let learnedIntervalMs = 10_000;
   let rangeMinutes = DEFAULT_RANGE_MINUTES;
   let unsubStore: (() => void) | null = null;
-
-  // Broker facts for the title bar. They read as part of the window's identity
-  // ("which broker is this, and how long has it been up"), so they live beside
-  // the title rather than in a row of their own down the page.
-  let facts: {
-    version: string | null;
-    uptimeSeconds: number | null;
-    clientsConnected: number | null;
-    clientsDisconnected: number | null;
-    clientsExpired: number | null;
-    avgMsgSize: number | null;
-  } = {
-    version: null,
-    uptimeSeconds: null,
-    clientsConnected: null,
-    clientsDisconnected: null,
-    clientsExpired: null,
-    avgMsgSize: null,
-  };
 
   // The selected range is persisted per connection in the same key/value table
   // the topic chart uses for its window. The key is namespaced so it can never
@@ -86,15 +66,6 @@
       sysLastSeenMs = st.sysLastSeenMs;
       learnedIntervalMs = st.learnedIntervalMs;
       rangeMinutes = st.rangeMinutes;
-      facts = {
-        version: st.metricByKey.get("version")?.text ?? null,
-        uptimeSeconds: st.metricByKey.get("uptime")?.value ?? null,
-        clientsConnected: st.metricByKey.get("clients_connected")?.value ?? null,
-        clientsDisconnected:
-          st.metricByKey.get("clients_disconnected")?.value ?? null,
-        clientsExpired: st.metricByKey.get("clients_expired")?.value ?? null,
-        avgMsgSize: st.metricByKey.get("avg_msg_size")?.value ?? null,
-      };
       if (st.windowOpenedAt !== lastOpenedAt) {
         lastOpenedAt = st.windowOpenedAt;
         armPillGrace(st.windowOpenedAt);
@@ -215,7 +186,7 @@
          shifted up (pt-2 pb-4 = the old py-3 total), putting the row's centre
          on the lights' centre. Windows and Linux keep the even padding. -->
     <header
-      class="flex items-center gap-2 px-4 border-b border-divider {$os.isMac &&
+      class="flex items-center gap-2 px-4 border-b border-outline {$os.isMac &&
       !$os.isFullscreen
         ? 'pt-2 pb-4'
         : 'py-3'}"
@@ -226,18 +197,11 @@
         <div class="w-[62px] shrink-0" />
       {/if}
       <ConnectionStatusCircle state={connectionState} />
-      <div class="flex min-w-0 flex-1 items-baseline gap-2">
+      <!-- The connection name alone. The window title and the dot already say
+           what this window is, and the broker facts now live in the health
+           strip below, which leaves the name its full width. -->
+      <div class="flex min-w-0 flex-1 items-baseline">
         <span class="text-lg text-emphasis truncate">{connectionName}</span>
-        <span class="text-secondary-text text-sm shrink-0">broker status</span>
-        <!-- Broker facts, ellipsised before they can reach the $SYS pill. -->
-        <FactsRow
-          version={facts.version}
-          uptimeSeconds={facts.uptimeSeconds}
-          clientsConnected={facts.clientsConnected}
-          clientsDisconnected={facts.clientsDisconnected}
-          clientsExpired={facts.clientsExpired}
-          avgMsgSize={facts.avgMsgSize}
-        />
       </div>
       {#if store}
         <div
@@ -273,7 +237,7 @@
       <div
         class="px-4 py-1.5 text-sm truncate border-b {banner.warn
           ? 'text-warning border-warning'
-          : 'text-secondary-text border-divider'}"
+          : 'text-secondary-text border-outline'}"
       >
         {banner.text}
       </div>

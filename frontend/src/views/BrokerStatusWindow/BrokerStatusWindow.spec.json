@@ -17,8 +17,12 @@
     "emphasis",
     "secondary-text",
     "white-text",
-    "elevation-0"
+    "elevation-0",
+    "outline"
   ],
-  "dependencies": ["BrokerStatusView", "TimeRangeSelector", "FactsRow"],
-  "notes": "Figma is not linked yet. The shell owns the header staleness pill, the broker facts line and the time-range selector, and wraps the body in an overflow-y-auto scroll container for the sticky health strip. On macOS the header keeps its total height but shifts its content up (pt-2 pb-4) so the row centres on the traffic lights. The selected range is persisted per connection under a namespaced key in the chart-window table."
+  "dependencies": [
+    "BrokerStatusView",
+    "TimeRangeSelector"
+  ],
+  "notes": "Figma is not linked yet. The header carries the connection name, the status dot, the staleness pill, the time-range selector and the metrics gear, and nothing else: the broker facts live in the health strip below. The shell wraps the body in an overflow-y-auto scroll container so that strip can pin. On macOS the header keeps its total height but shifts its content up (pt-2 pb-4) so the row centres on the traffic lights. The selected range is persisted per connection under a namespaced key in the chart-window table. Dividing lines use the outline token, matching how the main window's sidebar and data view divide themselves."
 }

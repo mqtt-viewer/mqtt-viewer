@@ -361,6 +361,18 @@ export const mockHealthChips = (): MockHealthChip[] => [
   { id: "churn", label: "Churn", level: null, informational: true, qualifier: "", value: 3.2, detail: null, since: now, stale: false, render: true },
 ];
 
+// Broker facts as the health strip prints them, matching the metricByKey
+// fixture above so a strip story and a view story read the same broker.
+export const mockBrokerFacts =
+  (): import("@/views/BrokerStatusWindow/sys-metrics").BrokerFacts => ({
+    version: "mosquitto 2.0.18",
+    uptimeSeconds: 273600,
+    clientsConnected: 17,
+    clientsDisconnected: 6,
+    clientsExpired: 2,
+    avgMsgSize: 312,
+  });
+
 type MockLoudestState = import("@/views/BrokerStatusWindow/broker-status-store").LoudestState;
 
 // Loudest-topics view model: six rows (one deliberately long, to exercise the

@@ -81,9 +81,8 @@
     </span>
     <span>Loudest topics</span>
     {#if expanded}
-      <span class="text-sm opacity-70">(this client's subscriptions)</span>
       <!-- Suppressed while the table is empty: the body already says no
-           messages have arrived, and two stacked suffixes read as clutter. -->
+           messages have arrived. -->
       {#if loudest.collecting && loudest.rows.length > 0}
         <span class="text-sm opacity-70">(collecting)</span>
       {/if}
@@ -101,7 +100,7 @@
           {#each loudest.rows as row (row.topic)}
             {@const parts = splitTopic(row.topic)}
             <div
-              class="group flex items-center gap-3 border-t border-divider py-1 first:border-t-0"
+              class="group flex items-center gap-3 border-t border-outline py-1 first:border-t-0"
             >
               <div class="flex min-w-0 flex-1 items-center gap-1">
                 <!-- Shrinks to the name (no flex-1), so the copy button sits

@@ -2,7 +2,7 @@
   "$schema": "../../../../design-system/component-spec.schema.json",
   "name": "HealthStrip",
   "tier": "view",
-  "description": "Wrapping row of broker-health chips. Renders only chips that have their minimum samples (chip.render) and hides entirely when none do. Composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix). Chips wrap onto further rows when the window is too narrow for them all, with the row gap matching the chip gap.",
+  "description": "The broker-status window's second bar: a wrapping row of health chips followed by the broker facts. Renders only chips that have their minimum samples (chip.render) and composes each chip's monospaced value (heap folds in its peak; rate chips carry a /s suffix). Chips and the facts are siblings in one wrapping row, so the facts sit at the end of the chip line when there is room and drop whole onto the next line when there is not, never squeezing the chips. The bar hides when there are neither chips nor facts.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -18,9 +18,19 @@
       "required": false,
       "default": [],
       "description": "HealthChip[] from the store; only entries with render:true are shown."
+    },
+    {
+      "name": "facts",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "BrokerFacts from the store's metricByKey (version, uptimeSeconds, clientsConnected, clientsDisconnected, clientsExpired, avgMsgSize), or null. The segment is absent when every field is null."
     }
   ],
   "tokens": [],
-  "dependencies": ["HealthChip"],
-  "notes": "Figma is not linked yet; stories use local health-chip fixtures. Stickiness and the capability-notice fallback are owned by BrokerStatusView, not this component."
+  "dependencies": [
+    "HealthChip",
+    "FactsRow"
+  ],
+  "notes": "Figma is not linked yet; stories use local health-chip and facts fixtures. Stickiness, the surrounding padding and the capability-notice fallback are owned by BrokerStatusView, not this component. The chips' ARIA list wrapper is display:contents so the list survives being flattened into the shared wrapping row. A min-height of one chip row keeps the bar from resizing as chips arrive one at a time."
 }

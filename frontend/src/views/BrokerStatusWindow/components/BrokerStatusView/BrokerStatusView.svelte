@@ -1,12 +1,11 @@
 <script lang="ts">
   // Body of the detached Broker Status window. v2 layout, top to bottom:
-  // sticky health strip (or a capability notice when no $SYS card is showing),
-  // the traffic hero chart, the loudest-topics table, the gauges grid (with an
-  // always-last "+"), and the collapsible raw $SYS browser. The broker facts
-  // moved up into the window's title bar (the shell renders FactsRow). The
-  // v1 no-$SYS empty state + add-subscription CTA is kept. The window shell owns
-  // the store's lifecycle and the header (pill + range selector); this view only
-  // reads the store and drives the mapping editor.
+  // sticky health strip (chips plus the broker facts, or a capability notice
+  // when no $SYS card is showing), the traffic hero chart, the loudest-topics
+  // table, the gauges grid (with an always-last "+"), and the collapsible raw
+  // $SYS browser. The v1 no-$SYS empty state + add-subscription CTA is kept.
+  // The window shell owns the store's lifecycle and the header (pill + range
+  // selector); this view only reads the store and drives the mapping editor.
   import { onDestroy } from "svelte";
   import { writable } from "svelte/store";
   import StatTile from "../StatTile/StatTile.svelte";
@@ -27,7 +26,11 @@
     BrokerTileView,
   } from "../../broker-status-store";
   import type { HeroSeries } from "../HeroChart/hero-chart-option";
-  import { formatMetricValue } from "../../sys-metrics";
+  import {
+    formatMetricValue,
+    hasBrokerFacts,
+    type BrokerFacts,
+  } from "../../sys-metrics";
   import { nowTick, formatAge, createRawRateTracker } from "./raw-browser";
 
   export let store: BrokerStatusStore;
@@ -88,17 +91,32 @@
 
   $: showEmptyState = !$store.sysEverSeen && $store.connected && graceElapsed;
 
+  // Broker facts for the strip, read straight off the metric snapshots. Each
+  // one is null until its metric has a value, so the segment grows into the bar
+  // rather than reserving space for numbers that may never come.
+  $: facts = {
+    version: $store.metricByKey.get("version")?.text ?? null,
+    uptimeSeconds: $store.metricByKey.get("uptime")?.value ?? null,
+    clientsConnected: $store.metricByKey.get("clients_connected")?.value ?? null,
+    clientsDisconnected:
+      $store.metricByKey.get("clients_disconnected")?.value ?? null,
+    clientsExpired: $store.metricByKey.get("clients_expired")?.value ?? null,
+    avgMsgSize: $store.metricByKey.get("avg_msg_size")?.value ?? null,
+  } satisfies BrokerFacts;
+
   // Health strip vs capability notice (deduplicated against the v1 empty card):
-  // the strip shows once any chip has data. The notice only stands in when no
-  // $SYS has EVER been seen (a broker with $SYS but no health signals gets
-  // neither strip nor notice, and a healthy broker's chip warm-up must not
-  // flash a false "no $SYS" claim) and the empty card is not already showing.
-  // It also needs the connection to have been up at least once: claiming a
-  // broker publishes no $SYS before ever reaching it is a guess, not a finding.
+  // the strip shows once any chip has data, or once the broker has published a
+  // fact (a broker with $SYS but no health signals still has an identity worth
+  // printing). The notice only stands in when no $SYS has EVER been seen (so a
+  // healthy broker's chip warm-up cannot flash a false "no $SYS" claim) and the
+  // empty card is not already showing. It also needs the connection to have
+  // been up at least once: claiming a broker publishes no $SYS before ever
+  // reaching it is a guess, not a finding.
   $: hasHealth = $store.health.some((c) => c.render);
+  $: showStrip = hasHealth || hasBrokerFacts(facts);
   $: showCapabilityNotice =
     graceElapsed &&
-    !hasHealth &&
+    !showStrip &&
     !showEmptyState &&
     !$store.sysEverSeen &&
     $store.everConnected;
@@ -317,10 +335,17 @@
 </script>
 
 <div class="flex flex-col gap-4 p-4">
-  <!-- Health strip (sticky) or capability notice. -->
-  {#if hasHealth}
-    <div class="sticky top-0 z-10 -mx-4 border-b border-divider bg-elevation-0 px-4 pb-2 pt-1">
-      <HealthStrip health={$store.health} />
+  <!-- Health strip (sticky) or capability notice. The strip is the window's
+       second bar, so it bleeds out of the body's p-4 on all four sides
+       (-mx-4/-mt-4) to sit flush under the header, and pays the inset back as
+       its own px-4: its content edge lines up with the body's. Vertical
+       padding is one value (py-3), so pinning at the top of the scroll
+       container looks the same as it does at rest. The gap-4 below it is the
+       only separation from the hero, which keeps the header border, the strip
+       border and the body one line each. -->
+  {#if showStrip}
+    <div class="sticky top-0 z-10 -mx-4 -mt-4 border-b border-outline bg-elevation-0 px-4 py-3">
+      <HealthStrip health={$store.health} {facts} />
     </div>
   {:else if showCapabilityNotice}
     <div class="rounded border border-outline bg-elevation-1 px-3 py-2 text-sm text-secondary-text">
@@ -336,7 +361,7 @@
   <!-- Traffic hero: msg/s in and out with the client-observed series. -->
   <HeroChart series={heroSeries} windowMinutes={$store.rangeMinutes} />
 
-  <!-- Loudest topics (this client's subscriptions). -->
+  <!-- Loudest topics, measured across this client's own subscriptions. -->
   <LoudestTopics loudest={$store.loudest} />
 
   <!-- Tile grid: gauges + custom/override tiles, then the always-last +. -->
@@ -450,7 +475,7 @@
               </thead>
               <tbody>
                 {#each rawShown as row (row.topic)}
-                  <tr class="border-t border-divider align-middle">
+                  <tr class="border-t border-outline align-middle">
                     <td class="truncate py-1 pr-3 text-emphasis" title={row.topic}>
                       {row.topic}
                     </td>

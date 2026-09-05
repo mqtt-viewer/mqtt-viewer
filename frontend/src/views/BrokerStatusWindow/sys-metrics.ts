@@ -106,6 +106,22 @@ export type ParsedSample =
   | { kind: "number"; value: number }
   | { kind: "text"; text: string };
 
+// The broker facts the health strip prints beside its chips. Every field is
+// null when the broker publishes nothing for it, so a sparse broker shortens
+// the line rather than filling it with placeholders.
+export interface BrokerFacts {
+  version: string | null;
+  uptimeSeconds: number | null;
+  clientsConnected: number | null;
+  clientsDisconnected: number | null;
+  clientsExpired: number | null;
+  avgMsgSize: number | null;
+}
+
+// True when at least one fact has a value, i.e. the facts segment renders.
+export const hasBrokerFacts = (facts: BrokerFacts | null): boolean =>
+  facts !== null && Object.values(facts).some((v) => v !== null);
+
 const MINUTE_AVG = 1 / 60; // mosquitto load/*/1min → per-second
 const MS = 1 / 1000; // milliseconds → seconds
 

@@ -33,9 +33,12 @@
     "elevation-2",
     "secondary-text",
     "emphasis",
-    "divider",
     "primary"
   ],
-  "dependencies": ["Tooltip", "CopyToClipboard", "Icon"],
+  "dependencies": [
+    "Tooltip",
+    "CopyToClipboard",
+    "Icon"
+  ],
   "notes": "Figma is not linked yet; stories use a local LoudestState fixture. Responsive column drops are driven by bind:clientWidth against fixed breakpoints, not the viewport. Topic truncation is CSS only (head span truncates, tail span shrink-0), so the full topic shows whenever it fits."
 }
