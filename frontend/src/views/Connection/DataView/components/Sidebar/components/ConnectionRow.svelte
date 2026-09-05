@@ -148,12 +148,12 @@
           {isConnected || isBusy ? "Disconnect" : "Connect"}
         </DropdownMenuItem>
         <DropdownMenuItem
-          iconType="settings"
+          iconType="edit"
           onClick={() => ($isEditOpen = true)}
         >
           Edit connection…
         </DropdownMenuItem>
-        <DropdownMenuItem iconType="edit" onClick={() => (isRenaming = true)}>
+        <DropdownMenuItem iconType="rename" onClick={() => (isRenaming = true)}>
           Rename
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => ($isLogsOpen = true)}>

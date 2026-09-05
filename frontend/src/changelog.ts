@@ -100,6 +100,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Both show the same memory estimate, from one shared piece of the interface, and sit on the same spacing rhythm.",
       },
       {
+        title: "Icon seed and delete are out in the open",
+        body: "The connection dialog used to hide its icon seed field and delete action behind a cog menu. They now sit in a row at the top of the form, and the sidebar's Edit connection item shows a pencil instead of a cog.",
+      },
+      {
         title: "The edit button on a connection tile opens the details",
         body: "Pressing the pencil on a connection, from Home or a new tab, opened its tab and left you to find the details dialog yourself. It now opens the dialog too.",
       },
