@@ -3,6 +3,15 @@ name: Release MQTT Viewer - Mac
 on:
   release:
     types: [published]
+  # Re-run just the Mac build for an existing release, after fixing a
+  # Mac-only failure, without recreating the tag and rebuilding every
+  # platform. Assets are uploaded to the release with --clobber and the
+  # portal record is updated in place.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build for (e.g. v1.1.0)"
+        required: true
 
 env:
   GO_VERSION: "1.25.x"
@@ -33,9 +42,8 @@ jobs:
         id: normalise_version
         shell: bash
         run: |
-          if [ -n "${{ github.event.release.tag_name }}" ]; then
-            version=$(echo ${{ github.event.release.tag_name }})
-          else
+          version="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -z "$version" ]; then
             version="v0.0.0"
           fi
           echo "version=$version" >> $GITHUB_OUTPUT
@@ -76,13 +84,6 @@ jobs:
         with:
           p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
           p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
-
-      - name: Use mac app icon
-        shell: bash
-        run: |
-          cd build
-          rm -f appicon.png
-          mv appicon-mac.png appicon.png
 
       # Build
 
@@ -127,11 +128,31 @@ jobs:
           cd bin && shasum -a 256 ${{ steps.define_filename.outputs.filename }}.zip > ${{ steps.define_filename.outputs.filename }}.zip.sha256
 
       - name: Upload release assets
-        uses: alexellis/upload-assets@0.4.1
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          asset_paths: '["bin/${{ steps.define_filename.outputs.filename }}.zip", "bin/${{ steps.define_filename.outputs.filename }}.zip.sha256"]'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.normalise_version.outputs.version }}" \
+            "bin/${{ steps.define_filename.outputs.filename }}.zip" \
+            "bin/${{ steps.define_filename.outputs.filename }}.zip.sha256" \
+            --clobber --repo "${{ github.repository }}"
+
+      # The release body and publish time come from the release itself, so a
+      # dispatch run sends the portal the same notes the release event would.
+      - name: Read release metadata
+        id: release_meta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ steps.normalise_version.outputs.version }}" \
+            --repo "${{ github.repository }}" --json body,publishedAt > release.json
+          {
+            echo "published_at=$(jq -r .publishedAt release.json)"
+            echo "notes<<NOTES_EOF"
+            jq -r .body release.json
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       # Register the updater artifact with the portal. The record is created
       # with released=false; toggle `released` in the portal admin UI to make
@@ -143,8 +164,8 @@ jobs:
           PORTAL_URL: https://cloud.mqttviewer.app
           CI_RELEASES_USERNAME: ${{ secrets.CI_RELEASES_USERNAME }}
           CI_RELEASES_PASSWORD: ${{ secrets.CI_RELEASES_PASSWORD }}
-          RELEASE_NOTES: ${{ github.event.release.body }}
-          PUBLISHED_AT: ${{ github.event.release.published_at }}
+          RELEASE_NOTES: ${{ steps.release_meta.outputs.notes }}
+          PUBLISHED_AT: ${{ steps.release_meta.outputs.published_at }}
         run: |
           asset=bin/${{ steps.define_filename.outputs.filename }}.zip
           name=$(basename "$asset")
