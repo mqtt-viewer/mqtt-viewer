@@ -1,22 +1,39 @@
 # Writing style
 
 How MQTT Viewer sounds in anything a user reads: the changelog / "What's new"
-notes, dialog copy, empty states, tooltips, README, release notes. The goal is
-simple. It should read like a real person who built the app wrote it, because
-one did. It should never read like it came out of a template or a language
-model.
+notes, dialog copy, empty states, tooltips, README, release notes, and the
+website. The goal is simple. It should read like a real person who built the
+app wrote it, because one did. It should never read like it came out of a
+template or a language model.
 
 If you are an AI writing copy for this app, this file is the brief. Follow it.
 
+## Two voices, one set of rules
+
+There are two registers. Everything below rule 1 applies to both.
+
+- **Personal.** The changelog, release notes, dialog copy, the README, and
+  anything else written as a note from the maintainer. First person singular.
+- **Product.** The website (mqttviewer.app) and any page whose job is to
+  explain what the app does to someone who has not installed it yet.
+  Impersonal, practical, matter-of-fact engineering copy. It describes the
+  tool and tells the reader what to do. It does not say "I" or "we".
+
 ## Voice in one line
 
-Warm, direct, and a little dry. First person. Talks to one user, not a crowd.
+Personal: warm, direct, and a little dry. Talks to one user, not a crowd.
+
+Product: plain engineering English. Says what the thing does, how, and what
+it costs, then stops.
 
 ## The rules
 
-1. **First person singular.** It's "I", not "we". One person builds MQTT Viewer,
-   so feedback "comes straight to me", not "to our team". Address the reader as
-   "you".
+1. **Person.** In the personal register it's "I", not "we". One person builds
+   MQTT Viewer, so feedback "comes straight to me", not "to our team". Address
+   the reader as "you". In the product register there is no narrator: write
+   about the app ("MQTT Viewer keeps a live tree of every topic") or to the
+   reader ("Right-click a topic to copy its path"). Never "we", "our" or "us",
+   and no "I" either.
 
 2. **British spelling.** visualise, colour, behaviour, favourite, licence (noun),
    customise, catalogue. Match the rest of the app.
@@ -43,8 +60,10 @@ Warm, direct, and a little dry. First person. Talks to one user, not a crowd.
    "enables real-time data visualisation". Name the button, the payload, the
    actual thing on screen.
 
-8. **A bit of warmth is good.** A wink is fine ("But wait, there's more"). Thank
-   people. Admit when something was overdue. Do not force jokes and do not gush.
+8. **A bit of warmth is good, in the personal register.** A wink is fine ("But
+   wait, there's more"). Thank people. Admit when something was overdue. Do not
+   force jokes and do not gush. Product copy skips the winks: it earns trust by
+   being specific, not by being friendly.
 
 9. **No hedging filler.** Drop "simply", "just", "easily", "of course", "in
    order to", "please note that". They add nothing.
@@ -58,6 +77,21 @@ Warm, direct, and a little dry. First person. Talks to one user, not a crowd.
     you're a hobbyist or a professional...", rhetorical questions answered in
     the next sentence, exclamation marks, and titles with a colon ("Charting:
     reimagined"). If a sentence has the rhythm of a keynote, rewrite it flat.
+
+## Website specifics
+
+- Product register throughout. Third person about the app, imperative to the
+  reader.
+- Every claim must be true of the shipped app today. No roadmap, no "coming
+  soon", no version numbers in feature copy (they rot).
+- Lead with what the reader can do, then how it works, then the limits.
+  Naming a limit ("the retained index only knows what this client has seen")
+  reads as competence, not weakness.
+- Facts that search engines and answer engines quote (the tagline, meta
+  descriptions, FAQ answers, JSON-LD) stay short, literal and self-contained.
+  An FAQ answer should make sense lifted out of the page on its own, and
+  should not open with "Yes." or "No.".
+- Screenshots carry alt text that says what is on screen, in the same voice.
 
 ## Changelog specifics
 

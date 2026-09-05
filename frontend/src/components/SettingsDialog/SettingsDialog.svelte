@@ -16,6 +16,7 @@
   } from "bindings/mqtt-viewer/backend/app/app";
   import env from "@/stores/env";
   import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
+  import { starPromptOpen } from "@/components/StarPromptDialog/StarPromptDialog.svelte";
   import {
     MB,
     GB,
@@ -263,6 +264,16 @@
             open.set(false);
             whatsNewOpen.set(true);
           }}>What's new</Button
+        >
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-secondary-text">Like the app?</span>
+        <Button
+          variant="text"
+          on:click={() => {
+            open.set(false);
+            starPromptOpen.set(true);
+          }}>Star on GitHub</Button
         >
       </div>
     </section>

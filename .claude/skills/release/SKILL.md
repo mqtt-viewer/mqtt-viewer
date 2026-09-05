@@ -123,8 +123,8 @@ gh run list --limit 6
 ```
 
 Expected assets (see `docs/RELEASING.md` for the full list): darwin arm64/amd64
-zips, windows zip + installer.exe, linux zip/AppImage/deb/rpm, each with a
-`.sha256`.
+zips, windows arm64/amd64 zips + installer.exe, linux zip/AppImage/deb/rpm,
+each with a `.sha256`.
 
 ## 6. Go live (manual, human gate)
 

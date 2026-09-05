@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-05T07:40:42.434Z",
+  "generatedAt": "2026-09-05T09:49:51.393Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2155,7 +2155,7 @@
         "outline"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet.",
+      "notes": "Figma is not linked yet. The footer section carries a \"Star on GitHub\" row that closes settings and opens the StarPromptDialog.",
       "sourcePath": "src/components/SettingsDialog/SettingsDialog.svelte",
       "specPath": "src/components/SettingsDialog/SettingsDialog.spec.json",
       "storyPath": "src/components/SettingsDialog/SettingsDialog.stories.svelte",

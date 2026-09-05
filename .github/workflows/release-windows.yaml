@@ -12,6 +12,7 @@ env:
 jobs:
   release:
     strategy:
+      fail-fast: false
       matrix:
         build:
           - arch: amd64
