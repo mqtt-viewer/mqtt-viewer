@@ -1212,16 +1212,18 @@
            the legend on a small panel; the entries scroll past that while the
            header and the overflow line stay put. Opaque like the stats HUD:
            nodes reading through the text made both harder to read. -->
-      <!-- top-3 to sit flush under the toolbar like the stats HUD; anything
-           lower reads as a gap. Collapsible like the list's pinned block, and
-           equally unpersisted: it is scratch state, not a preference (the gear
-           menu toggle is the preference). -->
+      <!-- top-1 to sit flush under the toolbar, same offset as the "Sorting
+           paused" note; anything lower reads as a gap. Collapsible like the
+           list's pinned block, and equally unpersisted: it is scratch state,
+           not a preference (the gear menu toggle is the preference). No
+           horizontal padding on the panel itself: each row carries its own,
+           so a hovered row highlights edge to edge. -->
       <div
-        class="absolute left-3 top-3 flex max-h-[45%] max-w-[260px] flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
+        class="absolute left-3 top-1 flex max-h-[45%] w-[260px] max-w-[calc(100%-24px)] flex-col overflow-hidden rounded border border-outline bg-elevation-1 py-1 text-xs text-secondary-text"
       >
         <button
           type="button"
-          class="flex shrink-0 items-center gap-1.5 rounded text-emphasis hover:bg-hovered focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+          class="flex w-full shrink-0 items-center gap-1.5 px-2.5 py-1 text-left text-emphasis hover:bg-hovered focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary"
           aria-label={pinnedOverlayCollapsed
             ? "Expand pinned topics"
             : "Collapse pinned topics"}
@@ -1234,25 +1236,40 @@
           <span class="text-secondary-text">({$pinnedTopicsStore.order.length})</span>
         </button>
         {#if !pinnedOverlayCollapsed}
-          <div class="flex min-h-0 flex-col gap-1 overflow-y-auto">
+          <div class="flex min-h-0 flex-col overflow-y-auto">
             {#each pinnedEntries as entry (entry.topic)}
-              <button
-                type="button"
-                class="flex shrink-0 flex-col items-start rounded px-1 py-0.5 text-left hover:bg-hovered"
-                title={entry.topic}
-                on:click={() => focusPinned(entry.topic)}
-              >
-                <span class="max-w-full truncate text-emphasis"
-                  >{entry.label}</span
+              <!-- The row is one hover surface (group) holding two buttons:
+                   the topic, which focuses the node, and an unpin control
+                   centred on the right. Nesting the unpin inside the topic
+                   button would be invalid HTML, so they sit side by side. -->
+              <div class="group flex shrink-0 items-center hover:bg-hovered">
+                <button
+                  type="button"
+                  class="flex min-w-0 grow flex-col items-start px-2.5 py-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary"
+                  title={entry.topic}
+                  on:click={() => focusPinned(entry.topic)}
                 >
-                <span class="max-w-full truncate text-secondary-text"
-                  >{entry.value}</span
+                  <span class="max-w-full truncate text-emphasis"
+                    >{entry.label}</span
+                  >
+                  <span class="max-w-full truncate text-secondary-text"
+                    >{entry.value}</span
+                  >
+                </button>
+                <button
+                  type="button"
+                  aria-label="Unpin topic"
+                  title="Unpin topic"
+                  class="mr-2 inline-flex shrink-0 items-center rounded p-1 text-secondary-text opacity-60 hover:text-emphasis group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  on:click|stopPropagation={() => pinnedTopicsStore.unpin(entry.topic)}
                 >
-              </button>
+                  <Icon type="pin" size={12} />
+                </button>
+              </div>
             {/each}
           </div>
           {#if pinnedOverflow > 0}
-            <div class="shrink-0 px-1 text-secondary-text">
+            <div class="shrink-0 px-2.5 pt-1 text-secondary-text">
               and {pinnedOverflow} more
             </div>
           {/if}
