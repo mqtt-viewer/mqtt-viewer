@@ -504,6 +504,44 @@ export class PanelSize {
     }
 }
 
+/**
+ * PinnedTopic is a topic the user has pinned to the top of a connection's
+ * topic tree. Position holds the pin order (newest last); the unique index
+ * keeps a topic from being pinned twice for the same connection.
+ */
+export class PinnedTopic {
+    "id": number;
+    "connectionId": number;
+    "topic": string;
+    "position": number;
+
+    /** Creates a new PinnedTopic instance. */
+    constructor($$source: Partial<PinnedTopic> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+        if (!("position" in $$source)) {
+            this["position"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PinnedTopic instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PinnedTopic {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PinnedTopic($$parsedSource as Partial<PinnedTopic>);
+    }
+}
+
 export class PublishHistory {
     "id": number;
     "connectionId": number;

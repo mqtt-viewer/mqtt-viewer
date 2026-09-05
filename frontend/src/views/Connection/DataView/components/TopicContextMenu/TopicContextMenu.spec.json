@@ -47,6 +47,13 @@
       "description": "Hide the topic header when the surrounding UI already names the topic, as the selected-topic panel does."
     },
     {
+      "name": "isPinned",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether this topic is currently pinned to the top of the tree. Switches the first item between Pin topic and Unpin topic."
+    },
+    {
       "name": "onCopyTopic",
       "type": "function",
       "required": true
@@ -68,6 +75,11 @@
     },
     {
       "name": "onClearRetainedBelow",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onTogglePin",
       "type": "function",
       "required": true
     }

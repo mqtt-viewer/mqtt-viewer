@@ -10,6 +10,7 @@ export {
     Connection,
     FilterHistory,
     PanelSize,
+    PinnedTopic,
     PublishHistory,
     SortState,
     Subscription,

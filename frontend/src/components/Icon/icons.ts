@@ -61,6 +61,7 @@ import {
   SquareSplitHorizontal,
   SquareSplitVertical,
   Pulse,
+  PushPin,
 } from "phosphor-svelte";
 
 export const ICON_MAP = {
@@ -125,6 +126,7 @@ export const ICON_MAP = {
   fullscreen: CornersOut,
   dockRight: SquareSplitHorizontal,
   dockBottom: SquareSplitVertical,
+  pin: PushPin,
 
   // States
   lastConnected: ClockCounterClockwise,

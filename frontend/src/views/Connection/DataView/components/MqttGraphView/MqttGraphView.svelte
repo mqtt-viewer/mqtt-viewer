@@ -33,6 +33,7 @@
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { MqttData } from "../MqttDataPanel/stores/mqtt-data";
   import type { SearchStore } from "../MqttDataPanel/stores/search";
+  import type { PinnedTopicsStore } from "../../stores/pinned-topics";
   import theme from "@/stores/theme";
   import PanelHeader from "@/components/PanelHeader/PanelHeader.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
@@ -83,6 +84,9 @@
   /** shared filter text store from the List view, so filter survives the
    *  List<->Graph toggle. Absent in storybook/dev: falls back to local state. */
   export let searchStore: SearchStore | undefined = undefined;
+  /** the connection's pinned topics; pins float to the top of their sibling
+   *  group and list in the Pinned overlay */
+  export let pinnedTopicsStore: PinnedTopicsStore;
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
@@ -104,6 +108,9 @@
   // teardown that lands mid-init can't register anything that outlives it
   let destroyed = false;
   let onScreen = true;
+  // true once init() has resolved on a renderer this component still owns, so
+  // the reactive pin push below can't run against a half-built Pixi app
+  let rendererReady = false;
   // true when the mount revealed an inbound selection, so the first-size
   // handler doesn't immediately fit the whole tree back over it
   let revealedOnMount = false;
@@ -142,6 +149,9 @@
   let cvdSafe = false;
   let legendOn = true;
   let statsOn = false;
+  let pinnedOn = true;
+  // Component-local, like the list block's collapse: flicked while looking.
+  let pinnedOverlayCollapsed = false;
   let cooldownMs = 60000;
   let tauMs = 14000; // EWMA half-life ~10s by default
   let maxNodeR = 20;
@@ -183,6 +193,7 @@
       if (typeof s.followHottest === "boolean") followHottest = s.followHottest;
       if (typeof s.cvdSafe === "boolean") cvdSafe = s.cvdSafe;
       if (typeof s.legendOn === "boolean") legendOn = s.legendOn;
+      if (typeof s.pinnedOn === "boolean") pinnedOn = s.pinnedOn;
       if (typeof s.statsOn === "boolean") statsOn = s.statsOn;
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
@@ -205,6 +216,7 @@
           cvdSafe,
           legendOn,
           statsOn,
+          pinnedOn,
           cooldownMs,
           tauMs,
           maxNodeR,
@@ -347,6 +359,7 @@
       pulse: tokenHex("emphasis", light ? 0x131316 : 0xffffff),
       // the same colour the message timeline gives retained messages
       retained: tokenHex("secondary", light ? 0xdfa900 : 0xf7d66a),
+      pin: tokenHex("primary", light ? 0x5e6ce0 : 0x7c8cff),
     });
   };
   $: applyTheme($theme);
@@ -534,6 +547,83 @@
     cvdSafe
   );
   $: cooldownShort = COOLDOWN_SHORT[cooldownMs] ?? `${Math.round(cooldownMs / 1000)}s`;
+
+  // ---- pinned topics ----
+  // The model needs the pins to sort them to the top, and the renderer needs
+  // them to draw the marker. rendererReady gates the very first push so this
+  // can't reach a Pixi app that hasn't finished initialising.
+  $: if (rendererReady && renderer) renderer.setPinnedTopics($pinnedTopicsStore.set);
+
+  // The overlay is a reading aid, so it shows the most recent pins and then
+  // says how many it left out rather than growing until it covers the graph.
+  const PINNED_HUD_LIMIT = 12;
+  // Same rule as the context menu header: keep the head and the tail, since
+  // the leaf segment is what identifies the topic.
+  const PINNED_TOPIC_CHARS = 34;
+  const PINNED_VALUE_CHARS = 40;
+
+  const elideMiddle = (value: string, max: number) => {
+    if (value.length <= max) return value;
+    const keep = Math.floor((max - 1) / 2);
+    return `${value.slice(0, keep)}…${value.slice(-keep)}`;
+  };
+
+  const oneLine = (value: string) => {
+    const flat = value.replace(/\s+/g, " ").trim();
+    if (flat === "") return "empty payload";
+    return flat.length <= PINNED_VALUE_CHARS
+      ? flat
+      : `${flat.slice(0, PINNED_VALUE_CHARS)}…`;
+  };
+
+  interface PinnedEntry {
+    topic: string;
+    label: string;
+    value: string;
+  }
+
+  // A pinned topic is in one of three states, and they are worth telling
+  // apart: nothing has arrived on it yet, it carries a payload, or it is a
+  // branch in the path that only counts what is below it. Without the model
+  // the last two both looked like "waiting for a message", which is a lie for
+  // a branch that is carrying traffic.
+  const pinnedValue = (topic: string): string => {
+    const node = findNode(topic);
+    if (!node) return "waiting for a message";
+    const raw = getTopicPayload(topic);
+    if (raw !== null) return oneLine(raw);
+    const msgs = `${node.aggCount.toLocaleString()} ${node.aggCount === 1 ? "msg" : "msgs"}`;
+    if (node.descendantCount === 0) return msgs;
+    const topics = `${node.descendantCount.toLocaleString()} ${node.descendantCount === 1 ? "topic" : "topics"}`;
+    return `${topics} · ${msgs}`;
+  };
+
+  // `_tick` is unused: it is there so the live tick re-runs this and the
+  // values stay current, without a second interval of its own.
+  const buildPinnedEntries = (order: string[], _tick: number): PinnedEntry[] =>
+    order.slice(0, PINNED_HUD_LIMIT).map((topic) => ({
+      topic,
+      label: elideMiddle(topic, PINNED_TOPIC_CHARS),
+      value: pinnedValue(topic),
+    }));
+
+  $: pinnedEntries = buildPinnedEntries($pinnedTopicsStore.order, liveTick);
+  $: pinnedOverflow = Math.max(
+    0,
+    $pinnedTopicsStore.order.length - PINNED_HUD_LIMIT
+  );
+
+  // Clicking a pinned entry does what clicking the node itself does (select
+  // it, opening the topic panel) and also brings the node into view. Select
+  // even when the node has not arrived yet: the panel can show history for it.
+  const focusPinned = (topic: string) => {
+    renderer?.focusTopic(topic);
+    renderer?.setSelected(topic);
+    lastSyncedTopic = topic;
+    if ($selectedTopicStore.selectedTopic !== topic) {
+      selectedTopicStore.selectTopic(topic);
+    }
+  };
 
   // ---- performance stats HUD ----
   // Ingest rate is counted here (in the message-source callback below) rather
@@ -725,6 +815,7 @@
       renderer = null;
       return;
     }
+    rendererReady = true;
     applyTheme($theme);
     applySettings();
     seed(initialData);
@@ -828,6 +919,7 @@
     }
     // cancel the trailing 150ms filter call so it can't touch a destroyed renderer
     applyFilter.cancel();
+    rendererReady = false;
     renderer?.destroy();
     renderer = null;
   });
@@ -881,6 +973,10 @@
   };
   const toggleStats = () => {
     statsOn = !statsOn;
+    saveSettings();
+  };
+  const togglePinnedOverlay = () => {
+    pinnedOn = !pinnedOn;
     saveSettings();
   };
   const setCooldown = (ms: number) => {
@@ -1009,6 +1105,11 @@
               <Icon type={legendOn ? "ticked" : "unticked"} size={14} />Legend
             </span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={togglePinnedOverlay}>
+            <span class="flex items-center gap-2">
+              <Icon type={pinnedOn ? "ticked" : "unticked"} size={14} />Pinned
+            </span>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={toggleStats}>
             <span class="flex items-center gap-2">
               <Icon type={statsOn ? "ticked" : "unticked"} size={14} />Performance
@@ -1056,6 +1157,8 @@
             onExport={exportTopicMessages}
             {onClearRetained}
             {onClearRetainedBelow}
+            isPinned={$pinnedTopicsStore.set.has(menuTopic)}
+            onTogglePin={(t) => pinnedTopicsStore.toggle(t)}
           />
         {/if}
       </svelte:fragment>
@@ -1092,7 +1195,7 @@
     {/if}
     {#if legendOn}
       <div
-        class="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1.5 rounded border border-outline bg-elevation-1 bg-opacity-85 px-2.5 py-2 text-xs text-secondary-text"
+        class="pointer-events-none absolute bottom-3 left-2 flex flex-col gap-1.5 rounded border border-outline bg-elevation-1 bg-opacity-85 px-2.5 py-2 text-xs text-secondary-text"
       >
         <div class="flex items-center gap-2">
           <span>now</span>
@@ -1112,9 +1215,80 @@
         </div>
       </div>
     {/if}
+    {#if pinnedOn && pinnedEntries.length > 0}
+      <!-- Capped at 45% of the canvas so a full list can never grow down into
+           the legend on a small panel; the entries scroll past that while the
+           header and the overflow line stay put. Opaque like the stats HUD:
+           nodes reading through the text made both harder to read. -->
+      <!-- top-0: the header is 50px with 28px controls centred, so the canvas
+           already starts one control-margin below them. Any extra offset here
+           makes the gap under the controls larger than the one above them,
+           which reads as a gap (the stats HUD uses the same). Collapsible like the
+           list's pinned block, and equally unpersisted: it is scratch state,
+           not a preference (the gear menu toggle is the preference). No
+           horizontal padding on the panel itself: each row carries its own,
+           so a hovered row highlights edge to edge. -->
+      <div
+        class="absolute left-2 top-0 flex max-h-[45%] w-[260px] max-w-[calc(100%-24px)] flex-col overflow-hidden rounded border border-outline bg-elevation-1 py-1 text-xs text-secondary-text"
+      >
+        <button
+          type="button"
+          class="flex w-full shrink-0 items-center gap-1.5 px-2.5 py-1 text-left text-emphasis hover:bg-hovered focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary"
+          aria-label={pinnedOverlayCollapsed
+            ? "Expand pinned topics"
+            : "Collapse pinned topics"}
+          on:click={() => (pinnedOverlayCollapsed = !pinnedOverlayCollapsed)}
+        >
+          <span class={pinnedOverlayCollapsed ? "rotate-0" : "rotate-90"}>
+            <Icon type="right" size={12} />
+          </span>
+          <Icon type="pin" size={12} />Pinned
+          <span class="text-secondary-text">({$pinnedTopicsStore.order.length})</span>
+        </button>
+        {#if !pinnedOverlayCollapsed}
+          <div class="flex min-h-0 flex-col overflow-y-auto">
+            {#each pinnedEntries as entry (entry.topic)}
+              <!-- The row is one hover surface (group) holding two buttons:
+                   the topic, which focuses the node, and an unpin control
+                   centred on the right. Nesting the unpin inside the topic
+                   button would be invalid HTML, so they sit side by side. -->
+              <div class="group flex shrink-0 items-center hover:bg-hovered">
+                <button
+                  type="button"
+                  class="flex min-w-0 grow flex-col items-start px-2.5 py-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary"
+                  title={entry.topic}
+                  on:click={() => focusPinned(entry.topic)}
+                >
+                  <span class="max-w-full truncate text-emphasis"
+                    >{entry.label}</span
+                  >
+                  <span class="max-w-full truncate text-secondary-text"
+                    >{entry.value}</span
+                  >
+                </button>
+                <button
+                  type="button"
+                  aria-label="Unpin topic"
+                  title="Unpin topic"
+                  class="mr-2 inline-flex shrink-0 items-center rounded p-1 text-secondary-text opacity-60 hover:text-emphasis group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  on:click|stopPropagation={() => pinnedTopicsStore.unpin(entry.topic)}
+                >
+                  <Icon type="pin" size={12} />
+                </button>
+              </div>
+            {/each}
+          </div>
+          {#if pinnedOverflow > 0}
+            <div class="shrink-0 px-2.5 pt-1 text-secondary-text">
+              and {pinnedOverflow} more
+            </div>
+          {/if}
+        {/if}
+      </div>
+    {/if}
     {#if statsOn && stats}
       <div
-        class="pointer-events-none absolute right-3 top-3 flex flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
+        class="pointer-events-none absolute right-2 top-0 flex flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
       >
         <div>{stats.fps} fps (cap {stats.maxFps})</div>
         <div>avg frame {stats.avgFrameMs} ms</div>

@@ -789,3 +789,21 @@ export async function UpdateSubscription(
 }
 
 export { mockEventSet, mockHeaders };
+
+export async function GetPinnedTopics(
+  _connectionID: number
+): Promise<models.PinnedTopic[]> {
+  return [];
+}
+
+export async function PinTopic(
+  _connectionID: number,
+  _topic: string
+): Promise<void> {}
+
+export async function UnpinTopic(
+  _connectionID: number,
+  _topic: string
+): Promise<void> {}
+
+export async function UnpinAllTopics(_connectionID: number): Promise<void> {}

@@ -379,9 +379,18 @@ export function GetPanelSizes(): $CancellablePromise<models$0.PanelSize[]> {
     });
 }
 
+/**
+ * GetPinnedTopics returns a connection's pinned topics in pin order.
+ */
+export function GetPinnedTopics(connectionID: number): $CancellablePromise<models$0.PinnedTopic[]> {
+    return $Call.ByID(1409829178, connectionID).then(($result: any) => {
+        return $$createType34($result);
+    });
+}
+
 export function GetPublishHistoriesForConnection(connectionID: number): $CancellablePromise<models$0.PublishHistory[]> {
     return $Call.ByID(3102818020, connectionID).then(($result: any) => {
-        return $$createType34($result);
+        return $$createType36($result);
     });
 }
 
@@ -462,13 +471,13 @@ export function GetReceivedTimelineWindow(connectionID: number, topic: string, b
  */
 export function GetRetainedTopicsUnderPrefix(connId: number, prefix: string): $CancellablePromise<string[]> {
     return $Call.ByID(570234138, connId, prefix).then(($result: any) => {
-        return $$createType35($result);
+        return $$createType37($result);
     });
 }
 
 export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
     return $Call.ByID(2748919454).then(($result: any) => {
-        return $$createType37($result);
+        return $$createType39($result);
     });
 }
 
@@ -485,13 +494,13 @@ export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType38($result);
+        return $$createType40($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType40($result);
+        return $$createType42($result);
     });
 }
 
@@ -507,7 +516,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType42($result);
+        return $$createType44($result);
     });
 }
 
@@ -536,6 +545,14 @@ export function OpenChartWindow(params: $models.OpenChartWindowParams): $Cancell
  */
 export function OpenTopicWindow(params: $models.OpenTopicWindowParams): $CancellablePromise<void> {
     return $Call.ByID(398361403, params);
+}
+
+/**
+ * PinTopic appends a topic to a connection's pin list. Pinning an
+ * already-pinned topic is a no-op, so it keeps its original position.
+ */
+export function PinTopic(connectionID: number, topic: string): $CancellablePromise<void> {
+    return $Call.ByID(531136374, connectionID, topic);
 }
 
 export function PublishMqtt(connId: number, message: $models.PublishParams): $CancellablePromise<void> {
@@ -568,7 +585,7 @@ export function RenameCollectionMessage(id: number, name: string): $CancellableP
  */
 export function ReorderCollectionMessages(collectionID: number, orderedIDs: number[]): $CancellablePromise<models$0.CollectionMessage[]> {
     return $Call.ByID(1139884023, collectionID, orderedIDs).then(($result: any) => {
-        return $$createType43($result);
+        return $$createType45($result);
     });
 }
 
@@ -600,7 +617,7 @@ export function SaveFilterHistoryEntry(connectionId: number, text: string): $Can
 
 export function SavePublishHistoryEntry(params: $models.SavePublishHistoryEntryParams): $CancellablePromise<models$0.PublishHistory> {
     return $Call.ByID(3794014424, params).then(($result: any) => {
-        return $$createType33($result);
+        return $$createType35($result);
     });
 }
 
@@ -656,6 +673,22 @@ export function StartUpdate(): $CancellablePromise<void> {
 
 export function Startup(options: $models.StartupOptions | null): $CancellablePromise<void> {
     return $Call.ByID(1674476365, options);
+}
+
+/**
+ * UnpinAllTopics clears a connection's pin list.
+ */
+export function UnpinAllTopics(connectionID: number): $CancellablePromise<void> {
+    return $Call.ByID(2950815637, connectionID);
+}
+
+/**
+ * UnpinTopic removes one topic from a connection's pin list. Unpinning a topic
+ * that is not pinned is a no-op. Positions of the remaining pins are left
+ * alone; only their relative order matters.
+ */
+export function UnpinTopic(connectionID: number, topic: string): $CancellablePromise<void> {
+    return $Call.ByID(3483744337, connectionID, topic);
 }
 
 export function UpdateAppSettings(params: $models.UpdateAppSettingsParams): $CancellablePromise<models$0.AppSettings> {
@@ -730,14 +763,16 @@ const $$createType29 = $Create.Array($$createType28);
 const $$createType30 = $models.MqttStats.createFrom;
 const $$createType31 = models$0.PanelSize.createFrom;
 const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = models$0.PublishHistory.createFrom;
+const $$createType33 = models$0.PinnedTopic.createFrom;
 const $$createType34 = $Create.Array($$createType33);
-const $$createType35 = $Create.Array($Create.Any);
-const $$createType36 = models$0.SortState.createFrom;
-const $$createType37 = $Create.Array($$createType36);
-const $$createType38 = $Create.Array($$createType3);
-const $$createType39 = models$0.Tab.createFrom;
-const $$createType40 = $Create.Array($$createType39);
-const $$createType41 = $models.Connection.createFrom;
-const $$createType42 = $Create.Nullable($$createType41);
-const $$createType43 = $Create.Array($$createType9);
+const $$createType35 = models$0.PublishHistory.createFrom;
+const $$createType36 = $Create.Array($$createType35);
+const $$createType37 = $Create.Array($Create.Any);
+const $$createType38 = models$0.SortState.createFrom;
+const $$createType39 = $Create.Array($$createType38);
+const $$createType40 = $Create.Array($$createType3);
+const $$createType41 = models$0.Tab.createFrom;
+const $$createType42 = $Create.Array($$createType41);
+const $$createType43 = $models.Connection.createFrom;
+const $$createType44 = $Create.Nullable($$createType43);
+const $$createType45 = $Create.Array($$createType9);

@@ -21,6 +21,7 @@
   import SelectedTopicPanel from "@/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import ConfirmClearRetainedDialog from "@/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
   import { createClearRetainedFlow } from "@/views/Connection/DataView/clear-retained";
+  import { createPinnedTopicsStore } from "@/views/Connection/DataView/stores/pinned-topics";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { copyToClipboard } from "@/util/copy";
   import { errorMessage } from "@/util/strings";
@@ -50,6 +51,9 @@
   // No onCleared: this window has no tree or graph to update. The main
   // window listens for the event the flow emits and updates its own copies.
   const clearRetained = createClearRetainedFlow(connectionId);
+  // Its own instance: this is a separate webview, so it cannot share the main
+  // window's. Both converge on the PinnedTopicsChanged event.
+  const pinnedTopicsStore = createPinnedTopicsStore(connectionId);
   const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
     clearRetained;
 
@@ -205,6 +209,9 @@
             {selectedTopicStore}
             {exportTopicMessages}
             {copyTopicPath}
+            isPinned={selectedTopic !== null &&
+              $pinnedTopicsStore.set.has(selectedTopic)}
+            onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
             onClearRetained={clearRetained.requestClear}
             onClearRetainedBelow={clearRetained.requestClearBelow}
             firstConnectedAtMs={timelineStartMs(

@@ -226,6 +226,16 @@ type ChartWindow struct {
 	WindowSeconds int64  `json:"windowSeconds"`
 }
 
+// PinnedTopic is a topic the user has pinned to the top of a connection's
+// topic tree. Position holds the pin order (newest last); the unique index
+// keeps a topic from being pinned twice for the same connection.
+type PinnedTopic struct {
+	ID           uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	ConnectionID uint   `json:"connectionId" gorm:"index:pinned_topics_connid;uniqueIndex:pinned_topics_conn_topic,priority:1"`
+	Topic        string `json:"topic" gorm:"uniqueIndex:pinned_topics_conn_topic,priority:2"`
+	Position     int    `json:"position"`
+}
+
 // CollectionCollapsedState remembers whether a sidebar collection folder is
 // collapsed. Keyed by collection id; a missing row means expanded.
 type CollectionCollapsedState struct {

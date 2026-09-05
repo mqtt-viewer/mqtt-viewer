@@ -47,6 +47,7 @@ export interface ThemeUi {
   minimapBorder: number;
   pulse: number; // message-arrival ripple stroke colour
   retained: number; // retained-message marker; matches the message timeline
+  pin: number; // pinned-topic marker; the brand primary
 }
 
 export interface GraphOptions {
@@ -66,6 +67,7 @@ interface NodeVisual {
   caretHover: boolean;
   badge: Text | null; // lazily created/pooled, same lifecycle as label
   retainedDot: Graphics | null; // lazily created/pooled, same lifecycle as label
+  pinDot: Graphics | null; // lazily created/pooled, same lifecycle as label
   node: TopicNode;
   expanded: boolean;
   tx: number; // target x (animated toward)
@@ -126,6 +128,9 @@ export class TopicGraphRenderer {
   // retained-marker colour; matches the message timeline's retained items
   private retainedColor = 0xf7d66a;
   private retainedColorDirty = false;
+  // pinned-marker colour; the brand primary (dark theme default)
+  private pinColor = 0x7c8cff;
+  private pinColorDirty = false;
   private sortKey: SortKey = "rate";
   private filter = "";
   private selected: string | null = null;
@@ -188,6 +193,7 @@ export class TopicGraphRenderer {
   private labelPool: Text[] = [];
   private badgePool: Text[] = [];
   private retainedDotPool: Graphics[] = [];
+  private pinDotPool: Graphics[] = [];
   private readonly LABEL_POOL_CAP = 300;
   private textColorDirty = false;
 
@@ -423,6 +429,10 @@ export class TopicGraphRenderer {
       // mark the live ones for a redraw; nothing else would repaint them.
       this.retainedColorDirty = true;
     }
+    if (ui.pin !== this.pinColor) {
+      this.pinColor = ui.pin;
+      this.pinColorDirty = true;
+    }
     this.requestRepaint();
   }
 
@@ -452,6 +462,17 @@ export class TopicGraphRenderer {
     // smaller) result, mirroring what setDepth does. Clearing the filter keeps
     // the current view: the user is going back to what they were looking at.
     if (q.trim() !== "" && this.visuals.size > 0) this.fitView();
+  }
+  /**
+   * Apply the connection's pinned topics. The model diffs against what it
+   * already had, so an unchanged set costs nothing and schedules no relayout.
+   * The repaint is immediate because the marker has to land on the same frame
+   * as the click, ahead of the debounced re-sort.
+   */
+  setPinnedTopics(topics: Set<string>): void {
+    this.model.setPinnedTopics(topics);
+    this.scheduleRelayout();
+    this.requestRepaint();
   }
   setSelected(topic: string | null): void {
     this.selected = topic;
@@ -990,6 +1011,7 @@ export class TopicGraphRenderer {
       caretHover: false,
       badge: null,
       retainedDot: null,
+      pinDot: null,
       node,
       expanded: node.expanded,
       tx: 0,
@@ -1112,6 +1134,46 @@ export class TopicGraphRenderer {
     if (this.retainedDotPool.length < this.LABEL_POOL_CAP) {
       g.visible = false;
       this.retainedDotPool.push(g);
+    } else {
+      g.destroy();
+    }
+  }
+
+  // Pinned marker: a small square to the LEFT of the node, opposite the
+  // retained dot on the right. A different shape as well as a different side,
+  // so the two markers can never be read as the same thing. Pooled like every
+  // other per-node graphic here.
+  private static readonly PIN_DOT_HALF = 2.5;
+
+  private acquirePinDot(v: NodeVisual): Graphics {
+    if (v.pinDot) return v.pinDot;
+    let g = this.pinDotPool.pop();
+    if (g) {
+      g.visible = true;
+    } else {
+      g = new Graphics();
+    }
+    this.drawPinDot(g);
+    v.container.addChild(g);
+    v.pinDot = g;
+    return g;
+  }
+
+  private drawPinDot(g: Graphics): void {
+    const h = TopicGraphRenderer.PIN_DOT_HALF;
+    g.clear();
+    g.rect(-h, -h, h * 2, h * 2);
+    g.fill({ color: this.pinColor });
+  }
+
+  private releasePinDot(v: NodeVisual): void {
+    if (!v.pinDot) return;
+    const g = v.pinDot;
+    v.container.removeChild(g);
+    v.pinDot = null;
+    if (this.pinDotPool.length < this.LABEL_POOL_CAP) {
+      g.visible = false;
+      this.pinDotPool.push(g);
     } else {
       g.destroy();
     }
@@ -1243,10 +1305,23 @@ export class TopicGraphRenderer {
       } else if (v.retainedDot) {
         this.releaseRetainedDot(v);
       }
+
+      // Pinned marker sits on the other side of the node from the retained
+      // dot, clear of the caret when the node has one.
+      if (v.node.pinned) {
+        const pin = this.acquirePinDot(v);
+        if (this.pinColorDirty) this.drawPinDot(pin);
+        pin.x = -(r + (v.caret && lodDetail ? 19 : 7));
+        pin.y = 0;
+        pin.visible = true;
+      } else if (v.pinDot) {
+        this.releasePinDot(v);
+      }
     } else {
       if (v.label) this.releaseLabel(v);
       if (v.badge) this.releaseBadge(v);
       if (v.retainedDot) this.releaseRetainedDot(v);
+      if (v.pinDot) this.releasePinDot(v);
     }
 
     // keep the caret clear of the node edge, however large the node grows;
@@ -1386,6 +1461,7 @@ export class TopicGraphRenderer {
             if (v.label) this.releaseLabel(v);
             if (v.badge) this.releaseBadge(v);
             if (v.retainedDot) this.releaseRetainedDot(v);
+            if (v.pinDot) this.releasePinDot(v);
           }
           continue;
         }
@@ -1433,6 +1509,7 @@ export class TopicGraphRenderer {
       }
       this.textColorDirty = false;
       this.retainedColorDirty = false;
+      this.pinColorDirty = false;
     } else if (recomputeCull) {
       // Not a slow-tick frame, but the cull pass above still ran (viewport
       // changed), so a node revealed this frame needs its detail refreshed
@@ -1694,9 +1771,11 @@ export class TopicGraphRenderer {
     for (const t of this.labelPool) t.destroy();
     for (const t of this.badgePool) t.destroy();
     for (const g of this.retainedDotPool) g.destroy();
+    for (const g of this.pinDotPool) g.destroy();
     this.labelPool = [];
     this.badgePool = [];
     this.retainedDotPool = [];
+    this.pinDotPool = [];
     // an unmount can land mid-init (init() is async), and destroying an
     // Application that never initialised throws
     if (this.inited) this.app.destroy(true, { children: true });

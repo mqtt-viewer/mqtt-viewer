@@ -15,6 +15,7 @@
   } from "./stores/sort";
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
+  import type { PinnedTopicsStore } from "../../stores/pinned-topics";
   import { createHighlightedMqttTopicsStore } from "./stores/highlighted-topics";
   import defaultSorts from "@/stores/default-sorts";
   import { get } from "svelte/store";
@@ -31,6 +32,7 @@
 
   export let connection: Connection;
   export let selectedTopicStore: SelectedTopicStore;
+  export let pinnedTopicsStore: PinnedTopicsStore;
   export let width: number;
   // Measured width of the tree's scroll container. The `width` prop is derived
   // arithmetically in DataView (window minus the side panels) and drifts by a
@@ -88,6 +90,9 @@
   let menuHasPayload = false;
   let menuIsRetained = false;
   let menuRetainedBelowCount = 0;
+  // Recomputed from the store so the item reads "Unpin topic" the moment a
+  // pin lands, including one made in another window.
+  $: menuIsPinned = menuTopic !== null && $pinnedTopicsStore.set.has(menuTopic);
 
   /**
    * Resolve which row was right-clicked, and set up what the menu renders.
@@ -190,6 +195,9 @@
       >
         <MqttTopicTree
           width={treeWidth || width}
+          pinnedTopics={$pinnedTopicsStore.order}
+          onUnpin={(topic) => pinnedTopicsStore.unpin(topic)}
+          onUnpinAll={() => pinnedTopicsStore.unpinAll()}
           selectedTopic={$selectedTopicStore.selectedTopic}
           mqttData={$mqttDataStore}
           highlightedTopicStore={mqttHighlightStore}
@@ -213,6 +221,8 @@
             hasPayload={menuHasPayload}
             isRetained={menuIsRetained}
             retainedBelowCount={menuRetainedBelowCount}
+            isPinned={menuIsPinned}
+            onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
             onCopyTopic={copyTopicPath}
             onCopyPayload={copyPayload}
             onExport={exportTopicMessages}
@@ -237,6 +247,7 @@
         {onClearRetained}
         {onClearRetainedBelow}
         {searchStore}
+        {pinnedTopicsStore}
       >
         <ViewToggle slot="leading" {view} onChange={(v) => setView(v)} />
       </MqttGraphView>

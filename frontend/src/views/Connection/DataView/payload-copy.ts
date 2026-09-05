@@ -21,7 +21,7 @@ export const formatPayloadForCopy = (payload: string): string => {
 };
 
 /** Walk a full topic path to its node, or null if it isn't in the tree. */
-const findTopicNode = (
+export const findTopicNode = (
   data: MqttData,
   topic: string
 ): MqttData[string] | null => {

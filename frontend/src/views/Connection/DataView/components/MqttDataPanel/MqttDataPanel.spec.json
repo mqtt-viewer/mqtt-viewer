@@ -48,6 +48,12 @@
       "type": "function",
       "required": true,
       "description": "Raises a bulk clear request for topics below the right-clicked one."
+    },
+    {
+      "name": "pinnedTopicsStore",
+      "type": "store",
+      "required": true,
+      "description": "This connection's pinned topics, shared with the selected-topic panel."
     }
   ],
   "tokens": [

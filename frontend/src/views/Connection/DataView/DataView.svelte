@@ -5,6 +5,7 @@
   import SelectedTopicDisplay from "./components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import MqttDataPanel from "./components/MqttDataPanel/MqttDataPanel.svelte";
   import { createSelectedTopicStore } from "./stores/selected-topic-store";
+  import { createPinnedTopicsStore } from "./stores/pinned-topics";
   import { createTopicPanelViewState } from "./stores/topic-panel-view-state";
   import { topicWindowSyncAction } from "./topic-window-sync";
   import type { Connection } from "@/stores/connections";
@@ -56,6 +57,15 @@
   const matchedTopicsStore = createMatchedTopicsStore(
     connection.connectionDetails.id
   );
+
+  // One instance per connection, shared by the topic panel and the selected
+  // topic panel so the pin glyph, the block and the menus cannot disagree.
+  const pinnedTopicsStore = createPinnedTopicsStore(
+    connection.connectionDetails.id
+  );
+  $: selectedTopicIsPinned =
+    $selectedTopicStore.selectedTopic !== null &&
+    $pinnedTopicsStore.set.has($selectedTopicStore.selectedTopic);
 
   $: connection.connectionState,
     (() => {
@@ -360,6 +370,7 @@
             bind:this={dataPanel}
             {connection}
             {selectedTopicStore}
+            {pinnedTopicsStore}
             width={dataViewWidth}
             {copyTopicPath}
             {exportTopicMessages}
@@ -382,6 +393,8 @@
             viewState={topicPanelViewState}
             {exportTopicMessages}
             {copyTopicPath}
+            isPinned={selectedTopicIsPinned}
+            onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
             onClearRetained={clearRetained.requestClear}
             onClearRetainedBelow={clearRetained.requestClearBelow}
             firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
@@ -416,6 +429,8 @@
           viewState={topicPanelViewState}
           {exportTopicMessages}
           {copyTopicPath}
+          isPinned={selectedTopicIsPinned}
+          onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
           onClearRetained={clearRetained.requestClear}
           onClearRetainedBelow={clearRetained.requestClearBelow}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}

@@ -11,6 +11,7 @@
     "isRetained",
     "retainedBelowCount",
     "showHeader",
+    "isPinned",
   ];
 
   const { Story } = defineMeta({
@@ -28,6 +29,7 @@
     onExport: noop,
     onClearRetained: noop,
     onClearRetainedBelow: noop,
+    onTogglePin: noop,
   };
 </script>
 
@@ -57,6 +59,7 @@
     hasPayload: true,
     isRetained: true,
     retainedBelowCount: 0,
+    isPinned: false,
   }}
   {template}
 />
@@ -79,6 +82,18 @@
     hasPayload: false,
     isRetained: false,
     retainedBelowCount: 12,
+  }}
+  {template}
+/>
+
+<Story
+  name="Pinned topic"
+  args={{
+    topic: "factory/line1/sensor3/temperature",
+    hasPayload: true,
+    isRetained: false,
+    retainedBelowCount: 0,
+    isPinned: true,
   }}
   {template}
 />

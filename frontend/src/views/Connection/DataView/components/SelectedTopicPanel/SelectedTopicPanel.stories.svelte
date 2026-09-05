@@ -6,7 +6,7 @@
 
   const componentName = "SelectedTopicPanel";
   const storyId = "Views/Connection/DataView/SelectedTopicPanel";
-  const props: string[] = ["connectionId","selectedTopicStore","firstConnectedAtMs","mqttVersion","exportTopicMessages","copyTopicPath","onClearRetained","onClearRetainedBelow","openChartWindow","dockMode","onSetDockMode","showCloseButton","headerDraggable","headerLeftInset","viewState"];
+  const props: string[] = ["connectionId","selectedTopicStore","firstConnectedAtMs","mqttVersion","exportTopicMessages","copyTopicPath","onClearRetained","onClearRetainedBelow","openChartWindow","dockMode","onSetDockMode","showCloseButton","headerDraggable","headerLeftInset","viewState","isPinned","onTogglePin"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -23,6 +23,10 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<!-- The selected topic is pinned, so the header's pin button is filled and its
+     menu item reads "Unpin topic". -->
+<Story name="Pinned" args={{ ...storyArgs, isPinned: true }} {template} />
 
 <!-- Dock side "right" (default, narrow width): matches DataView's ResizableContainer
      resizeEdge="left" placement, the current/unchanged docked-right layout. -->
