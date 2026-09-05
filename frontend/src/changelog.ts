@@ -65,7 +65,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Startup failures show an error instead of a blank window",
-        body: "If the app cannot initialise it now tells you what went wrong and where to report it.",
+        body: "If the app or a pop-out window cannot initialise it now tells you what went wrong and where to report it.",
       },
       {
         group: "Miscellaneous",

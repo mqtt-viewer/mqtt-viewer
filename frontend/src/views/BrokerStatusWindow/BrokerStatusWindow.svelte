@@ -6,6 +6,7 @@
   import chartWindows from "@/stores/chart-windows";
   import os from "@/stores/env";
   import IconContext from "@/components/Icon/IconContext.svelte";
+  import StartupError from "@/components/StartupError/StartupError.svelte";
   import Toast, { addToast } from "@/components/Toast/Toast.svelte";
   import ConnectionStatusCircle from "@/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
@@ -33,6 +34,7 @@
   let viewRef: BrokerStatusView | null = null;
   let connectionName = "Broker status";
   let error = "";
+  let startupError: unknown = null;
 
   // Header state, mirrored from the store via a manual subscription (the store
   // is nullable until onMount, so `$store` auto-subscription is not usable here).
@@ -141,7 +143,13 @@
     // reality (otherwise it reads as always-false and the empty state offers a
     // duplicate "$SYS/#" subscription the connection already has). env feeds
     // the macOS traffic-light inset in the header.
-    await Promise.all([os.init(), connections.init(), subscriptions.init()]);
+    try {
+      await Promise.all([os.init(), connections.init(), subscriptions.init()]);
+    } catch (e) {
+      startupError = e;
+      console.error("Failed to initialise stores", e);
+      return;
+    }
     const connection = get(connections).connections[connectionId];
     if (!connection) {
       error = "Connection not found";
@@ -180,86 +188,90 @@
 </script>
 
 <IconContext>
-  <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
-    <!-- The top padding is what lines the row up with the macOS traffic
-         lights, so it stays at pt-2 on every platform; only the bottom was
-         trimmed to bring the bar to the main window's app-bar height. -->
-    <header
-      class="flex items-center gap-2 px-4 border-b border-outline {$os.isMac &&
-      !$os.isFullscreen
-        ? 'pt-2 pb-2'
-        : 'py-2'}"
-      style="--wails-draggable:drag"
-    >
-      {#if $os.isMac && !$os.isFullscreen}
-        <!-- Clear the macOS traffic lights (frameless hidden-inset titlebar). -->
-        <div class="w-[62px] shrink-0" />
-      {/if}
-      <ConnectionStatusCircle state={connectionState} />
-      <!-- The connection name alone. The window title and the dot already say
-           what this window is, and the broker facts now live in the health
-           strip below, which leaves the name its full width. -->
-      <div class="flex min-w-0 flex-1 items-baseline">
-        <span class="text-lg text-emphasis truncate">{connectionName}</span>
-      </div>
-      {#if store}
-        <div
-          class="ml-auto flex items-center gap-3"
-          style="--wails-draggable:false"
-        >
-          {#if pill.show}
-            <span
-              class="text-sm tabular-nums {pill.grey
-                ? 'text-secondary-text opacity-60'
-                : 'text-secondary-text'}"
-            >
-              {pill.text}
-            </span>
-          {/if}
-          <TimeRangeSelector
-            value={rangeMinutes}
-            {sparseNote}
-            on:change={onRangeChange}
-          />
-          <IconButton
-            tooltipText="Configure metrics"
-            tooltipPlacement="bottom"
-            onClick={() => viewRef?.openMappingEditor()}
+  {#if startupError}
+    <StartupError error={startupError} />
+  {:else}
+    <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
+      <!-- The top padding is what lines the row up with the macOS traffic
+           lights, so it stays at pt-2 on every platform; only the bottom was
+           trimmed to bring the bar to the main window's app-bar height. -->
+      <header
+        class="flex items-center gap-2 px-4 border-b border-outline {$os.isMac &&
+        !$os.isFullscreen
+          ? 'pt-2 pb-2'
+          : 'py-2'}"
+        style="--wails-draggable:drag"
+      >
+        {#if $os.isMac && !$os.isFullscreen}
+          <!-- Clear the macOS traffic lights (frameless hidden-inset titlebar). -->
+          <div class="w-[62px] shrink-0" />
+        {/if}
+        <ConnectionStatusCircle state={connectionState} />
+        <!-- The connection name alone. The window title and the dot already say
+             what this window is, and the broker facts now live in the health
+             strip below, which leaves the name its full width. -->
+        <div class="flex min-w-0 flex-1 items-baseline">
+          <span class="text-lg text-emphasis truncate">{connectionName}</span>
+        </div>
+        {#if store}
+          <div
+            class="ml-auto flex items-center gap-3"
+            style="--wails-draggable:false"
           >
-            <Icon type="settings" size={16} />
-          </IconButton>
+            {#if pill.show}
+              <span
+                class="text-sm tabular-nums {pill.grey
+                  ? 'text-secondary-text opacity-60'
+                  : 'text-secondary-text'}"
+              >
+                {pill.text}
+              </span>
+            {/if}
+            <TimeRangeSelector
+              value={rangeMinutes}
+              {sparseNote}
+              on:change={onRangeChange}
+            />
+            <IconButton
+              tooltipText="Configure metrics"
+              tooltipPlacement="bottom"
+              onClick={() => viewRef?.openMappingEditor()}
+            >
+              <Icon type="settings" size={16} />
+            </IconButton>
+          </div>
+        {/if}
+      </header>
+
+      {#if banner && !error}
+        <div
+          class="px-4 py-1.5 text-sm truncate border-b {banner.warn
+            ? 'text-warning border-warning'
+            : 'text-secondary-text border-outline'}"
+        >
+          {banner.text}
         </div>
       {/if}
-    </header>
 
-    {#if banner && !error}
-      <div
-        class="px-4 py-1.5 text-sm truncate border-b {banner.warn
-          ? 'text-warning border-warning'
-          : 'text-secondary-text border-outline'}"
-      >
-        {banner.text}
-      </div>
-    {/if}
-
-    {#if error}
-      <div class="px-4 py-2 text-secondary-text">
-        {error}
-      </div>
-    {:else if store}
-      <!-- Scrolls on its own axis so the view's sticky health strip pins to
-           the top of the body. A browser tab is much wider than the desktop
-           pop-out window, so horizontal overflow is clipped instead of growing
-           a scrollbar; the inset that keeps the tile grid off both edges is
-           the view's own p-4 (the strip bleeds back out of it with -mx-4). -->
-      <div class="grow min-h-0 overflow-y-auto overflow-x-hidden">
-        <BrokerStatusView bind:this={viewRef} {store} {connectionId} />
-      </div>
-    {:else}
-      <div class="px-4 py-2 text-secondary-text">
-        Loading…
-      </div>
-    {/if}
-    <Toast />
-  </main>
+      {#if error}
+        <div class="px-4 py-2 text-secondary-text">
+          {error}
+        </div>
+      {:else if store}
+        <!-- Scrolls on its own axis so the view's sticky health strip pins to
+             the top of the body. A browser tab is much wider than the desktop
+             pop-out window, so horizontal overflow is clipped instead of growing
+             a scrollbar; the inset that keeps the tile grid off both edges is
+             the view's own p-4 (the strip bleeds back out of it with -mx-4). -->
+        <div class="grow min-h-0 overflow-y-auto overflow-x-hidden">
+          <BrokerStatusView bind:this={viewRef} {store} {connectionId} />
+        </div>
+      {:else}
+        <div class="px-4 py-2 text-secondary-text">
+          Loading…
+        </div>
+      {/if}
+      <Toast />
+    </main>
+  {/if}
 </IconContext>
