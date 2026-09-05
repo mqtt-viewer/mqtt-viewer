@@ -100,8 +100,8 @@
     <div class="mt-4 flex flex-col gap-3 text-secondary-text">
       {#if isBranch}
         <p>
-          I'll clear {count} retained {count === 1 ? "message" : "messages"} that I
-          know about below
+          This will clear {count} retained {count === 1 ? "message" : "messages"}
+          known to this client below
           <span class="break-all font-mono text-emphasis">{topic}</span>.
         </p>
         {#if listed.length > 0}
@@ -125,12 +125,11 @@
              client retained mid-session is genuinely invisible to us.
              Promising a clean sweep here would be a lie. -->
         <p>
-          If a client retained something here that I haven't seen, I won't
-          clear it.
+          Retained messages this client has not seen are left as they are.
         </p>
       {:else}
         <p>
-          I'll publish an empty retained message to <span
+          This publishes an empty retained message to <span
             class="break-all font-mono text-emphasis">{topic}</span
           >, which tells the broker to drop its retained value.
         </p>

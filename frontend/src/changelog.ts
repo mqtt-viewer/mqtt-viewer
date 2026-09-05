@@ -331,6 +331,10 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
         ],
       },
+      {
+        title: "The chart's Y-axis rescales with its time window",
+        body: "Narrowing a chart's time window could leave the Y-axis stretched to an old value elsewhere in that topic's history, squashing the visible points to the bottom. It now ranges over only what the window shows.",
+      },
     ],
   },
   {
