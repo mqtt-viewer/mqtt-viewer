@@ -16,6 +16,10 @@ name: Publish Docker image
 # `:latest` only moves for a full release. Pre-releases publish their version
 # tags and nothing else, so a beta never repoints the tag every compose user
 # is pinned to.
+#
+# A full release also bumps the Home Assistant add-on's version pin (see the
+# bump-addon job), so the manifest in mqtt-viewer/home-assistant-addon can
+# never name a tag that was not published here.
 
 on:
   release:
@@ -34,6 +38,14 @@ on:
         description: "Version string to stamp (e.g. v1.2.3)"
         required: false
         default: "v0.0.0-test"
+      bump_addon:
+        description: >-
+          Also repoint the Home Assistant add-on at this version. Off by
+          default, so a manual test push never moves the add-on's pin.
+          Published releases bump it without needing this input.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: docker-publish-${{ github.ref }}
@@ -78,6 +90,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      build_version: ${{ steps.ver.outputs.build_version }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -134,3 +149,82 @@ jobs:
             machine_id_secret=${{ secrets.MACHINE_ID_SECRET }}
             cloud_username=${{ secrets.CLOUD_USERNAME }}
             cloud_password=${{ secrets.CLOUD_PASSWORD }}
+
+  # Keeps the Home Assistant add-on's version pin honest. The add-on manifest
+  # in mqtt-viewer/home-assistant-addon names an image tag that Home Assistant
+  # pulls directly, so it has to move in lockstep with what publish just
+  # pushed. Full releases only: prereleases are not for add-on users, and a
+  # manual dispatch has to opt in with the bump_addon input.
+  bump-addon:
+    needs: publish
+    if: >-
+      (github.event_name == 'release' && github.event.release.prerelease == false)
+      || (github.event_name == 'workflow_dispatch' && inputs.bump_addon)
+    runs-on: ubuntu-latest
+    name: Bump Home Assistant add-on pin
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.publish.outputs.build_version }}
+      RELEASE_URL: ${{ github.event.release.html_url }}
+    steps:
+      # Fail here rather than halfway through, so a missing secret reads as
+      # "the add-on was not bumped" instead of a half-done push.
+      - name: Require the add-on token
+        env:
+          HA_ADDON_TOKEN: ${{ secrets.HA_ADDON_TOKEN }}
+        run: |
+          if [ -z "$HA_ADDON_TOKEN" ]; then
+            echo "::error::HA_ADDON_TOKEN is not set. Create a fine-grained PAT scoped to mqtt-viewer/home-assistant-addon with Contents read/write and add it as a repository secret (see docs/RELEASING.md), then re-run this job."
+            exit 1
+          fi
+
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Anonymous on purpose: this job never logs in to GHCR, so the inspect
+      # sees exactly what Home Assistant sees. On the first publication the
+      # package is private and this fails, which is the point.
+      - name: Verify the image is publicly pullable
+        run: |
+          docker logout ghcr.io || true
+          ref="${IMAGE_NAME}:${VERSION}"
+          for attempt in 1 2 3 4 5; do
+            if docker buildx imagetools inspect "$ref"; then
+              echo "$ref is anonymously pullable"
+              exit 0
+            fi
+            echo "attempt $attempt failed, retrying in 15s"
+            sleep 15
+          done
+          echo "::error::Cannot pull $ref anonymously. If this is the first Docker publication, the GHCR package is still private: open the package settings, connect it to this repository and change visibility to public (docs/RELEASING.md, 'Expected assets per release'), then re-run this job with 'gh run rerun --job'. Home Assistant cannot install a private image."
+          exit 1
+
+      - name: Checkout the add-on repository
+        uses: actions/checkout@v4
+        with:
+          repository: mqtt-viewer/home-assistant-addon
+          token: ${{ secrets.HA_ADDON_TOKEN }}
+          path: addon
+
+      - name: Bump the manifest
+        run: |
+          url="$RELEASE_URL"
+          if [ -z "$url" ]; then
+            url="https://github.com/${{ github.repository }}/releases/tag/${{ needs.publish.outputs.version }}"
+          fi
+          scripts/bump-addon-version.sh "$VERSION" "$url" addon/mqtt-viewer
+
+      - name: Commit and push
+        working-directory: addon
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "add-on already tracks $VERSION, nothing to push"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: track MQTT Viewer $VERSION"
+          git push
+          echo "pushed the $VERSION pin to mqtt-viewer/home-assistant-addon"
