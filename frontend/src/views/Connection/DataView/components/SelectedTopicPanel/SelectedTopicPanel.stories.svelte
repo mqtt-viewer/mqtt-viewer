@@ -6,7 +6,7 @@
 
   const componentName = "SelectedTopicPanel";
   const storyId = "Views/Connection/DataView/SelectedTopicPanel";
-  const props: string[] = ["connectionId","selectedTopicStore","firstConnectedAtMs","mqttVersion","exportTopicMessages","copyTopicPath","onClearRetained","onClearRetainedBelow","openChartWindow","dockMode","onSetDockMode","showCloseButton","headerDraggable","headerLeftInset","viewState"];
+  const props: string[] = ["connectionId","selectedTopicStore","firstConnectedAtMs","mqttVersion","exportTopicMessages","copyTopicPath","onClearRetained","onClearRetainedBelow","openChartWindow","dockMode","onSetDockMode","showCloseButton","headerDraggable","headerLeftInset","viewState","isPinned","onTogglePin"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

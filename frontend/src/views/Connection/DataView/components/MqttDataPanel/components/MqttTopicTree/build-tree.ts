@@ -14,11 +14,13 @@ export type TreeRow = {
   countMessage: number;
   message?: string;
   isRetained: boolean;
+  isPinned: boolean;
 };
 
 interface BuildTreeParams {
   data: MqttData;
   expandedTopics: Set<string>;
+  pinnedTopics: Set<string>;
   sortKey: MqttDataSortKey;
   sortDir: MqttDataSortDirection;
   searchText: string;
@@ -39,6 +41,7 @@ interface BuildRowParams {
   result: TreeRow[];
   data: MqttData;
   expandedTopics: Set<string>;
+  pinnedTopics: Set<string>;
   levelCount: number;
   sortKey: MqttDataSortKey;
   sortDir: MqttDataSortDirection;
@@ -49,6 +52,7 @@ const buildRows = (params: BuildRowParams) => {
     result,
     data,
     expandedTopics,
+    pinnedTopics,
     levelCount,
     sortKey,
     sortDir,
@@ -71,6 +75,7 @@ const buildRows = (params: BuildRowParams) => {
       countMessage: topicData.messageCount,
       isExpanded: thisRowIsExpanded,
       isRetained: topicData.isRetained,
+      isPinned: pinnedTopics.has(topicData.topic),
     });
 
     if (thisRowIsExpanded) {
@@ -78,6 +83,7 @@ const buildRows = (params: BuildRowParams) => {
         result,
         data: topicData.children,
         expandedTopics,
+        pinnedTopics,
         levelCount: levelCount + 1,
         sortKey,
         sortDir,

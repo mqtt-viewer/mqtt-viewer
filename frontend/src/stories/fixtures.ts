@@ -12,6 +12,7 @@ import { createExpandedTopicsStore } from "@/views/Connection/DataView/component
 import { createHighlightedMqttTopicsStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/highlighted-topics";
 import { createSearchStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/search";
 import { createSortStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/sort";
+import { createPinnedTopicsStore } from "@/views/Connection/DataView/stores/pinned-topics";
 
 const now = Date.now();
 
@@ -916,6 +917,16 @@ const propDefaults: Record<string, () => unknown> = {
   messageCount: () => 12,
   minSize: () => 180,
   mqttData: () => mockMqttData,
+  pinnedTopics: () => [
+    "factory/line/temperature",
+    "factory/line/humidity",
+    "warehouse/dock2/door",
+  ],
+  pinnedTopicsStore: () => createPinnedTopicsStore(1),
+  isPinned: () => false,
+  onTogglePin: () => noop,
+  onUnpin: () => noop,
+  onUnpinAll: () => noop,
   mqttVersion: () => "5",
   name: () => "storybook-field",
   newTabButtonWidth: () => 126,

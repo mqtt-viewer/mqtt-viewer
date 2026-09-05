@@ -65,6 +65,25 @@
       "type": "function",
       "required": false,
       "default": "> void"
+    },
+    {
+      "name": "pinnedTopics",
+      "type": "array",
+      "required": false,
+      "default": [],
+      "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list."
+    },
+    {
+      "name": "onUnpin",
+      "type": "function",
+      "required": false,
+      "default": "> void"
+    },
+    {
+      "name": "onUnpinAll",
+      "type": "function",
+      "required": false,
+      "default": "> void"
     }
   ],
   "tokens": [],

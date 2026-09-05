@@ -146,3 +146,23 @@ test("coerceSortKey falls back to rate for legacy-missing and garbage values", (
   expect(coerceSortKey("alpha")).toBe("alpha");
   expect(coerceSortKey("count")).toBe("count");
 });
+
+test("pinned siblings (and branches leading to one) sort before the rest", () => {
+  const model = new TopicModel(14000);
+  model.ingest("busy", T);
+  model.ingest("busy", T);
+  model.ingest("busy", T);
+  model.ingest("quiet", T);
+  model.ingest("pinned/leaf", T);
+
+  model.setPinnedTopics(new Set(["pinned/leaf"]));
+
+  const res = layoutTopicTree(model, { ...baseOpts, nowMs: T, sortKey: "rate" });
+  const order = res.nodes
+    .filter((pn) => pn.node.depth === 0)
+    .sort((x, y) => x.y - y.y)
+    .map((pn) => pn.node.name);
+  // "pinned" holds the pin below it, so it floats above the busier sibling;
+  // the unpinned two keep their rate order
+  expect(order).toEqual(["pinned", "busy", "quiet"]);
+});

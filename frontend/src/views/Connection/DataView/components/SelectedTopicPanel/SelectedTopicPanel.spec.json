@@ -104,6 +104,19 @@
       "name": "viewState",
       "type": "store",
       "required": false
+    },
+    {
+      "name": "isPinned",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether the selected topic is pinned. Fills the header pin button and switches the menu item to Unpin topic."
+    },
+    {
+      "name": "onTogglePin",
+      "type": "function",
+      "required": false,
+      "default": "> void"
     }
   ],
   "tokens": [

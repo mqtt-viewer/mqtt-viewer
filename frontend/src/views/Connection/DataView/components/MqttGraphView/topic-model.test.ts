@@ -372,3 +372,62 @@ test("clear empties touched", () => {
   model.clear();
   expect(model.touched.size).toBe(0);
 });
+
+test("setPinnedTopics flags the node and counts it on every ancestor", () => {
+  const model = new TopicModel();
+  model.ingest("house/kitchen/temp", 1000);
+  model.ingest("house/hall/temp", 1000);
+
+  model.setPinnedTopics(new Set(["house/kitchen/temp"]));
+
+  const house = model.root.children.get("house")!;
+  const kitchen = house.children.get("kitchen")!;
+  const temp = kitchen.children.get("temp")!;
+  const hall = house.children.get("hall")!;
+
+  expect(temp.pinned).toBe(true);
+  expect(temp.pinnedBelow).toBe(0);
+  expect(kitchen.pinnedBelow).toBe(1);
+  expect(house.pinnedBelow).toBe(1);
+  expect(hall.pinnedBelow).toBe(0);
+  expect(hall.pinned).toBe(false);
+});
+
+test("unpinning restores the flag and the ancestor counts", () => {
+  const model = new TopicModel();
+  model.ingest("a/b/c", 1000);
+  model.setPinnedTopics(new Set(["a/b/c"]));
+  model.setPinnedTopics(new Set());
+
+  const a = model.root.children.get("a")!;
+  const b = a.children.get("b")!;
+  const c = b.children.get("c")!;
+  expect(c.pinned).toBe(false);
+  expect(b.pinnedBelow).toBe(0);
+  expect(a.pinnedBelow).toBe(0);
+});
+
+test("pinning an unseen topic creates no node but applies when it arrives", () => {
+  const model = new TopicModel();
+  model.setPinnedTopics(new Set(["later/topic"]));
+  expect(model.topicCount).toBe(0);
+  expect(model.root.children.size).toBe(0);
+
+  model.ingest("later/topic", 1000);
+  const later = model.root.children.get("later")!;
+  const topic = later.children.get("topic")!;
+  expect(topic.pinned).toBe(true);
+  expect(later.pinnedBelow).toBe(1);
+});
+
+test("an unchanged pinned set does not bump structureGen", () => {
+  const model = new TopicModel();
+  model.ingest("a/b", 1000);
+  model.setPinnedTopics(new Set(["a/b"]));
+
+  const gen = model.structureGen;
+  model.visibleDirty = false;
+  model.setPinnedTopics(new Set(["a/b"]));
+  expect(model.structureGen).toBe(gen);
+  expect(model.visibleDirty).toBe(false);
+});

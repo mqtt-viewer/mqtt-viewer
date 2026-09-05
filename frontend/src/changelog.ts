@@ -106,6 +106,16 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "Pin the topics you keep coming back to",
+        body: "Pin any topic from its right-click menu, or from the pin button above the selected topic, and it sits in a Pinned block at the top of the tree with its live value, so topics from different branches sit together instead of scrolling apart. The graph view marks pinned nodes, sorts their branches first, and lists them in a Pinned overlay you can click to fly to one. Pins are saved per connection.",
+        thanks: [
+          {
+            name: "mrpiggi",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/153",
+          },
+        ],
+      },
+      {
         title: "See your topics as a graph",
         body: "There's a new graph view of the topic tree, where each node is sized and coloured by how much traffic it carries, so the busy corners of a broker stand out at a glance. Switch between list and graph above the tree.",
       },

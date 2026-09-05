@@ -33,6 +33,7 @@
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { MqttData } from "../MqttDataPanel/stores/mqtt-data";
   import type { SearchStore } from "../MqttDataPanel/stores/search";
+  import type { PinnedTopicsStore } from "../../stores/pinned-topics";
   import theme from "@/stores/theme";
   import PanelHeader from "@/components/PanelHeader/PanelHeader.svelte";
   import BaseInput from "@/components/InputFields/BaseInput.svelte";
@@ -83,6 +84,9 @@
   /** shared filter text store from the List view, so filter survives the
    *  List<->Graph toggle. Absent in storybook/dev: falls back to local state. */
   export let searchStore: SearchStore | undefined = undefined;
+  /** the connection's pinned topics; pins float to the top of their sibling
+   *  group and list in the Pinned overlay */
+  export let pinnedTopicsStore: PinnedTopicsStore;
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
@@ -104,6 +108,9 @@
   // teardown that lands mid-init can't register anything that outlives it
   let destroyed = false;
   let onScreen = true;
+  // true once init() has resolved on a renderer this component still owns, so
+  // the reactive pin push below can't run against a half-built Pixi app
+  let rendererReady = false;
   // true when the mount revealed an inbound selection, so the first-size
   // handler doesn't immediately fit the whole tree back over it
   let revealedOnMount = false;
@@ -142,6 +149,7 @@
   let cvdSafe = false;
   let legendOn = true;
   let statsOn = false;
+  let pinnedOn = true;
   let cooldownMs = 60000;
   let tauMs = 14000; // EWMA half-life ~10s by default
   let maxNodeR = 20;
@@ -183,6 +191,7 @@
       if (typeof s.followHottest === "boolean") followHottest = s.followHottest;
       if (typeof s.cvdSafe === "boolean") cvdSafe = s.cvdSafe;
       if (typeof s.legendOn === "boolean") legendOn = s.legendOn;
+      if (typeof s.pinnedOn === "boolean") pinnedOn = s.pinnedOn;
       if (typeof s.statsOn === "boolean") statsOn = s.statsOn;
       if (typeof s.cooldownMs === "number") cooldownMs = s.cooldownMs;
       if (typeof s.tauMs === "number") tauMs = s.tauMs;
@@ -205,6 +214,7 @@
           cvdSafe,
           legendOn,
           statsOn,
+          pinnedOn,
           cooldownMs,
           tauMs,
           maxNodeR,
@@ -347,6 +357,7 @@
       pulse: tokenHex("emphasis", light ? 0x131316 : 0xffffff),
       // the same colour the message timeline gives retained messages
       retained: tokenHex("secondary", light ? 0xdfa900 : 0xf7d66a),
+      pin: tokenHex("primary", light ? 0x5e6ce0 : 0x7c8cff),
     });
   };
   $: applyTheme($theme);
@@ -534,6 +545,62 @@
     cvdSafe
   );
   $: cooldownShort = COOLDOWN_SHORT[cooldownMs] ?? `${Math.round(cooldownMs / 1000)}s`;
+
+  // ---- pinned topics ----
+  // The model needs the pins to sort them to the top, and the renderer needs
+  // them to draw the marker. rendererReady gates the very first push so this
+  // can't reach a Pixi app that hasn't finished initialising.
+  $: if (rendererReady && renderer) renderer.setPinnedTopics($pinnedTopicsStore.set);
+
+  // The overlay is a reading aid, so it shows the most recent pins and then
+  // says how many it left out rather than growing until it covers the graph.
+  const PINNED_HUD_LIMIT = 12;
+  // Same rule as the context menu header: keep the head and the tail, since
+  // the leaf segment is what identifies the topic.
+  const PINNED_TOPIC_CHARS = 34;
+  const PINNED_VALUE_CHARS = 40;
+
+  const elideMiddle = (value: string, max: number) => {
+    if (value.length <= max) return value;
+    const keep = Math.floor((max - 1) / 2);
+    return `${value.slice(0, keep)}…${value.slice(-keep)}`;
+  };
+
+  const oneLine = (value: string) => {
+    const flat = value.replace(/\s+/g, " ").trim();
+    if (flat === "") return "empty payload";
+    return flat.length <= PINNED_VALUE_CHARS
+      ? flat
+      : `${flat.slice(0, PINNED_VALUE_CHARS)}…`;
+  };
+
+  interface PinnedEntry {
+    topic: string;
+    label: string;
+    value: string;
+  }
+
+  // `_tick` is unused: it is there so the live tick re-runs this and the
+  // values stay current, without a second interval of its own.
+  const buildPinnedEntries = (order: string[], _tick: number): PinnedEntry[] =>
+    order.slice(0, PINNED_HUD_LIMIT).map((topic) => {
+      const raw = getTopicPayload(topic);
+      return {
+        topic,
+        label: elideMiddle(topic, PINNED_TOPIC_CHARS),
+        value: raw === null ? "waiting for a message" : oneLine(raw),
+      };
+    });
+
+  $: pinnedEntries = buildPinnedEntries($pinnedTopicsStore.order, liveTick);
+  $: pinnedOverflow = Math.max(
+    0,
+    $pinnedTopicsStore.order.length - PINNED_HUD_LIMIT
+  );
+
+  const focusPinned = (topic: string) => {
+    renderer?.focusTopic(topic);
+  };
 
   // ---- performance stats HUD ----
   // Ingest rate is counted here (in the message-source callback below) rather
@@ -725,6 +792,7 @@
       renderer = null;
       return;
     }
+    rendererReady = true;
     applyTheme($theme);
     applySettings();
     seed(initialData);
@@ -828,6 +896,7 @@
     }
     // cancel the trailing 150ms filter call so it can't touch a destroyed renderer
     applyFilter.cancel();
+    rendererReady = false;
     renderer?.destroy();
     renderer = null;
   });
@@ -881,6 +950,10 @@
   };
   const toggleStats = () => {
     statsOn = !statsOn;
+    saveSettings();
+  };
+  const togglePinnedOverlay = () => {
+    pinnedOn = !pinnedOn;
     saveSettings();
   };
   const setCooldown = (ms: number) => {
@@ -1009,6 +1082,11 @@
               <Icon type={legendOn ? "ticked" : "unticked"} size={14} />Legend
             </span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={togglePinnedOverlay}>
+            <span class="flex items-center gap-2">
+              <Icon type={pinnedOn ? "ticked" : "unticked"} size={14} />Pinned
+            </span>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={toggleStats}>
             <span class="flex items-center gap-2">
               <Icon type={statsOn ? "ticked" : "unticked"} size={14} />Performance
@@ -1056,6 +1134,8 @@
             onExport={exportTopicMessages}
             {onClearRetained}
             {onClearRetainedBelow}
+            isPinned={$pinnedTopicsStore.set.has(menuTopic)}
+            onTogglePin={(t) => pinnedTopicsStore.toggle(t)}
           />
         {/if}
       </svelte:fragment>
@@ -1110,6 +1190,31 @@
           </div>
           <span>size = msg rate · ring = collapsed subtree</span>
         </div>
+      </div>
+    {/if}
+    {#if pinnedOn && pinnedEntries.length > 0}
+      <div
+        class="absolute left-3 top-8 flex max-w-[260px] flex-col gap-1 rounded border border-outline bg-elevation-1 bg-opacity-85 px-2.5 py-2 text-xs text-secondary-text"
+      >
+        <div class="flex items-center gap-1.5 text-emphasis">
+          <Icon type="pin" size={12} />Pinned
+        </div>
+        {#each pinnedEntries as entry (entry.topic)}
+          <button
+            type="button"
+            class="flex flex-col items-start rounded px-1 py-0.5 text-left hover:bg-hovered"
+            title={entry.topic}
+            on:click={() => focusPinned(entry.topic)}
+          >
+            <span class="max-w-full truncate text-emphasis">{entry.label}</span>
+            <span class="max-w-full truncate text-secondary-text"
+              >{entry.value}</span
+            >
+          </button>
+        {/each}
+        {#if pinnedOverflow > 0}
+          <div class="px-1 text-secondary-text">and {pinnedOverflow} more</div>
+        {/if}
       </div>
     {/if}
     {#if statsOn && stats}

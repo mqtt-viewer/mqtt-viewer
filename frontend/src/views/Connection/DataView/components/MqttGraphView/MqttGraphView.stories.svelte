@@ -5,6 +5,7 @@
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
   import { startMockMessages } from "./mock-source";
+  import { createPinnedTopicsStore } from "../../stores/pinned-topics";
 
   const componentName = "MqttGraphView";
   const storyId = "Views/Connection/DataView/MqttGraphView";
@@ -23,6 +24,9 @@
   const storyArgs = {
     ...getStoryArgs(storyId, componentName, props),
     messageSource: mockMessageSource,
+    // real store against the mocked bindings, so the story exercises the same
+    // shape the app passes in
+    pinnedTopicsStore: createPinnedTopicsStore(1),
   };
 
   const { Story } = defineMeta({

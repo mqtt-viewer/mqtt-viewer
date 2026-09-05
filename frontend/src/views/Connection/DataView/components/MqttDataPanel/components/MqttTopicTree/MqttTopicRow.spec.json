@@ -80,6 +80,27 @@
       "type": "function",
       "required": false,
       "default": "undefined"
+    },
+    {
+      "name": "isPinned",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether this topic is pinned. Renders a quiet pin marker after the retained dot."
+    },
+    {
+      "name": "onUnpin",
+      "type": "function",
+      "required": false,
+      "default": "undefined",
+      "description": "Set only by the pinned block, where the pin marker becomes a hover-revealed unpin button."
+    },
+    {
+      "name": "showChevron",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "description": "Hide the expansion chevron column, as the pinned block does."
     }
   ],
   "tokens": [

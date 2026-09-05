@@ -39,6 +39,9 @@
   export let copyTopicPath: (topic: string) => void;
   export let onClearRetained: (topic: string) => void;
   export let onClearRetainedBelow: (prefix: string) => void;
+  /** Whether the selected topic is pinned to the top of the topic tree. */
+  export let isPinned = false;
+  export let onTogglePin: (topic: string) => void = () => {};
   // Optional: opens the chart in a separate window (wired by DataView).
   export let openChartWindow:
     | ((topic: string, fields: string[]) => void)
@@ -251,6 +254,18 @@
           <Topic topic={selectedTopicString ?? ""} />
         </div>
         <div class="grow"></div>
+        {#if selectedTopicString !== null}
+          <!-- The discoverable way in. The context menu is the fast one, but
+               nobody finds an action they never right-click for. -->
+          <div style="--wails-draggable:false">
+            <IconButton
+              tooltipText={isPinned ? "Unpin topic" : "Pin topic"}
+              onClick={() => onTogglePin(selectedTopicString ?? "")}
+            >
+              <Icon type="pin" size={16} selected={isPinned} />
+            </IconButton>
+          </div>
+        {/if}
         <DropdownMenu>
           <div slot="trigger" class="" style="--wails-draggable:false">
             <IconButton>
@@ -324,6 +339,8 @@
                   hasPayload={selectedMessagePayload !== null}
                   isRetained={isSelectedTopicRetained}
                   retainedBelowCount={retainedBelowSelectedCount}
+                  {isPinned}
+                  {onTogglePin}
                   onCopyTopic={copyTopicPath}
                   onCopyPayload={copySelectedPayload}
                   onExport={exportTopicMessages}

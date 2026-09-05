@@ -27,6 +27,14 @@ export class TopicNode {
   // topic a message was published to, not of its ancestors.
   ownRetained = false;
 
+  // is this exact topic pinned? Set from the connection's pinned-topics store,
+  // never inferred from traffic.
+  pinned = false;
+
+  // how many pinned topics live strictly below this node. Lets the layout
+  // float a whole branch that leads to a pin without walking the subtree.
+  pinnedBelow = 0;
+
   // subtree aggregate (this node + all descendants)
   agg: DecayScore = { score: 0, lastMs: 0 };
   aggLastMsg = 0;
@@ -79,6 +87,12 @@ export class TopicModel {
   // so a topic ticking many times between frames costs one entry per node.
   touched = new Set<TopicNode>();
 
+  // The pinned set as last applied to the tree. Kept so setPinnedTopics can
+  // diff against it (cost is O(pins that changed), not O(tree)) and so a topic
+  // pinned before it was ever seen still gets its flag the moment a node is
+  // created for it.
+  private pinnedApplied = new Set<string>();
+
   constructor(tauMs = 14000) {
     this.tauMs = tauMs;
   }
@@ -125,6 +139,64 @@ export class TopicModel {
     return true;
   }
 
+  // Walk a topic path, returning the node or null if any segment is missing.
+  private findNode(topic: string): TopicNode | null {
+    let node: TopicNode | undefined = this.root;
+    for (const seg of topic.split("/")) {
+      node = node.children.get(seg);
+      if (!node) return null;
+    }
+    return node === this.root ? null : node;
+  }
+
+  // Flip one topic's pin flag and fold the change into every ancestor's
+  // pinnedBelow. A pin on a topic with no node yet is a silent no-op: pinning
+  // must never conjure a node for a topic that has not arrived.
+  private applyPin(topic: string, delta: 1 | -1): void {
+    const node = this.findNode(topic);
+    if (!node) return;
+    node.pinned = delta === 1;
+    for (let p = node.parent; p && p !== this.root; p = p.parent) {
+      p.pinnedBelow += delta;
+    }
+  }
+
+  // Called for every node the tree creates, so a topic pinned while it was
+  // still unseen picks its flag up the moment its first message lands.
+  private applyPinOnCreate(child: TopicNode, parent: TopicNode): void {
+    if (!this.pinnedApplied.has(child.topic)) return;
+    child.pinned = true;
+    for (let p: TopicNode | null = parent; p && p !== this.root; p = p.parent) {
+      p.pinnedBelow++;
+    }
+  }
+
+  /**
+   * Apply the connection's pinned topics to the tree.
+   *
+   * Diffs against the previously applied set, so a single pin costs one path
+   * walk rather than a full traversal, however large the tree. Topics with no
+   * node yet are remembered but draw nothing until they arrive.
+   */
+  setPinnedTopics(topics: Set<string>): void {
+    let changed = false;
+    for (const t of topics) {
+      if (this.pinnedApplied.has(t)) continue;
+      changed = true;
+      this.applyPin(t, 1);
+    }
+    for (const t of this.pinnedApplied) {
+      if (topics.has(t)) continue;
+      changed = true;
+      this.applyPin(t, -1);
+    }
+    if (!changed) return;
+    this.pinnedApplied = new Set(topics);
+    // pinned siblings sort first, so the laid-out order changes
+    this.visibleDirty = true;
+    this.structureGen++;
+  }
+
   // Mark a toggled node's visibility state dirty (expand/collapse always
   // changes the laid-out tree, whether it reveals or hides a subtree).
   markExpansionChanged(): void {
@@ -152,6 +224,7 @@ export class TopicModel {
         child.expanded = i < this.autoExpandDepth;
         node.children.set(seg, child);
         this.nodeCount++;
+        this.applyPinOnCreate(child, node);
         // every ancestor gains a descendant
         for (let p = node; p && p !== this.root; p = p.parent!) p.descendantCount++;
         // only a node reachable under a fully-expanded ancestor chain can
@@ -216,6 +289,7 @@ export class TopicModel {
         child.expanded = i < this.autoExpandDepth;
         node.children.set(seg, child);
         this.nodeCount++;
+        this.applyPinOnCreate(child, node);
         for (let p = node; p && p !== this.root; p = p.parent!) p.descendantCount++;
         if (this.isVisibleInTree(child)) {
           this.visibleDirty = true;

@@ -18,6 +18,9 @@
   // Whether this topic holds a retained message, as far as we know. Drives the
   // retained marker only; the backend is authoritative for counting/clearing.
   export let isRetained: boolean = false;
+  // Whether this topic is pinned to the block above the tree. Drives a quiet
+  // marker only; the pinned block itself is owned by MqttTopicTree.
+  export let isPinned: boolean = false;
   export let toggleExpansion: (expandKey: string) => void;
   export let onTopicSelect: () => void;
   export let highlightedTopicStore: HighlightedMqttTopicsStore;
@@ -26,6 +29,13 @@
   // other row so no per-row listener/markup cost is incurred (see the tree-row
   // performance rule in docs/broker-status-spec.md).
   export let onOpenBrokerStatus: (() => void) | undefined = undefined;
+  // Set only by the pinned block, where the marker doubles as the unpin
+  // control. Undefined for every ordinary tree row, so those rows render a
+  // static glyph and pay no listener cost (same rule as onOpenBrokerStatus).
+  export let onUnpin: (() => void) | undefined = undefined;
+  // The pinned block shows no expansion chevron: its rows are a flat list, so
+  // the column would only be dead space.
+  export let showChevron: boolean = true;
 
   $: syntaxHighlightedMessage = !!message ? highlightJson(message) : "";
 
@@ -99,19 +109,21 @@
     "overflow-hidden min-w-0 w-full"
   )}
 >
-  <button
-    on:click={() => {
-      toggleExpansion(expandKey);
-    }}
-  >
-    <div class={`w-4 relative`}>
-      {#if subtopicCount > 0}
-        <div class={`${isExpanded ? "rotate-90" : "rotate-0"}`}>
-          <Button variant="text" iconType="right" iconSize={14} />
-        </div>
-      {/if}
-    </div>
-  </button>
+  {#if showChevron}
+    <button
+      on:click={() => {
+        toggleExpansion(expandKey);
+      }}
+    >
+      <div class={`w-4 relative`}>
+        {#if subtopicCount > 0}
+          <div class={`${isExpanded ? "rotate-90" : "rotate-0"}`}>
+            <Button variant="text" iconType="right" iconSize={14} />
+          </div>
+        {/if}
+      </div>
+    </button>
+  {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     id={`topic-row-${expandKey}`}
@@ -138,6 +150,39 @@
         title="Has a retained message"
         class="mr-2 size-[5px] shrink-0 self-center rounded-full bg-secondary"
       ></span>
+    {/if}
+    {#if isPinned}
+      <!-- Pin marker. Quiet on purpose: it says where the topic also appears,
+           it is not a call to action. Sized well under the text line-height so
+           it cannot alter the fixed 19px row height the virtual list depends
+           on. In the pinned block onUnpin is set and the same glyph becomes
+           the hover-revealed unpin control; ordinary tree rows leave it
+           undefined and render the static span, paying no listener cost. -->
+      {#if onUnpin}
+        <button
+          type="button"
+          aria-label="Unpin topic"
+          title="Unpin topic"
+          class={twMerge(
+            "mr-2 inline-flex shrink-0 self-center rounded",
+            "text-secondary-text hover:text-white-text",
+            "opacity-60 group-hover:opacity-100",
+            "focus-visible:opacity-100"
+          )}
+          on:click|stopPropagation={onUnpin}
+          on:keypress|stopPropagation
+          on:keydown|stopPropagation
+        >
+          <Icon type="pin" size={10} />
+        </button>
+      {:else}
+        <span
+          title="Pinned"
+          class="mr-2 inline-flex shrink-0 self-center text-secondary-text"
+        >
+          <Icon type="pin" size={10} />
+        </span>
+      {/if}
     {/if}
     {#if subtopicCount > 0}
       <div class="w-3 min-w-3 ml-[2px] relative">

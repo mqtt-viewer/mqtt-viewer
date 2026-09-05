@@ -21,12 +21,15 @@
   export let retainedBelowCount = 0;
   /** Hide the topic header when the surrounding UI already names the topic. */
   export let showHeader = true;
+  /** Whether this topic is currently pinned to the top of the tree. */
+  export let isPinned = false;
 
   export let onCopyTopic: (topic: string) => void;
   export let onCopyPayload: (topic: string) => void;
   export let onExport: (topic: string) => void;
   export let onClearRetained: (topic: string) => void;
   export let onClearRetainedBelow: (prefix: string) => void;
+  export let onTogglePin: (topic: string) => void;
 
   // Right-click does not move selection, so the menu names its own target.
   // Without this, a right-click on one topic while another is selected gives no
@@ -48,6 +51,16 @@
     {elideMiddle(topic)}
   </div>
 {/if}
+
+<!-- First item, and always in the same place: pinning is the action people
+     reach for most here, and a menu entry that moves between topics is a menu
+     entry you have to read every time. -->
+<DropdownMenuItem onClick={() => onTogglePin(topic)}>
+  <span class="flex items-center gap-2">
+    <Icon type="pin" size={16} />
+    <span>{isPinned ? "Unpin topic" : "Pin topic"}</span>
+  </span>
+</DropdownMenuItem>
 
 <DropdownMenuItem onClick={() => onCopyTopic(topic)}>
   <span class="flex items-center gap-2">

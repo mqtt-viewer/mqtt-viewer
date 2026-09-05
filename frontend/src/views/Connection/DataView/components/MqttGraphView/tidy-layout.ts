@@ -126,8 +126,16 @@ export function layoutTopicTree(model: TopicModel, opts: LayoutOptions): LayoutR
   const sortChildren = (n: TopicNode): TopicNode[] => {
     let kids = [...n.children.values()];
     if (filtering) kids = kids.filter((k) => keep.has(k));
-    const decorated = kids.map((node) => ({ node, key: sortValue(node) }));
+    const decorated = kids.map((node) => ({
+      node,
+      key: sortValue(node),
+      // A pin, or a branch leading to one, floats to the top of its sibling
+      // group whatever the sort is: the point of pinning is not having to hunt
+      // for the topic again. Ordering WITHIN each group is untouched.
+      pinned: node.pinned || node.pinnedBelow > 0,
+    }));
     decorated.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       if (typeof a.key === "string" || typeof b.key === "string") {
         return String(a.key).localeCompare(String(b.key));
       }

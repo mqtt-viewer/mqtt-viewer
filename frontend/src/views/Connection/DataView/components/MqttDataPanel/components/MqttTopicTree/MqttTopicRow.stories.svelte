@@ -6,7 +6,7 @@
 
   const componentName = "MqttTopicRow";
   const storyId = "Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow";
-  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus"];
+  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus","isRetained","isPinned","showChevron"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -23,3 +23,23 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<Story
+  name="Pinned"
+  args={{ ...storyArgs, isPinned: true }}
+  {template}
+/>
+
+<!-- How a row looks inside the pinned block: no chevron column, and the pin
+     marker doubles as the unpin control. -->
+<Story
+  name="Pinned block row"
+  args={{
+    ...storyArgs,
+    isPinned: true,
+    showChevron: false,
+    topicLevel: "factory/line/temperature",
+    onUnpin: () => {},
+  }}
+  {template}
+/>
