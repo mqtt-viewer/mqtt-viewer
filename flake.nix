@@ -10,10 +10,10 @@
     let
       inherit (nixpkgs) lib;
 
-      # Latest release tag is v1.0.0. The ldflag value keeps the leading "v"
+      # Latest release tag is v1.1.0. The ldflag value keeps the leading "v"
       # (backend/env flips IsDev when Version contains "-dev", so a plain
       # release tag gives us a production build).
-      version = "1.0.0";
+      version = "1.1.0";
 
       # Wails on Linux needs the GTK/WebKit stack, so only Linux gets packages.
       # The dev shell is offered everywhere so a mac checkout can still get Go,
@@ -43,6 +43,8 @@
           ./go.sum
           ./main.go
           ./tools.go
+          ./window_default.go
+          ./window_server.go
           ./backend
           ./events
           ./loader
@@ -111,12 +113,12 @@
               pkgs.atlas
               pkgs.git
             ]
-            ++ lib.optional stdenv.isLinux self.packages.${stdenv.hostPlatform.system}.wails3;
+            ++ lib.optional stdenv.hostPlatform.isLinux self.packages.${stdenv.hostPlatform.system}.wails3;
 
             # pkg-config discovery for cgo needs these as real build inputs, not
             # as `packages` (which land in PATH but not in the pkg-config path).
-            nativeBuildInputs = lib.optionals stdenv.isLinux [ pkgs.pkg-config ];
-            buildInputs = lib.optionals stdenv.isLinux [
+            nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ pkgs.pkg-config ];
+            buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
               pkgs.gtk3
               pkgs.webkitgtk_4_1
               pkgs.libsoup_3
@@ -133,7 +135,7 @@
             # CLAUDE.md work verbatim. GOFLAGS is only a default: an explicit
             # `-tags production,gtk3` on a command line still wins, so
             # `wails3 dev` and the Taskfile builds are unaffected.
-            env.GOFLAGS = lib.optionalString stdenv.isLinux "-tags=gtk3";
+            env.GOFLAGS = lib.optionalString stdenv.hostPlatform.isLinux "-tags=gtk3";
 
             # On darwin the GTK stack does not apply and wails3 itself wants the
             # Xcode frameworks, so getting the CLI there is left to
@@ -149,7 +151,7 @@
                 echo "<html></html>" > frontend/dist/index.html
                 echo "nix: stubbed frontend/dist/index.html so go build works; run 'pnpm build' in frontend/ for the real thing"
               fi
-              echo "nix: dev shell ready${lib.optionalString stdenv.isLinux " (GOFLAGS=-tags=gtk3)"}; 'just dev' to run the app"
+              echo "nix: dev shell ready${lib.optionalString stdenv.hostPlatform.isLinux " (GOFLAGS=-tags=gtk3)"}; 'just dev' to run the app"
             '';
           };
         }
