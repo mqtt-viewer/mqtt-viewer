@@ -24,14 +24,16 @@
 
 <Story name="Default" args={storyArgs} {template} />
 
+<!-- A pinned row in the tree. The pin marker is the unpin button here too, so
+     a pin can be undone from wherever the row is. -->
 <Story
   name="Pinned"
-  args={{ ...storyArgs, isPinned: true }}
+  args={{ ...storyArgs, isPinned: true, onUnpin: () => {} }}
   {template}
 />
 
-<!-- How a row looks inside the pinned block: no chevron column, and the pin
-     marker doubles as the unpin control. -->
+<!-- How the same row looks inside the pinned block: no chevron column, and the
+     whole topic path as the label. -->
 <Story
   name="Pinned block row"
   args={{

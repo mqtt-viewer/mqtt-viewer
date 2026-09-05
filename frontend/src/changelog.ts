@@ -107,7 +107,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Pin the topics you keep coming back to",
-        body: "Pin any topic from its right-click menu, or from the pin button above the selected topic, and it sits in a Pinned block at the top of the tree with its live value, so topics from different branches sit together instead of scrolling apart. The graph view marks pinned nodes, sorts their branches first, and lists them in a Pinned overlay you can click to fly to one. Pins are saved per connection.",
+        body: "Pin any topic from its right-click menu or the pin button above the selected topic, and it stays in a Pinned block at the top of the tree with its live value, saved per connection. The graph view marks pinned nodes, sorts their branches first and lists them in a Pinned overlay that jumps to the node when clicked.",
         thanks: [
           {
             name: "mrpiggi",

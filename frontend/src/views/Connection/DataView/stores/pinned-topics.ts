@@ -45,7 +45,16 @@ export const createPinnedTopicsStore = (connectionId: number) => {
     });
     // Tear the listener down when the last subscriber leaves, so listeners
     // don't accumulate across tab churn.
-    return () => off?.();
+    return () => {
+      off?.();
+      // The pins can change while nothing is subscribed (another window, or a
+      // connection delete), so the next subscription has to read the database
+      // again rather than serving whatever was last in memory. Bumping the
+      // sequence with it stops a load still in flight from marking the store
+      // loaded after we asked for a fresh one.
+      loadSeq++;
+      hasLoaded = false;
+    };
   });
 
   const apply = (order: string[]) => {
@@ -53,14 +62,30 @@ export const createPinnedTopicsStore = (connectionId: number) => {
     set(current);
   };
 
+  // Optimistic paints win over any read that was already in flight: the
+  // database row the reload is reading predates the mutation, so its result is
+  // stale by definition. The mutation emits PinnedTopicsChanged, which starts a
+  // fresh reload that does see the write.
+  const applyOptimistic = (order: string[]) => {
+    loadSeq++;
+    apply(order);
+  };
+
   let hasLoaded = false;
+  // Guards against out-of-order reads. Two reloads racing (two events, or an
+  // event plus a failed-write retry) can resolve in either order, and the
+  // loser must not overwrite the winner.
+  let loadSeq = 0;
 
   const reload = async () => {
+    const seq = ++loadSeq;
     try {
       const pinned = await GetPinnedTopics(connectionId);
+      if (seq !== loadSeq) return;
       apply((pinned ?? []).map((pin) => pin.topic));
       hasLoaded = true;
     } catch (e) {
+      if (seq !== loadSeq) return;
       // Allow the next first-subscription to retry rather than losing the
       // persisted pins for the whole session.
       hasLoaded = false;
@@ -79,7 +104,7 @@ export const createPinnedTopicsStore = (connectionId: number) => {
   // the UI falls back to what is actually persisted.
   const pin = (topic: string) => {
     if (current.set.has(topic)) return;
-    apply([...current.order, topic]);
+    applyOptimistic([...current.order, topic]);
     PinTopic(connectionId, topic).catch((e) => {
       console.error("failed to pin topic", e);
       reload();
@@ -88,7 +113,7 @@ export const createPinnedTopicsStore = (connectionId: number) => {
 
   const unpin = (topic: string) => {
     if (!current.set.has(topic)) return;
-    apply(current.order.filter((t) => t !== topic));
+    applyOptimistic(current.order.filter((t) => t !== topic));
     UnpinTopic(connectionId, topic).catch((e) => {
       console.error("failed to unpin topic", e);
       reload();
@@ -105,7 +130,7 @@ export const createPinnedTopicsStore = (connectionId: number) => {
 
   const unpinAll = () => {
     if (current.order.length === 0) return;
-    apply([]);
+    applyOptimistic([]);
     UnpinAllTopics(connectionId).catch((e) => {
       console.error("failed to unpin all topics", e);
       reload();

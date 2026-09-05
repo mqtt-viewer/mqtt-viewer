@@ -580,17 +580,30 @@
     value: string;
   }
 
+  // A pinned topic is in one of three states, and they are worth telling
+  // apart: nothing has arrived on it yet, it carries a payload, or it is a
+  // branch in the path that only counts what is below it. Without the model
+  // the last two both looked like "waiting for a message", which is a lie for
+  // a branch that is carrying traffic.
+  const pinnedValue = (topic: string): string => {
+    const node = findNode(topic);
+    if (!node) return "waiting for a message";
+    const raw = getTopicPayload(topic);
+    if (raw !== null) return oneLine(raw);
+    const msgs = `${node.aggCount.toLocaleString()} ${node.aggCount === 1 ? "msg" : "msgs"}`;
+    if (node.descendantCount === 0) return msgs;
+    const topics = `${node.descendantCount.toLocaleString()} ${node.descendantCount === 1 ? "topic" : "topics"}`;
+    return `${topics} · ${msgs}`;
+  };
+
   // `_tick` is unused: it is there so the live tick re-runs this and the
   // values stay current, without a second interval of its own.
   const buildPinnedEntries = (order: string[], _tick: number): PinnedEntry[] =>
-    order.slice(0, PINNED_HUD_LIMIT).map((topic) => {
-      const raw = getTopicPayload(topic);
-      return {
-        topic,
-        label: elideMiddle(topic, PINNED_TOPIC_CHARS),
-        value: raw === null ? "waiting for a message" : oneLine(raw),
-      };
-    });
+    order.slice(0, PINNED_HUD_LIMIT).map((topic) => ({
+      topic,
+      label: elideMiddle(topic, PINNED_TOPIC_CHARS),
+      value: pinnedValue(topic),
+    }));
 
   $: pinnedEntries = buildPinnedEntries($pinnedTopicsStore.order, liveTick);
   $: pinnedOverflow = Math.max(
@@ -1193,27 +1206,36 @@
       </div>
     {/if}
     {#if pinnedOn && pinnedEntries.length > 0}
+      <!-- Capped at 45% of the canvas so a full list can never grow down into
+           the legend on a small panel; the entries scroll past that while the
+           header and the overflow line stay put. Opaque like the stats HUD:
+           nodes reading through the text made both harder to read. -->
       <div
-        class="absolute left-3 top-8 flex max-w-[260px] flex-col gap-1 rounded border border-outline bg-elevation-1 bg-opacity-85 px-2.5 py-2 text-xs text-secondary-text"
+        class="absolute left-3 top-8 flex max-h-[45%] max-w-[260px] flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
       >
-        <div class="flex items-center gap-1.5 text-emphasis">
+        <div class="flex shrink-0 items-center gap-1.5 text-emphasis">
           <Icon type="pin" size={12} />Pinned
         </div>
-        {#each pinnedEntries as entry (entry.topic)}
-          <button
-            type="button"
-            class="flex flex-col items-start rounded px-1 py-0.5 text-left hover:bg-hovered"
-            title={entry.topic}
-            on:click={() => focusPinned(entry.topic)}
-          >
-            <span class="max-w-full truncate text-emphasis">{entry.label}</span>
-            <span class="max-w-full truncate text-secondary-text"
-              >{entry.value}</span
+        <div class="flex min-h-0 flex-col gap-1 overflow-y-auto">
+          {#each pinnedEntries as entry (entry.topic)}
+            <button
+              type="button"
+              class="flex shrink-0 flex-col items-start rounded px-1 py-0.5 text-left hover:bg-hovered"
+              title={entry.topic}
+              on:click={() => focusPinned(entry.topic)}
             >
-          </button>
-        {/each}
+              <span class="max-w-full truncate text-emphasis">{entry.label}</span
+              >
+              <span class="max-w-full truncate text-secondary-text"
+                >{entry.value}</span
+              >
+            </button>
+          {/each}
+        </div>
         {#if pinnedOverflow > 0}
-          <div class="px-1 text-secondary-text">and {pinnedOverflow} more</div>
+          <div class="shrink-0 px-1 text-secondary-text">
+            and {pinnedOverflow} more
+          </div>
         {/if}
       </div>
     {/if}

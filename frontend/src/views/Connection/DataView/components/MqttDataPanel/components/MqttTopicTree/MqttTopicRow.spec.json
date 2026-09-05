@@ -86,14 +86,14 @@
       "type": "boolean",
       "required": false,
       "default": false,
-      "description": "Whether this topic is pinned. Renders a quiet pin marker after the retained dot."
+      "description": "Whether this topic is pinned. Renders the pin marker after the retained dot; the marker is also the unpin button."
     },
     {
       "name": "onUnpin",
       "type": "function",
       "required": false,
       "default": "undefined",
-      "description": "Set only by the pinned block, where the pin marker becomes a hover-revealed unpin button."
+      "description": "Unpins the topic. The pin marker is a button wherever a pinned row appears, in the tree as well as the pinned block; only pinned rows render it, so unpinned rows pay no listener cost."
     },
     {
       "name": "showChevron",

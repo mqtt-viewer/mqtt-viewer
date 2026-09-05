@@ -29,9 +29,9 @@
   // other row so no per-row listener/markup cost is incurred (see the tree-row
   // performance rule in docs/broker-status-spec.md).
   export let onOpenBrokerStatus: (() => void) | undefined = undefined;
-  // Set only by the pinned block, where the marker doubles as the unpin
-  // control. Undefined for every ordinary tree row, so those rows render a
-  // static glyph and pay no listener cost (same rule as onOpenBrokerStatus).
+  // Unpins this topic. The pin marker is the button, wherever the row appears.
+  // Only rows that are actually pinned render it, so unpinned rows still pay
+  // nothing (same rule as onOpenBrokerStatus).
   export let onUnpin: (() => void) | undefined = undefined;
   // The pinned block shows no expansion chevron: its rows are a flat list, so
   // the column would only be dead space.
@@ -152,37 +152,30 @@
       ></span>
     {/if}
     {#if isPinned}
-      <!-- Pin marker. Quiet on purpose: it says where the topic also appears,
-           it is not a call to action. Sized well under the text line-height so
-           it cannot alter the fixed 19px row height the virtual list depends
-           on. In the pinned block onUnpin is set and the same glyph becomes
-           the hover-revealed unpin control; ordinary tree rows leave it
-           undefined and render the static span, paying no listener cost. -->
-      {#if onUnpin}
-        <button
-          type="button"
-          aria-label="Unpin topic"
-          title="Unpin topic"
-          class={twMerge(
-            "mr-2 inline-flex shrink-0 self-center rounded",
-            "text-secondary-text hover:text-white-text",
-            "opacity-60 group-hover:opacity-100",
-            "focus-visible:opacity-100"
-          )}
-          on:click|stopPropagation={onUnpin}
-          on:keypress|stopPropagation
-          on:keydown|stopPropagation
-        >
-          <Icon type="pin" size={10} />
-        </button>
-      {:else}
-        <span
-          title="Pinned"
-          class="mr-2 inline-flex shrink-0 self-center text-secondary-text"
-        >
-          <Icon type="pin" size={10} />
-        </span>
-      {/if}
+      <!-- Pin marker, and the unpin control: clicking it unpins wherever the
+           row appears, so a pin can be undone from the tree as well as from
+           the pinned block. Quiet until hovered, since it says where the topic
+           also appears rather than asking to be pressed. Sized well under the
+           text line-height so it cannot alter the fixed 19px row height the
+           virtual list depends on. Unpinned rows render none of this and pay
+           no listener cost, which is the rule that matters on the hot path
+           (same as onOpenBrokerStatus above). -->
+      <button
+        type="button"
+        aria-label="Unpin topic"
+        title="Unpin topic"
+        class={twMerge(
+          "mr-2 inline-flex shrink-0 self-center rounded",
+          "text-secondary-text hover:text-emphasis",
+          "opacity-60 group-hover:opacity-100",
+          "focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-primary"
+        )}
+        on:click|stopPropagation={() => onUnpin?.()}
+        on:keypress|stopPropagation
+        on:keydown|stopPropagation
+      >
+        <Icon type="pin" size={10} />
+      </button>
     {/if}
     {#if subtopicCount > 0}
       <div class="w-3 min-w-3 ml-[2px] relative">

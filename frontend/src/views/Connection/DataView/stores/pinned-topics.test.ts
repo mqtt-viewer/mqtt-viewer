@@ -182,6 +182,79 @@ describe("pinned-topics store", () => {
     off();
   });
 
+  it("keeps the newer result when two reloads resolve out of order", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const { seen, off } = observe(store);
+    await flush();
+    expect(seen.value.order).toEqual(["a/one"]);
+
+    const handler = listeners.get("PinnedTopicsChanged")!;
+
+    // The first reload reads the stale database state and is slow; the second
+    // reads the fresh state and lands first.
+    let resolveFirst: (v: unknown) => void = () => {};
+    GetPinnedTopics.mockImplementationOnce(
+      () => new Promise((resolve) => (resolveFirst = resolve))
+    );
+    GetPinnedTopics.mockImplementationOnce(() =>
+      Promise.resolve(rows("a/one", "b/two"))
+    );
+
+    handler({ data: { connectionId: 1 } });
+    handler({ data: { connectionId: 1 } });
+    await flush();
+    expect(seen.value.order).toEqual(["a/one", "b/two"]);
+
+    resolveFirst(rows("a/one"));
+    await flush();
+
+    expect(seen.value.order).toEqual(["a/one", "b/two"]);
+    off();
+  });
+
+  it("an unpin during an in-flight reload is not reverted by it", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one", "b/two"));
+    const store = createPinnedTopicsStore(1);
+    const { seen, off } = observe(store);
+    await flush();
+
+    const handler = listeners.get("PinnedTopicsChanged")!;
+    let resolveReload: (v: unknown) => void = () => {};
+    GetPinnedTopics.mockImplementationOnce(
+      () => new Promise((resolve) => (resolveReload = resolve))
+    );
+    handler({ data: { connectionId: 1 } });
+
+    store.unpin("a/one");
+    expect(seen.value.order).toEqual(["b/two"]);
+
+    // The read predates the unpin, so its result must not put the pin back.
+    resolveReload(rows("a/one", "b/two"));
+    await flush();
+
+    expect(seen.value.order).toEqual(["b/two"]);
+    off();
+  });
+
+  it("re-reads the pins when it is subscribed to again", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const first = observe(store);
+    await flush();
+    expect(first.seen.value.order).toEqual(["a/one"]);
+    first.off();
+
+    // Another window pinned something while nothing here was subscribed.
+    GetPinnedTopics.mockResolvedValue(rows("a/one", "b/two"));
+    const second = observe(store);
+    await flush();
+
+    expect(GetPinnedTopics).toHaveBeenCalledTimes(2);
+    expect(second.seen.value.order).toEqual(["a/one", "b/two"]);
+    second.off();
+  });
+
   it("drops the event listener when the last subscriber leaves", async () => {
     GetPinnedTopics.mockResolvedValue([]);
     const store = createPinnedTopicsStore(1);

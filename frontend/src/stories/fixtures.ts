@@ -12,9 +12,44 @@ import { createExpandedTopicsStore } from "@/views/Connection/DataView/component
 import { createHighlightedMqttTopicsStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/highlighted-topics";
 import { createSearchStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/search";
 import { createSortStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/sort";
-import { createPinnedTopicsStore } from "@/views/Connection/DataView/stores/pinned-topics";
+import type { PinnedTopics } from "@/views/Connection/DataView/stores/pinned-topics";
 
 const now = Date.now();
+
+/**
+ * A PinnedTopicsStore that starts from a fixed list and keeps its pins in
+ * memory. Same interface as the real one, so stories stay interactive
+ * (pinning and unpinning update the view), without touching the Wails
+ * bindings or the database behind them.
+ */
+export const createStaticPinnedTopicsStore = (topics: string[] = []) => {
+  const snapshot = (order: string[]): PinnedTopics => ({
+    order,
+    set: new Set(order),
+  });
+  let current = snapshot(topics);
+  const { subscribe, set } = writable<PinnedTopics>(current);
+
+  const apply = (order: string[]) => {
+    current = snapshot(order);
+    set(current);
+  };
+
+  const pin = (topic: string) => {
+    if (current.set.has(topic)) return;
+    apply([...current.order, topic]);
+  };
+  const unpin = (topic: string) => {
+    if (!current.set.has(topic)) return;
+    apply(current.order.filter((t) => t !== topic));
+  };
+  const toggle = (topic: string) =>
+    current.set.has(topic) ? unpin(topic) : pin(topic);
+  const unpinAll = () => apply([]);
+  const isPinned = (topic: string) => current.set.has(topic);
+
+  return { subscribe, pin, unpin, toggle, unpinAll, isPinned };
+};
 
 export const mockEventSet = {
   mqttConnected: "storybook:mqttConnected",
@@ -922,7 +957,7 @@ const propDefaults: Record<string, () => unknown> = {
     "factory/line/humidity",
     "warehouse/dock2/door",
   ],
-  pinnedTopicsStore: () => createPinnedTopicsStore(1),
+  pinnedTopicsStore: () => createStaticPinnedTopicsStore(),
   isPinned: () => false,
   onTogglePin: () => noop,
   onUnpin: () => noop,

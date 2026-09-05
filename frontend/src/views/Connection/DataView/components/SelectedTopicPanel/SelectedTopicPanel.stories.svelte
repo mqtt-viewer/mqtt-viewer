@@ -24,6 +24,10 @@
 
 <Story name="Default" args={storyArgs} {template} />
 
+<!-- The selected topic is pinned, so the header's pin button is filled and its
+     menu item reads "Unpin topic". -->
+<Story name="Pinned" args={{ ...storyArgs, isPinned: true }} {template} />
+
 <!-- Dock side "right" (default, narrow width): matches DataView's ResizableContainer
      resizeEdge="left" placement, the current/unchanged docked-right layout. -->
 <Story

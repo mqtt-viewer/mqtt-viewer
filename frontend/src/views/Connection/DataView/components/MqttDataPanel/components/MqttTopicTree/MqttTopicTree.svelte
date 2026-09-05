@@ -14,7 +14,6 @@
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import { OpenBrokerStatusWindow } from "bindings/mqtt-viewer/backend/app/app";
   import { findTopicNode } from "@/views/Connection/DataView/payload-copy";
-  import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import { tick } from "svelte";
   import { twMerge } from "tailwind-merge";
@@ -77,6 +76,11 @@
    * The virtual list has a fixed row height, so a row's offset is just its
    * index times that height. Nothing else in the list can be a different
    * height, which is what makes this safe.
+   *
+   * A search filter can prune the topic out of the tree entirely, in which
+   * case there is nothing to reveal and the expansions are undone: leaving
+   * half a broker's branches open after a click that visibly did nothing is
+   * worse than the click doing nothing at all.
    */
   const revealInTree = async (topic: string) => {
     const levels = topic.split("/");
@@ -84,10 +88,16 @@
     for (let i = 0; i < levels.length; i++) {
       ancestors.push(levels.slice(0, i + 1).join("/"));
     }
+    // Only the keys this reveal adds are ours to take back; anything the user
+    // had already opened stays open.
+    const opened = ancestors.filter((key) => !$expandedTopicsStore.has(key));
     expandedTopicsStore.expandMultipleTopics(ancestors);
     await tick();
     const index = treeData.findIndex((row) => row.topic === topic);
-    if (index < 0) return;
+    if (index < 0) {
+      if (opened.length > 0) expandedTopicsStore.collapseMultipleTopics(opened);
+      return;
+    }
     const viewport = treeElement?.querySelector(
       "svelte-virtual-list-viewport"
     ) as HTMLElement | null;
@@ -131,7 +141,10 @@
       >
         <button
           type="button"
-          class="flex items-center gap-1"
+          class={twMerge(
+            "flex items-center gap-1 rounded hover:text-emphasis",
+            "focus-visible:ring-1 focus-visible:ring-primary"
+          )}
           aria-label={isPinnedBlockCollapsed
             ? "Expand pinned topics"
             : "Collapse pinned topics"}
@@ -139,7 +152,7 @@
         >
           <span class="w-4 flex justify-center">
             <span class={isPinnedBlockCollapsed ? "rotate-0" : "rotate-90"}>
-              <Button variant="text" iconType="right" iconSize={14} />
+              <Icon type="right" size={14} />
             </span>
           </span>
           <span class="uppercase tracking-wide">Pinned</span>
@@ -149,10 +162,11 @@
         <button
           type="button"
           class={twMerge(
-            "rounded px-1 hover:text-white-text hover:bg-hovered",
+            "rounded px-1 hover:text-emphasis hover:bg-hovered",
             "opacity-0 pointer-events-none",
             "group-hover:opacity-100 group-hover:pointer-events-auto",
-            "focus-visible:opacity-100 focus-visible:pointer-events-auto"
+            "focus-visible:opacity-100 focus-visible:pointer-events-auto",
+            "focus-visible:ring-1 focus-visible:ring-primary"
           )}
           on:click={onUnpinAll}
         >
@@ -189,30 +203,38 @@
                 {:else}
                   <!-- Pinned before anything arrived on the topic: a persisted
                        pin survives a restart, so the row has to exist before the
-                       first message does. Same height as a real row so the block
-                       does not jump when one lands. -->
+                       first message does. Deliberately the same shape as
+                       MqttTopicRow: same px-1, the topic path first in the same
+                       mono/semibold/white, then the pin button in the same spot
+                       at the same size, so nothing shifts when a message lands
+                       and the row becomes a real one. Same height too, so the
+                       block does not jump. -->
                   <div
                     data-topic={row.topic}
-                    class="group flex items-center gap-2 px-1 min-w-0 select-none"
+                    class={twMerge(
+                      "group flex min-w-0 select-none items-center px-1",
+                      "font-mono font-thin text-secondary-text"
+                    )}
                     style:height={`${ROW_HEIGHT_PX}px`}
                   >
+                    <p class="mr-2 truncate font-semibold text-white-text">
+                      {row.topic}
+                    </p>
                     <button
                       type="button"
                       aria-label="Unpin topic"
                       title="Unpin topic"
                       class={twMerge(
-                        "inline-flex shrink-0 rounded text-secondary-text",
-                        "opacity-60 hover:text-white-text group-hover:opacity-100",
-                        "focus-visible:opacity-100"
+                        "mr-2 inline-flex shrink-0 self-center rounded",
+                        "text-secondary-text hover:text-emphasis",
+                        "opacity-60 group-hover:opacity-100",
+                        "focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-primary"
                       )}
                       on:click|stopPropagation={() => onUnpin(row.topic)}
                     >
                       <Icon type="pin" size={10} />
                     </button>
-                    <span class="font-mono font-thin truncate text-secondary-text"
-                      >{row.topic}</span
-                    >
-                    <span class="text-xs text-secondary-text opacity-60 shrink-0"
+                    <span class="shrink-0 text-xs text-secondary-text"
                       >waiting for a message</span
                     >
                   </div>
@@ -250,6 +272,7 @@
             item.topicLevel === "$SYS"
               ? () => OpenBrokerStatusWindow(connectionId)
               : undefined}
+            onUnpin={item.isPinned ? () => onUnpin(item.topic) : undefined}
             {highlightedTopicStore}
           />
         </div>
