@@ -150,6 +150,8 @@
   let legendOn = true;
   let statsOn = false;
   let pinnedOn = true;
+  // Component-local, like the list block's collapse: flicked while looking.
+  let pinnedOverlayCollapsed = false;
   let cooldownMs = 60000;
   let tauMs = 14000; // EWMA half-life ~10s by default
   let maxNodeR = 20;
@@ -1210,32 +1212,50 @@
            the legend on a small panel; the entries scroll past that while the
            header and the overflow line stay put. Opaque like the stats HUD:
            nodes reading through the text made both harder to read. -->
+      <!-- top-3 to sit flush under the toolbar like the stats HUD; anything
+           lower reads as a gap. Collapsible like the list's pinned block, and
+           equally unpersisted: it is scratch state, not a preference (the gear
+           menu toggle is the preference). -->
       <div
-        class="absolute left-3 top-8 flex max-h-[45%] max-w-[260px] flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
+        class="absolute left-3 top-3 flex max-h-[45%] max-w-[260px] flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
       >
-        <div class="flex shrink-0 items-center gap-1.5 text-emphasis">
+        <button
+          type="button"
+          class="flex shrink-0 items-center gap-1.5 rounded text-emphasis hover:bg-hovered focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+          aria-label={pinnedOverlayCollapsed
+            ? "Expand pinned topics"
+            : "Collapse pinned topics"}
+          on:click={() => (pinnedOverlayCollapsed = !pinnedOverlayCollapsed)}
+        >
+          <span class={pinnedOverlayCollapsed ? "rotate-0" : "rotate-90"}>
+            <Icon type="right" size={12} />
+          </span>
           <Icon type="pin" size={12} />Pinned
-        </div>
-        <div class="flex min-h-0 flex-col gap-1 overflow-y-auto">
-          {#each pinnedEntries as entry (entry.topic)}
-            <button
-              type="button"
-              class="flex shrink-0 flex-col items-start rounded px-1 py-0.5 text-left hover:bg-hovered"
-              title={entry.topic}
-              on:click={() => focusPinned(entry.topic)}
-            >
-              <span class="max-w-full truncate text-emphasis">{entry.label}</span
+          <span class="text-secondary-text">({$pinnedTopicsStore.order.length})</span>
+        </button>
+        {#if !pinnedOverlayCollapsed}
+          <div class="flex min-h-0 flex-col gap-1 overflow-y-auto">
+            {#each pinnedEntries as entry (entry.topic)}
+              <button
+                type="button"
+                class="flex shrink-0 flex-col items-start rounded px-1 py-0.5 text-left hover:bg-hovered"
+                title={entry.topic}
+                on:click={() => focusPinned(entry.topic)}
               >
-              <span class="max-w-full truncate text-secondary-text"
-                >{entry.value}</span
-              >
-            </button>
-          {/each}
-        </div>
-        {#if pinnedOverflow > 0}
-          <div class="shrink-0 px-1 text-secondary-text">
-            and {pinnedOverflow} more
+                <span class="max-w-full truncate text-emphasis"
+                  >{entry.label}</span
+                >
+                <span class="max-w-full truncate text-secondary-text"
+                  >{entry.value}</span
+                >
+              </button>
+            {/each}
           </div>
+          {#if pinnedOverflow > 0}
+            <div class="shrink-0 px-1 text-secondary-text">
+              and {pinnedOverflow} more
+            </div>
+          {/if}
         {/if}
       </div>
     {/if}
