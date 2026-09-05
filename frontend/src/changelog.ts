@@ -323,6 +323,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Run MQTT Viewer in your browser",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and pop-out charts open as tabs; broker status stays desktop-only until it has an in-page web view. It lets you know when a newer image is available, with the pull command to update, and you can turn that check off if you'd rather it stayed off the network. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+      },
+      {
         body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads. It works under a reverse-proxy subpath for Home Assistant ingress; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
         thanks: [
           {

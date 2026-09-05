@@ -39,6 +39,10 @@ type portalCheckResponse struct {
 	Artifact         *portalArtifact `json:"artifact"`
 }
 
+// fetchUpdate is the seam the check flow calls, so tests can drive
+// CheckForUpdate without a portal. Production always points at the portal.
+var fetchUpdate = fetchUpdateInfo
+
 // fetchUpdateInfo queries the portal update endpoint for the running platform.
 func fetchUpdateInfo(currentVersion string) (*portalCheckResponse, error) {
 	return fetchUpdateInfoFor(currentVersion, runtime.GOOS, runtime.GOARCH)

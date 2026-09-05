@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-04T13:08:10.191Z",
+  "generatedAt": "2026-09-04T13:18:43.794Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2435,7 +2435,12 @@
         "lastSyncedAt": null
       },
       "props": [],
-      "tokens": [],
+      "tokens": [
+        "outline",
+        "elevation-2",
+        "secondary-text",
+        "emphasis"
+      ],
       "dependencies": [],
       "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent.",
       "sourcePath": "src/components/UpdateDialog/UpdateDialog.svelte",

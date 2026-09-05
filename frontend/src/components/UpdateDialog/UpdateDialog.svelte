@@ -152,6 +152,10 @@
   const onSkip = async () => {
     const update = $updateStore.availableUpdate;
     if (update) {
+      // Skipping is the strongest "not this one": persist it through the
+      // backend so the auto-prompt stays quiet, and quieten the bell entry
+      // in this browser too.
+      updateStore.markVersionSeen(update.latest_version);
       try {
         await SkipUpdateVersion(update.latest_version);
       } catch (e) {

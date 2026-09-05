@@ -8,6 +8,8 @@ export type Notification = {
   type: "info" | "warning" | "error";
   icon?: IconType;
   onClick?: () => void;
+  // Called when the user dismisses the entry, before it is marked as seen.
+  onDismiss?: () => void;
   seen?: boolean;
 };
 interface NotificationsStore {
