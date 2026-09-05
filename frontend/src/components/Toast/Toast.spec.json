@@ -17,5 +17,5 @@
     "error"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Toast itself takes no props: it renders the shared toast store, populated via addToast(data: ToastData). ToastData.descriptionStyle (\"text\" default | \"code\") controls whether the description is capitalised as a sentence or rendered verbatim in monospace for identifiers like MQTT topics."
 }

@@ -13,6 +13,10 @@
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
   import {
+    estimateRetentionSeconds,
+    formatRetentionDuration,
+  } from "./retention-estimates";
+  import {
     MB,
     GB,
     MIN_MEMORY_MB,
@@ -71,6 +75,16 @@
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
   };
+
+  // Mirror the byte conversion onSave uses so the estimates match what will
+  // actually be saved.
+  $: estimateBudgetBytes = Math.max(0, diskBudgetGb ?? 0) * GB;
+
+  const usageProfiles = [
+    { label: "Heavy", detail: "about 1,000 msg/s", messagesPerSecond: 1000 },
+    { label: "Medium", detail: "about 100 msg/s", messagesPerSecond: 100 },
+    { label: "Light", detail: "about 10 msg/s", messagesPerSecond: 10 },
+  ];
 
   // Runs on every close path (Escape, overlay click, or after apply) via the
   // Dialog's onClose. The Dialog invokes onClose once during init because the
@@ -191,6 +205,33 @@
           disabled={!recordingEnabled}
           bind:value={diskBudgetGb}
         />
+        {#if recordingEnabled}
+          <div
+            class="flex flex-col gap-1.5 mt-2 p-3 rounded bg-elevation-1 text-sm text-secondary-text"
+          >
+            <p class="text-emphasis">History kept for one connection</p>
+            {#each usageProfiles as profile}
+              <div class="flex items-baseline justify-between gap-3">
+                <span
+                  >{profile.label}
+                  <span class="text-xs">({profile.detail})</span></span
+                >
+                <span class="whitespace-nowrap text-emphasis"
+                  >{formatRetentionDuration(
+                    estimateRetentionSeconds(
+                      estimateBudgetBytes,
+                      profile.messagesPerSecond
+                    )
+                  )}</span
+                >
+              </div>
+            {/each}
+            <p class="mt-1 text-xs">
+              Estimates assume small messages of a few hundred bytes. You can
+              change this any time in settings.
+            </p>
+          </div>
+        {/if}
       </div>
     </div>
 

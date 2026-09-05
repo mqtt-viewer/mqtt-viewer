@@ -43,6 +43,32 @@
     await onCreate(name, scope);
     query = "";
   };
+
+  const onKeydown = async (event: KeyboardEvent) => {
+    // stopPropagation keeps melt's typeahead off the input but also hides
+    // Escape from it, so close the menu here.
+    if (event.key === "Escape") {
+      event.preventDefault();
+      query = "";
+      $open = false;
+      return;
+    }
+    if (event.key !== "Enter") return;
+    const name = query.trim();
+    if (!name) return;
+    // Enter picks the connection-scoped collection with this name, or
+    // creates one; the global rows stay click-only.
+    const existing = filterByScope(collections, "connection").find(
+      (c) => c.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      onSelect(existing.id);
+      query = "";
+    } else {
+      await create("connection");
+    }
+    $open = false;
+  };
 </script>
 
 <DropdownMenu placement="bottom-end" {open}>
@@ -54,14 +80,7 @@
       autofocus
       {placeholder}
       bind:value={query}
-      on:keydown|stopPropagation={(e) => {
-        // stopPropagation keeps melt's typeahead off the input but also
-        // hides Escape from it, so close the menu here.
-        if (e.key === "Escape") {
-          e.preventDefault();
-          $open = false;
-        }
-      }}
+      on:keydown|stopPropagation={onKeydown}
     />
     {#if connectionMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Connection</div>

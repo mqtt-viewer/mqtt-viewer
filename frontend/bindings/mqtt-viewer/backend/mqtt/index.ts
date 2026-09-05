@@ -5,5 +5,6 @@ export {
     ConnectionStats,
     LogEntry,
     MessageProperties,
-    MqttMessage
+    MqttMessage,
+    MqttMessageStub
 } from "./models.js";

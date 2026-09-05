@@ -25,6 +25,12 @@
       "default": "() => {}"
     },
     {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
       "name": "iconType",
       "type": "string",
       "required": false,
@@ -35,6 +41,7 @@
   "tokens": [
     "primary",
     "white-text",
+    "secondary-text",
     "elevation-2",
     "elevation-2-hover"
   ],

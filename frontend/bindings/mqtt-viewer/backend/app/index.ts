@@ -7,10 +7,12 @@ export {
 };
 
 export {
+    ClearRetainedResult,
     Connection,
     Connections,
     CreateCollectionParams,
     EnvInfo,
+    ExportedMessagesPayload,
     MemoryLimitModel,
     MemoryStats,
     MqttStats,

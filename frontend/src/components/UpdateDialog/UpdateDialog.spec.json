@@ -12,7 +12,12 @@
     "lastSyncedAt": null
   },
   "props": [],
-  "tokens": [],
+  "tokens": [
+    "outline",
+    "elevation-2",
+    "secondary-text",
+    "emphasis"
+  ],
   "dependencies": [],
   "notes": "Figma is not linked yet. Wiring shell: store/gate logic lives here, layout in UpdateAvailableContent."
 }

@@ -50,15 +50,44 @@
       "required": false,
       "default": false,
       "description": "Shows a subdued 'no data yet' placeholder instead of the value."
+    },
+    {
+      "name": "deltaPct",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "Percentage change across the visible window (last vs first sample). A direction arrow shows only when |deltaPct| >= 2, so steady tiles carry no flicker."
+    },
+    {
+      "name": "exact",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Exact, unabbreviated value string for the hover panel; falls back to `value`."
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "One-line note shown at the top of the hover panel (e.g. an observed tile's measurement note)."
+    },
+    {
+      "name": "windowName",
+      "type": "string",
+      "required": false,
+      "default": "15m",
+      "description": "Window the sparkline and delta span; named in the hover panel."
     }
   ],
   "tokens": [
     "elevation-1",
+    "elevation-2",
     "outline",
     "secondary-text",
     "emphasis",
     "primary"
   ],
   "dependencies": ["Sparkline"],
-  "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper."
+  "notes": "Figma is not linked yet; stories use local fixtures. Sparkline color is set here via text-primary on the wrapper. The tile owns its hover/focus panel (exact value, min/max, window name) so observed tiles no longer need an outer Tooltip wrapper; the panel opens on group-hover and group-focus-within."
 }

@@ -19,12 +19,22 @@
   import connections from "@/stores/connections";
   import tabs from "@/stores/tabs";
   import {
-    DeleteRetainedMessage,
     ExportTopicMessages,
-    FocusTopicWindow,
-    OpenChartWindow,
-    OpenTopicWindow,
+    ExportTopicMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
+  import { createClearRetainedFlow, onRetainedCleared } from "./clear-retained";
+  import { onDestroy, onMount } from "svelte";
+  import { get } from "svelte/store";
+  import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
+  import {
+    openChartWindow,
+    openTopicWindow,
+    focusTopicWindow as focusTopicWindowPopout,
+  } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
+  import envStore from "@/stores/env";
 
   export let connection: Connection;
 
@@ -99,7 +109,7 @@
       addToast({
         data: {
           title: "Failed to connect",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -180,7 +190,7 @@
         break;
       case "open-and-emit":
         lastEmittedTopic = topic;
-        OpenTopicWindow({
+        openTopicWindow({
           connectionId: connection.connectionDetails.id,
           topic: topic ?? "",
         })
@@ -189,7 +199,7 @@
             addToast({
               data: {
                 title: "Failed to open topic window",
-                description: e as string,
+                description: errorMessage(e),
                 type: "error",
               },
             });
@@ -203,7 +213,7 @@
 
   const focusTopicWindow = async () => {
     try {
-      await FocusTopicWindow({
+      await focusTopicWindowPopout({
         connectionId: connection.connectionDetails.id,
         topic: $selectedTopicStore.selectedTopic ?? "",
       });
@@ -211,21 +221,50 @@
       addToast({
         data: {
           title: "Failed to focus topic window",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
     }
   };
 
-  const deleteRetainedMessage = async (topic: string) => {
+  // Clearing a retained message publishes an empty retained message, which
+  // every other client on the broker sees. It used to fire on a single click
+  // with no confirmation; both the single-topic and branch cases now route
+  // through the dialog below.
+  //
+  // The panel owns the topic tree and the graph, so it is what has to be told
+  // a marker is stale. Absent while the "not connected" state is showing.
+  let dataPanel: MqttDataPanel | undefined;
+
+  const clearRetained = createClearRetainedFlow(
+    connection.connectionDetails.id,
+    { onCleared: (topics) => dataPanel?.markRetainedCleared(topics) }
+  );
+  const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
+    clearRetained;
+
+  // This is how clears done in the pop-out window reach this window's tree
+  // and graph: the pop-out is a separate webview with no access to dataPanel.
+  let unlistenRetainedCleared: (() => void) | null = null;
+  onMount(() => {
+    unlistenRetainedCleared = onRetainedCleared(
+      connection.connectionDetails.id,
+      (topics) => dataPanel?.markRetainedCleared(topics)
+    );
+  });
+  onDestroy(() => {
+    unlistenRetainedCleared?.();
+  });
+
+  const copyTopicPath = async (topic: string) => {
     try {
-      await DeleteRetainedMessage(connection.connectionDetails.id, topic);
+      await copyToClipboard(topic);
     } catch (e) {
       addToast({
         data: {
-          title: "Failed to delete retained message",
-          description: e as string,
+          title: "Failed to copy topic path",
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -234,6 +273,24 @@
 
   const exportTopicMessages = async (topic: string) => {
     try {
+      if (get(envStore).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportTopicMessagesData(
+          connection.connectionDetails.id,
+          topic
+        );
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            descriptionStyle: "code",
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportTopicMessages(
         connection.connectionDetails.id,
         topic
@@ -243,6 +300,7 @@
           data: {
             title: "Messages exported",
             description: path,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -251,7 +309,7 @@
       addToast({
         data: {
           title: "Failed to export messages",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -299,9 +357,14 @@
           </div>
         {:else}
           <MqttDataPanel
+            bind:this={dataPanel}
             {connection}
             {selectedTopicStore}
             width={dataViewWidth}
+            {copyTopicPath}
+            {exportTopicMessages}
+            onClearRetained={clearRetained.requestClear}
+            onClearRetainedBelow={clearRetained.requestClearBelow}
           />
         {/if}
       </div>
@@ -317,14 +380,16 @@
             connectionId={connection.connectionDetails.id}
             {selectedTopicStore}
             viewState={topicPanelViewState}
-            {deleteRetainedMessage}
             {exportTopicMessages}
+            {copyTopicPath}
+            onClearRetained={clearRetained.requestClear}
+            onClearRetainedBelow={clearRetained.requestClearBelow}
             firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
             mqttVersion={connection.connectionDetails.mqttVersion === "3"
               ? "3"
               : "5"}
             openChartWindow={(topic, fields) =>
-              OpenChartWindow({
+              openChartWindow({
                 connectionId: connection.connectionDetails.id,
                 topic,
                 fields,
@@ -349,14 +414,16 @@
           connectionId={connection.connectionDetails.id}
           {selectedTopicStore}
           viewState={topicPanelViewState}
-          {deleteRetainedMessage}
           {exportTopicMessages}
+          {copyTopicPath}
+          onClearRetained={clearRetained.requestClear}
+          onClearRetainedBelow={clearRetained.requestClearBelow}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
           mqttVersion={connection.connectionDetails.mqttVersion === "3"
             ? "3"
             : "5"}
           openChartWindow={(topic, fields) =>
-            OpenChartWindow({
+            openChartWindow({
               connectionId: connection.connectionDetails.id,
               topic,
               fields,
@@ -406,3 +473,15 @@
     {/if}
   </div>
 </div>
+
+<!-- One dialog for every surface: the tree menu, the graph menu, and the
+     selected-topic panel all raise their clear requests here, so the
+     confirmation wording and the clear itself cannot drift between them. -->
+<ConfirmClearRetainedDialog
+  isOpen={isClearRetainedOpen}
+  topic={$clearRetainedRequest.topic}
+  count={$clearRetainedRequest.count}
+  topics={$clearRetainedRequest.topics}
+  busy={$clearRetainedRequest.busy}
+  onConfirm={clearRetained.confirm}
+/>

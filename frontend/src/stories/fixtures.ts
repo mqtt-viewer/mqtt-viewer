@@ -1,4 +1,4 @@
-import { writable, type Writable } from "svelte/store";
+import { get, writable, type Writable } from "svelte/store";
 import connections from "@/stores/connections";
 import defaultSorts from "@/stores/default-sorts";
 import env from "@/stores/env";
@@ -187,7 +187,8 @@ const brokerSparkline = (
         v = base + (i / 29) * amp * 1.6 + pnoise(j) * amp * 0.25;
         break;
       case "bursty": {
-        const spike = pnoise(j) > 0.55 ? Math.abs(pnoise(j * 5)) * amp * 2.2 : 0;
+        const spike =
+          pnoise(j) > 0.55 ? Math.abs(pnoise(j * 5)) * amp * 2.2 : 0;
         v = base + Math.abs(pnoise(j * 3)) * amp * 0.3 + spike;
         break;
       }
@@ -230,7 +231,7 @@ const brokerTile = (t: MockBrokerTile) => ({
 const observedTiles = () => [
   brokerTile({
     key: "observed_msg_rate",
-    label: "Observed msgs/s",
+    label: "Observed msg/s",
     computed: true,
     tooltip: "Measured by this client across its subscriptions",
     value: 36.5,
@@ -248,6 +249,10 @@ const observedTiles = () => [
   }),
 ];
 
+// v2: the reclassified builtins (msg_rate_in/out, uptime, version) are `hidden`
+// and no longer render as gauge tiles — they feed the hero and facts row via
+// metricByKey. The mock grid mirrors what BrokerStatusView actually renders:
+// the surviving gauges, the observed computed tiles, and the custom tile.
 export const mockBrokerTilesPopulated = [
   brokerTile({
     key: "clients_connected",
@@ -257,25 +262,18 @@ export const mockBrokerTilesPopulated = [
     samples: brokerSparkline(15, 3, "steady", 1),
   }),
   brokerTile({
-    key: "msg_rate_in",
-    label: "Msgs/s in",
-    value: 842,
-    display: "842",
-    samples: brokerSparkline(820, 120, "ramp", 2),
-  }),
-  brokerTile({
-    key: "msg_rate_out",
-    label: "Msgs/s out",
-    value: 1180,
-    display: "1.2k",
-    samples: brokerSparkline(1100, 160, "ramp", 3),
-  }),
-  brokerTile({
     key: "bytes_rate_in",
     label: "Bytes/s in",
     value: 48200,
     display: "48.2k",
     samples: brokerSparkline(46000, 6000, "bursty", 4),
+  }),
+  brokerTile({
+    key: "bytes_rate_out",
+    label: "Bytes/s out",
+    value: 61300,
+    display: "61.3k",
+    samples: brokerSparkline(58000, 7000, "bursty", 8),
   }),
   brokerTile({
     key: "subscriptions",
@@ -289,20 +287,6 @@ export const mockBrokerTilesPopulated = [
     value: 89,
     display: "89",
   }),
-  brokerTile({
-    key: "uptime",
-    label: "Uptime",
-    value: 273600,
-    display: "3d 4h",
-    isDuration: true,
-  }),
-  brokerTile({
-    key: "version",
-    label: "Broker",
-    valueKind: "text",
-    text: "mosquitto 2.0.18",
-    display: "mosquitto 2.0.18",
-  }),
   ...observedTiles(),
   brokerTile({
     key: "custom:factory/line/temp#",
@@ -314,18 +298,98 @@ export const mockBrokerTilesPopulated = [
   }),
 ];
 
-const emptyBuiltins = () =>
-  [
-    { key: "clients_connected", label: "Connected clients" },
-    { key: "msg_rate_in", label: "Msgs/s in" },
-    { key: "msg_rate_out", label: "Msgs/s out" },
-    { key: "bytes_rate_in", label: "Bytes/s in" },
-    { key: "bytes_rate_out", label: "Bytes/s out" },
-    { key: "subscriptions", label: "Subscriptions" },
-    { key: "retained", label: "Retained msgs" },
-    { key: "uptime", label: "Uptime" },
-    { key: "version", label: "Broker" },
-  ].map((b) => brokerTile({ ...b, valueKind: "empty" }));
+// --- v2 state-field fixtures ------------------------------------------------
+
+type MockSnapshot = import("@/views/BrokerStatusWindow/broker-status-store").MetricSnapshot;
+
+const snap = (
+  key: string,
+  opts: Partial<Omit<MockSnapshot, "key">> = {}
+): MockSnapshot => ({
+  key,
+  value: opts.value ?? null,
+  text: opts.text ?? null,
+  isDuration: opts.isDuration ?? false,
+  samples: opts.samples ?? [],
+  lastTimeMs: opts.lastTimeMs ?? now,
+  hidden: opts.hidden ?? true,
+});
+
+// Sparse broker rate samples: one point per ~10 s across the last 5 min, so the
+// hero's in/out lines read as the sparse points a $SYS republisher produces.
+const brokerHeroSamples = (base: number, amp: number, seed: number) =>
+  Array.from({ length: 30 }, (_, i) => ({
+    t: now - (29 - i) * 10_000,
+    v: Math.max(0, base + Math.sin(i / 4 + seed) * amp + pnoise(i + seed * 17) * amp * 0.2),
+  }));
+
+// Settled per-second client-observed msgs/s across the last ~2 min.
+export const mockObservedSeries = () =>
+  Array.from({ length: 120 }, (_, i) => ({
+    t: now - (119 - i) * 1000,
+    v: Math.max(0, 36 + Math.sin(i / 9) * 8 + pnoise(i * 3) * 3),
+  }));
+
+// Every metric's snapshot keyed by registry id, including the hidden ones that
+// feed the hero, facts row and derived tiles.
+export const mockMetricByKey = (): Map<string, MockSnapshot> =>
+  new Map<string, MockSnapshot>([
+    ["version", snap("version", { text: "mosquitto 2.0.18", lastTimeMs: now - 60_000 })],
+    ["uptime", snap("uptime", { value: 273600, isDuration: true, lastTimeMs: now - 2000 })],
+    ["clients_connected", snap("clients_connected", { value: 17, hidden: false, samples: brokerSparkline(15, 3, "steady", 1) })],
+    ["clients_disconnected", snap("clients_disconnected", { value: 6 })],
+    ["clients_expired", snap("clients_expired", { value: 2 })],
+    ["avg_msg_size", snap("avg_msg_size", { value: 312 })],
+    ["msg_rate_in", snap("msg_rate_in", { value: 842, samples: brokerHeroSamples(820, 120, 2) })],
+    ["msg_rate_out", snap("msg_rate_out", { value: 1180, samples: brokerHeroSamples(1100, 160, 3) })],
+    ["msg_rate_in_5min", snap("msg_rate_in_5min", { value: 810 })],
+    ["msg_rate_in_15min", snap("msg_rate_in_15min", { value: 790 })],
+    ["msg_rate_out_5min", snap("msg_rate_out_5min", { value: 1150 })],
+    ["msg_rate_out_15min", snap("msg_rate_out_15min", { value: 1120 })],
+  ]);
+
+type MockHealthChip = import("@/views/BrokerStatusWindow/health").HealthChip;
+
+// Health chips spanning every rendered state: a filled-error problem, a
+// filled-warning attention, an outline-dot ok, and the two dotless
+// informational chips (heap folds in its peak).
+export const mockHealthChips = (): MockHealthChip[] => [
+  { id: "drops", label: "Drops", level: "problem", informational: false, qualifier: "rising", value: 12.4, detail: null, since: now - 30_000, stale: false, render: true },
+  { id: "backlog", label: "Delivery backlog", level: "attention", informational: false, qualifier: "rising", value: 340, detail: null, since: now - 15_000, stale: false, render: true },
+  { id: "store", label: "Store", level: "ok", informational: false, qualifier: "", value: 1280, detail: null, since: now - 60_000, stale: false, render: true },
+  { id: "heap", label: "Heap", level: null, informational: true, qualifier: "", value: 8_600_000, detail: 9_100_000, since: now, stale: false, render: true },
+  { id: "churn", label: "Churn", level: null, informational: true, qualifier: "", value: 3.2, detail: null, since: now, stale: false, render: true },
+];
+
+// Broker facts as the health strip prints them, matching the metricByKey
+// fixture above so a strip story and a view story read the same broker.
+export const mockBrokerFacts =
+  (): import("@/views/BrokerStatusWindow/sys-metrics").BrokerFacts => ({
+    version: "mosquitto 2.0.18",
+    uptimeSeconds: 273600,
+    clientsConnected: 17,
+    clientsDisconnected: 6,
+    clientsExpired: 2,
+    avgMsgSize: 312,
+  });
+
+type MockLoudestState = import("@/views/BrokerStatusWindow/broker-status-store").LoudestState;
+
+// Loudest-topics view model: six rows (one deliberately long, to exercise the
+// middle-ellipsis + tooltip) and a non-zero overflow footer.
+export const mockLoudest = (): MockLoudestState => ({
+  rows: [
+    { topic: "factory/line/1/temperature", msgPerSec: 128.4, bytesPerSec: 5120 },
+    { topic: "factory/line/2/temperature", msgPerSec: 96.1, bytesPerSec: 3980 },
+    { topic: "devices/sensor/44/state", msgPerSec: 62.7, bytesPerSec: 2510 },
+    { topic: "telemetry/region/eu-west/gateway/07/metrics", msgPerSec: 40.3, bytesPerSec: 8800 },
+    { topic: "home/livingroom/thermostat", msgPerSec: 22.0, bytesPerSec: 610 },
+    { topic: "app/status", msgPerSec: 8.5, bytesPerSec: 210 },
+  ],
+  overflowTopics: 12,
+  overflowMsgPerSec: 34.2,
+  collecting: false,
+});
 
 export const mockBrokerLatestByTopic = () =>
   new Map<string, { value: string; timeMs: number }>([
@@ -357,8 +421,22 @@ type MockBrokerState = {
   tiles: ReturnType<typeof brokerTile>[];
   latestByTopic: Map<string, { value: string; timeMs: number }>;
   connected: boolean;
+  everConnected: boolean;
+  trendFloorMs: number;
   sysEverSeen: boolean;
   windowOpenedAt: number;
+  // v2 state fields consumed by the hero, health strip, loudest topics and
+  // facts row.
+  metricByKey: Map<string, import("@/views/BrokerStatusWindow/broker-status-store").MetricSnapshot>;
+  rangeMinutes: number;
+  learnedIntervalMs: number;
+  sysLastSeenMs: number;
+  observedSeries: import("@/views/BrokerStatusWindow/broker-status-store").SparklineSample[];
+  // Minute-grain hero series, set only on ranges longer than the second-grain
+  // buffers cover. Null here: the stories all sit inside that window.
+  longSeries: Map<string, import("@/views/BrokerStatusWindow/broker-status-store").SparklineSample[]> | null;
+  loudest: import("@/views/BrokerStatusWindow/broker-status-store").LoudestState;
+  health: import("@/views/BrokerStatusWindow/health").HealthChip[];
 };
 
 export const createMockBrokerStatusStore = (
@@ -369,8 +447,18 @@ export const createMockBrokerStatusStore = (
     tiles: mockBrokerTilesPopulated,
     latestByTopic: mockBrokerLatestByTopic(),
     connected: true,
+    everConnected: true,
+    trendFloorMs: 0,
     sysEverSeen: true,
     windowOpenedAt: now,
+    metricByKey: mockMetricByKey(),
+    rangeMinutes: 5,
+    learnedIntervalMs: 10_000,
+    sysLastSeenMs: now - 3000,
+    observedSeries: mockObservedSeries(),
+    longSeries: null,
+    loudest: mockLoudest(),
+    health: mockHealthChips(),
     ...overrides,
   };
   const { subscribe } = writable<MockBrokerState>(state);
@@ -380,16 +468,29 @@ export const createMockBrokerStatusStore = (
     reloadMappings: async () => [],
     destroy: noop,
     snapshot: () => state,
+    setRange: noop,
+    topicRingSize: () => 0,
+    topicMinuteRingSize: () => 0,
     connectionId,
   };
 };
 
 export const createMockBrokerStatusEmptyStore = () =>
   createMockBrokerStatusStore({
-    tiles: [...emptyBuiltins(), ...observedTiles()],
+    // No $SYS ever seen: the observed tiles (client-measured) still populate, the
+    // v1 empty card carries the explanation, and the hero shows the promoted
+    // solid observed line. No health chips, no facts, empty loudest table.
+    tiles: [...observedTiles()],
     latestByTopic: new Map(),
     sysEverSeen: false,
     windowOpenedAt: now - 20000,
+    metricByKey: new Map(),
+    observedSeries: mockObservedSeries(),
+    // The client IS receiving traffic (observed tiles show a rate), so the
+    // loudest table must have rows too; an empty table next to a live
+    // observed rate is an impossible state (review cycle 4).
+    loudest: mockLoudest(),
+    health: [],
   });
 
 export const createMockBrokerStatusDisconnectedStore = () =>
@@ -488,19 +589,156 @@ export const createMockSelectedTopicStore = () => {
           ? '{"temp":21.4,"unit":"C"}'
           : '{"humidity":42.8}',
       payloadB64: message.payload,
+      payloadState: "loaded",
     })) as any,
     historySource: "memory",
     window: null,
     totalCount: mockMqttMessages.length,
+    isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
     options: {
       autoSelect: true,
       compare: true,
       decoding: "none",
       format: "json",
     },
-    onNewMessages: null,
+    onHistoryDelta: null,
   });
   return store;
+};
+
+// Builds a synthetic history of `count` tiny messages spread evenly over
+// `spanMs` milliseconds, ending at `endMs`. Mirrors the shape decode() in
+// selected-topic-store.ts produces (payload + payloadB64 present).
+const buildBusyHistory = (count: number, spanMs: number, endMs: number) => {
+  const startMs = endMs - spanMs;
+  const messages = [];
+  for (let i = 0; i < count; i++) {
+    const timeMs = Math.round(startMs + (spanMs * i) / (count - 1));
+    const payload = `{"n":${i}}`;
+    messages.push({
+      id: `history-${i}`,
+      topic: "factory/line/temperature",
+      payload,
+      payloadB64: btoa(payload),
+      payloadState: "loaded",
+      qos: 0,
+      retain: false,
+      properties: undefined,
+      timeMs,
+      middlewareProperties: { IsDecodedProto: false },
+    });
+  }
+  return messages;
+};
+
+// Simulates a busy topic for perf testing/repro: seeds `historyCount`
+// messages (default 5,000, matching HISTORY_WINDOW_SIZE) spread over
+// `spanMinutes`, then — once `startLiveAppends()` is called — fires a batch
+// of tiny live messages every `intervalMs` (default 300ms, matching the
+// real drain cadence) via the same setOnHistoryDelta path the real store
+// uses, so it exercises MessageTimeline exactly like production traffic.
+// Kept entirely in fixtures/stories per the component-only-fix constraint.
+export const createBusyMockSelectedTopicStore = (
+  options: {
+    historyCount?: number;
+    spanMinutes?: number;
+    messagesPerBatch?: number;
+    intervalMs?: number;
+  } = {}
+) => {
+  const {
+    historyCount = 5000,
+    spanMinutes = 40,
+    messagesPerBatch = 40,
+    intervalMs = 300,
+  } = options;
+
+  const store = createSelectedTopicStore(1, mockEventSet as any);
+  const endMs = now;
+  const history = buildBusyHistory(
+    historyCount,
+    spanMinutes * 60 * 1000,
+    endMs
+  );
+
+  store.set({
+    connectionId: 1,
+    connectionEventSet: mockEventSet as any,
+    selectedTopic: "factory/line/temperature",
+    history: history as any,
+    historySource: "memory",
+    window: null,
+    totalCount: history.length,
+    isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
+    options: {
+      autoSelect: true,
+      compare: true,
+      decoding: "none",
+      format: "json",
+    },
+    onHistoryDelta: null,
+  });
+
+  let liveTimer: ReturnType<typeof setInterval> | null = null;
+  let nextId = historyCount;
+
+  const startLiveAppends = () => {
+    if (liveTimer !== null) return;
+    liveTimer = setInterval(() => {
+      const batchEndMs = Date.now();
+      const batch = [];
+      for (let i = 0; i < messagesPerBatch; i++) {
+        const id = `live-${nextId++}`;
+        const payload = `{"n":${id}}`;
+        batch.push({
+          id,
+          topic: "factory/line/temperature",
+          payload,
+          payloadB64: btoa(payload),
+          payloadState: "loaded",
+          qos: 0,
+          retain: false,
+          properties: undefined,
+          timeMs: batchEndMs,
+          middlewareProperties: { IsDecodedProto: false },
+        });
+      }
+      const current = get({ subscribe: store.subscribe });
+      store.set({
+        ...current,
+        history: [...current.history, ...(batch as any)],
+        totalCount: current.totalCount + batch.length,
+      });
+      // Mirrors registerMessageListener in the real store: history is
+      // updated above, then the registered onHistoryDelta callback (set by
+      // MessageTimeline via setOnHistoryDelta) is invoked with the delta.
+      const onHistoryDelta = get({ subscribe: store.subscribe }).onHistoryDelta;
+      if (onHistoryDelta !== null) {
+        onHistoryDelta({ kind: "append", messages: batch as any });
+      }
+    }, intervalMs);
+  };
+
+  const stopLiveAppends = () => {
+    if (liveTimer !== null) {
+      clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  };
+
+  return { store, startLiveAppends, stopLiveAppends };
 };
 
 export const createMockPublishStore = (
@@ -723,7 +961,6 @@ const propDefaults: Record<string, () => unknown> = {
   defaultTab: () => 0,
   defaultValue: () => "mqtt",
   defaultValueText: () => "mqtt",
-  deleteRetainedMessage: () => asyncNoop,
   disabled: () => false,
   dockMode: () => "right",
   errorMessage: () => "Field is required",
@@ -733,6 +970,11 @@ const propDefaults: Record<string, () => unknown> = {
     return store;
   },
   exportTopicMessages: () => asyncNoop,
+  copyTopicPath: () => noop,
+  copyPayload: () => noop,
+  getTopicPayload: () => () => null,
+  onClearRetained: () => noop,
+  onClearRetainedBelow: () => noop,
   feedbackText: () => "Copied",
   firstConnectedAtMs: () => now - 600000,
   forceOpen: () => true,
@@ -936,10 +1178,12 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   Sidebar: { isOpen: true, open: noop, close: noop },
   Sparkline: { points: mockSparklinePoints, height: 28 },
   StatTile: {
-    label: "Msgs/s in",
+    label: "Msg/s in",
     value: "1.2k",
     unit: "/s",
     points: mockSparklinePoints,
+    exact: "1,204",
+    windowName: "15m",
   },
   Select: {
     options: ["mqtt", "mqtts", "ws", "wss"],

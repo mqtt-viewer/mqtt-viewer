@@ -19,7 +19,7 @@
 | Primitives/Card | [x] | [ ] | [x] | [x] |
 | Primitives/ConnectionIdenticon | [x] | [ ] | [x] | [ ] |
 | Primitives/ConnectionStatusCircle | [x] | [ ] | [x] | [x] |
-| Primitives/ContextMenu | [x] | [ ] | [ ] | [ ] |
+| Primitives/ContextMenu | [x] | [ ] | [x] | [x] |
 | Primitives/CopyToClipboard | [x] | [ ] | [x] | [ ] |
 | Primitives/Dialog | [x] | [ ] | [x] | [x] |
 | Primitives/Dialog/DialogActionBar | [x] | [ ] | [ ] | [ ] |
@@ -62,11 +62,14 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/Connection/DataView/ConfirmClearRetainedDialog | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/TopicContextMenu | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
-| Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
+| Components/UpdateDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog/UpdateAvailableContent | [x] | [ ] | [x] | [x] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
 | Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
@@ -77,9 +80,15 @@
 |---|:---:|:---:|:---:|:---:|
 | Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
 | Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/FactsRow | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/HealthChip | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/HealthStrip | [x] | [ ] | [x] | [ ] |
+| Views/BrokerStatusWindow/HeroChart | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/LoudestTopics | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/MetricMappingEditor | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/Sparkline | [x] | [ ] | [x] | [ ] |
 | Views/BrokerStatusWindow/StatTile | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/TimeRangeSelector | [x] | [ ] | [x] | [x] |
 | Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
@@ -94,6 +103,7 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/MqttGraphView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -143,7 +153,7 @@
 
 ## Summary
 
-- Components scanned: 117
-- Story present: 117
+- Components scanned: 127
+- Story present: 127
 - Figma-linked: 0
 - Missing specs: 0

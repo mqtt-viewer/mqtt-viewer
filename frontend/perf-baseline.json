@@ -1,0 +1,7 @@
+{
+  "description": "Topic Graph perf baseline for scripts/perf-graph.mjs, sampled at the dev harness's ?scale=30 (~2400 placed nodes) after expand-all and settle. avgFrameMs is the renderer's per-frame WORK time (frame() body, excluding display/cap idle wait), so headed and headless numbers are close but still tracked separately (headless software GL slightly inflates ancillary costs). perf-graph.mjs compares a run only against the field matching how it launched (headedAvgFrameMs vs headlessAvgFrameMs; PERF_HEADLESS=1 forces headless). Update this file by running `node scripts/perf-graph.mjs` on a quiescent machine and copying its avgFrameMs into the matching field, then re-running once to confirm it reports PASS.",
+  "placedNodes": 2400,
+  "headedAvgFrameMs": 0.6,
+  "headlessAvgFrameMs": 0.8,
+  "hardRegressionMultiplier": 3
+}

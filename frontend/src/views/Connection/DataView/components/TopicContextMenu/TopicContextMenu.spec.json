@@ -1,0 +1,83 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "TopicContextMenu",
+  "tier": "component",
+  "description": "The actions offered for a topic, shared by the list tree, the graph, and the selected-topic panel. Renders menu items only; the surrounding menu supplies the melt context.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "topic",
+      "type": "string",
+      "required": true,
+      "description": "The topic these actions apply to."
+    },
+    {
+      "name": "hasPayload",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "False for an intermediate branch node, which has no value of its own. Hides the payload and export actions."
+    },
+    {
+      "name": "isRetained",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether this exact topic holds a retained message, as far as we know. Disables the clear action when false."
+    },
+    {
+      "name": "retainedBelowCount",
+      "type": "number",
+      "required": false,
+      "default": 0,
+      "description": "How many known-retained topics sit strictly below this one. The bulk clear action is hidden when 0."
+    },
+    {
+      "name": "showHeader",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "description": "Hide the topic header when the surrounding UI already names the topic, as the selected-topic panel does."
+    },
+    {
+      "name": "onCopyTopic",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onCopyPayload",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onExport",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onClearRetained",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onClearRetainedBelow",
+      "type": "function",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "secondary-text"
+  ],
+  "dependencies": [
+    "DropdownMenuItem",
+    "Icon"
+  ],
+  "notes": "Figma is not linked yet. Right-click does not move selection, so the header names the menu's target."
+}
