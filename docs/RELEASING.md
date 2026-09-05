@@ -82,7 +82,7 @@ so a dry run shows the real notes.
 
 | Platform | Signing | Gotchas |
 |---|---|---|
-| mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. |
+| mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. A Mac-only failure does not need the release recreated: fix it, land the fix on `main`, then `gh workflow run release-mac.yaml --ref main -f tag=vX.Y.Z`. That rebuilds both arches, uploads the zips to the existing release with `--clobber`, and re-registers them with the portal using the release's own notes. |
 | windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions, so pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
 | linux (`release-linux.yaml`) | none | Runs on `ubuntu-latest` + `ubuntu-24.04-arm`. gtk3/webkit2gtk-4.1 dev packages must install **before** the wails3 CLI (`-tags gtk3`). |
 | Docker (`docker-publish.yaml`) | none | Publishes one `linux/amd64` + `linux/arm64` manifest to GHCR. Release builds fail if any shared app secret is missing; prereleases never move `latest`. |
@@ -94,6 +94,10 @@ Shared foundations that have bitten before:
   needs `^20.19 || >=22.12`). Keep `NODE_VERSION` at 22.x in all three
   workflows and pin pnpm to the version in `frontend/package.json`'s
   `packageManager` field.
+- **Local `main` must not diverge.** `scripts/release.sh` fast-forwards the
+  local `main` branch from `origin/develop`; a stray local commit on `main`
+  aborts it with "Not possible to fast-forward" before anything is tagged.
+  `git branch -f main origin/main` (from another branch) and re-run.
 - **Secrets** (repo → Settings → Actions): `AZURE_*` (6), `AC_*`/`APPLE_*` (5),
   `MACHINE_ID_SECRET`, `CLOUD_USERNAME`, `CLOUD_PASSWORD`,
   `CI_RELEASES_USERNAME`, `CI_RELEASES_PASSWORD`, `HA_ADDON_TOKEN`.
@@ -126,7 +130,10 @@ Shared foundations that have bitten before:
 
 For the first Docker publication, GHCR creates the package as private. Open the
 package settings, connect it to this repository, change visibility to public,
-then verify anonymous access and both architectures:
+then verify anonymous access and both architectures. If the visibility control
+reads "Setting is disabled by organization administrators", first allow public
+container packages under the org's Settings → Packages, then come back. This
+was done once for 1.1.0 on 2026-09-05, so later releases inherit it:
 
 ```sh
 docker buildx imagetools inspect ghcr.io/mqtt-viewer/mqtt-viewer:<version>
@@ -194,7 +201,12 @@ the GTK3 WebKit.
 `.github/workflows/flatpak-publish.yaml` builds both architectures, merges
 them into one GPG-signed OSTree repository and deploys it to GitHub Pages, so
 that installs update through `flatpak update`. It runs on every published
-release, and can be triggered manually:
+release, and can be triggered manually. The deploy job targets the
+`github-pages` environment, whose deployment policy must allow the `v*` tag
+pattern as well as `main` (added 2026-09-05); without it the job is rejected
+with "Tag is not allowed to deploy to github-pages" before it starts, and
+`gh run rerun <run> --failed` after fixing the policy finishes it from the
+artifacts already built. Manual trigger:
 
 ```sh
 gh workflow run flatpak-publish.yaml --ref develop -f version=v0.0.0-test
