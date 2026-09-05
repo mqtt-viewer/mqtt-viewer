@@ -309,6 +309,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: "Reach older messages on the timeline",
         body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
       },
+      {
+        title: "The chart's Y-axis rescales with its time window",
+        body: "Narrowing a chart's time window could leave the Y-axis stretched to an old value elsewhere in that topic's history, squashing the visible points to the bottom. It now ranges over only what the window shows.",
+      },
     ],
   },
   {
