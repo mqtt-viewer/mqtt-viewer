@@ -17,7 +17,7 @@ describe("parseReleaseNotes", () => {
 
   it("renders a link as its text", () => {
     expect(
-      parseReleaseNotes("Thanks to [jeeftor](https://github.com/jeeftor).")
+      parseReleaseNotes("Thanks [jeeftor](https://github.com/jeeftor).")
     ).toEqual([{ kind: "text", text: "Thanks jeeftor." }]);
   });
 
