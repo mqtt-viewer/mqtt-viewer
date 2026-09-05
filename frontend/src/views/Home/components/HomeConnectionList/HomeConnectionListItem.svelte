@@ -61,6 +61,8 @@
       connection.connectionDetails.id,
       false
     );
+    // Ask the connection's row to open its details dialog once the tab is up.
+    connections.requestEdit(connection.connectionDetails.id);
     tabs.selectTab(connection.connectionDetails.id);
   };
 

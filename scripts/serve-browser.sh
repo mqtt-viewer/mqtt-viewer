@@ -37,5 +37,12 @@ fi
 echo "Building server-mode binary (-tags server)..." >&2
 go build -tags server -o "$bin" .
 
-echo "Serving on http://localhost:$port  (Ctrl+C to stop)" >&2
-exec env WAILS_SERVER_PORT="$port" "$bin"
+# A server build resolves the production data directory, the same one the
+# installed app uses, unless MQTT_VIEWER_DATA_DIR says otherwise. Default it to
+# a per-checkout scratch directory so an agent driving this script never
+# touches, or migrates, the real database.
+data_dir="${MQTT_VIEWER_DATA_DIR:-$root/_dev_resources/server}"
+mkdir -p "$data_dir"
+
+echo "Serving on http://localhost:$port  (Ctrl+C to stop), data in $data_dir" >&2
+exec env WAILS_SERVER_PORT="$port" MQTT_VIEWER_DATA_DIR="$data_dir" "$bin"

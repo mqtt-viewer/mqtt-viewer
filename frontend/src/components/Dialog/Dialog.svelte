@@ -46,9 +46,13 @@
   });
 </script>
 
-<button use:melt={$trigger}>
-  <slot name="trigger"></slot>
-</button>
+<!-- Dialogs opened from a store have no trigger; an empty inline button
+     still takes a line box and pushes the page into a 20px scroll. -->
+{#if $$slots.trigger}
+  <button use:melt={$trigger}>
+    <slot name="trigger"></slot>
+  </button>
+{/if}
 
 <div class="text-white-text overflow-auto" use:melt={$portalled}>
   {#if $isOpen}

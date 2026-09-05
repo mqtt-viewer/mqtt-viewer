@@ -3,6 +3,7 @@
   import Button from "@/components/Button/Button.svelte";
   import BaseNumberInput from "@/components/InputFields/BaseNumberInput.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
+  import MemoryFormula from "@/components/MemoryFormula/MemoryFormula.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
@@ -20,9 +21,6 @@
     MB,
     GB,
     MIN_MEMORY_MB,
-    EXAMPLE_CONNECTION_COUNTS,
-    formatBytes,
-    estimateTotalBytes,
     type MemoryLimitModel,
   } from "@/util/memory-budget";
 
@@ -151,53 +149,30 @@
       You can decide how much memory MQTT Viewer uses.
     </p>
 
-    <div class="flex flex-col gap-4">
-      <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="prompt-memory-budget"
-          label="Memory budget (MB)"
+          label="Memory budget per connection (MB)"
           min={MIN_MEMORY_MB}
-          class="mb-[17px]"
           hasError={memoryBelowMin}
-          errorMessage={memoryBelowMin ? "64 MB is the minimum" : undefined}
           bind:value={memoryBudgetMb}
         />
-
-        <p class="text-sm text-secondary-text">
-          With this budget, expect up to about:
-        </p>
-        <ul
-          class="grid grid-cols-[max-content_auto] gap-x-3 text-sm text-secondary-text"
-        >
-          {#each EXAMPLE_CONNECTION_COUNTS as count}
-            <li class="contents">
-              <span>{count} connection{count === 1 ? "" : "s"}:</span>
-              <span
-                >{formatBytes(
-                  estimateTotalBytes(
-                    limitModel,
-                    memoryBudgetMb ?? MIN_MEMORY_MB,
-                    count
-                  )
-                )}</span
-              >
-            </li>
-          {/each}
-          <li>etc...</li>
-        </ul>
+        {#if memoryBelowMin}
+          <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
+        {/if}
+        <MemoryFormula budgetMb={memoryBudgetMb} {limitModel} />
       </div>
 
-      <div class="flex flex-col gap-2">
-        <Switch
-          name="prompt-recording-enabled"
-          label="Record history to disk"
-          checked={recordingChecked}
-          checkedBool={recordingEnabled}
-          onChange={onRecordingChange}
-        />
-      </div>
+      <Switch
+        name="prompt-recording-enabled"
+        label="Record history to disk"
+        checked={recordingChecked}
+        checkedBool={recordingEnabled}
+        onChange={onRecordingChange}
+      />
 
-      <div class="flex flex-col gap-1 mt-3">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="prompt-disk-budget"
           label="Disk budget (GB)"

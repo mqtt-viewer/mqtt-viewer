@@ -14,7 +14,8 @@
   "props": [],
   "tokens": [
     "secondary",
-    "secondary-text"
+    "secondary-text",
+    "error"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet."

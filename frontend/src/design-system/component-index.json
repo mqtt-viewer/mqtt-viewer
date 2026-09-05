@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-05T07:51:27.217Z",
+  "generatedAt": "2026-09-05T09:49:41.233Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1305,7 +1305,8 @@
       "props": [],
       "tokens": [
         "secondary",
-        "secondary-text"
+        "secondary-text",
+        "error"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet.",
@@ -1979,6 +1980,44 @@
       "specMissing": false
     },
     {
+      "name": "MemoryFormula",
+      "tier": "component",
+      "description": "The memory ceiling estimate for one, two and three connections, shared by the settings dialog and the first-run retention prompt.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "budgetMb",
+          "type": "number",
+          "required": false,
+          "default": "MIN_MEMORY_MB"
+        },
+        {
+          "name": "limitModel",
+          "type": "object",
+          "required": false,
+          "default": "undefined",
+          "description": "The backend's memory limit model, from GetMemoryLimitModel. The figures show a placeholder until it is given."
+        }
+      ],
+      "tokens": [
+        "secondary-text"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet.",
+      "sourcePath": "src/components/MemoryFormula/MemoryFormula.svelte",
+      "specPath": "src/components/MemoryFormula/MemoryFormula.spec.json",
+      "storyPath": "src/components/MemoryFormula/MemoryFormula.stories.svelte",
+      "storyId": "Components/MemoryFormula",
+      "specMissing": false
+    },
+    {
       "name": "PageHeaderBar",
       "tier": "primitive",
       "description": "Storybook coverage for PageHeaderBar.",
@@ -2152,7 +2191,8 @@
         "secondary",
         "emphasis",
         "secondary-text",
-        "outline"
+        "outline",
+        "error"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet. The footer section carries a \"Star on GitHub\" row that closes settings and opens the StarPromptDialog.",
