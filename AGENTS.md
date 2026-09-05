@@ -74,11 +74,10 @@ Caveats:
 - **Headless, not the native window.** It's the real Go backend + services (DB,
   MQTT, etc.), so bindings behave for real — but there's no OS window, menus,
   dialogs, screens, or native file pickers (those are no-ops in server mode).
-- **Backend→frontend live events need one extra step.** Events are pushed over a
-  WebSocket set up by `/wails/custom.js`, which server mode serves but does *not*
-  auto-inject. If you need live pushes (incoming MQTT messages, etc.), add
-  `<script src="/wails/custom.js"></script>` to the page. Plain request/response
-  binding calls need nothing extra.
+- **Backend→frontend live events ride a WebSocket set up by `/wails/custom.js`.**
+  The pinned `@wailsio/runtime` loads that script itself on every page, so live
+  pushes (incoming MQTT messages, etc.) work with no extra tag. Adding one by
+  hand opens a second socket and delivers every event twice.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
 

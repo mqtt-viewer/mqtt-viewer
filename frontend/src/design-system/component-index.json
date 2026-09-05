@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-04T12:56:33.793Z",
+  "generatedAt": "2026-09-04T13:08:10.191Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1749,6 +1749,12 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "serverPlaceholder",
+          "type": "string",
+          "required": false,
+          "default": null
         }
       ],
       "tokens": [
@@ -1758,7 +1764,7 @@
         "secondary-text"
       ],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. Reads the env store to branch in server mode (no native file dialog behind HTTP): it renders a BaseInput for typing a container path instead of the browse button. Storybook's env store defaults to desktop, so stories show the browse variant. The BaseInput use is intra-primitive composition; the validator forbids listing it as a dependency.",
       "sourcePath": "src/components/InputFields/FilePathPicker.svelte",
       "specPath": "src/components/InputFields/FilePathPicker.spec.json",
       "storyPath": "src/components/InputFields/FilePathPicker.stories.svelte",

@@ -24,6 +24,7 @@ But wait, there's more:
 | Saved message collections                | ✅     | ⭐ New! Save messages per connection or globally and republish them with a click.                                                                                                                            |
 | Bounded memory usage                     | ✅     | ⭐ New! Message history stays within a configurable memory budget, with opt-in recording to disk.                                                                                                            |
 | Image payload previews                   | ✅     | ⭐ New! PNG, JPEG, GIF, WebP and BMP payloads render as images.                                                                                                                                              |
+| Web UI via Docker                        | ✅     | ⭐ New! Run the full app headless and use it from a browser. See [docs/DOCKER.md](docs/DOCKER.md).                                                                                                           |
 | Sparkplug + Base64 + Hex codecs          | ✅     |                                                                                                                                                                                                              |
 | Free-text / pattern-based filters        | ✅     |                                                                                                                                                                                                              |
 | Publish history                          | ✅     |                                                                                                                                                                                                              |
@@ -33,6 +34,28 @@ But wait, there's more:
 | Team workspaces + cloud collections sync | ❓     | Potential. Let me know if you might use this [here](https://github.com/mqtt-viewer/mqtt-viewer/discussions/3).                                                                                               |
 
 Don't see a feature that would make your life easier? [I really, really want to know.](https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=feature_idea.yml)
+
+## Run it in your browser (Docker)
+
+Prefer a web UI, or want MQTT Viewer running on a server or NAS? The same app
+ships as a Docker image:
+
+```sh
+docker run -d --name mqtt-viewer \
+  -p 127.0.0.1:8080:8080 \
+  -v mqtt-viewer-data:/data \
+  ghcr.io/mqtt-viewer/mqtt-viewer:latest
+```
+
+Open http://localhost:8080. It is the full app served over HTTP: same backend,
+same features, live updates included.
+
+That command publishes the port to this machine only. There is no built-in
+login, and anyone who can load the page can read your saved broker passwords,
+so to reach it from other devices drop the `127.0.0.1:` and only do it on a
+network you trust, or put an authenticating reverse proxy in front. Setup,
+configuration and the few differences from the desktop app are covered in
+[docs/DOCKER.md](docs/DOCKER.md).
 
 ## Installing with Nix
 

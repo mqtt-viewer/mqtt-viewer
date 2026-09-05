@@ -14,6 +14,7 @@
   import { twMerge } from "tailwind-merge";
   import ConnectionIdenticon from "@/components/ConnectionIdenticon/ConnectionIdenticon.svelte";
   import FilePathPicker from "@/components/InputFields/FilePathPicker.svelte";
+  import envStore from "@/stores/env";
   import { getConnectionIsValidContext } from "@/views/Connection/contexts/connection-is-valid.js";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import Button from "@/components/Button/Button.svelte";
@@ -310,6 +311,7 @@
           variant="certificate"
           actionLabel="Add CA Certificate"
           valueLabel="CA"
+          serverPlaceholder="/certs/ca.pem"
           defaultValue={certCa ?? undefined}
           onFileChosen={(filePath) => setFields("certCa", filePath, true)}
           onFileRemoved={() => {
@@ -321,6 +323,7 @@
           variant="certificate"
           actionLabel="Add Client Certificate"
           valueLabel="Client"
+          serverPlaceholder="/certs/client.pem"
           defaultValue={certClient ?? undefined}
           onFileChosen={(filePath) => setFields("certClient", filePath, true)}
           onFileRemoved={() => {
@@ -332,6 +335,7 @@
           variant="certificate"
           actionLabel="Add Client Key"
           valueLabel="Client Key"
+          serverPlaceholder="/certs/client.key"
           defaultValue={certClientKey ?? undefined}
           onFileChosen={(filePath) =>
             setFields("certClientKey", filePath, true)}
@@ -339,6 +343,15 @@
             setFields("certClientKey", "", true);
           }}
         />
+        {#if $envStore.isServerMode}
+          <!-- One hint for the group: in the browser these are typed paths
+               resolved inside the container, not files picked from this
+               machine. -->
+          <span class="block text-sm text-secondary-text">
+            Type paths inside the container. Mount your certificates in first,
+            as described in the Docker guide.
+          </span>
+        {/if}
       </div>
     {/if}
   {/if}

@@ -17,11 +17,15 @@
   import {
     ClearConnectionHistory,
     ExportAllMessages,
-    OpenBrokerStatusWindow,
+    ExportAllMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { getConnectionIdContext } from "@/views/Connection/contexts/connection-id";
   import SearchAndHistory from "./SearchAndHistory.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import { get } from "svelte/store";
+  import { openBrokerStatusWindow } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
+  import envStore from "@/stores/env";
 
   export let getAllTopics: () => string[];
   export let searchStore: SearchStore;
@@ -65,12 +69,28 @@
 
   $: onExportDataClick = async () => {
     try {
+      if (get(envStore).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportAllMessagesData(connectionId);
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            descriptionStyle: "code",
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportAllMessages(connectionId);
       if (path !== "") {
         addToast({
           data: {
             title: "Messages exported",
             description: path,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -121,12 +141,15 @@
       <span slot="tooltip-content">Expand/Collapse all topics</span>
     </Tooltip>
 
-    <Tooltip placement="bottom" focusable>
-      <Button on:click={() => OpenBrokerStatusWindow(connectionId)}
-        ><Icon type="pulse" width={20} height={20} /></Button
-      >
-      <span slot="tooltip-content">Broker status</span>
-    </Tooltip>
+    <!-- ponytail: browser status needs an in-page route before this control returns. -->
+    {#if !$envStore.isServerMode}
+      <Tooltip placement="bottom" focusable>
+        <Button on:click={() => openBrokerStatusWindow(connectionId)}
+          ><Icon type="pulse" width={20} height={20} /></Button
+        >
+        <span slot="tooltip-content">Broker status</span>
+      </Tooltip>
+    {/if}
 
     <Tooltip placement="bottom" focusable>
       <DropdownMenu triggerText={sortButtonText} triggerClass="w-[110px]">

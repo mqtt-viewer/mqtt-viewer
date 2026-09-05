@@ -14,7 +14,7 @@
 </script>
 
 <script lang="ts">
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import Dialog from "../Dialog/Dialog.svelte";
   import UpdateAvailableContent from "./UpdateAvailableContent.svelte";
   import updateStore from "@/stores/update";
@@ -125,7 +125,7 @@
     } else if (update.releases_url) {
       // Package-managed installs update outside the app; send the user to
       // the releases page instead.
-      Browser.OpenURL(update.releases_url);
+      openExternal(update.releases_url);
       updateStore.closeUpdateDialog();
     }
   };

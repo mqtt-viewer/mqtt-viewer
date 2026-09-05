@@ -14,8 +14,7 @@
   // 0 = all history; otherwise show only the last N seconds.
   export let windowSeconds = 0;
   // False while the chart is rendered but off screen (an inactive tab slot).
-  // Gates the 1 Hz ticker so a hidden chart doesn't re-parse history every
-  // second from launch.
+  // Gates full-payload loading and the 1 Hz ticker.
   export let visible = true;
 
   let container: HTMLDivElement;

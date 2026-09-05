@@ -187,7 +187,8 @@ const brokerSparkline = (
         v = base + (i / 29) * amp * 1.6 + pnoise(j) * amp * 0.25;
         break;
       case "bursty": {
-        const spike = pnoise(j) > 0.55 ? Math.abs(pnoise(j * 5)) * amp * 2.2 : 0;
+        const spike =
+          pnoise(j) > 0.55 ? Math.abs(pnoise(j * 5)) * amp * 2.2 : 0;
         v = base + Math.abs(pnoise(j * 3)) * amp * 0.3 + spike;
         break;
       }
@@ -560,7 +561,11 @@ export const createBusyMockSelectedTopicStore = (
 
   const store = createSelectedTopicStore(1, mockEventSet as any);
   const endMs = now;
-  const history = buildBusyHistory(historyCount, spanMinutes * 60 * 1000, endMs);
+  const history = buildBusyHistory(
+    historyCount,
+    spanMinutes * 60 * 1000,
+    endMs
+  );
 
   store.set({
     connectionId: 1,

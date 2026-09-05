@@ -1,0 +1,18 @@
+{
+  "name": "MQTT Viewer",
+  "id": "mqtt-viewer",
+  "available": true,
+  "short_desc": "Browser-based MQTT client with a live topic tree, history and charts.",
+  "author": "Sam Webster",
+  "port": 8080,
+  "categories": ["utilities", "network"],
+  "description": "MQTT Viewer connects to one or more MQTT brokers and shows you the topic tree, live message history and charts as data arrives. It is the same Go backend and Svelte frontend as the desktop app, running headless. There is no login screen built into the app itself, so put it on a trusted network or behind Runtipi's own authentication.",
+  "tipi_version": 1,
+  "version": "1.0.0",
+  "source": "https://github.com/mqtt-viewer/mqtt-viewer",
+  "website": "https://mqttviewer.app",
+  "exposable": true,
+  "supported_architectures": ["arm64", "amd64"],
+  "dynamic_config": true,
+  "form_fields": []
+}

@@ -8,8 +8,10 @@
   import * as events from "bindings/mqtt-viewer/events/models";
   import {
     ExportTopicMessages,
-    OpenChartWindow,
+    ExportTopicMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import { openChartWindow } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
   import IconContext from "@/components/Icon/IconContext.svelte";
   import Toast from "@/components/Toast/Toast.svelte";
   import {
@@ -67,12 +69,28 @@
 
   const exportTopicMessages = async (topic: string) => {
     try {
+      if (get(os).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportTopicMessagesData(connectionId, topic);
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            descriptionStyle: "code",
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportTopicMessages(connectionId, topic);
       if (path !== "") {
         addToast({
           data: {
             title: "Messages exported",
             description: path,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -196,7 +214,7 @@
             )}
             {mqttVersion}
             openChartWindow={(topic, fields) =>
-              OpenChartWindow({ connectionId, topic, fields })}
+              openChartWindow({ connectionId, topic, fields })}
             dockMode={$topicPanelDock.mode}
             onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
             showCloseButton={false}

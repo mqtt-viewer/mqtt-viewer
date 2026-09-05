@@ -157,7 +157,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Adding a value to a chart is clearer",
-        body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
+        body: 'Choosing "Add value from payload" now opens the picker straight on the value, so it\'s obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.',
         thanks: [
           {
             name: "Daschi2",
@@ -167,7 +167,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "See what your connection is doing",
-        body: "There's a \"View logs\" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.",
+        body: 'There\'s a "View logs" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.',
       },
       {
         title: "Pick your own chart time window",
@@ -229,7 +229,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Chart and dropdown fixes",
-        body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
+        body: 'Switching a chart back to "All history" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.',
         thanks: [
           {
             name: "viktak",
@@ -259,7 +259,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Reconnecting when the network drops out",
-        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+        body: 'If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing "connected" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.',
       },
       {
         title: "Install it with Nix",
@@ -291,7 +291,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Connection failures no longer go unreported",
-        body: "On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting \"Connection failed\" indicator until you try again.",
+        body: 'On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting "Connection failed" indicator until you try again.',
       },
       {
         title: "Collapsible collections",
@@ -320,6 +320,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Spot retained topics at a glance",
         body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages. The marker goes the moment you clear the message, on MQTT 3 as well as 5, and it starts again from what your broker replays each time you reconnect.",
+      },
+      {
+        title: "Run MQTT Viewer in your browser",
+        body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
+        thanks: [
+          {
+            name: "Jake W",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/119",
+          },
+        ],
       },
       {
         title: "The chart's Y-axis rescales with its time window",
