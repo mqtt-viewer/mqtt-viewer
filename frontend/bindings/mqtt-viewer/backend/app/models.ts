@@ -19,6 +19,44 @@ import * as paths$0 from "../paths/models.js";
 import * as events$0 from "../../events/models.js";
 
 /**
+ * ClearRetainedResult reports what a bulk clear actually did. The UI states a
+ * number to the user, so it must come from attempted publishes rather than
+ * from the size of the list we were handed.
+ */
+export class ClearRetainedResult {
+    "cleared": number;
+    "failed": number;
+
+    /**
+     * FirstError names one failure so the user has something to act on.
+     */
+    "firstError": string;
+
+    /** Creates a new ClearRetainedResult instance. */
+    constructor($$source: Partial<ClearRetainedResult> = {}) {
+        if (!("cleared" in $$source)) {
+            this["cleared"] = 0;
+        }
+        if (!("failed" in $$source)) {
+            this["failed"] = 0;
+        }
+        if (!("firstError" in $$source)) {
+            this["firstError"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ClearRetainedResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ClearRetainedResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ClearRetainedResult($$parsedSource as Partial<ClearRetainedResult>);
+    }
+}
+
+/**
  * Used to represent a connection in the frontend
  */
 export class Connection {

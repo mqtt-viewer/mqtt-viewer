@@ -7,7 +7,6 @@
   import os from "@/stores/env";
   import * as events from "bindings/mqtt-viewer/events/models";
   import {
-    DeleteRetainedMessage,
     ExportTopicMessages,
     OpenChartWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
@@ -18,7 +17,11 @@
     type SelectedTopicStore,
   } from "@/views/Connection/DataView/stores/selected-topic-store";
   import SelectedTopicPanel from "@/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.svelte";
+  import ConfirmClearRetainedDialog from "@/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
+  import { createClearRetainedFlow } from "@/views/Connection/DataView/clear-retained";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
   import { timelineStartMs } from "./topic-window-timeline";
 
   // State comes from the window URL the backend opened:
@@ -42,14 +45,20 @@
   let unlistenTopicSelect: (() => void) | null = null;
   let unsubscribeSelectedTopicStore: (() => void) | null = null;
 
-  const deleteRetainedMessage = async (topic: string) => {
+  // No onCleared: this window has no tree or graph to update. The main
+  // window listens for the event the flow emits and updates its own copies.
+  const clearRetained = createClearRetainedFlow(connectionId);
+  const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
+    clearRetained;
+
+  const copyTopicPath = async (topic: string) => {
     try {
-      await DeleteRetainedMessage(connectionId, topic);
+      await copyToClipboard(topic);
     } catch (e) {
       addToast({
         data: {
-          title: "Failed to delete retained message",
-          description: e as string,
+          title: "Failed to copy topic path",
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -176,8 +185,10 @@
           <SelectedTopicPanel
             {connectionId}
             {selectedTopicStore}
-            {deleteRetainedMessage}
             {exportTopicMessages}
+            {copyTopicPath}
+            onClearRetained={clearRetained.requestClear}
+            onClearRetainedBelow={clearRetained.requestClearBelow}
             firstConnectedAtMs={timelineStartMs(
               connection?.firstConnectedThisSessionAtMs,
               oldestMessageMs,
@@ -200,5 +211,15 @@
       </div>
     {/if}
     <Toast />
+    <!-- The pop-out confirms its own clears: it is a separate webview, so the
+         main window's dialog is out of reach. -->
+    <ConfirmClearRetainedDialog
+      isOpen={isClearRetainedOpen}
+      topic={$clearRetainedRequest.topic}
+      count={$clearRetainedRequest.count}
+      topics={$clearRetainedRequest.topics}
+      busy={$clearRetainedRequest.busy}
+      onConfirm={clearRetained.confirm}
+    />
   </main>
 </IconContext>

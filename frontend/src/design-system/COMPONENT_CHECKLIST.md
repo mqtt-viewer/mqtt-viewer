@@ -19,7 +19,7 @@
 | Primitives/Card | [x] | [ ] | [x] | [x] |
 | Primitives/ConnectionIdenticon | [x] | [ ] | [x] | [ ] |
 | Primitives/ConnectionStatusCircle | [x] | [ ] | [x] | [x] |
-| Primitives/ContextMenu | [x] | [ ] | [ ] | [ ] |
+| Primitives/ContextMenu | [x] | [ ] | [x] | [x] |
 | Primitives/CopyToClipboard | [x] | [ ] | [x] | [ ] |
 | Primitives/Dialog | [x] | [ ] | [x] | [x] |
 | Primitives/Dialog/DialogActionBar | [x] | [ ] | [ ] | [ ] |
@@ -62,7 +62,9 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/Connection/DataView/ConfirmClearRetainedDialog | [x] | [ ] | [x] | [x] |
 | Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/TopicContextMenu | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
@@ -145,7 +147,7 @@
 
 ## Summary
 
-- Components scanned: 119
-- Story present: 119
+- Components scanned: 121
+- Story present: 121
 - Figma-linked: 0
 - Missing specs: 0

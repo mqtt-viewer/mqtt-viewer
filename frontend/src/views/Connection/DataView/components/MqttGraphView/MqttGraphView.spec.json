@@ -39,9 +39,41 @@
       "required": false
     },
     {
+      "name": "getTopicPayload",
+      "type": "function",
+      "required": false,
+      "description": "A topic's latest payload, or null. Called when the context menu opens to decide whether payload actions apply."
+    },
+    {
+      "name": "copyTopicPath",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "copyPayload",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "exportTopicMessages",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onClearRetained",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onClearRetainedBelow",
+      "type": "function",
+      "required": false
+    },
+    {
       "name": "searchStore",
       "type": "object",
-      "required": false
+      "required": false,
+      "description": "Shared filter text store from the List view, so filter survives the List/Graph toggle. Absent in storybook/dev: falls back to local state."
     }
   ],
   "tokens": [

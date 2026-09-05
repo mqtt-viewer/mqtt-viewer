@@ -310,6 +310,18 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
       },
       {
+        title: "Right-click a topic",
+        body: "Topics now have a right-click menu, in the list and in the graph. Copy the topic path or the payload, export the message history, or clear the retained message. The selected topic panel offers the same actions, so wherever you are, the options are the same.",
+      },
+      {
+        title: "Clear retained messages in bulk",
+        body: "Right-click a branch and you can clear every retained message beneath it in one go. I'll list what I'm about to clear and ask first, since clearing a retained message reaches every other client on the broker, and afterwards I'll tell you how many actually went. Your broker's own $SYS topics are never offered or touched, and a single sweep is capped at 1000 topics. One caveat worth knowing: I can only clear retained messages I've seen, and on MQTT 3 brokers I only learn about them when I subscribe, so anything retained by another client mid-session won't be counted.",
+      },
+      {
+        title: "Spot retained topics at a glance",
+        body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages. The marker goes the moment you clear the message, on MQTT 3 as well as 5, and it starts again from what your broker replays each time you reconnect.",
+      },
+      {
         title: "The chart's Y-axis rescales with its time window",
         body: "Narrowing a chart's time window could leave the Y-axis stretched to an old value elsewhere in that topic's history, squashing the visible points to the bottom. It now ranges over only what the window shows.",
       },

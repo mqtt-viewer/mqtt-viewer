@@ -19,12 +19,16 @@
   import connections from "@/stores/connections";
   import tabs from "@/stores/tabs";
   import {
-    DeleteRetainedMessage,
     ExportTopicMessages,
     FocusTopicWindow,
     OpenChartWindow,
     OpenTopicWindow,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
+  import { createClearRetainedFlow, onRetainedCleared } from "./clear-retained";
+  import { onDestroy, onMount } from "svelte";
+  import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
 
   export let connection: Connection;
 
@@ -99,7 +103,7 @@
       addToast({
         data: {
           title: "Failed to connect",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -218,14 +222,43 @@
     }
   };
 
-  const deleteRetainedMessage = async (topic: string) => {
+  // Clearing a retained message publishes an empty retained message, which
+  // every other client on the broker sees. It used to fire on a single click
+  // with no confirmation; both the single-topic and branch cases now route
+  // through the dialog below.
+  //
+  // The panel owns the topic tree and the graph, so it is what has to be told
+  // a marker is stale. Absent while the "not connected" state is showing.
+  let dataPanel: MqttDataPanel | undefined;
+
+  const clearRetained = createClearRetainedFlow(
+    connection.connectionDetails.id,
+    { onCleared: (topics) => dataPanel?.markRetainedCleared(topics) }
+  );
+  const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
+    clearRetained;
+
+  // This is how clears done in the pop-out window reach this window's tree
+  // and graph: the pop-out is a separate webview with no access to dataPanel.
+  let unlistenRetainedCleared: (() => void) | null = null;
+  onMount(() => {
+    unlistenRetainedCleared = onRetainedCleared(
+      connection.connectionDetails.id,
+      (topics) => dataPanel?.markRetainedCleared(topics)
+    );
+  });
+  onDestroy(() => {
+    unlistenRetainedCleared?.();
+  });
+
+  const copyTopicPath = async (topic: string) => {
     try {
-      await DeleteRetainedMessage(connection.connectionDetails.id, topic);
+      await copyToClipboard(topic);
     } catch (e) {
       addToast({
         data: {
-          title: "Failed to delete retained message",
-          description: e as string,
+          title: "Failed to copy topic path",
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -243,6 +276,7 @@
           data: {
             title: "Messages exported",
             description: path,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -251,7 +285,7 @@
       addToast({
         data: {
           title: "Failed to export messages",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -299,9 +333,14 @@
           </div>
         {:else}
           <MqttDataPanel
+            bind:this={dataPanel}
             {connection}
             {selectedTopicStore}
             width={dataViewWidth}
+            {copyTopicPath}
+            {exportTopicMessages}
+            onClearRetained={clearRetained.requestClear}
+            onClearRetainedBelow={clearRetained.requestClearBelow}
           />
         {/if}
       </div>
@@ -317,8 +356,10 @@
             connectionId={connection.connectionDetails.id}
             {selectedTopicStore}
             viewState={topicPanelViewState}
-            {deleteRetainedMessage}
             {exportTopicMessages}
+            {copyTopicPath}
+            onClearRetained={clearRetained.requestClear}
+            onClearRetainedBelow={clearRetained.requestClearBelow}
             firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
             mqttVersion={connection.connectionDetails.mqttVersion === "3"
               ? "3"
@@ -349,8 +390,10 @@
           connectionId={connection.connectionDetails.id}
           {selectedTopicStore}
           viewState={topicPanelViewState}
-          {deleteRetainedMessage}
           {exportTopicMessages}
+          {copyTopicPath}
+          onClearRetained={clearRetained.requestClear}
+          onClearRetainedBelow={clearRetained.requestClearBelow}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
           mqttVersion={connection.connectionDetails.mqttVersion === "3"
             ? "3"
@@ -406,3 +449,15 @@
     {/if}
   </div>
 </div>
+
+<!-- One dialog for every surface: the tree menu, the graph menu, and the
+     selected-topic panel all raise their clear requests here, so the
+     confirmation wording and the clear itself cannot drift between them. -->
+<ConfirmClearRetainedDialog
+  isOpen={isClearRetainedOpen}
+  topic={$clearRetainedRequest.topic}
+  count={$clearRetainedRequest.count}
+  topics={$clearRetainedRequest.topics}
+  busy={$clearRetainedRequest.busy}
+  onConfirm={clearRetained.confirm}
+/>

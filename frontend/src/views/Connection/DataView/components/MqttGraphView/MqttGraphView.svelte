@@ -3,7 +3,15 @@
    *  Injectable so storybook / browser harnesses can drive synthetic traffic. */
   export interface GraphMessageSource {
     subscribe: (
-      onMessages: (msgs: Array<{ topic: string; timeMs?: number }>) => void,
+      onMessages: (
+        msgs: Array<{
+          topic: string;
+          timeMs?: number;
+          /** what this message implies about the topic's retained state;
+           *  undefined means it says nothing (see TopicModel.ingest) */
+          retained?: boolean;
+        }>
+      ) => void,
       onClear: () => void
     ) => () => void;
   }
@@ -45,6 +53,10 @@
     rateFromScore,
   } from "./cooldown";
   import { coerceSortKey, type SortKey } from "./tidy-layout";
+  import ContextMenu from "@/components/ContextMenu/ContextMenu.svelte";
+  import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
+  import { retainedStateOf } from "../MqttDataPanel/stores/mqtt-data";
+  import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
 
   export let connection: Connection;
   export let selectedTopicStore: SelectedTopicStore;
@@ -53,12 +65,30 @@
   export let width = 0;
   /** override the live message feed (storybook / dev harnesses) */
   export let messageSource: GraphMessageSource | undefined = undefined;
+  /**
+   * A topic's latest payload, or null if it has none. Called only when the
+   * context menu opens, to decide whether payload actions apply.
+   *
+   * A function rather than the tree store itself: the graph keeps its own model
+   * and its own feed so store churn cannot reach the render path, and the copy
+   * behaviour then lives in one place shared with the list rather than being
+   * reimplemented here.
+   */
+  export let getTopicPayload: (topic: string) => string | null = () => null;
+  export let copyTopicPath: (topic: string) => void = () => {};
+  export let copyPayload: (topic: string) => void = () => {};
+  export let exportTopicMessages: (topic: string) => void = () => {};
+  export let onClearRetained: (topic: string) => void = () => {};
+  export let onClearRetainedBelow: (prefix: string) => void = () => {};
   /** shared filter text store from the List view, so filter survives the
    *  List<->Graph toggle. Absent in storybook/dev: falls back to local state. */
   export let searchStore: SearchStore | undefined = undefined;
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
+  // Portal destination for the context menu. Per-connection, because several
+  // connection tabs can each hold a graph and the selector must not collide.
+  const graphContainerId = `graph-container-${connection.connectionDetails.id}`;
   let containerW = 0;
   let containerH = 0;
   const model = new TopicModel();
@@ -233,7 +263,8 @@
             n.topic,
             ownMsgs,
             lastMs,
-            n.rate ? scaleRate(n.rate) : undefined
+            n.rate ? scaleRate(n.rate) : undefined,
+            n.isRetained
           );
         }
       }
@@ -314,6 +345,8 @@
       minimapBgAlpha: light ? 0.7 : 0.32,
       minimapBorder: tokenHex("divider", light ? 0xb8b8c0 : 0x505050),
       pulse: tokenHex("emphasis", light ? 0x131316 : 0xffffff),
+      // the same colour the message timeline gives retained messages
+      retained: tokenHex("secondary", light ? 0xdfa900 : 0xf7d66a),
     });
   };
   $: applyTheme($theme);
@@ -344,6 +377,104 @@
     y: number;
   }
   let hover: HoverInfo | null = null;
+
+  // ---- context menu ----
+  // The menu opens at the pointer and stays there rather than tracking the
+  // node, because node positions are not stable: relayout, zoom-to-subtree and
+  // follow-hottest all move the camera, so an anchored menu would drift out
+  // from under the pointer while open.
+  let menuTopic: string | null = null;
+  let menuHasPayload = false;
+  let menuIsRetained = false;
+  let menuRetainedBelowCount = 0;
+  // True while the context menu is open, so the hover tooltip can hide
+  // itself (see the `hover` render guard below and the WHY comment on the
+  // window listeners that clear this in onMount).
+  let menuOpen = false;
+
+  /**
+   * Resolve the node under a right-click, and set up what the menu renders.
+   * Returns false over empty canvas so no menu opens.
+   *
+   * The target is hit-tested here, from the native event, rather than coming
+   * from a Pixi `rightclick` handler: Pixi's synthetic event and the browser's
+   * contextmenu event have no guaranteed order, so resolving on one and opening
+   * on the other would be a race. This is also exactly how the list view
+   * resolves its target.
+   */
+  const resolveGraphMenuTarget = (event: MouseEvent) => {
+    if (!renderer) return false;
+    const rect = canvasEl.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const topic = renderer.topicAt(x, y);
+    if (topic === null) return false;
+
+    // The tooltip would otherwise sit underneath/behind the menu that's
+    // about to open over the same node.
+    hover = null;
+    menuOpen = true;
+
+    const node = findNode(topic);
+    menuTopic = topic;
+    menuIsRetained = node?.ownRetained ?? false;
+    // A node with no traffic of its own is a structural level in the path, so
+    // it has no payload to copy or export, matching the list view's rule.
+    menuHasPayload =
+      (node?.ownCount ?? 0) > 0 && getTopicPayload(topic) !== null;
+    menuRetainedBelowCount = 0;
+    GetRetainedTopicsUnderPrefix(connection.connectionDetails.id, topic)
+      .then((topics) => {
+        if (menuTopic === topic) {
+          menuRetainedBelowCount = topics.filter((t) => t !== topic).length;
+          // The model's own value is the optimistic immediate paint; the
+          // backend's retained index is the truth. The frontend message
+          // stream is a capped drop-oldest buffer, so under flood the
+          // message that would have set ownRetained can be lost, and this
+          // call is already in flight to get the below-count anyway.
+          menuIsRetained = topics.includes(topic);
+        }
+      })
+      .catch((e) => {
+        // A silently missing bulk-clear item is indistinguishable from a
+        // logic bug from the user's side, so this is worth a warning even
+        // though the menu still works without the count.
+        console.warn(
+          `failed to fetch retained topics under "${topic}"`,
+          e
+        );
+      });
+    return true;
+  };
+
+  // ContextMenu exposes no "closed" callback, only `open`/`close`, so
+  // menuOpen is reset heuristically instead of tracked precisely: a
+  // pointerdown anywhere covers dismiss-by-click-away and dismiss-by-picking
+  // an item, and Escape covers melt's own keyboard dismissal. Both fire
+  // before or as the menu is closing, which is early enough that the
+  // tooltip reappearing a beat before the menu's close transition finishes
+  // is not perceptible.
+  const clearMenuOpen = () => {
+    menuOpen = false;
+  };
+  const onWindowKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") clearMenuOpen();
+  };
+
+  // Invalidate the retained marker on already-known nodes after a clear
+  // succeeds. The tombstone does come back as a message, but only MQTT 5
+  // keeps its Retain flag set, so under MQTT 3 the ingest() carrying it says
+  // nothing about retained state and the marker would survive. The clear call
+  // resolving is the only signal the graph gets. Repaints once, immediately,
+  // rather than waiting for the next ~10Hz slow tick that would otherwise
+  // pick up the model change on its own.
+  export const clearRetainedMarks = (topics: string[]) => {
+    let changed = false;
+    for (const topic of topics) {
+      if (model.clearRetained(topic)) changed = true;
+    }
+    if (changed) renderer?.requestRepaint();
+  };
 
   const findNode = (topic: string): TopicNode | null => {
     let n = model.root;
@@ -461,7 +592,15 @@
     subscribe: (onMessages, onClear) => {
       const unMsgs = Events.On(connection.eventSet.mqttMessages, (e) => {
         const messages: mqtt.MqttMessage[] = e.data;
-        onMessages(messages);
+        // retainedStateOf is shared with the list view's store so both views
+        // read the retained flag by exactly the same rule.
+        onMessages(
+          messages.map((m) => ({
+            topic: m.topic,
+            timeMs: m.timeMs,
+            retained: retainedStateOf(m),
+          }))
+        );
       });
       const unClear = Events.On(connection.eventSet.mqttClearHistory, () =>
         onClear()
@@ -615,7 +754,8 @@
       (msgs) => {
         ingestCounter += msgs.length;
         totalIngested += msgs.length;
-        for (const m of msgs) model.ingest(m.topic, m.timeMs || Date.now());
+        for (const m of msgs)
+          model.ingest(m.topic, m.timeMs || Date.now(), m.retained);
       },
       () => {
         model.clear();
@@ -663,11 +803,14 @@
     );
     io.observe(containerEl);
 
-    document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("pointerdown", clearMenuOpen, true);
+    window.addEventListener("keydown", onWindowKeydown, true);
   });
 
   onDestroy(() => {
     destroyed = true;
+    window.removeEventListener("pointerdown", clearMenuOpen, true);
+    window.removeEventListener("keydown", onWindowKeydown, true);
     // hand the current expansion to the next mount of this connection
     if (renderer) {
       expansionByConnection.set(connectionKey(), renderer.expandedTopics());
@@ -676,7 +819,6 @@
     unsubSearch?.();
     ro?.disconnect();
     io?.disconnect();
-    document.removeEventListener("fullscreenchange", onFullscreenChange);
     stopLiveTimer();
     stopStatsTimer();
     // a pending trailing resize would otherwise fire into a destroyed renderer
@@ -759,23 +901,6 @@
     renderer?.setMaxNodeSize(r);
     saveSettings();
   };
-  const toggleFullscreen = () => {
-    const el = containerEl?.parentElement ?? containerEl;
-    if (!document.fullscreenElement) el?.requestFullscreen?.();
-    else document.exitFullscreen?.();
-  };
-  const onFullscreenChange = () => {
-    // the container resizes when entering/leaving fullscreen; refit once settled
-    requestAnimationFrame(() => {
-      const cw = containerEl?.clientWidth ?? 0;
-      const ch = containerEl?.clientHeight ?? 0;
-      if (cw > 0 && ch > 0 && renderer) {
-        renderer.resize(cw, ch);
-        renderer.fitView();
-      }
-    });
-  };
-
   const filterFieldColor = untypedColors["outline"]["DEFAULT"];
 
   // A blank canvas reads as broken. Say which kind of nothing it is instead.
@@ -904,23 +1029,37 @@
           </DropdownMenuItem>
         </div>
       </DropdownMenu>
-      <div class="ml-auto">
-        <Tooltip placement="bottom">
-          <Button on:click={toggleFullscreen}>
-            <Icon type="fullscreen" width={20} height={20} />
-          </Button>
-          <span slot="tooltip-content">Fullscreen</span>
-        </Tooltip>
-      </div>
     </div>
   </PanelHeader>
   <div
     bind:this={containerEl}
+    id={graphContainerId}
     bind:clientWidth={containerW}
     bind:clientHeight={containerH}
     class="relative min-h-0 w-full grow bg-elevation-0"
   >
-    <canvas bind:this={canvasEl} class="block h-full w-full"></canvas>
+    <!-- Portalled into this container, never document.body, so the menu
+         stays inside the graph's stacking context. The id is per-connection
+         because several connection tabs can each hold a graph. -->
+    <ContextMenu portal={`#${graphContainerId}`} onOpen={resolveGraphMenuTarget}>
+      <canvas slot="trigger" bind:this={canvasEl} class="block h-full w-full"
+      ></canvas>
+      <svelte:fragment slot="menu-content">
+        {#if menuTopic !== null}
+          <TopicContextMenu
+            topic={menuTopic}
+            hasPayload={menuHasPayload}
+            isRetained={menuIsRetained}
+            retainedBelowCount={menuRetainedBelowCount}
+            onCopyTopic={copyTopicPath}
+            onCopyPayload={copyPayload}
+            onExport={exportTopicMessages}
+            {onClearRetained}
+            {onClearRetainedBelow}
+          />
+        {/if}
+      </svelte:fragment>
+    </ContextMenu>
     {#if emptyMessage}
       <div
         class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-secondary-text"
@@ -936,7 +1075,7 @@
         Sorting paused
       </div>
     {/if}
-    {#if hover}
+    {#if hover && !menuOpen}
       <div
         class="pointer-events-none absolute z-20 max-w-[290px] rounded bg-elevation-2 px-2.5 py-1.5 text-xs shadow"
         style:left={`${tipLeft}px`}

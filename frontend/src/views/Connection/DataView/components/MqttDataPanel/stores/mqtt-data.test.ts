@@ -201,6 +201,142 @@ describe("processMessages batching", () => {
   });
 });
 
+const makeRetainedMessage = (
+  id: string,
+  topic: string,
+  payload: string,
+  timeMs: number
+): mqtt.MqttMessage =>
+  ({
+    ...makeMessage(id, topic, payload, timeMs),
+    retain: true,
+  }) as any;
+
+describe("retained tracking", () => {
+  it("marks a topic retained from a retained message with a payload", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    expect(get(store).home.children.a.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("unmarks a topic on a zero-length retained message", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    fireMessages([makeRetainedMessage("2", "home/a", "", 2)]);
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    unsub();
+  });
+
+  it("leaves retained state alone for non-retained messages", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    // ordinary traffic says nothing about the retained value, so it must not
+    // clear the mark
+    fireMessages([makeMessage("2", "home/a", "live", 2)]);
+    expect(get(store).home.children.a.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("never marks intermediate levels retained", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a/b", "value", 1)]);
+    expect(get(store).home.isRetained).toBe(false);
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    expect(get(store).home.children.a.children.b.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("applies a tombstone that arrives mid-batch, not just the last message", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    // A batch is collapsed to its last message per topic. If retained state
+    // came from that last message alone, the tombstone here would be lost and
+    // the topic would stay marked retained.
+    fireMessages([
+      makeRetainedMessage("2", "home/a", "", 2),
+      makeMessage("3", "home/a", "live", 3),
+    ]);
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    unsub();
+  });
+});
+
+describe("markRetainedCleared", () => {
+  it("clears the flag for a known topic", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+    expect(get(store).home.children.a.isRetained).toBe(true);
+
+    store.markRetainedCleared(["home/a"]);
+
+    expect(get(store).home.children.a.isRetained).toBe(false);
+    unsub();
+  });
+
+  it("leaves a sibling and an ancestor's flag alone", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([
+      makeRetainedMessage("1", "home/a/b", "value", 1),
+      makeRetainedMessage("2", "home/a/c", "value", 2),
+    ]);
+    // an intermediate level is never itself retained, but set it explicitly
+    // via a retained message on the shorter path too, to prove clearing a
+    // deeper topic doesn't touch it
+    fireMessages([makeRetainedMessage("3", "home", "value", 3)]);
+
+    store.markRetainedCleared(["home/a/b"]);
+
+    expect(get(store).home.children.a.children.b.isRetained).toBe(false);
+    expect(get(store).home.children.a.children.c.isRetained).toBe(true);
+    expect(get(store).home.isRetained).toBe(true);
+    unsub();
+  });
+
+  it("is a no-op for a topic it does not know about", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+    fireMessages([makeRetainedMessage("1", "home/a", "value", 1)]);
+
+    expect(() =>
+      store.markRetainedCleared(["home/does-not-exist"])
+    ).not.toThrow();
+    expect(get(store).home.children.a.isRetained).toBe(true);
+    unsub();
+  });
+});
+
 describe("rate score bumps", () => {
   it("initialises and bumps rate on the leaf and every ancestor by the batch count", () => {
     const highlightStore = createHighlightedMqttTopicsStore();

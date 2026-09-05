@@ -823,3 +823,204 @@ func TestGetMessagesByIdsRejectsMismatchedSlices(t *testing.T) {
 		t.Errorf("expected nil for mismatched slice lengths, got %v", got)
 	}
 }
+
+// retainedMsg builds a message carrying the broker's Retain flag. A zero
+// payloadLen is the MQTT tombstone that clears a retained value.
+func retainedMsg(topic string, payloadLen int) MqttMessage {
+	m := msg(topic, payloadLen)
+	m.Retain = true
+	return m
+}
+
+func TestRetainedIndexMarksTopicWithRetainedPayload(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	if !h.IsRetained("a/b") {
+		t.Errorf("expected a/b to be marked retained")
+	}
+}
+
+func TestRetainedIndexTombstoneUnmarksTopic(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.addMessageToHistory(retainedMsg("a/b", 0)) // zero-length retained = clear
+	if h.IsRetained("a/b") {
+		t.Errorf("expected a/b to be unmarked after a zero-length retained message")
+	}
+}
+
+func TestRetainedIndexIgnoresNonRetainedMessages(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(msg("a/b", 10))
+	if h.IsRetained("a/b") {
+		t.Errorf("a non-retained message must not mark a topic retained")
+	}
+
+	// A non-retained message must also not clear an existing retained mark:
+	// live traffic on a topic says nothing about its retained value.
+	h.addMessageToHistory(retainedMsg("c/d", 10))
+	h.addMessageToHistory(msg("c/d", 0))
+	if !h.IsRetained("c/d") {
+		t.Errorf("a non-retained message must not unmark a retained topic")
+	}
+}
+
+func TestRetainedUnderPrefixFindsDescendantsAtAnyDepth(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.addMessageToHistory(retainedMsg("a/b/c", 10))
+	h.addMessageToHistory(retainedMsg("a/b/c/d/e", 10))
+	h.addMessageToHistory(retainedMsg("a/z", 10))
+
+	got := h.RetainedUnderPrefix("a/b")
+	want := []string{"a/b", "a/b/c", "a/b/c/d/e"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("expected sorted %v, got %v", want, got)
+			break
+		}
+	}
+}
+
+func TestRetainedUnderPrefixRespectsTopicLevelBoundary(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.addMessageToHistory(retainedMsg("a/bc", 10))
+	h.addMessageToHistory(retainedMsg("a/bc/d", 10))
+
+	got := h.RetainedUnderPrefix("a/b")
+	if len(got) != 1 || got[0] != "a/b" {
+		t.Errorf("prefix a/b must match a/b only, never the sibling a/bc; got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixExcludesTombstonedTopics(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b/one", 10))
+	h.addMessageToHistory(retainedMsg("a/b/two", 10))
+	h.addMessageToHistory(retainedMsg("a/b/one", 0)) // cleared again
+
+	got := h.RetainedUnderPrefix("a/b")
+	if len(got) != 1 || got[0] != "a/b/two" {
+		t.Errorf("expected only a/b/two to remain retained, got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixEmptyPrefixMatchesAll(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.addMessageToHistory(retainedMsg("z", 10))
+	if got := h.RetainedUnderPrefix(""); len(got) != 2 {
+		t.Errorf("empty prefix must match every retained topic, got %v", got)
+	}
+}
+
+func TestRetainedIndexSurvivesEviction(t *testing.T) {
+	h := newMessageHistory()
+	// Budget that holds only a couple of messages, so the retained one is
+	// evicted from `recent` by later traffic. The index is bounded by topic
+	// cardinality, not the byte budget, so it must not be dropped with it.
+	perMsg := estBytes(msg("t", 1024))
+	h.SetBudgetBytes(int64(perMsg * 2))
+	h.addMessageToHistory(retainedMsg("a/b", 1024))
+	for i := 0; i < 10; i++ {
+		h.addMessageToHistory(msg("noise", 1024))
+	}
+	if !h.IsRetained("a/b") {
+		t.Errorf("eviction under byte pressure must not drop the retained index")
+	}
+}
+
+func TestRetainedIndexClearedByClear(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.Clear()
+	if h.IsRetained("a/b") {
+		t.Errorf("Clear must reset the retained index")
+	}
+	if got := h.RetainedUnderPrefix(""); len(got) != 0 {
+		t.Errorf("expected no retained topics after Clear, got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixExcludesBrokerReservedTopics(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("factory/line1/s1", 10))
+	h.addMessageToHistory(retainedMsg("$SYS/broker/uptime", 10))
+	h.addMessageToHistory(retainedMsg("$SYS/broker/clients/connected", 10))
+
+	// Empty prefix matches everything else, but $SYS/... must never come back.
+	got := h.RetainedUnderPrefix("")
+	if len(got) != 1 || got[0] != "factory/line1/s1" {
+		t.Errorf("expected only the non-$ topic, got %v", got)
+	}
+
+	// Even asking for the $SYS branch directly must not surface it: a bulk
+	// clear can never be offered over broker internals.
+	if got := h.RetainedUnderPrefix("$SYS"); len(got) != 0 {
+		t.Errorf("expected no $SYS topics under any prefix, got %v", got)
+	}
+}
+
+func TestUnmarkRetainedRemovesFromIndex(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.addMessageToHistory(retainedMsg("a/c", 10))
+
+	h.UnmarkRetained("a/b")
+
+	if h.IsRetained("a/b") {
+		t.Error("expected a/b to be unmarked")
+	}
+	if !h.IsRetained("a/c") {
+		t.Error("expected a/c to remain marked")
+	}
+	got := h.RetainedUnderPrefix("")
+	if len(got) != 1 || got[0] != "a/c" {
+		t.Errorf("expected only a/c to remain, got %v", got)
+	}
+}
+
+func TestUnmarkRetainedNoopForUnknownTopic(t *testing.T) {
+	h := newMessageHistory()
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+
+	// Must not panic or otherwise disturb the index for a topic it never knew
+	// about.
+	h.UnmarkRetained("never/seen")
+
+	if !h.IsRetained("a/b") {
+		t.Error("expected a/b to be unaffected by unmarking an unrelated topic")
+	}
+}
+
+func TestClearRetainedIndexEmptiesIndexButKeepsHistory(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.addMessageToHistory(retainedMsg("a/b", 10))
+
+	h.ClearRetainedIndex()
+
+	if h.IsRetained("a/b") {
+		t.Error("expected the retained index to be empty after ClearRetainedIndex")
+	}
+	if got := h.RetainedUnderPrefix(""); len(got) != 0 {
+		t.Errorf("expected no retained topics after ClearRetainedIndex, got %v", got)
+	}
+
+	// Message history itself must be untouched.
+	got, err := h.GetTopicHistory("a/b")
+	if err != nil {
+		t.Fatalf("expected message history to survive ClearRetainedIndex, got error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("expected 1 message still in history, got %d", len(got))
+	}
+	all := h.GetAllHistory()
+	if _, ok := all["a/b"]; !ok {
+		t.Error("expected a/b still present in GetAllHistory after ClearRetainedIndex")
+	}
+}

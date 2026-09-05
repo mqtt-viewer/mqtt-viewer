@@ -87,6 +87,24 @@ export function startMockMessages(
   return { stop: () => window.clearInterval(id), topicCount: topics.length };
 }
 
+/**
+ * Deterministically marks a slice of topics retained, so the harnesses render
+ * retained markers rather than silently skipping that path.
+ *
+ * Without this the perf harness measures a graph where no node is ever
+ * retained, so the marker's draw and pooling cost never runs and the number it
+ * reports is not the number users get. A cheap string hash keeps it stable
+ * across runs, which the perf baseline depends on.
+ */
+export function isMockRetained(topic: string): boolean {
+  let h = 0;
+  for (let i = 0; i < topic.length; i++) h = (h * 31 + topic.charCodeAt(i)) | 0;
+  return Math.abs(h) % 4 === 0; // ~25% of topics
+}
+
 export function startMockTraffic(model: TopicModel, scale = 1): MockHandle {
-  return startMockMessages((topic, t) => model.ingest(topic, t), scale);
+  return startMockMessages(
+    (topic, t) => model.ingest(topic, t, isMockRetained(topic)),
+    scale
+  );
 }

@@ -113,6 +113,29 @@ test("clear resets nodeCount and marks visibleDirty", () => {
   expect(model.visibleDirty).toBe(true);
 });
 
+test("retained: marks the exact topic, never its ancestors", () => {
+  const m = new TopicModel();
+  m.ingest("a/b/c", 1000, true);
+  const c = m.root.children.get("a")!.children.get("b")!.children.get("c")!;
+  expect(c.ownRetained).toBe(true);
+  expect(m.root.children.get("a")!.ownRetained).toBe(false);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(false);
+});
+
+test("retained: a tombstone clears the mark", () => {
+  const m = new TopicModel();
+  m.ingest("a", 1000, true);
+  m.ingest("a", 2000, false);
+  expect(m.root.children.get("a")!.ownRetained).toBe(false);
+});
+
+test("retained: an ordinary message leaves the mark alone", () => {
+  const m = new TopicModel();
+  m.ingest("a", 1000, true);
+  m.ingest("a", 2000);
+  expect(m.root.children.get("a")!.ownRetained).toBe(true);
+});
+
 const SEED_T = 1_700_000_000_000; // realistic epoch-ms base for seed timestamps
 
 test("seedTopic makes aggCount equal the List's cumulative messageCount at every level", () => {
@@ -271,6 +294,39 @@ test("setTau rescales scores so the implied rate survives a smoothing change", (
   expect(after).toBeCloseTo(before, 6);
   // and the raw score (which drives node radius) is rescaled, not left alone
   expect(node.agg.score).toBeCloseTo((before * 5000) / 1000, 6);
+});
+
+test("clearRetained clears ownRetained on an existing topic and reports it was found", () => {
+  const m = new TopicModel();
+  m.ingest("a/b", 1000, true);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(true);
+
+  const found = m.clearRetained("a/b");
+
+  expect(found).toBe(true);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(false);
+});
+
+test("clearRetained leaves a sibling and an ancestor alone", () => {
+  const m = new TopicModel();
+  m.ingest("a/b", 1000, true);
+  m.ingest("a/c", 1000, true);
+
+  m.clearRetained("a/b");
+
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(false);
+  expect(m.root.children.get("a")!.children.get("c")!.ownRetained).toBe(true);
+});
+
+test("clearRetained is a no-op and reports not-found for an unknown topic", () => {
+  const m = new TopicModel();
+  m.ingest("a/b", 1000, true);
+
+  const found = m.clearRetained("a/x");
+
+  expect(found).toBe(false);
+  expect(m.root.children.get("a")!.children.get("b")!.ownRetained).toBe(true);
+  expect(m.root.children.get("a")!.children.has("x")).toBe(false);
 });
 
 test("setTau ignores a no-op or invalid tau", () => {
