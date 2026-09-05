@@ -163,6 +163,5 @@ buildGoModule (finalAttrs: {
     mainProgram = "mqtt-viewer";
     platforms = lib.platforms.linux;
     maintainers = [ ];
-    sourceProvenance = [ lib.sourceTypes.fromSource ];
   };
 })
