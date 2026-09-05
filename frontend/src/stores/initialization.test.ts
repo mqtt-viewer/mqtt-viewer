@@ -84,4 +84,30 @@ describe("startup initialization", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("rejects and stays not ready when the environment cannot be read", async () => {
+    const failure = new Error("GetEnvInfo failed");
+    mocks.getEnvInfo.mockRejectedValue(failure);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0", platform: "Linux" });
+    vi.stubGlobal("window", {
+      innerWidth: 1440,
+      innerHeight: 900,
+      addEventListener: vi.fn(),
+    });
+
+    // The first test left the cached module's store at appIsReady: true, so
+    // start from a fresh module instance.
+    vi.resetModules();
+    const initialization = (await import("./initialization")).default;
+
+    await expect(initialization.init()).rejects.toBe(failure);
+    expect(get(initialization)).toEqual({ appIsReady: false });
+    expect(consoleError).toHaveBeenCalledWith(failure);
+
+    consoleError.mockRestore();
+    vi.unstubAllGlobals();
+  });
 });

@@ -70,6 +70,7 @@
 | Components/MemoryFormula | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
+| Components/StartupError | [x] | [ ] | [x] | [ ] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog/UpdateAvailableContent | [x] | [ ] | [x] | [x] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
@@ -154,7 +155,7 @@
 
 ## Summary
 
-- Components scanned: 128
-- Story present: 128
+- Components scanned: 129
+- Story present: 129
 - Figma-linked: 0
 - Missing specs: 0
