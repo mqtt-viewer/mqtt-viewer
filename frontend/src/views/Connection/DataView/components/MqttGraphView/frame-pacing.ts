@@ -56,8 +56,10 @@ const STRIDE_BOUNDARY = 0.47;
 // (45 fps, even regardless of jitter), 120 Hz stride 2, 144 Hz stride 2
 // (72 fps: the target is a ceiling on work rather than an exact rate, and
 // every second tick is the closest even cadence), 165 Hz stride 3, 240 Hz
-// stride 4. A 30 fps target doubles each stride (144 Hz becomes 5, the
-// closest whole number to 4.8).
+// stride 4. Displays between 60 and about 88 Hz round to stride 1 and so
+// render at their own rate (75 Hz gives 75 fps): the target caps how often
+// the graph draws on fast panels, it is not an exact rate. A 30 fps target
+// doubles each stride (144 Hz becomes 5, the closest whole number to 4.8).
 export class FramePacer {
   // ring of the last RING_SIZE usable rAF gaps, in no particular order
   private recentGaps: number[] = [];
