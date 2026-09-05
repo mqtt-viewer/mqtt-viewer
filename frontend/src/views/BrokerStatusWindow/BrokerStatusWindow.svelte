@@ -183,13 +183,13 @@
   <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
     <!-- macOS sits the traffic lights higher than a symmetrically padded row
          centres its content, so on mac the same total height is kept but
-         shifted up (pt-1 pb-2.5, the same total as py-1.5 plus the offset), putting the row's centre
+         kept at pt-2 so the row's centre stays
          on the lights' centre. Windows and Linux keep the even padding. -->
     <header
       class="flex items-center gap-2 px-4 border-b border-outline {$os.isMac &&
       !$os.isFullscreen
-        ? 'pt-1 pb-2.5'
-        : 'py-1.5'}"
+        ? 'pt-2 pb-2'
+        : 'py-2'}"
       style="--wails-draggable:drag"
     >
       {#if $os.isMac && !$os.isFullscreen}
