@@ -1220,14 +1220,16 @@
            the legend on a small panel; the entries scroll past that while the
            header and the overflow line stay put. Opaque like the stats HUD:
            nodes reading through the text made both harder to read. -->
-      <!-- top-1 to sit flush under the toolbar, same offset as the "Sorting
-           paused" note; anything lower reads as a gap. Collapsible like the
+      <!-- top-0: the header is 50px with 28px controls centred, so the canvas
+           already starts one control-margin below them. Any extra offset here
+           makes the gap under the controls larger than the one above them,
+           which reads as a gap (the stats HUD uses the same). Collapsible like the
            list's pinned block, and equally unpersisted: it is scratch state,
            not a preference (the gear menu toggle is the preference). No
            horizontal padding on the panel itself: each row carries its own,
            so a hovered row highlights edge to edge. -->
       <div
-        class="absolute left-3 top-1 flex max-h-[45%] w-[260px] max-w-[calc(100%-24px)] flex-col overflow-hidden rounded border border-outline bg-elevation-1 py-1 text-xs text-secondary-text"
+        class="absolute left-3 top-0 flex max-h-[45%] w-[260px] max-w-[calc(100%-24px)] flex-col overflow-hidden rounded border border-outline bg-elevation-1 py-1 text-xs text-secondary-text"
       >
         <button
           type="button"
@@ -1286,7 +1288,7 @@
     {/if}
     {#if statsOn && stats}
       <div
-        class="pointer-events-none absolute right-3 top-3 flex flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
+        class="pointer-events-none absolute right-3 top-0 flex flex-col gap-1 rounded border border-outline bg-elevation-1 px-2.5 py-2 text-xs text-secondary-text"
       >
         <div>{stats.fps} fps (cap {stats.maxFps})</div>
         <div>avg frame {stats.avgFrameMs} ms</div>
