@@ -10,6 +10,12 @@ const storybookConfigDir = fileURLToPath(
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [svelte()],
+  // Relative asset base so the built index.html references ./assets/* rather
+  // than /assets/*. That lets a reverse proxy serve the app under a path prefix
+  // (Home Assistant ingress) without the asset URLs escaping to the origin
+  // root. Server mode and the desktop webview both load at "/", where "./"
+  // resolves identically to "/", so nothing changes for them.
+  base: "./",
   // The Wails dev proxy (ExternalAssetHandler) dials the frontend dev server
   // over IPv4 (`tcp4 127.0.0.1:<port>`). Vite's default `localhost` host can
   // resolve to IPv6 `::1` only, leaving the proxy with a permanent

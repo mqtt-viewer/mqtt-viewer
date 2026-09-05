@@ -87,10 +87,8 @@ func (a *App) DisconnectMqtt(connId uint) error {
 }
 
 // GetMessageHistory returns up to `limit` of the newest retained messages for
-// a topic (limit <= 0 returns everything). The UI passes its window size:
-// returning a busy topic's entire RAM history serializes an unbounded JSON
-// blob across the webview bridge, which crashed the app on huge
-// public-broker topics.
+// a topic (limit <= 0 returns everything). The UI passes its window size to
+// avoid serialising an unbounded payload across the bridge.
 func (a *App) GetMessageHistory(connId uint, topic string, limit int) ([]mqtt.MqttMessage, error) {
 	appConnection, ok := a.appConnection(connId)
 	if !ok {

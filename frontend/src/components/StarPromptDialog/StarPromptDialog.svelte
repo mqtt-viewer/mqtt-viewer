@@ -9,7 +9,7 @@
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import {
     whatsNewResolved,
     whatsNewOpen,
@@ -179,7 +179,7 @@
   };
 
   const onStar = () => {
-    Browser.OpenURL(STARGAZERS_URL);
+    openExternal(STARGAZERS_URL);
     starPromptOpen.set(false);
   };
 

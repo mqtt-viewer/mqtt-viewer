@@ -2,7 +2,7 @@
   import Dialog from "@/components/Dialog/Dialog.svelte";
   import { writable } from "svelte/store";
   import GiveFeedbackCard from "./GiveFeedbackCard.svelte";
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import Button from "@/components/Button/Button.svelte";
 
   export let open = writable(false);
@@ -12,14 +12,14 @@
   };
 
   const onSubmitFeatureClick = async () => {
-    Browser.OpenURL(
+    openExternal(
       "https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=feature_idea.yml"
     );
     onClose();
   };
 
   const onSubmitBugClick = async () => {
-    Browser.OpenURL(
+    openExternal(
       "https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=bug_report.yml"
     );
     onClose();

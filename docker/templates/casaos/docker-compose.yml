@@ -1,0 +1,59 @@
+# CasaOS app store entry for MQTT Viewer.
+#
+# Schema followed: CasaOS-AppStore v2 protocol, specifically the top-level
+# x-casaos block described in
+# https://github.com/IceWhaleTech/CasaOS-AppStore/blob/main/docs/specs/compose-and-x-casaos.md
+# (fetched July 2026). Service-level x-casaos blocks are the legacy v1
+# format and are not used here.
+#
+# See docker/templates/README.md for where a human submits this.
+name: mqtt-viewer
+services:
+  mqtt-viewer:
+    image: ghcr.io/mqtt-viewer/mqtt-viewer:latest
+    restart: unless-stopped
+    ports:
+      - target: 8080
+        published: "8080"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /DATA/AppData/mqtt-viewer
+        target: /data
+    environment:
+      WAILS_SERVER_HOST: "0.0.0.0"
+      WAILS_SERVER_PORT: "8080"
+x-casaos:
+  id: app.mqttviewer.mqtt-viewer
+  main: mqtt-viewer
+  index: /
+  port_map: "8080"
+  scheme: http
+  icon: https://raw.githubusercontent.com/mqtt-viewer/mqtt-viewer/main/build/appicon.png
+  title:
+    en_US: MQTT Viewer
+  tagline:
+    en_US: Watch MQTT traffic live in your browser
+  description:
+    en_US: >-
+      MQTT Viewer connects to one or more MQTT brokers and shows you the
+      topic tree, live message history and charts as data arrives. It is
+      the same Go backend and Svelte frontend as the desktop app, running
+      headless.
+
+
+      There is no login screen built into the app. Anyone who can reach
+      this port can use your saved broker connections, so keep it on a
+      trusted network or put an authenticating reverse proxy in front of
+      it.
+  author: Sam Webster
+  developer: Sam Webster
+  category: Developer
+  architectures:
+    - amd64
+    - arm64
+  version: "1.0.0"
+  website: https://mqttviewer.app
+  repo: https://github.com/mqtt-viewer/mqtt-viewer
+  support: https://github.com/mqtt-viewer/mqtt-viewer/issues
+  docs: https://github.com/mqtt-viewer/mqtt-viewer/blob/main/docs/DOCKER.md
