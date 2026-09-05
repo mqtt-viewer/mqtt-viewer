@@ -91,7 +91,7 @@
     "@lezer/highlight": "^1.2.0",
     "@lezer/json": "^1.0.2",
     "@sveltejs/svelte-virtual-list": "^3.0.1",
-    "@wailsio/runtime": "3.0.0-alpha.79",
+    "@wailsio/runtime": "3.0.0-beta.16",
     "codemirror": "^6.0.1",
     "d3-hierarchy": "^3.1.2",
     "echarts": "^6.1.0",

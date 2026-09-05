@@ -5,10 +5,6 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as time$0 from "../../../time/models.js";
-
 /**
  * AppSettings is a single-row table (id = 1) holding app-wide preferences for
  * message retention. MemoryBudgetBytes bounds the in-RAM message history (the
@@ -129,8 +125,8 @@ export class Collection {
      * order within its scope: the global list, or this connection's list
      */
     "position": number;
-    "createdAt": time$0.Time;
-    "updatedAt": time$0.Time;
+    "createdAt": string;
+    "updatedAt": string;
     "messages": CollectionMessage[];
 
     /** Creates a new Collection instance. */
@@ -148,10 +144,10 @@ export class Collection {
             this["position"] = 0;
         }
         if (!("createdAt" in $$source)) {
-            this["createdAt"] = null;
+            this["createdAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("updatedAt" in $$source)) {
-            this["updatedAt"] = null;
+            this["updatedAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("messages" in $$source)) {
             this["messages"] = [];
@@ -229,8 +225,8 @@ export class CollectionMessage {
     "headerMessageExpiryInterval": number | null;
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
-    "createdAt": time$0.Time;
-    "updatedAt": time$0.Time;
+    "createdAt": string;
+    "updatedAt": string;
 
     /** Creates a new CollectionMessage instance. */
     constructor($$source: Partial<CollectionMessage> = {}) {
@@ -289,10 +285,10 @@ export class CollectionMessage {
             this["headerSubscriptionIdentifier"] = null;
         }
         if (!("createdAt" in $$source)) {
-            this["createdAt"] = null;
+            this["createdAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("updatedAt" in $$source)) {
-            this["updatedAt"] = null;
+            this["updatedAt"] = "0001-01-01T00:00:00.000Z";
         }
 
         Object.assign(this, $$source);
@@ -309,8 +305,8 @@ export class CollectionMessage {
 
 export class Connection {
     "id": number;
-    "createdAt": time$0.Time;
-    "updatedAt": time$0.Time;
+    "createdAt": string;
+    "updatedAt": string;
     "name": string;
     "mqttVersion": string;
     "hasCustomClientId": boolean | null;
@@ -328,7 +324,7 @@ export class Connection {
     "certClient": string | null;
     "certClientKey": string | null;
     "subscriptions": Subscription[];
-    "lastConnectedAt": time$0.Time | null;
+    "lastConnectedAt": string | null;
     "customIconSeed": string | null;
 
     /**
@@ -346,10 +342,10 @@ export class Connection {
             this["id"] = 0;
         }
         if (!("createdAt" in $$source)) {
-            this["createdAt"] = null;
+            this["createdAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("updatedAt" in $$source)) {
-            this["updatedAt"] = null;
+            this["updatedAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("name" in $$source)) {
             this["name"] = "";
@@ -446,7 +442,7 @@ export class FilterHistory {
     "id": number;
     "connectionId": number;
     "text": string;
-    "lastUsed": time$0.Time;
+    "lastUsed": string;
 
     /** Creates a new FilterHistory instance. */
     constructor($$source: Partial<FilterHistory> = {}) {
@@ -460,7 +456,7 @@ export class FilterHistory {
             this["text"] = "";
         }
         if (!("lastUsed" in $$source)) {
-            this["lastUsed"] = null;
+            this["lastUsed"] = "0001-01-01T00:00:00.000Z";
         }
 
         Object.assign(this, $$source);
@@ -563,7 +559,7 @@ export class PublishHistory {
     "headerMessageExpiryInterval": number | null;
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
-    "publishedAt": time$0.Time;
+    "publishedAt": string;
 
     /** Creates a new PublishHistory instance. */
     constructor($$source: Partial<PublishHistory> = {}) {
@@ -616,7 +612,7 @@ export class PublishHistory {
             this["headerSubscriptionIdentifier"] = null;
         }
         if (!("publishedAt" in $$source)) {
-            this["publishedAt"] = null;
+            this["publishedAt"] = "0001-01-01T00:00:00.000Z";
         }
 
         Object.assign(this, $$source);
@@ -662,8 +658,8 @@ export class SortState {
 
 export class Subscription {
     "id": number;
-    "createdAt": time$0.Time;
-    "updatedAt": time$0.Time;
+    "createdAt": string;
+    "updatedAt": string;
     "connectionId": number;
     "qos": number | null;
     "topic": string;
@@ -674,10 +670,10 @@ export class Subscription {
             this["id"] = 0;
         }
         if (!("createdAt" in $$source)) {
-            this["createdAt"] = null;
+            this["createdAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("updatedAt" in $$source)) {
-            this["updatedAt"] = null;
+            this["updatedAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("connectionId" in $$source)) {
             this["connectionId"] = 0;
@@ -708,8 +704,8 @@ export class Subscription {
  */
 export class SysMetricMapping {
     "id": number;
-    "createdAt": time$0.Time;
-    "updatedAt": time$0.Time;
+    "createdAt": string;
+    "updatedAt": string;
     "connectionId": number;
 
     /**
@@ -744,10 +740,10 @@ export class SysMetricMapping {
             this["id"] = 0;
         }
         if (!("createdAt" in $$source)) {
-            this["createdAt"] = null;
+            this["createdAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("updatedAt" in $$source)) {
-            this["updatedAt"] = null;
+            this["updatedAt"] = "0001-01-01T00:00:00.000Z";
         }
         if (!("connectionId" in $$source)) {
             this["connectionId"] = 0;
