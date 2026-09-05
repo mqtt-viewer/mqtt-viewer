@@ -14,6 +14,7 @@ import {
   Sprite,
   Text,
   Texture,
+  type Ticker,
 } from "pixi.js";
 import {
   COLD_ENDPOINT_DARK,
@@ -21,6 +22,7 @@ import {
   tintForAge,
   type RGB,
 } from "./cooldown";
+import { FramePacer, targetIntervalMs } from "./frame-pacing";
 import { layoutTopicTree, type LayoutResult, type SortKey } from "./tidy-layout";
 import { TopicModel, TopicNode } from "./topic-model";
 
@@ -67,6 +69,7 @@ interface NodeVisual {
   tx: number; // target x (animated toward)
   ty: number; // target y
   lastRippleMsg: number; // last-rendered message timestamp (for ripple spawn edge-detect)
+  lastRippleAt: number; // wall time this visual last spawned a ripple (per-node throttle)
   culled: boolean; // outside the viewport (+ margin) — skips all per-frame work
   moving: boolean; // still easing toward (tx, ty)
   r: number; // last-computed radius (cached so culled nodes keep a sane value)
@@ -132,6 +135,9 @@ export class TopicGraphRenderer {
   private readonly RIPPLE_DURATION_MS = 1200;
   // global cap on live ripples so a busy broker can't pile up unbounded draw calls
   private readonly RIPPLE_CAP = 40;
+  // per-node spacing between ripples: a hot topic ticking many times a second
+  // would otherwise stack rings on top of each other
+  private readonly RIPPLE_MIN_GAP_MS = 150;
   private minimap = new Container();
   private minimapBg = new Graphics();
   private minimapDots = new Graphics();
@@ -185,11 +191,14 @@ export class TopicGraphRenderer {
   private slowFrameStreak = 0;
   private fastFrameStreak = 0;
   private currentMaxFps = 60;
+  // decides which rAF ticks draw (see onTick and frame-pacing.ts)
+  private pacer = new FramePacer();
 
   // ---- perf HUD counters (see getPerfStats()) ----
-  // Rendered-frames-per-second, counted directly in the ticker callback over
-  // rolling ~1s windows, independent of frameMsEma, which is an EMA used to
-  // drive the adaptive fps cap, not a literal frame count.
+  // Rendered-frames-per-second, counted in frame() (which only runs on the
+  // ticks onTick decides to draw) over rolling ~1s windows, independent of
+  // frameMsEma, which is an EMA used to drive the adaptive fps target, not a
+  // literal frame count.
   private fpsWindowStart = 0;
   private fpsWindowFrames = 0;
   private lastFps = 0;
@@ -297,14 +306,32 @@ export class TopicGraphRenderer {
     this.installMinimapNav();
 
     this.installPanZoom(canvas);
-    this.app.ticker.add(() => this.frame());
-    // apply the default cap up front: Pixi's ticker is otherwise uncapped
-    // (maxFPS 0), which ran the graph at display rate (e.g. 120Hz) while the
-    // HUD and adaptive logic assumed a 60fps ceiling
-    this.app.ticker.maxFPS = this.currentMaxFps;
+    // Pace frames here rather than with Pixi's ticker.maxFPS. That cap
+    // truncates the elapsed gap to whole milliseconds before comparing it
+    // with 1000/maxFPS, which on a 120 Hz display produced 8/17/25 ms gaps
+    // between rendered frames instead of a steady 16.7 ms, and dropped the
+    // odd frame on a 60 Hz display (16 < 16.667). The ticker stays uncapped
+    // (maxFPS 0, its default) and onTick picks the ticks that draw, so
+    // TickerPlugin's own render listener (ticker.add(app.render, app)) has to
+    // come off or a skipped tick would still present the stage.
+    this.app.ticker.remove(this.app.render, this.app);
+    this.app.ticker.add((t) => this.onTick(t));
 
     document.addEventListener("visibilitychange", this.visibilityHandler);
     this.inited = true;
+  }
+
+  // Every rAF tick lands here; only the ticks the pacer picks run frame()
+  // and draw. Inside a listener, ticker.lastTime is still the previous
+  // tick's timestamp (Ticker.update assigns it after the listener loop) and
+  // elapsedMS is the raw gap since it, so their sum is this tick's time on
+  // the ticker's clock. See frame-pacing.ts for the rule.
+  private onTick(ticker: Ticker): void {
+    const now = ticker.lastTime + ticker.elapsedMS;
+    const interval = targetIntervalMs(this.currentMaxFps);
+    if (!this.pacer.shouldRender(now, ticker.elapsedMS, interval)) return;
+    this.frame();
+    this.app.render();
   }
 
   private positionMinimap(): void {
@@ -923,6 +950,7 @@ export class TopicGraphRenderer {
       tx: 0,
       ty: 0,
       lastRippleMsg: node.expanded ? node.ownLastMsg : node.aggLastMsg,
+      lastRippleAt: 0,
       culled: false,
       moving: true,
       r: this.rMin,
@@ -1054,19 +1082,19 @@ export class TopicGraphRenderer {
     if (v.caret) this.drawCaret(v);
   }
 
-  // Recompute a visible visual's radius/tint/label/badge/caret, and (when
-  // spawnRipple) detect a message-arrival edge and spawn a pulse ring. Shared
-  // by the slow tick (every visual, ~10Hz) and the just-revealed fast path (a
-  // single visual, the frame it comes back on screen). Returns the resolved
-  // lastMsg so callers can fold it into hottest-topic tracking without
-  // re-deriving expanded/own-vs-agg themselves. Caller must have already
-  // confirmed the visual isn't culled.
+  // Recompute a visible visual's radius/tint/label/badge/caret. Shared by the
+  // slow tick (every visual, ~10Hz) and the just-revealed fast path (a single
+  // visual, the frame it comes back on screen). Ripples are not spawned here
+  // (see spawnArrivalRipples, which runs every rendered frame); this only
+  // keeps the arrival edge tracked. Returns the resolved lastMsg so callers
+  // can fold it into hottest-topic tracking without re-deriving
+  // expanded/own-vs-agg themselves. Caller must have already confirmed the
+  // visual isn't culled.
   private refreshVisualDetail(
     v: NodeVisual,
     nowMs: number,
     showLabels: boolean,
-    lodDetail: boolean,
-    spawnRipple: boolean
+    lodDetail: boolean
   ): number {
     const score = v.expanded
       ? this.model.ownScore(v.node, nowMs)
@@ -1125,32 +1153,46 @@ export class TopicGraphRenderer {
       if (lodDetail) v.caret.position.x = -(r + 10);
     }
 
-    if (!spawnRipple) {
-      v.lastRippleMsg = lastMsg;
-      return lastMsg;
-    }
-
-    // message-arrival pulse: spawn a ripple when the rendered last-message
-    // time advances, unless this node already rippled very recently (avoid
-    // overdraw on hot topics ticking many times a second). No ripples at all
-    // when zoomed out past the LOD threshold — they're imperceptible and
-    // just cost draw calls.
-    if (lodDetail && lastMsg > v.lastRippleMsg) {
-      v.lastRippleMsg = lastMsg;
-      const recent = this.ripples.find(
-        (rp) => rp.visual === v && nowMs - rp.startMs < 150
-      );
-      if (!recent) {
-        if (this.ripples.length >= this.RIPPLE_CAP) this.ripples.shift();
-        this.ripples.push({ visual: v, startMs: nowMs });
-      }
-    } else if (lastMsg > v.lastRippleMsg) {
-      // still track the edge even while suppressed, so a zoom-in afterwards
-      // doesn't replay a backlog of "new" messages as ripples
-      v.lastRippleMsg = lastMsg;
-    }
+    // keep the arrival edge current for visuals that never passed through
+    // spawnArrivalRipples for this message (seeded on a List -> Graph toggle,
+    // or an expanded/collapsed flip that switched which timestamp is
+    // rendered), so the next arrival is measured against the present rather
+    // than replaying history as a ripple
+    v.lastRippleMsg = lastMsg;
 
     return lastMsg;
+  }
+
+  // Message-arrival pulses spawn on the first rendered frame after the model
+  // recorded the arrival, from the nodes ingest() touched since the previous
+  // frame, instead of waiting for the ~10Hz slow tick (up to 100 ms late at
+  // 60 fps, 200 ms at 30). The edge rule is the one refreshVisualDetail used
+  // to apply: the rendered last-message time advanced past what this visual
+  // last rippled for. lastRippleMsg always advances, even when the ripple is
+  // suppressed (zoomed out past the LOD threshold, culled, or inside the
+  // per-node throttle window), so a later zoom-in or reveal never replays a
+  // backlog of "new" messages as ripples. A touched node with no visual yet
+  // (not laid out until the next relayout) is skipped; createVisual starts
+  // its edge at the current last-message time for the same reason. Must run
+  // after the cull pass (it reads v.culled) and before the slow tick, which
+  // advances lastRippleMsg itself and would otherwise swallow the edge on
+  // every sixth frame.
+  private spawnArrivalRipples(nowMs: number, lodDetail: boolean): void {
+    const touched = this.model.touched;
+    if (touched.size === 0) return;
+    for (const node of touched) {
+      const v = this.visuals.get(node.topic);
+      if (!v) continue;
+      const lastMsg = v.expanded ? node.ownLastMsg : node.aggLastMsg;
+      if (lastMsg <= v.lastRippleMsg) continue;
+      v.lastRippleMsg = lastMsg;
+      if (!lodDetail || v.culled || !v.container.visible) continue;
+      if (nowMs - v.lastRippleAt < this.RIPPLE_MIN_GAP_MS) continue;
+      v.lastRippleAt = nowMs;
+      if (this.ripples.length >= this.RIPPLE_CAP) this.ripples.shift();
+      this.ripples.push({ visual: v, startMs: nowMs });
+    }
+    touched.clear();
   }
 
   // World-space visible rect (screen corners projected into world space),
@@ -1254,7 +1296,10 @@ export class TopicGraphRenderer {
       this.viewportDirty = false;
     }
 
-    // ---- slow tick: hottest-topic tracking, radius/tint/labels/ripples ----
+    // ---- arrival ripples: every rendered frame, from the model's touched set ----
+    this.spawnArrivalRipples(nowMs, lodDetail);
+
+    // ---- slow tick: hottest-topic tracking, radius/tint/labels ----
     // Runs the O(placed) detail pass at ~10Hz rather than every frame. Culled
     // nodes are skipped except for follow-hottest, which must still consider
     // them (panning the viewport to an offscreen hot topic is the point).
@@ -1273,7 +1318,7 @@ export class TopicGraphRenderer {
           continue;
         }
 
-        const lastMsg = this.refreshVisualDetail(v, nowMs, showLabels, lodDetail, true);
+        const lastMsg = this.refreshVisualDetail(v, nowMs, showLabels, lodDetail);
         v.justRevealed = false;
 
         if (lastMsg > hottestMs) {
@@ -1286,14 +1331,13 @@ export class TopicGraphRenderer {
       // Not a slow-tick frame, but the cull pass above still ran (viewport
       // changed), so a node revealed this frame needs its detail refreshed
       // immediately rather than rendering stale for up to SLOW_TICK_EVERY
-      // frames. Ripple edge-detection is intentionally skipped for these
-      // (see refreshVisualDetail's spawnRipple param): a just-revealed node's
-      // backlog of "new" messages while offscreen/stale shouldn't replay as
-      // ripples. The next slow tick picks up its cadence cleanly.
+      // frames. Ripples are not a concern here: spawnArrivalRipples advanced
+      // the edge for culled nodes as their messages arrived, so a reveal has
+      // no backlog of "new" messages to replay.
       for (const v of this.visuals.values()) {
         if (!v.justRevealed) continue;
         v.justRevealed = false;
-        this.refreshVisualDetail(v, nowMs, showLabels, lodDetail, false);
+        this.refreshVisualDetail(v, nowMs, showLabels, lodDetail);
       }
     }
     // follow-hottest still needs a candidate on non-slow-tick frames; rather
@@ -1424,15 +1468,17 @@ export class TopicGraphRenderer {
   }
 
   // EMA of per-frame WORK time (measured around the frame() body) drives an
-  // adaptive frame-rate cap: sustained slow frames (busy tree, big relayout,
-  // etc.) drop the cap to 30fps to keep interactions responsive; sustained
-  // fast frames restore 60fps. Hysteresis (60-frame streaks in each
-  // direction) prevents flapping at the boundary.
+  // adaptive frame-rate target: sustained slow frames (busy tree, big
+  // relayout, etc.) drop it to 30fps to keep interactions responsive;
+  // sustained fast frames restore 60fps. Hysteresis (60-frame streaks in
+  // each direction) prevents flapping at the boundary. The target is read by
+  // onTick's pacing gate rather than written to ticker.maxFPS, whose
+  // whole-millisecond truncation produced uneven frame gaps (see init).
   //
   // Work time, NOT ticker.elapsedMS: elapsed time between ticks includes the
-  // idle wait imposed by the display rate and the cap itself, so on a plain
-  // 60Hz display it reads ~16.7ms regardless of load — permanently past the
-  // 14ms threshold, which would wrongly degrade every 60Hz user to 30fps.
+  // idle wait imposed by the display rate and the target itself, so on a
+  // plain 60Hz display it reads ~16.7ms regardless of load, permanently past
+  // the 14ms threshold, which would wrongly degrade every 60Hz user to 30fps.
   private updateAdaptiveFps(workMs: number): void {
     this.frameMsEma = this.frameMsEma + this.EMA_ALPHA * (workMs - this.frameMsEma);
 
@@ -1449,10 +1495,8 @@ export class TopicGraphRenderer {
 
     if (this.currentMaxFps !== 30 && this.slowFrameStreak > 60) {
       this.currentMaxFps = 30;
-      this.app.ticker.maxFPS = 30;
     } else if (this.currentMaxFps !== 60 && this.fastFrameStreak > 60) {
       this.currentMaxFps = 60;
-      this.app.ticker.maxFPS = 60;
     }
   }
 

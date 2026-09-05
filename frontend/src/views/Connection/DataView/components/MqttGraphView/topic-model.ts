@@ -66,6 +66,13 @@ export class TopicModel {
   // positions moved.
   structureGen = 0;
 
+  // Nodes whose last-message time ingest() advanced since the renderer last
+  // looked: every node on the arrival's path (agg) plus the exact topic node
+  // (own). The renderer drains it once per rendered frame to spawn arrival
+  // pulses on the very next frame instead of waiting for its slow tick. A Set
+  // so a topic ticking many times between frames costs one entry per node.
+  touched = new Set<TopicNode>();
+
   constructor(tauMs = 14000) {
     this.tauMs = tauMs;
   }
@@ -99,6 +106,7 @@ export class TopicModel {
     this.nodeCount = 0;
     this.visibleDirty = true;
     this.structureGen++;
+    this.touched.clear();
   }
 
   // true if every ancestor up to (but not including) the synthetic root is
@@ -147,6 +155,7 @@ export class TopicModel {
       bumpScore(node.agg, tMs, this.tauMs);
       node.aggLastMsg = tMs;
       node.aggCount++;
+      this.touched.add(node);
     }
     // the exact topic node accumulates its own traffic
     bumpScore(node.own, tMs, this.tauMs);
