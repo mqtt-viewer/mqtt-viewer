@@ -243,11 +243,27 @@ demands the signing and portal secrets only the release workflow has.
 
 The image is a normal web app on a single port with a single `/data` volume,
 which is the shape Home Assistant add-ons, Unraid templates, Portainer
-templates and similar app stores expect. A Home Assistant add-on needs
-ingress support (serving the UI under a path prefix), which the app does not
-handle yet. If you want this, say so in
-[issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119) so I know
-to prioritise it.
+templates and similar app stores expect.
+
+The UI also works when it is served under a path prefix rather than at the
+origin root, which is what Home Assistant ingress needs: ingress mounts each
+add-on under `/api/hassio_ingress/<token>/` inside an iframe. Built asset URLs
+are relative, and a small shim in the page rewrites the internal `/wails/*`
+calls (the runtime POST, the event WebSocket and the `custom.js` loader) so
+they resolve under the prefix instead of jumping to the origin root. I have
+verified a full round-trip through a prefix-stripping reverse proxy that mirrors
+how ingress forwards requests: the UI loads, binding calls reach the backend and
+the live-event WebSocket connects, all under the prefix. Three things the proxy
+in front must do, all of which ingress already does: strip the prefix before
+forwarding to the container, pass WebSocket upgrades through, and serve or
+redirect the prefix root with a trailing slash (`/mqtt/`, not `/mqtt`). Without
+the slash the browser treats the prefix as a filename and resolves every asset
+one level too high; the page heals that itself by redirecting once to the
+trailing-slash form, but a proxy that redirects is one round-trip quicker.
+
+I have not yet packaged this as a Home Assistant add-on (the `config.yaml` and
+supervisor wiring); if you want that, say so in
+[issue #119](https://github.com/mqtt-viewer/mqtt-viewer/issues/119).
 
 ## App store templates
 
@@ -264,6 +280,10 @@ that README has the submission URL and process for each one.
 - **UI loads but nothing updates live**: the browser could not open the
   event WebSocket. Check that your reverse proxy passes WebSocket upgrades
   through to the container.
+- **Blank page behind a path prefix**: the app must be entered at the
+  trailing-slash form of the prefix. It redirects itself there, so a blank
+  page means the redirect could not land: check the proxy serves the prefix
+  root and forwards the whole subtree, not just the exact path.
 - **Saved passwords stopped decrypting**: the machine id in
   `/data/machine-id` is part of the encryption key. If you deleted the
   volume, saved credentials cannot be recovered; re-enter them.

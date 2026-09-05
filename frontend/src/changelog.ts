@@ -323,7 +323,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Run MQTT Viewer in your browser",
-        body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
+        body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads. It works under a reverse-proxy subpath for Home Assistant ingress; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
         thanks: [
           {
             name: "Jake W",

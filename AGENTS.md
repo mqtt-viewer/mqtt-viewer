@@ -75,11 +75,29 @@ Caveats:
   MQTT, etc.), so bindings behave for real — but there's no OS window, menus,
   dialogs, screens, or native file pickers (those are no-ops in server mode).
 - **Backend→frontend live events ride a WebSocket set up by `/wails/custom.js`.**
-  The pinned `@wailsio/runtime` loads that script itself on every page, so live
-  pushes (incoming MQTT messages, etc.) work with no extra tag. Adding one by
-  hand opens a second socket and delivers every event twice.
+  The pinned `@wailsio/runtime` loads that script itself on every page: its index
+  module runs `loadOptionalScript('/wails/custom.js')`, which HEAD-probes the
+  path and appends the tag only where the route exists. So live pushes (incoming
+  MQTT messages, etc.) work with no extra markup, and adding a tag by hand opens
+  a second socket and delivers every event twice. In the native webview the
+  probe 404s and is a no-op.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
+
+To test the app behind a path-prefixing reverse proxy (Home Assistant ingress),
+put `scripts/ingress-sim.go` in front of the server-mode app: it serves
+everything under `/prefix/` and strips the prefix before forwarding, mirroring
+how ingress mounts an add-on.
+
+```sh
+go build -o bin/ingress-sim ./scripts && bin/ingress-sim   # then open :9600/prefix/
+bin/ingress-sim -listen :9601 -redirect=false              # no trailing-slash redirect
+```
+
+Build the binary, don't `go run` it: `go run`'s temp binaries have been seen to
+die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
+mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
+trailing-slash self-heal (see the file's header for the rest).
 
 ### Fallback for human/visual verification
 
