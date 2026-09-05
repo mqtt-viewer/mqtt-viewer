@@ -6,7 +6,7 @@
 
   const componentName = "MemoryFormula";
   const storyId = "Components/MemoryFormula";
-  const props: string[] = ["budgetMb"];
+  const props: string[] = ["budgetMb", "limitModel"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

@@ -19,7 +19,7 @@
 | Primitives/Card | [x] | [ ] | [x] | [x] |
 | Primitives/ConnectionIdenticon | [x] | [ ] | [x] | [ ] |
 | Primitives/ConnectionStatusCircle | [x] | [ ] | [x] | [x] |
-| Primitives/ContextMenu | [x] | [ ] | [ ] | [ ] |
+| Primitives/ContextMenu | [x] | [ ] | [x] | [x] |
 | Primitives/CopyToClipboard | [x] | [ ] | [x] | [ ] |
 | Primitives/Dialog | [x] | [ ] | [x] | [x] |
 | Primitives/Dialog/DialogActionBar | [x] | [ ] | [ ] | [ ] |
@@ -62,6 +62,9 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/Connection/DataView/ConfirmClearRetainedDialog | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/TopicContextMenu | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
 | Components/MemoryFormula | [x] | [ ] | [x] | [x] |
@@ -95,6 +98,7 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/MqttGraphView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -140,10 +144,11 @@
 | Views/NewTab/RecentConnectionsList | [x] | [ ] | [x] | [x] |
 | Views/NewTab/RecentConnectionsList/RecentConnectionsListItem | [x] | [ ] | [x] | [x] |
 | Views/PleaseUpdate | [x] | [ ] | [ ] | [ ] |
+| Views/TopicWindow | [x] | [ ] | [ ] | [x] |
 
 ## Summary
 
-- Components scanned: 117
-- Story present: 117
+- Components scanned: 122
+- Story present: 122
 - Figma-linked: 0
 - Missing specs: 0

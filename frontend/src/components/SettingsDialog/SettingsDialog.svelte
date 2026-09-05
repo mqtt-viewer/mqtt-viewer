@@ -13,6 +13,7 @@
     GetDatabaseSizeBytes,
     ClearReceivedMessages,
     GetMemoryStats,
+    GetMemoryLimitModel,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { whatsNewOpen } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
   import {
@@ -20,6 +21,7 @@
     GB,
     MIN_MEMORY_MB,
     formatBytes,
+    type MemoryLimitModel,
   } from "@/util/memory-budget";
 
   export let open = writable(false);
@@ -29,6 +31,7 @@
   let diskBudgetGb = 1;
   let dbSizeBytes: number | undefined = undefined;
   let historyBytes: number | undefined = undefined;
+  let limitModel: MemoryLimitModel | undefined;
   let isSaving = false;
   let isClearing = false;
 
@@ -88,6 +91,13 @@
           type: "error",
         },
       });
+    }
+
+    // Not fatal: the estimate falls back to a placeholder without it.
+    try {
+      limitModel = await GetMemoryLimitModel();
+    } catch (e) {
+      console.error("Failed to read the memory limit model", e);
     }
   };
 
@@ -169,8 +179,6 @@
 <Dialog title="Settings" isOpen={open}>
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
     <section class="flex flex-col gap-5">
-      <h3 class="text-emphasis font-medium">Message retention</h3>
-
       <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="memory-budget"
@@ -182,7 +190,7 @@
         {#if memoryBelowMin}
           <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
         {/if}
-        <MemoryFormula budgetMb={memoryBudgetMb} />
+        <MemoryFormula budgetMb={memoryBudgetMb} {limitModel} />
       </div>
 
       <Switch
@@ -214,11 +222,7 @@
         <span class="text-secondary-text"
           >Database size: {formatBytes(dbSizeBytes)}</span
         >
-        <Button
-          variant="text"
-          disabled={isClearing}
-          on:click={onClearHistory}
-        >
+        <Button variant="text" disabled={isClearing} on:click={onClearHistory}>
           {isClearing ? "Clearing…" : "Clear recorded history"}
         </Button>
       </div>

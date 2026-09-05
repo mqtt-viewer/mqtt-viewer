@@ -1,20 +1,38 @@
 <script lang="ts">
   // The memory estimate shown under the memory budget field, in the settings
-  // dialog and in the first-run retention prompt. The app baseline comes from
-  // the shared constant, so the figure is never written down twice.
+  // dialog and in the first-run retention prompt. The figures come from the
+  // backend's own limit model, so neither dialog quotes a ceiling the runtime
+  // disagrees with, and neither writes the sum down twice.
   import {
-    BASE_APP_BYTES,
+    EXAMPLE_CONNECTION_COUNTS,
     MIN_MEMORY_MB,
     formatBytes,
+    estimateTotalBytes,
+    type MemoryLimitModel,
   } from "@/util/memory-budget";
 
   // A cleared Svelte number input binds null, so fall back to the floor.
   export let budgetMb: number | null | undefined = MIN_MEMORY_MB;
+  // Undefined until the caller has fetched GetMemoryLimitModel; the figures
+  // show a placeholder until it lands.
+  export let limitModel: MemoryLimitModel | undefined = undefined;
 
-  const baseAppLabel = formatBytes(BASE_APP_BYTES);
   $: shownBudgetMb = budgetMb ?? MIN_MEMORY_MB;
 </script>
 
-<p class="font-mono text-sm text-secondary-text">
-  Total = active connections × {shownBudgetMb} MB + {baseAppLabel} app
-</p>
+<div class="flex flex-col gap-1.5 text-sm text-secondary-text">
+  <p>With this budget, expect up to about:</p>
+  <ul class="grid grid-cols-[max-content_auto] gap-x-3 font-mono">
+    {#each EXAMPLE_CONNECTION_COUNTS as count}
+      <li class="contents">
+        <span>{count} connection{count === 1 ? "" : "s"}:</span>
+        <span
+          >{formatBytes(
+            estimateTotalBytes(limitModel, shownBudgetMb, count)
+          )}</span
+        >
+      </li>
+    {/each}
+    <li>etc...</li>
+  </ul>
+</div>

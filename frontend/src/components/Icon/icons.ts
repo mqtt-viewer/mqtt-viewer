@@ -55,6 +55,10 @@ import {
   ArrowSquareOut,
   Pause,
   Image,
+  FrameCorners,
+  CornersOut,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
   Pulse,
 } from "phosphor-svelte";
 
@@ -115,6 +119,10 @@ export const ICON_MAP = {
   popOut: ArrowSquareOut,
   pause: Pause,
   image: Image,
+  fit: FrameCorners,
+  fullscreen: CornersOut,
+  dockRight: SquareSplitHorizontal,
+  dockBottom: SquareSplitVertical,
 
   // States
   lastConnected: ClockCounterClockwise,

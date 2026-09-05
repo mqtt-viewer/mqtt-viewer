@@ -148,7 +148,7 @@ describe("createBrokerStatusStore — backfill", () => {
     await store.init();
     const state = get(store);
 
-    expect(mocks.getHist).toHaveBeenCalledWith(CONN, "factory/line0/temp");
+    expect(mocks.getHist).toHaveBeenCalledWith(CONN, "factory/line0/temp", 0);
     expect(state.latestByTopic.get("factory/line0/temp")?.value).toBe("42");
     const ct = customTile(state);
     expect(ct.label).toBe("Line temp");

@@ -1,4 +1,4 @@
-import { writable, type Writable } from "svelte/store";
+import { get, writable, type Writable } from "svelte/store";
 import connections from "@/stores/connections";
 import defaultSorts from "@/stores/default-sorts";
 import env from "@/stores/env";
@@ -488,19 +488,152 @@ export const createMockSelectedTopicStore = () => {
           ? '{"temp":21.4,"unit":"C"}'
           : '{"humidity":42.8}',
       payloadB64: message.payload,
+      payloadState: "loaded",
     })) as any,
     historySource: "memory",
     window: null,
     totalCount: mockMqttMessages.length,
+    isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
     options: {
       autoSelect: true,
       compare: true,
       decoding: "none",
       format: "json",
     },
-    onNewMessages: null,
+    onHistoryDelta: null,
   });
   return store;
+};
+
+// Builds a synthetic history of `count` tiny messages spread evenly over
+// `spanMs` milliseconds, ending at `endMs`. Mirrors the shape decode() in
+// selected-topic-store.ts produces (payload + payloadB64 present).
+const buildBusyHistory = (count: number, spanMs: number, endMs: number) => {
+  const startMs = endMs - spanMs;
+  const messages = [];
+  for (let i = 0; i < count; i++) {
+    const timeMs = Math.round(startMs + (spanMs * i) / (count - 1));
+    const payload = `{"n":${i}}`;
+    messages.push({
+      id: `history-${i}`,
+      topic: "factory/line/temperature",
+      payload,
+      payloadB64: btoa(payload),
+      payloadState: "loaded",
+      qos: 0,
+      retain: false,
+      properties: undefined,
+      timeMs,
+      middlewareProperties: { IsDecodedProto: false },
+    });
+  }
+  return messages;
+};
+
+// Simulates a busy topic for perf testing/repro: seeds `historyCount`
+// messages (default 5,000, matching HISTORY_WINDOW_SIZE) spread over
+// `spanMinutes`, then — once `startLiveAppends()` is called — fires a batch
+// of tiny live messages every `intervalMs` (default 300ms, matching the
+// real drain cadence) via the same setOnHistoryDelta path the real store
+// uses, so it exercises MessageTimeline exactly like production traffic.
+// Kept entirely in fixtures/stories per the component-only-fix constraint.
+export const createBusyMockSelectedTopicStore = (
+  options: {
+    historyCount?: number;
+    spanMinutes?: number;
+    messagesPerBatch?: number;
+    intervalMs?: number;
+  } = {}
+) => {
+  const {
+    historyCount = 5000,
+    spanMinutes = 40,
+    messagesPerBatch = 40,
+    intervalMs = 300,
+  } = options;
+
+  const store = createSelectedTopicStore(1, mockEventSet as any);
+  const endMs = now;
+  const history = buildBusyHistory(historyCount, spanMinutes * 60 * 1000, endMs);
+
+  store.set({
+    connectionId: 1,
+    connectionEventSet: mockEventSet as any,
+    selectedTopic: "factory/line/temperature",
+    history: history as any,
+    historySource: "memory",
+    window: null,
+    totalCount: history.length,
+    isLoadingHistory: false,
+    historyRevision: 0,
+    isLoadingWindow: null,
+    chartHistory: null,
+    isLoadingChartHistory: false,
+    recordingEnabled: false,
+    recordedCount: null,
+    options: {
+      autoSelect: true,
+      compare: true,
+      decoding: "none",
+      format: "json",
+    },
+    onHistoryDelta: null,
+  });
+
+  let liveTimer: ReturnType<typeof setInterval> | null = null;
+  let nextId = historyCount;
+
+  const startLiveAppends = () => {
+    if (liveTimer !== null) return;
+    liveTimer = setInterval(() => {
+      const batchEndMs = Date.now();
+      const batch = [];
+      for (let i = 0; i < messagesPerBatch; i++) {
+        const id = `live-${nextId++}`;
+        const payload = `{"n":${id}}`;
+        batch.push({
+          id,
+          topic: "factory/line/temperature",
+          payload,
+          payloadB64: btoa(payload),
+          payloadState: "loaded",
+          qos: 0,
+          retain: false,
+          properties: undefined,
+          timeMs: batchEndMs,
+          middlewareProperties: { IsDecodedProto: false },
+        });
+      }
+      const current = get({ subscribe: store.subscribe });
+      store.set({
+        ...current,
+        history: [...current.history, ...(batch as any)],
+        totalCount: current.totalCount + batch.length,
+      });
+      // Mirrors registerMessageListener in the real store: history is
+      // updated above, then the registered onHistoryDelta callback (set by
+      // MessageTimeline via setOnHistoryDelta) is invoked with the delta.
+      const onHistoryDelta = get({ subscribe: store.subscribe }).onHistoryDelta;
+      if (onHistoryDelta !== null) {
+        onHistoryDelta({ kind: "append", messages: batch as any });
+      }
+    }, intervalMs);
+  };
+
+  const stopLiveAppends = () => {
+    if (liveTimer !== null) {
+      clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  };
+
+  return { store, startLiveAppends, stopLiveAppends };
 };
 
 export const createMockPublishStore = (
@@ -703,6 +836,8 @@ const propDefaults: Record<string, () => unknown> = {
   onOpenMessage: () => noop,
   onSearch: () => noop,
   onSelect: () => noop,
+  onSetDockMode: () => noop,
+  openChartWindow: () => noop,
   scope: () => "global",
   connection: () => mockConnection,
   connectionId: () => 1,
@@ -721,8 +856,8 @@ const propDefaults: Record<string, () => unknown> = {
   defaultTab: () => 0,
   defaultValue: () => "mqtt",
   defaultValueText: () => "mqtt",
-  deleteRetainedMessage: () => asyncNoop,
   disabled: () => false,
+  dockMode: () => "right",
   errorMessage: () => "Field is required",
   expandedTopicsStore: () => {
     const store = createExpandedTopicsStore();
@@ -730,6 +865,11 @@ const propDefaults: Record<string, () => unknown> = {
     return store;
   },
   exportTopicMessages: () => asyncNoop,
+  copyTopicPath: () => noop,
+  copyPayload: () => noop,
+  getTopicPayload: () => () => null,
+  onClearRetained: () => noop,
+  onClearRetainedBelow: () => noop,
   feedbackText: () => "Copied",
   firstConnectedAtMs: () => now - 600000,
   forceOpen: () => true,
@@ -944,7 +1084,17 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     getOptionLabel: (option: unknown) => String(option).toUpperCase(),
   },
   Switch: { name: "tls", label: "TLS enabled" },
-  MemoryFormula: { budgetMb: 512 },
+  MemoryFormula: {
+    budgetMb: 512,
+    // Mirrors memoryLimitModel in backend/app/memlimit.go and the Storybook
+    // mock of GetMemoryLimitModel: 1 GiB base plus 3/2 of the budget per
+    // connected connection.
+    limitModel: {
+      baseBytes: 1024 * 1024 * 1024,
+      budgetFactorNumerator: 3,
+      budgetFactorDenominator: 2,
+    },
+  },
 };
 
 export const getStoryArgs = (
@@ -964,12 +1114,13 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
   const enumOptions: Record<string, string[]> = {
     as: ["button", "a", "div"],
     codec: ["none", "base64", "hex"],
+    dockMode: ["right", "bottom", "window"],
     format: ["none", "json", "json-prettier", "xml"],
     iconPlacement: ["left", "right"],
     kind: ["number", "text"],
     mqttVersion: ["3", "5"],
     placement: ["top", "right", "bottom", "left"],
-    resizeEdge: ["left", "right"],
+    resizeEdge: ["left", "right", "top"],
     size: ["small", "medium"],
     sortDir: ["asc", "desc"],
     sortKey: ["topic", "time"],

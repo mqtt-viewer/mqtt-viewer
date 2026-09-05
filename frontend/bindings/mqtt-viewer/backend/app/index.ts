@@ -7,13 +7,16 @@ export {
 };
 
 export {
+    ClearRetainedResult,
     Connection,
     Connections,
     CreateCollectionParams,
     EnvInfo,
+    MemoryLimitModel,
     MemoryStats,
     MqttStats,
     OpenChartWindowParams,
+    OpenTopicWindowParams,
     PublishParams,
     PublishProperties,
     SaveCollectionMessageParams,

@@ -83,6 +83,8 @@ let mockAppSettings = new models.AppSettings({
   lastSeenChangelogVersion: "",
   launchCount: 0,
   hasSeenStarPrompt: false,
+  topicPanelDockMode: "right",
+  topicPanelLastDockedSide: "right",
   ignoredUpdateVersion: "",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
@@ -119,6 +121,18 @@ export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
   return mockAppSettings;
 }
 
+export async function SetTopicPanelDock(
+  mode: string,
+  lastDockedSide: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    topicPanelDockMode: mode,
+    topicPanelLastDockedSide: lastDockedSide,
+  });
+  return mockAppSettings;
+}
+
 export async function SkipUpdateVersion(
   version: string
 ): Promise<models.AppSettings> {
@@ -128,6 +142,14 @@ export async function SkipUpdateVersion(
   });
   return mockAppSettings;
 }
+
+export async function OpenTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
+
+export async function FocusTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
 
 export async function GetDatabaseSizeBytes(): Promise<number> {
   return mockDatabaseSizeBytes;
@@ -148,6 +170,10 @@ export async function DeletePublishHistoryEntry(_id: number): Promise<void> {}
 export async function DeleteRetainedMessage(
   _connectionId: number,
   _topic: string
+): Promise<void> {}
+export async function DeleteRetainedMessages(
+  _connectionId: number,
+  _topics: string[]
 ): Promise<void> {}
 export async function DeleteSubscription(
   _connectionId: number,
@@ -438,6 +464,13 @@ export async function GetSysMessageHistory(
   return [];
 }
 
+export async function GetRetainedTopicsUnderPrefix(
+  _connId: number,
+  _prefix: string
+): Promise<string[]> {
+  return [];
+}
+
 export async function OpenBrokerStatusWindow(
   _connectionId: number
 ): Promise<void> {}
@@ -482,7 +515,8 @@ export async function GetMatchingSubscriptionForTopic(
 
 export async function GetMessageHistory(
   _connectionId: number,
-  _topic: string
+  _topic: string,
+  _limit?: number
 ): Promise<any[]> {
   return mockMqttMessages;
 }
@@ -502,6 +536,86 @@ export async function GetReceivedMessageCount(
   _topic: string
 ): Promise<number> {
   return mockMqttMessages.length;
+}
+
+// Lightweight stubs (id/timeMs/qos/retain, no payload) mirroring the real
+// GetMessageTimeline/GetReceivedTimelineWindow bindings used by the
+// selection timeline. Computed lazily (not a module-level const) to avoid
+// depending on fixtures.ts's own initialization order.
+const mockMqttMessageStubs = () =>
+  mockMqttMessages.map((m) => ({
+    id: m.id,
+    timeMs: m.timeMs,
+    qos: m.qos,
+    retain: m.retain,
+  }));
+
+export async function GetMessageTimeline(
+  _connectionId: number,
+  _topic: string,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetReceivedTimelineWindow(
+  _connectionId: number,
+  _topic: string,
+  _beforeID: number,
+  _afterID: number,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetMessageById(
+  _connectionId: number,
+  topic: string,
+  id: string
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === id);
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetReceivedMessageById(
+  _connectionId: number,
+  topic: string,
+  id: number
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === String(id));
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: string[],
+  _timesMs: number[]
+): Promise<any[]> {
+  return mockMqttMessages
+    .filter((m) => ids.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetReceivedMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: number[]
+): Promise<any[]> {
+  const wanted = ids.map(String);
+  return mockMqttMessages
+    .filter((m) => wanted.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetMemoryLimitModel(): Promise<app.MemoryLimitModel> {
+  return new app.MemoryLimitModel({
+    baseBytes: 1024 * 1024 * 1024,
+    budgetFactorNumerator: 3,
+    budgetFactorDenominator: 2,
+  });
 }
 
 export async function GetMemoryStats(): Promise<app.MemoryStats> {

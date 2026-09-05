@@ -37,22 +37,80 @@
       ]
     },
     {
-      "name": "deleteRetainedMessage",
+      "name": "exportTopicMessages",
       "type": "function",
-      "required": false,
+      "required": true,
       "default": "> Promise<void>"
     },
     {
-      "name": "exportTopicMessages",
+      "name": "copyTopicPath",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "onClearRetained",
+      "type": "function",
+      "required": true,
+      "description": "Raises a clear request; DataView confirms it and performs the clear."
+    },
+    {
+      "name": "onClearRetainedBelow",
+      "type": "function",
+      "required": true,
+      "description": "Raises a bulk clear request for topics below the selected one."
+    },
+    {
+      "name": "openChartWindow",
       "type": "function",
       "required": false,
-      "default": "> Promise<void>"
+      "default": null
+    },
+    {
+      "name": "dockMode",
+      "type": "enum",
+      "required": false,
+      "options": [
+        "right",
+        "bottom",
+        "window"
+      ],
+      "default": "right"
+    },
+    {
+      "name": "onSetDockMode",
+      "type": "function",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "showCloseButton",
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "headerDraggable",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "headerLeftInset",
+      "type": "number",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "viewState",
+      "type": "store",
+      "required": false
     }
   ],
   "tokens": [
     "secondary",
     "secondary-text",
-    "elevation-1"
+    "elevation-1",
+    "primary"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

@@ -2,7 +2,7 @@
   "$schema": "../../design-system/component-spec.schema.json",
   "name": "MemoryFormula",
   "tier": "component",
-  "description": "The memory budget estimate, as a formula, shared by the settings dialog and the first-run retention prompt.",
+  "description": "The memory ceiling estimate for one, two and three connections, shared by the settings dialog and the first-run retention prompt.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -17,6 +17,13 @@
       "type": "number",
       "required": false,
       "default": "MIN_MEMORY_MB"
+    },
+    {
+      "name": "limitModel",
+      "type": "object",
+      "required": false,
+      "default": "undefined",
+      "description": "The backend's memory limit model, from GetMemoryLimitModel. The figures show a placeholder until it is given."
     }
   ],
   "tokens": [

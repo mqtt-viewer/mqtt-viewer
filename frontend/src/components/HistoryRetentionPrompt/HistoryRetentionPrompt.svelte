@@ -10,9 +10,19 @@
   import {
     GetAppSettings,
     UpdateAppSettings,
+    GetMemoryLimitModel,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
-  import { MB, GB, MIN_MEMORY_MB } from "@/util/memory-budget";
+  import {
+    estimateRetentionSeconds,
+    formatRetentionDuration,
+  } from "./retention-estimates";
+  import {
+    MB,
+    GB,
+    MIN_MEMORY_MB,
+    type MemoryLimitModel,
+  } from "@/util/memory-budget";
 
   const isOpen = writable(false);
 
@@ -21,6 +31,7 @@
   let diskBudgetGb = 1;
   let isSaving = false;
   let wasShown = false;
+  let limitModel: MemoryLimitModel | undefined;
 
   const recordingChecked = writable(false);
 
@@ -28,6 +39,15 @@
   $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
 
   onMount(async () => {
+    // Deliberately not awaited: this only feeds an estimate, so a slow or
+    // hanging call must never hold up the prompt or the first-run gate behind
+    // it. The copy shows a placeholder until it lands, and nothing if it fails.
+    GetMemoryLimitModel()
+      .then((model) => {
+        limitModel = model;
+      })
+      .catch((e) => console.error("Failed to read the memory limit model", e));
+
     try {
       const settings = await GetAppSettings();
       if (!settings.hasSeenHistoryPrompt) {
@@ -53,6 +73,16 @@
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
   };
+
+  // Mirror the byte conversion onSave uses so the estimates match what will
+  // actually be saved.
+  $: estimateBudgetBytes = Math.max(0, diskBudgetGb ?? 0) * GB;
+
+  const usageProfiles = [
+    { label: "Heavy", detail: "about 1,000 msg/s", messagesPerSecond: 1000 },
+    { label: "Medium", detail: "about 100 msg/s", messagesPerSecond: 100 },
+    { label: "Light", detail: "about 10 msg/s", messagesPerSecond: 10 },
+  ];
 
   // Runs on every close path (Escape, overlay click, or after apply) via the
   // Dialog's onClose. The Dialog invokes onClose once during init because the
@@ -116,9 +146,7 @@
 >
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
     <p class="text-secondary-text">
-      I cap how much message history I keep in memory so long sessions don't
-      eat your RAM. You can also record history to disk so it survives
-      restarts.
+      You can decide how much memory MQTT Viewer uses.
     </p>
 
     <div class="flex flex-col gap-5">
@@ -133,7 +161,7 @@
         {#if memoryBelowMin}
           <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
         {/if}
-        <MemoryFormula budgetMb={memoryBudgetMb} />
+        <MemoryFormula budgetMb={memoryBudgetMb} {limitModel} />
       </div>
 
       <Switch
@@ -152,6 +180,33 @@
           disabled={!recordingEnabled}
           bind:value={diskBudgetGb}
         />
+        {#if recordingEnabled}
+          <div
+            class="flex flex-col gap-1.5 mt-2 p-3 rounded bg-elevation-1 text-sm text-secondary-text"
+          >
+            <p class="text-emphasis">History kept for one connection</p>
+            {#each usageProfiles as profile}
+              <div class="flex items-baseline justify-between gap-3">
+                <span
+                  >{profile.label}
+                  <span class="text-xs">({profile.detail})</span></span
+                >
+                <span class="whitespace-nowrap text-emphasis"
+                  >{formatRetentionDuration(
+                    estimateRetentionSeconds(
+                      estimateBudgetBytes,
+                      profile.messagesPerSecond
+                    )
+                  )}</span
+                >
+              </div>
+            {/each}
+            <p class="mt-1 text-xs">
+              Estimates assume small messages of a few hundred bytes. You can
+              change this any time in settings.
+            </p>
+          </div>
+        {/if}
       </div>
     </div>
 

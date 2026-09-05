@@ -44,6 +44,7 @@
       <MqttTopicRow
         topic={item.expandKey}
         isDecodedProto={item.isDecodedProto}
+        isRetained={item.isRetained}
         isSelected={selectedTopic === item.topic}
         isExpanded={item.isExpanded}
         topicLevel={item.topicLevel}
