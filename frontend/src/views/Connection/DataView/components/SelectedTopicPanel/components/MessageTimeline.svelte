@@ -480,10 +480,18 @@
   // there is no need for the findIndex over a 20k history the old
   // per-DataSet-add listener paid on every drain. sampleEvenly always keeps
   // the last element, so the newest history message is always drawn.
+  //
+  // Items go in via DataSet.update (an upsert) rather than add: add throws
+  // on an id the DataSet already holds, and a throw here used to leave the
+  // buffer intact so every later flush threw too and the timeline froze.
+  // The buffer is also taken before the DataSet is touched, so even an
+  // unexpected exception can never wedge later flushes.
   const flushAppends = () => {
     appendFlushTimer = null;
     if (destroyed || pendingAppends.length === 0) return;
-    if (pendingAppends.length >= TIMELINE_MAX_ITEMS) {
+    const batch = pendingAppends;
+    pendingAppends = [];
+    if (batch.length >= TIMELINE_MAX_ITEMS) {
       // The buffer alone fills the visual cap: cheaper to rebuild the
       // DataSet than to add everything and immediately trim most of it out.
       // Sample across the whole buffer rather than slicing the newest so
@@ -491,16 +499,15 @@
       timelineDataSet.clear();
       resetDrawn();
       hideHover();
-      timelineDataSet.add(
-        getTimelineData(sampleEvenly(pendingAppends, TIMELINE_MAX_ITEMS))
+      timelineDataSet.update(
+        getTimelineData(sampleEvenly(batch, TIMELINE_MAX_ITEMS))
       );
     } else {
-      timelineDataSet.add(
-        getTimelineData(sampleEvenly(pendingAppends, FLUSH_MAX_ADDS))
+      timelineDataSet.update(
+        getTimelineData(sampleEvenly(batch, FLUSH_MAX_ADDS))
       );
       trimTimelineDataSetToMax();
     }
-    pendingAppends = [];
 
     if (!isAutoSelectingMostRecent) return;
     const history = $selectedTopicStore.history;
@@ -552,7 +559,8 @@
       return;
     }
     if (delta.kind === "prepend") {
-      timelineDataSet.add(
+      // update, not add: same duplicate-id safety as flushAppends.
+      timelineDataSet.update(
         getTimelineData(sampleEvenly(delta.messages, PREPEND_MAX_ADDS))
       );
       // The user is panning into the past: evict from the newest end, the
