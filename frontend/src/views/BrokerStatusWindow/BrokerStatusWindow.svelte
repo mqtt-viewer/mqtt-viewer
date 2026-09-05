@@ -181,10 +181,9 @@
 
 <IconContext>
   <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
-    <!-- macOS sits the traffic lights higher than a symmetrically padded row
-         centres its content, so on mac the same total height is kept but
-         kept at pt-2 so the row's centre stays
-         on the lights' centre. Windows and Linux keep the even padding. -->
+    <!-- The top padding is what lines the row up with the macOS traffic
+         lights, so it stays at pt-2 on every platform; only the bottom was
+         trimmed to bring the bar to the main window's app-bar height. -->
     <header
       class="flex items-center gap-2 px-4 border-b border-outline {$os.isMac &&
       !$os.isFullscreen
