@@ -109,7 +109,7 @@ Shared foundations that have bitten before:
 ## Expected assets per release
 
 - darwin: `MQTT_Viewer_<tag>_darwin_{arm64,amd64}.zip` (+ `.sha256`)
-- windows: `..._windows_amd64.zip` + `..._installer.exe` (+ `.sha256`)
+- windows: `..._windows_{amd64,arm64}.zip` + `..._installer.exe` (+ `.sha256`)
 - linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm,flatpak}` (+ `.sha256`)
 
 Linux distro guidance: deb/rpm use the system WebKit and are the most

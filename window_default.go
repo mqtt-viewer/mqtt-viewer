@@ -11,8 +11,8 @@ import "github.com/wailsapp/wails/v3/pkg/application"
 func createMainWindow(wailsApp *application.App) {
 	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "MQTT Viewer",
-		Width:            900,
-		Height:           700,
+		Width:            1440,
+		Height:           1080,
 		MinWidth:         825,
 		MinHeight:        660,
 		BackgroundColour: application.NewRGB(35, 33, 32),
