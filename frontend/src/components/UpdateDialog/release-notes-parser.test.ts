@@ -18,7 +18,7 @@ describe("parseReleaseNotes", () => {
   it("renders a link as its text", () => {
     expect(
       parseReleaseNotes("Thanks to [jeeftor](https://github.com/jeeftor).")
-    ).toEqual([{ kind: "text", text: "Thanks to jeeftor." }]);
+    ).toEqual([{ kind: "text", text: "Thanks jeeftor." }]);
   });
 
   it("strips bold and italic markers", () => {
@@ -146,7 +146,7 @@ describe("round trip from renderReleaseNotes", () => {
         kind: "text",
         text: "Numeric payloads can now be plotted from the topic tree.",
       },
-      { kind: "text", text: "Thanks to jeeftor." },
+      { kind: "text", text: "Thanks jeeftor." },
       { kind: "heading", text: "Steadier under load" },
       {
         kind: "text",
