@@ -507,7 +507,7 @@ Every guess-point, with its decided answer.
 | Index after reconnect | Rebuilt from retained replay at subscribe. Briefly empty between connect and replay. |
 | Menu open while messages stream in | Counts are captured at open; the menu does not live-update. |
 | Menu open while the graph relayouts / follow-hottest pans | Menu stays at its opened screen position. Node positions are not stable (`viewAnim` `:1264`, `followHottest` `:1287`), so anchoring to the node would make it drift. |
-| Menu in graph fullscreen | Must work: portal to `containerEl`, never `document.body`. |
+| Menu in graph fullscreen | Moot: the fullscreen button was removed on 2026-09-05 (the Element Fullscreen API is not enabled in the native webview, and the mode was judged not worth its header space). The portal still targets `containerEl` for stacking-context reasons. |
 | Right-click over the minimap | Minimap swallows the event (`pixi-graph.ts:291-293`); no topic menu. Acceptable. |
 | Copy payload on a protobuf/Sparkplug topic | Already JSON by the time it reaches the frontend (decoded in Go at ingest). Copies the JSON. |
 | Copy payload formatting | Matches the panel: `json-prettier` when it parses as JSON, raw utf8 otherwise. |
@@ -556,7 +556,7 @@ Every guess-point, with its decided answer.
   value (verify with `mosquitto_sub -t '#' -v` on reconnect).
 - Graph: left-drag on empty canvas still pans; right-press does not pan; native
   browser menu never appears; pan/zoom/minimap/fit/follow-hottest unaffected.
-- Graph menu works **in fullscreen**.
+- Graph menu works **in fullscreen**. (Superseded: fullscreen removed 2026-09-05.)
 - Retained indicator visible and subtle in both views, light **and** dark theme.
 - Row height unchanged in the list.
 
