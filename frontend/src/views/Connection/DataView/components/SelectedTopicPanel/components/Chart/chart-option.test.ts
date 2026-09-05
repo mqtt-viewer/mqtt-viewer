@@ -26,9 +26,11 @@ const params = (over: Partial<ChartOptionParams> = {}): ChartOptionParams => ({
   ...over,
 });
 
-// Access xAxis as the single-object form buildChartOption always produces.
+// Access xAxis/yAxis as the single-object form buildChartOption always produces.
 const xAxis = (p: ChartOptionParams) =>
   buildChartOption(p).xAxis as { min?: unknown; max?: unknown };
+const yAxis = (p: ChartOptionParams) =>
+  buildChartOption(p).yAxis as { min?: unknown; max?: unknown; scale?: unknown };
 
 describe("buildChartOption xAxis bounds", () => {
   it("anchors min/max to a sliding window when windowSeconds > 0", () => {
@@ -126,5 +128,126 @@ describe("buildChartOption series", () => {
       [NOW - 1000, 21],
       [NOW, 22],
     ]);
+  });
+
+  it("keeps one pre-window point per series so the line still draws into the left edge", () => {
+    const opt = buildChartOption(
+      params({
+        history: [
+          msg(NOW - 3_600_000, '{"temp":10000000}'),
+          msg(NOW - 200 * 1000, '{"temp":21}'),
+          msg(NOW - 100 * 1000, '{"temp":22}'),
+        ],
+        windowSeconds: 300,
+      })
+    );
+    const s = opt.series as { data: [number, number][] }[];
+    expect(s[0].data).toEqual([
+      [NOW - 3_600_000, 10000000],
+      [NOW - 200 * 1000, 21],
+      [NOW - 100 * 1000, 22],
+    ]);
+  });
+
+  it("keeps only the most recent pre-window point when several exist", () => {
+    const opt = buildChartOption(
+      params({
+        history: [
+          msg(NOW - 500 * 1000, '{"temp":5}'),
+          msg(NOW - 400 * 1000, '{"temp":9}'),
+          msg(NOW - 100 * 1000, '{"temp":22}'),
+        ],
+        windowSeconds: 300,
+      })
+    );
+    const s = opt.series as { data: [number, number][] }[];
+    expect(s[0].data).toEqual([
+      [NOW - 400 * 1000, 9],
+      [NOW - 100 * 1000, 22],
+    ]);
+  });
+
+  it("keeps the full history's data when windowSeconds is 0 (All history)", () => {
+    const opt = buildChartOption(
+      params({
+        history: [msg(NOW - 3_600_000, '{"temp":10000000}'), msg(NOW, '{"temp":22}')],
+        windowSeconds: 0,
+      })
+    );
+    const s = opt.series as { data: [number, number][] }[];
+    expect(s[0].data).toEqual([
+      [NOW - 3_600_000, 10000000],
+      [NOW, 22],
+    ]);
+  });
+});
+
+describe("buildChartOption yAxis bounds", () => {
+  it("ranges only over in-window values, ignoring an older leading point (regression)", () => {
+    // This is the reported bug: an all-time spike kept the Y-axis stretched
+    // even after the X-axis window narrowed to a recent, low-value slice,
+    // so the visible points rendered collapsed at the bottom of the chart.
+    const ax = yAxis(
+      params({
+        history: [
+          msg(NOW - 3_600_000, '{"temp":10000000}'),
+          msg(NOW - 200 * 1000, '{"temp":21}'),
+          msg(NOW - 100 * 1000, '{"temp":22}'),
+        ],
+        windowSeconds: 300,
+      })
+    );
+    expect(ax.min).toBeCloseTo(20.9);
+    expect(ax.max).toBeCloseTo(22.1);
+  });
+
+  it("merges the in-window extent across multiple visible series", () => {
+    const ax = yAxis(
+      params({
+        series: [
+          { path: "a", label: "a", color: "#f5a623", visible: true },
+          { path: "b", label: "b", color: "#7788fc", visible: true },
+        ],
+        history: [
+          msg(NOW - 100 * 1000, '{"a":10,"b":-5}'),
+          msg(NOW - 50 * 1000, '{"a":20,"b":3}'),
+        ],
+        windowSeconds: 300,
+      })
+    );
+    // Span is the union of both series' ranges ([10,20] and [-5,3]), not
+    // just one of them: [-5, 20], padded by 10% of that 25-wide range.
+    expect(ax.min).toBeCloseTo(-7.5);
+    expect(ax.max).toBeCloseTo(22.5);
+  });
+
+  it("falls back to scale:true (auto-fit) for All history, explicitly clearing any prior window's bounds", () => {
+    // Regression #95, on the Y-axis this time: echarts deep-merges yAxis on
+    // setOption, so an absent min/max here would leave a previous windowed
+    // render's numeric bounds clamped in place.
+    const ax = yAxis(
+      params({
+        history: [msg(NOW - 3_600_000, '{"temp":10000000}'), msg(NOW, '{"temp":22}')],
+        windowSeconds: 0,
+      })
+    );
+    expect(ax.scale).toBe(true);
+    expect(ax).toHaveProperty("min", null);
+    expect(ax).toHaveProperty("max", null);
+  });
+
+  it("falls back to scale:true when the window contains no points, but still draws the leading point", () => {
+    const opt = buildChartOption(
+      params({
+        history: [msg(NOW - 3_600_000, '{"temp":10000000}')],
+        windowSeconds: 300,
+      })
+    );
+    const ax = opt.yAxis as { scale?: unknown; min?: unknown; max?: unknown };
+    expect(ax.scale).toBe(true);
+    expect(ax).toHaveProperty("min", null);
+    expect(ax).toHaveProperty("max", null);
+    const s = opt.series as { data: [number, number][] }[];
+    expect(s[0].data).toEqual([[NOW - 3_600_000, 10000000]]);
   });
 });

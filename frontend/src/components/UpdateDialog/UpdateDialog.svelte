@@ -14,7 +14,7 @@
 </script>
 
 <script lang="ts">
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import Dialog from "../Dialog/Dialog.svelte";
   import UpdateAvailableContent from "./UpdateAvailableContent.svelte";
   import updateStore from "@/stores/update";
@@ -125,7 +125,7 @@
     } else if (update.releases_url) {
       // Package-managed installs update outside the app; send the user to
       // the releases page instead.
-      Browser.OpenURL(update.releases_url);
+      openExternal(update.releases_url);
       updateStore.closeUpdateDialog();
     }
   };
@@ -152,6 +152,10 @@
   const onSkip = async () => {
     const update = $updateStore.availableUpdate;
     if (update) {
+      // Skipping is the strongest "not this one": persist it through the
+      // backend so the auto-prompt stays quiet, and quieten the bell entry
+      // in this browser too.
+      updateStore.markVersionSeen(update.latest_version);
       try {
         await SkipUpdateVersion(update.latest_version);
       } catch (e) {
@@ -163,7 +167,16 @@
 </script>
 
 {#if $updateStore.availableUpdate}
-  <Dialog title="Update available" {isOpen} {onClose} showCloseButton>
+  <!-- openFocus lands initial focus on the primary action (Update now /
+       Open releases page) instead of melt's default of the first focusable
+       element, which would otherwise be Skip this version. -->
+  <Dialog
+    title="Update available"
+    {isOpen}
+    {onClose}
+    showCloseButton
+    openFocus="[data-update-primary-focus]"
+  >
     <UpdateAvailableContent
       update={$updateStore.availableUpdate}
       currentVersion={$env.version}

@@ -7,10 +7,11 @@
   import os from "@/stores/env";
   import * as events from "bindings/mqtt-viewer/events/models";
   import {
-    DeleteRetainedMessage,
     ExportTopicMessages,
-    OpenChartWindow,
+    ExportTopicMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
+  import { openChartWindow } from "@/util/popout";
+  import { downloadJson } from "@/util/download";
   import IconContext from "@/components/Icon/IconContext.svelte";
   import Toast from "@/components/Toast/Toast.svelte";
   import {
@@ -18,7 +19,11 @@
     type SelectedTopicStore,
   } from "@/views/Connection/DataView/stores/selected-topic-store";
   import SelectedTopicPanel from "@/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.svelte";
+  import ConfirmClearRetainedDialog from "@/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
+  import { createClearRetainedFlow } from "@/views/Connection/DataView/clear-retained";
   import { addToast } from "@/components/Toast/Toast.svelte";
+  import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
   import { timelineStartMs } from "./topic-window-timeline";
 
   // State comes from the window URL the backend opened:
@@ -42,14 +47,20 @@
   let unlistenTopicSelect: (() => void) | null = null;
   let unsubscribeSelectedTopicStore: (() => void) | null = null;
 
-  const deleteRetainedMessage = async (topic: string) => {
+  // No onCleared: this window has no tree or graph to update. The main
+  // window listens for the event the flow emits and updates its own copies.
+  const clearRetained = createClearRetainedFlow(connectionId);
+  const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
+    clearRetained;
+
+  const copyTopicPath = async (topic: string) => {
     try {
-      await DeleteRetainedMessage(connectionId, topic);
+      await copyToClipboard(topic);
     } catch (e) {
       addToast({
         data: {
-          title: "Failed to delete retained message",
-          description: e as string,
+          title: "Failed to copy topic path",
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -58,12 +69,28 @@
 
   const exportTopicMessages = async (topic: string) => {
     try {
+      if (get(os).isServerMode) {
+        // Headless there is no native save dialog: the backend returns the
+        // JSON and a default filename, and the browser downloads it.
+        const payload = await ExportTopicMessagesData(connectionId, topic);
+        downloadJson(payload.filename, payload.json);
+        addToast({
+          data: {
+            title: "Messages exported",
+            description: payload.filename,
+            descriptionStyle: "code",
+            type: "success",
+          },
+        });
+        return;
+      }
       const path = await ExportTopicMessages(connectionId, topic);
       if (path !== "") {
         addToast({
           data: {
             title: "Messages exported",
             description: path,
+            descriptionStyle: "code",
             type: "success",
           },
         });
@@ -176,8 +203,10 @@
           <SelectedTopicPanel
             {connectionId}
             {selectedTopicStore}
-            {deleteRetainedMessage}
             {exportTopicMessages}
+            {copyTopicPath}
+            onClearRetained={clearRetained.requestClear}
+            onClearRetainedBelow={clearRetained.requestClearBelow}
             firstConnectedAtMs={timelineStartMs(
               connection?.firstConnectedThisSessionAtMs,
               oldestMessageMs,
@@ -185,7 +214,7 @@
             )}
             {mqttVersion}
             openChartWindow={(topic, fields) =>
-              OpenChartWindow({ connectionId, topic, fields })}
+              openChartWindow({ connectionId, topic, fields })}
             dockMode={$topicPanelDock.mode}
             onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
             showCloseButton={false}
@@ -200,5 +229,15 @@
       </div>
     {/if}
     <Toast />
+    <!-- The pop-out confirms its own clears: it is a separate webview, so the
+         main window's dialog is out of reach. -->
+    <ConfirmClearRetainedDialog
+      isOpen={isClearRetainedOpen}
+      topic={$clearRetainedRequest.topic}
+      count={$clearRetainedRequest.count}
+      topics={$clearRetainedRequest.topics}
+      busy={$clearRetainedRequest.busy}
+      onConfirm={clearRetained.confirm}
+    />
   </main>
 </IconContext>

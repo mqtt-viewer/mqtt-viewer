@@ -3,7 +3,15 @@ import type * as events from "bindings/mqtt-viewer/events/models";
 import type * as mqtt from "bindings/mqtt-viewer/backend/mqtt/models";
 import { Events } from "@wailsio/runtime";
 import { base64ToUtf8 } from "@/components/CodeEditor/codec";
-import type { HighlightedMqttTopicsStore } from "./highlighted-topics";
+import {
+  bumpScore,
+  LIST_RATE_TAU_MS,
+  type DecayScore,
+} from "@/util/decay-score";
+import type {
+  HighlightCause,
+  HighlightedMqttTopicsStore,
+} from "./highlighted-topics";
 
 export type MqttData = {
   [topicLevel: string]: {
@@ -13,11 +21,38 @@ export type MqttData = {
     latestMessageTime: Date;
     message?: string; // byte array
     isDecodedProto: boolean;
+    // Whether this topic currently holds a retained message, as far as we
+    // know. Mirrors the backend's retained index (see mqtt.MessageHistory) so
+    // the tree can show a retained marker without a binding call per row. The
+    // backend is authoritative for counting and clearing; this is for display.
+    isRetained: boolean;
     children: MqttData;
+    // EWMA rate score for "Busiest" sort, lazily initialised on first message.
+    // Optional so hand-built fixtures/stories stay valid without it.
+    rate?: DecayScore;
   };
 };
 
 export type MqttDataStore = ReturnType<typeof createMqttDataStore>;
+
+/**
+ * What a message says about its topic's retained state, mirroring the rule the
+ * backend applies (see mqtt.MessageHistory's retained field):
+ * a retained message with a payload means the topic holds a retained value, a
+ * retained zero-length payload is the MQTT tombstone that clears one, and a
+ * non-retained message says nothing either way.
+ *
+ * Returns undefined for "no change".
+ */
+export const retainedStateOf = (
+  message: mqtt.MqttMessage
+): boolean | undefined => {
+  if (!message.retain) return undefined;
+  // payload crosses the bridge base64-encoded, so an empty string is a
+  // zero-length payload.
+  const payload = (message.payload as unknown as string) ?? "";
+  return payload.length > 0;
+};
 
 export const createMqttDataStore = (
   highlightedTopicStore: HighlightedMqttTopicsStore,
@@ -40,117 +75,188 @@ export const createMqttDataStore = (
     };
   });
 
+  // A batch may carry many messages for the same topic (e.g. a busy sensor
+  // publishing at high frequency within one 300ms drain). Only the last
+  // message per topic ends up in the tree, so decoding/timestamping every
+  // message is wasted work — collapse the batch to one entry per topic first,
+  // keeping a running count so messageCount still reflects every message.
   const processMessages = (messages: mqtt.MqttMessage[]) => {
+    const latestByTopic = new Map<
+      string,
+      { last: mqtt.MqttMessage; count: number; retained?: boolean }
+    >();
     for (const message of messages) {
-      const topicLevels = message.topic.split("/");
-
-      for (let i = 0; i < topicLevels.length; i++) {
-        const topic = topicLevels.slice(0, i + 1).join("/");
-        if (i !== topicLevels.length - 1) {
-          highlightedTopicStore.markTopicForHighlight(
-            topic,
-            message.id,
-            "child-update"
-          );
-        } else {
-          highlightedTopicStore.markTopicForHighlight(
-            topic,
-            message.id,
-            "message-update"
-          );
-        }
+      const existing = latestByTopic.get(message.topic);
+      if (existing === undefined) {
+        latestByTopic.set(message.topic, {
+          last: message,
+          count: 1,
+          retained: retainedStateOf(message),
+        });
+      } else {
+        existing.last = message;
+        existing.count += 1;
+        // Retained state is tracked across the whole batch rather than taken
+        // from the last message, because collapsing to the last message would
+        // lose a state change: a retained tombstone followed by ordinary
+        // traffic on the same topic within one drain would leave the topic
+        // still marked retained.
+        const retained = retainedStateOf(message);
+        if (retained !== undefined) existing.retained = retained;
       }
-      const timestamp = new Date(message.timeMs);
-      const decodedMessage = base64ToUtf8(message.payload as unknown as string);
-      const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
-      update((mqttData) => {
-        return insertMqttMessage(
+    }
+
+    const highlightMarks: Array<{
+      topic: string;
+      messageId: string;
+      cause: HighlightCause;
+    }> = [];
+
+    update((mqttData) => {
+      for (const { last: message, count, retained } of latestByTopic.values()) {
+        const topicLevels = message.topic.split("/");
+        const timestamp = new Date(message.timeMs);
+        const decodedMessage = base64ToUtf8(
+          message.payload as unknown as string
+        );
+        const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
+
+        let prefix = "";
+        for (let i = 0; i < topicLevels.length; i++) {
+          prefix = i === 0 ? topicLevels[0] : `${prefix}/${topicLevels[i]}`;
+          highlightMarks.push({
+            topic: prefix,
+            messageId: message.id,
+            cause:
+              i !== topicLevels.length - 1 ? "child-update" : "message-update",
+          });
+        }
+
+        insertMqttMessage(
           mqttData,
           topicLevels,
           0,
           decodedMessage,
           isDecodedProto,
-          timestamp
+          timestamp,
+          count,
+          retained
         );
-      });
-    }
+      }
+      return mqttData;
+    });
+
+    highlightedTopicStore.markTopicsForHighlight(highlightMarks);
   };
 
+  // Age the node's rate score to the batch timestamp and credit all `count`
+  // messages (lazily creating the score the first time a node sees traffic).
+  // Called on the leaf node AND every ancestor so each level carries its
+  // subtree-aggregate rate, mirroring the graph's per-level bump.
+  const bumpNodeRate = (
+    node: MqttData[string],
+    nowMs: number,
+    count: number
+  ) => {
+    if (node.rate === undefined) {
+      node.rate = { score: 0, lastMs: 0 };
+    }
+    bumpScore(node.rate, nowMs, LIST_RATE_TAU_MS, count);
+  };
+
+  // Returns true when a new topic-level key was created in mqttData, so the
+  // caller can maintain subtopicCount (the number of direct child keys) by
+  // incrementing it, instead of rescanning every sibling on each insert —
+  // that scan is O(siblings) and made wide subtrees quadratic per batch.
   const insertMqttMessage = (
     mqttData: MqttData,
     topicLevels: string[],
     currentTopicLevel: number,
     message: string,
     isDecodedProto: boolean,
-    timestamp: Date
-  ) => {
+    timestamp: Date,
+    count: number,
+    // undefined means "this message says nothing about retained state"; only
+    // the topic the message was published to is affected, never its ancestors.
+    retained: boolean | undefined
+  ): boolean => {
     const topicLevel = topicLevels[currentTopicLevel];
     if (mqttData[topicLevel] !== undefined) {
       if (currentTopicLevel === topicLevels.length - 1) {
-        mqttData[topicLevel].messageCount += 1;
+        mqttData[topicLevel].messageCount += count;
         mqttData[topicLevel].message = message;
         mqttData[topicLevel].isDecodedProto = isDecodedProto;
         mqttData[topicLevel].latestMessageTime = timestamp;
+        if (retained !== undefined) {
+          mqttData[topicLevel].isRetained = retained;
+        }
+        bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
 
-        return mqttData;
+        return false;
       }
-      const children = insertMqttMessage(
+      const createdChild = insertMqttMessage(
         mqttData[topicLevel].children,
         topicLevels,
         currentTopicLevel + 1,
         message,
         isDecodedProto,
-        timestamp
+        timestamp,
+        count,
+        retained
       );
       mqttData[topicLevel].isDecodedProto = isDecodedProto;
-      mqttData[topicLevel].messageCount += 1;
-      mqttData[topicLevel].children = children;
-      mqttData[topicLevel].subtopicCount = getSubtopicCount(children);
+      mqttData[topicLevel].messageCount += count;
+      if (createdChild) {
+        mqttData[topicLevel].subtopicCount += 1;
+      }
       mqttData[topicLevel].latestMessageTime = timestamp;
-      return mqttData;
+      bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
+      return false;
     }
 
     if (currentTopicLevel === topicLevels.length - 1) {
       const topic = topicLevels.join("/");
       mqttData[topicLevel] = {
         subtopicCount: 0,
-        messageCount: 1,
+        messageCount: count,
         topic,
         isDecodedProto,
+        isRetained: retained ?? false,
         message,
         children: {},
         latestMessageTime: timestamp,
       };
-      return mqttData;
+      bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
+      return true;
     }
 
-    const children = insertMqttMessage(
-      {},
+    const children: MqttData = {};
+    insertMqttMessage(
+      children,
       topicLevels,
       currentTopicLevel + 1,
       message,
       false,
-      timestamp
+      timestamp,
+      count,
+      retained
     );
     const topic = topicLevels.slice(0, currentTopicLevel + 1).join("/");
     mqttData[topicLevel] = {
-      subtopicCount: getSubtopicCount(children),
-      messageCount: 1,
+      // The recursive call above created exactly one child key.
+      subtopicCount: 1,
+      messageCount: count,
       topic,
       message: undefined,
       isDecodedProto: false,
+      // An intermediate level is not the topic the message was published to,
+      // so it holds no retained value of its own.
+      isRetained: false,
       children,
       latestMessageTime: timestamp,
     };
-    return mqttData;
-  };
-
-  const getSubtopicCount = (mqttData: MqttData) => {
-    let subtopicCount = 0;
-    for (const key in mqttData) {
-      subtopicCount += 1;
-    }
-    return subtopicCount;
+    bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
+    return true;
   };
 
   const getAllTopics = () => {
@@ -172,5 +278,38 @@ export const createMqttDataStore = (
     set({});
   };
 
-  return { subscribe, getAllTopics, resetMqttData };
+  // Walk the topic path and return that exact node, or undefined if any
+  // level along the way is missing. Never creates nodes.
+  const findNode = (
+    mqttData: MqttData,
+    topic: string
+  ): MqttData[string] | undefined => {
+    let children = mqttData;
+    let node: MqttData[string] | undefined;
+    for (const level of topic.split("/")) {
+      node = children[level];
+      if (node === undefined) return undefined;
+      children = node.children;
+    }
+    return node;
+  };
+
+  // Invalidate the retained marker after a successful clear. The tombstone
+  // does come back to us as a message, but only MQTT 5 keeps its Retain flag
+  // set (RetainAsPublished); under MQTT 3 the broker clears the flag on
+  // forwarding [MQTT-3.3.1-9], so retainedStateOf reads it as "says nothing"
+  // and the marker would sit there until the next reconnect. The clear call
+  // resolving is the only signal this store gets. Topics it cannot find are
+  // left alone rather than created: a clear only ever targets known topics.
+  const markRetainedCleared = (topics: string[]) => {
+    update((mqttData) => {
+      for (const topic of topics) {
+        const node = findNode(mqttData, topic);
+        if (node !== undefined) node.isRetained = false;
+      }
+      return mqttData;
+    });
+  };
+
+  return { subscribe, getAllTopics, resetMqttData, markRetainedCleared };
 };

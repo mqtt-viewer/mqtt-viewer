@@ -52,12 +52,28 @@ export async function ClearConnectionHistory(
 export async function GetConnectionLogs(_connId: number): Promise<any[]> {
   const base = 1_710_000_000_000;
   return [
-    { timestampMs: base, level: "info", message: "connection state changed from disconnected to connecting" },
-    { timestampMs: base + 500, level: "info", message: "connection state changed from connecting to connected" },
+    {
+      timestampMs: base,
+      level: "info",
+      message: "connection state changed from disconnected to connecting",
+    },
+    {
+      timestampMs: base + 500,
+      level: "info",
+      message: "connection state changed from connecting to connected",
+    },
     { timestampMs: base + 1200, level: "debug", message: "PINGREQ sent" },
     { timestampMs: base + 1400, level: "debug", message: "PINGRESP received" },
-    { timestampMs: base + 2600, level: "warn", message: "reconnecting to broker" },
-    { timestampMs: base + 3000, level: "error", message: "connect failed: connection refused" },
+    {
+      timestampMs: base + 2600,
+      level: "warn",
+      message: "reconnecting to broker",
+    },
+    {
+      timestampMs: base + 3000,
+      level: "error",
+      message: "connect failed: connection refused",
+    },
   ];
 }
 
@@ -171,6 +187,10 @@ export async function DeleteRetainedMessage(
   _connectionId: number,
   _topic: string
 ): Promise<void> {}
+export async function DeleteRetainedMessages(
+  _connectionId: number,
+  _topics: string[]
+): Promise<void> {}
 export async function DeleteSubscription(
   _connectionId: number,
   _subscriptionId: number
@@ -187,6 +207,24 @@ export async function ExportTopicMessages(
   topic: string
 ): Promise<string> {
   return `/Users/sam/exports/mqtt-messages-${topic.replaceAll("/", "-")}.json`;
+}
+
+export async function ExportAllMessagesData(
+  _connectionId: number
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: "mqtt-messages-all.json",
+    json: "[]",
+  });
+}
+export async function ExportTopicMessagesData(
+  _connectionId: number,
+  topic: string
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: `mqtt-messages-${topic.replaceAll("/", "-")}.json`,
+    json: "[]",
+  });
 }
 
 export async function GetAllConnections(): Promise<app.Connections> {
@@ -460,6 +498,13 @@ export async function GetSysMessageHistory(
   return [];
 }
 
+export async function GetRetainedTopicsUnderPrefix(
+  _connId: number,
+  _prefix: string
+): Promise<string[]> {
+  return [];
+}
+
 export async function OpenBrokerStatusWindow(
   _connectionId: number
 ): Promise<void> {}
@@ -475,6 +520,7 @@ export async function GetEnvInfo(): Promise<app.EnvInfo> {
     isDev: true,
     serverAddress: "localhost",
     version: "storybook",
+    isServerMode: false,
   });
 }
 
@@ -504,7 +550,8 @@ export async function GetMatchingSubscriptionForTopic(
 
 export async function GetMessageHistory(
   _connectionId: number,
-  _topic: string
+  _topic: string,
+  _limit?: number
 ): Promise<any[]> {
   return mockMqttMessages;
 }
@@ -524,6 +571,87 @@ export async function GetReceivedMessageCount(
   _topic: string
 ): Promise<number> {
   return mockMqttMessages.length;
+}
+
+// Lightweight stubs (id/timeMs/qos/retain, no payload) mirroring the real
+// GetMessageTimeline/GetReceivedTimelineWindow bindings used by the
+// selection timeline. Computed lazily (not a module-level const) to avoid
+// depending on fixtures.ts's own initialization order.
+const mockMqttMessageStubs = () =>
+  mockMqttMessages.map((m) => ({
+    id: m.id,
+    timeMs: m.timeMs,
+    qos: m.qos,
+    retain: m.retain,
+  }));
+
+export async function GetMessageTimeline(
+  _connectionId: number,
+  _topic: string,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetReceivedTimelineWindow(
+  _connectionId: number,
+  _topic: string,
+  _beforeID: number,
+  _afterID: number,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetMessageById(
+  _connectionId: number,
+  topic: string,
+  id: string,
+  _timeMs: number
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === id);
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetReceivedMessageById(
+  _connectionId: number,
+  topic: string,
+  id: number
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === String(id));
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: string[],
+  _timesMs: number[]
+): Promise<any[]> {
+  return mockMqttMessages
+    .filter((m) => ids.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetReceivedMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: number[]
+): Promise<any[]> {
+  const wanted = ids.map(String);
+  return mockMqttMessages
+    .filter((m) => wanted.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetMemoryLimitModel(): Promise<app.MemoryLimitModel> {
+  return new app.MemoryLimitModel({
+    baseBytes: 1024 * 1024 * 1024,
+    budgetFactorNumerator: 3,
+    budgetFactorDenominator: 2,
+  });
 }
 
 export async function GetMemoryStats(): Promise<app.MemoryStats> {

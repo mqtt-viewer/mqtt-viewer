@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "ViewToggle",
+  "tier": "component",
+  "description": "Segmented List/Graph switch shown at the left of the data panel header in both views.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "view",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onChange",
+      "type": "function",
+      "required": true
+    }
+  ],
+  "tokens": [
+    "outline",
+    "secondary-text",
+    "elevation-2",
+    "white-text",
+    "emphasis"
+  ],
+  "dependencies": [
+    "Tooltip"
+  ],
+  "notes": "Figma is not linked yet; segmented-control pattern shared by the List and Graph data views."
+}

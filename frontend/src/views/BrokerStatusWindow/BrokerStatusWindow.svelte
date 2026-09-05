@@ -284,7 +284,12 @@
         {error}
       </div>
     {:else if store}
-      <div class="grow min-h-0 overflow-y-auto">
+      <!-- Scrolls on its own axis so the view's sticky health strip pins to
+           the top of the body. A browser tab is much wider than the desktop
+           pop-out window, so horizontal overflow is clipped instead of growing
+           a scrollbar; the inset that keeps the tile grid off both edges is
+           the view's own p-4 (the strip bleeds back out of it with -mx-4). -->
+      <div class="grow min-h-0 overflow-y-auto overflow-x-hidden">
         <BrokerStatusView bind:this={viewRef} {store} {connectionId} />
       </div>
     {:else}

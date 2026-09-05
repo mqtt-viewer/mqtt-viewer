@@ -147,6 +147,43 @@
 />
 
 <Story
+  name="Docker"
+  args={{
+    ...storyArgs,
+    update: new UpdateResponse({
+      latest_version: "v1.1.0",
+      can_self_update: false,
+      release_notes: releaseNotes,
+      install_type: "docker",
+      update_command: "docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest",
+      instructions: "Pull the new image and recreate the container:",
+      releases_url: "https://github.com/mqtt-viewer/mqtt-viewer/releases",
+    }),
+    currentVersion: "v1.0.0",
+  }}
+  {template}
+/>
+
+<Story
+  name="HomeAssistantAddon"
+  args={{
+    ...storyArgs,
+    update: new UpdateResponse({
+      latest_version: "v1.1.0",
+      can_self_update: false,
+      release_notes: releaseNotes,
+      install_type: "home-assistant-addon",
+      update_command: "",
+      instructions:
+        "Update the MQTT Viewer add-on from the add-on store in Home Assistant.",
+      releases_url: "",
+    }),
+    currentVersion: "v1.0.0",
+  }}
+  {template}
+/>
+
+<Story
   name="LongNotes"
   args={{
     ...storyArgs,

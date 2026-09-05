@@ -106,6 +106,14 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: "See your topics as a graph",
+        body: "There's a new graph view of the topic tree, where each node is sized and coloured by how much traffic it carries, so the busy corners of a broker stand out at a glance. Switch between list and graph above the tree.",
+      },
+      {
+        title: "Sort topics by how busy they are",
+        body: "The topic list can now order itself by what matters in the moment: busiest first, most messages, newest first or silent first, alongside the usual A to Z. The graph view offers the same choices and remembers the one you pick per connection. Its filter box also understands MQTT wildcards now, like sensors/+/temperature, just as the list does, and whatever you type in the filter follows you when you switch between list and graph.",
+      },
+      {
         title: "A status page for your broker",
         body: "There's a new broker status window on the pulse icon above the topic tree, with a health strip that warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart, and a table of the loudest topics over a window from a minute to a day. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and measures rates here as well, so a broker that publishes nothing still gives you numbers.",
         thanks: [
@@ -153,7 +161,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Adding a value to a chart is clearer",
-        body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
+        body: 'Choosing "Add value from payload" now opens the picker straight on the value, so it\'s obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.',
         thanks: [
           {
             name: "Daschi2",
@@ -163,7 +171,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "See what your connection is doing",
-        body: "There's a \"View logs\" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.",
+        body: 'There\'s a "View logs" item in the connection menu now, opening a terminal-style view of what the MQTT client is up to: connects, reconnects, subscriptions and errors. Turn on debug logging for the full chatter; everything is also written to a log file you can send me with a bug report.',
       },
       {
         title: "Pick your own chart time window",
@@ -225,7 +233,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Chart and dropdown fixes",
-        body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
+        body: 'Switching a chart back to "All history" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.',
         thanks: [
           {
             name: "viktak",
@@ -255,7 +263,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Reconnecting when the network drops out",
-        body: "If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing \"connected\" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.",
+        body: 'If a broker went away without closing the connection properly, which is what a dropped VPN, a flaky network or a laptop waking from sleep look like, MQTT Viewer could sit showing "connected" with nothing arriving and never reconnect. On MQTT 5 connections it now notices within about ten seconds and reconnects, and keeps retrying for as long as the broker is away.',
       },
       {
         title: "Install it with Nix",
@@ -267,7 +275,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Clearer memory settings",
-        body: "The settings dialog now shows how much memory message history is using and estimates the app's total use from your budget.",
+        body: "The settings dialog now shows how much memory message history is using, and what the app can grow to with one, two or three connections at your budget.",
       },
       {
         title: "The memory budget now covers every topic",
@@ -287,7 +295,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Connection failures no longer go unreported",
-        body: "On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting \"Connection failed\" indicator until you try again.",
+        body: 'On MQTT 3 connections, a wrong hostname, refused port, bad credentials or TLS failure gave no feedback for a full ten seconds and then reported a generic timeout instead of the real problem. Failures now report immediately with a plain explanation of what went wrong, and the connection list, home screen, recent connections and tabs all show a lasting "Connection failed" indicator until you try again.',
       },
       {
         title: "Collapsible collections",
@@ -304,6 +312,32 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Reach older messages on the timeline",
         body: "The message timeline now stretches back to cover everything in the loaded history, so the arrow keys no longer land on a message the timeline cannot show.",
+      },
+      {
+        title: "Right-click a topic",
+        body: "Topics now have a right-click menu, in the list and in the graph. Copy the topic path or the payload, export the message history, or clear the retained message. The selected topic panel offers the same actions, so wherever you are, the options are the same.",
+      },
+      {
+        title: "Clear retained messages in bulk",
+        body: "Right-click a branch and you can clear every retained message beneath it in one go. I'll list what I'm about to clear and ask first, since clearing a retained message reaches every other client on the broker, and afterwards I'll tell you how many actually went. Your broker's own $SYS topics are never offered or touched, and a single sweep is capped at 1000 topics. One caveat worth knowing: I can only clear retained messages I've seen, and on MQTT 3 brokers I only learn about them when I subscribe, so anything retained by another client mid-session won't be counted.",
+      },
+      {
+        title: "Spot retained topics at a glance",
+        body: "Topics holding a retained message now carry a small marker, in the list and in the graph, in the same colour the message timeline already uses for retained messages. The marker goes the moment you clear the message, on MQTT 3 as well as 5, and it starts again from what your broker replays each time you reconnect.",
+      },
+      {
+        title: "Run MQTT Viewer in your browser",
+        body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and pop-out charts open as tabs; broker status stays desktop-only until it has an in-page web view. It lets you know when a newer image is available, with the pull command to update, and you can turn that check off if you'd rather it stayed off the network. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
+        thanks: [
+          {
+            name: "Jake W",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/119",
+          },
+        ],
+      },
+      {
+        title: "The chart's Y-axis rescales with its time window",
+        body: "Narrowing a chart's time window could leave the Y-axis stretched to an old value elsewhere in that topic's history, squashing the visible points to the bottom. It now ranges over only what the window shows.",
       },
     ],
   },
