@@ -10,8 +10,8 @@ name: Publish Docker image
 #
 # Runs on every published release, and can be triggered manually
 # (workflow_dispatch) to push an image from the current branch state for
-# testing. Pull requests that touch the image get a build-only job instead:
-# no secrets, no registry login, no push.
+# testing. It does not run on pull requests: building the image is part of
+# the release flow, not the PR gate.
 #
 # `:latest` only moves for a full release. Pre-releases publish their version
 # tags and nothing else, so a beta never repoints the tag every compose user
@@ -24,14 +24,6 @@ name: Publish Docker image
 on:
   release:
     types: [published]
-  pull_request:
-    paths:
-      - 'Dockerfile'
-      - 'docker/**'
-      - 'main.go'
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/docker-publish.yaml'
   workflow_dispatch:
     inputs:
       version:
@@ -55,37 +47,7 @@ env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/mqtt-viewer
 
 jobs:
-  # Verification gate for pull requests: proves the Dockerfile still builds
-  # after a change to the image, the Go backend or the frontend. amd64 only
-  # and no push, so it stays quick.
-  build-check:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    name: Build image (amd64, no push)
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: false
-          # A "-dev" version keeps the ldflags stage from demanding the
-          # release secrets, which a PR build has no access to.
-          build-args: |
-            VERSION=0.0.0-dev-pr
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   publish:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read

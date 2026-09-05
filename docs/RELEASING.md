@@ -179,8 +179,9 @@ flatpak install ./MQTT_Viewer_<tag>_linux_amd64.flatpak
 
 The Flatpak build cannot run on macOS. It is verified in CI by
 `.github/workflows/flatpak-check.yaml`, which builds the bundle and launches
-it headlessly on every pull request that touches `build/linux/flatpak/`,
-failing if the GNOME runtime no longer ships `webkit2gtk-4.1`.
+it headlessly. It runs on demand only (`gh workflow run flatpak-check.yaml
+--ref <branch>`), so run it after touching `build/linux/flatpak/`. It fails
+if the GNOME runtime no longer ships `webkit2gtk-4.1`.
 
 The bundled binary links `webkit2gtk-4.1` (the `-tags gtk3` stack), so the
 manifest pins `org.gnome.Platform` to a runtime that still ships it. Keep

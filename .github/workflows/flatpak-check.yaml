@@ -1,15 +1,13 @@
 name: Flatpak build check
 
-# Verification gate for the Flatpak packaging. The bundle cannot be built
-# on macOS, so this is where a broken manifest, runtime version, or
-# metadata file is caught before release.
+# Manual check for the Flatpak packaging. The bundle cannot be built on
+# macOS, so this is where a broken manifest, runtime version, or metadata
+# file is caught before a release. Run it by hand after touching
+# build/linux/flatpak/ (gh workflow run flatpak-check.yaml --ref <branch>);
+# it is not a pull request gate, since building the app belongs to the
+# release flow.
 
 on:
-  pull_request:
-    paths:
-      - 'build/linux/flatpak/**'
-      - 'build/linux/Taskfile.yml'
-      - '.github/workflows/flatpak-check.yaml'
   workflow_dispatch:
 
 env:
