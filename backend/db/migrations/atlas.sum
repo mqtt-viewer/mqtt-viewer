@@ -1,4 +1,4 @@
-h1:61i4YHYJ/Pd45DwAYkQxTzDjmu48HwtN8ImPXumeu4A=
+h1:R55148leWvjdAGdk0S+y2IrZ3y326jdjyvKO3SwvZ9A=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -19,3 +19,4 @@ h1:61i4YHYJ/Pd45DwAYkQxTzDjmu48HwtN8ImPXumeu4A=
 20260901000000_add-ignored-update-version.sql h1:Jsm2GKh85mZgY4Ykjsvsx1P3jcYSMZJYv29UWFdltks=
 20260901042245_collection-collapsed-states.sql h1:p3FRjJ5QRBwuHBwzHoSLqygQMBkQWwSe/GHiF+d+6/c=
 20260903023223_collection-ordering.sql h1:k5oZiFNZYU6CCnPmJzmZ/esoS9juLqeOzhiw1sT6ZE4=
+20260905055903_pinned-topics.sql h1:6gdNIedsC6xCnHMyXaLhmBazzjbZfpv3BrhKrNS6sso=

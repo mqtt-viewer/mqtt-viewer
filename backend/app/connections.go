@@ -168,6 +168,9 @@ func (a *App) DeleteConnection(id uint) error {
 		if res := tx.Where("connection_id = ?", id).Delete(&models.ReceivedMessage{}); res.Error != nil {
 			return res.Error
 		}
+		if err := deletePinnedTopicsForConnection(tx, id); err != nil {
+			return err
+		}
 		// sys_metric_mappings has ON DELETE CASCADE; every other child table
 		// uses a NO ACTION foreign key and must be cleared above.
 		if res := tx.Delete(&models.Connection{}, id); res.Error != nil {

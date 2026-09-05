@@ -30,6 +30,7 @@ func main() {
 		&models.CollectionMessage{},
 		&models.CollectionCollapsedState{},
 		&models.SysMetricMapping{},
+		&models.PinnedTopic{},
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load gorm schema: %v\n", err)
