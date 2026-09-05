@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { groupSections } from "./changelog-groups";
 import {
   CHANGELOG,
+  CHANGELOG_GROUPS,
   changelogForDisplay,
   entryForVersion,
   releasedEntries,
@@ -140,5 +142,59 @@ describe("content", () => {
         expect(emoji.test(t), `emoji in: ${t}`).toBe(false);
       }
     }
+  });
+});
+
+describe("section groups", () => {
+  it("an entry that groups any section groups all of them", () => {
+    for (const e of CHANGELOG) {
+      if (!e.sections.some((s) => s.group)) continue;
+      const ungrouped = e.sections.filter((s) => !s.group).map((s) => s.title);
+      expect(
+        ungrouped,
+        `ungrouped sections in ${e.version}: ${ungrouped.join(", ")}`
+      ).toEqual([]);
+    }
+  });
+
+  it("every group is one of CHANGELOG_GROUPS", () => {
+    for (const e of CHANGELOG) {
+      for (const s of e.sections) {
+        if (!s.group) continue;
+        expect(CHANGELOG_GROUPS).toContain(s.group);
+      }
+    }
+  });
+
+  it("groups the unreleased entry, and every section in it", () => {
+    const staging = unreleasedEntry();
+    if (!staging) return; // No staging entry right after a release.
+    for (const s of staging.sections) {
+      expect(s.group, `no group on section: ${s.title}`).toBeTruthy();
+    }
+  });
+
+  it("keeps ungrouped entries as one unheaded bucket", () => {
+    const oneOh = entryForVersion("1.0.0");
+    expect(oneOh).not.toBeNull();
+    const buckets = groupSections(oneOh!.sections);
+    expect(buckets).toEqual([{ group: null, sections: oneOh!.sections }]);
+  });
+
+  it("orders buckets by CHANGELOG_GROUPS, skipping empty ones", () => {
+    const sections = [
+      { group: "Fixed" as const, title: "b", body: "" },
+      { group: "Added" as const, title: "a", body: "" },
+      { title: "c", body: "" },
+    ];
+    expect(groupSections(sections).map((b) => b.group)).toEqual([
+      "Added",
+      "Fixed",
+      null,
+    ]);
+  });
+
+  it("returns nothing for an entry with no sections", () => {
+    expect(groupSections([])).toEqual([]);
   });
 });

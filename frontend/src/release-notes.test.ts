@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { unreleasedEntry, type ChangelogEntry } from "./changelog";
+import {
+  CHANGELOG_GROUPS,
+  entryForVersion,
+  unreleasedEntry,
+  type ChangelogEntry,
+} from "./changelog";
 import {
   REPO_URL,
   releaseNotesForVersion,
@@ -197,5 +202,106 @@ describe("releaseNotesForVersion", () => {
     expect(() => releaseNotesForVersion(staging.version)).toThrow(
       /still released: false/
     );
+  });
+});
+
+describe("section groups", () => {
+  const groupedEntry = () =>
+    entry({
+      sections: [
+        { group: "Fixed", title: "WebSocket paths", body: "They connect." },
+        { group: "Added", title: "Graph view", body: "Topics as a graph." },
+        { group: "Added", title: "Pinned topics", body: "" },
+        { group: "Miscellaneous", title: "A Save button", body: "" },
+      ],
+    });
+
+  it("gathers sections under group headings in CHANGELOG_GROUPS order", () => {
+    const notes = renderReleaseNotes(groupedEntry(), opts);
+    const headings = notes
+      .split("\n")
+      .filter((l) => l.startsWith("## "))
+      .map((l) => l.slice(3));
+    expect(headings).toEqual(["Added", "Fixed", "Miscellaneous"]);
+    expect(notes.indexOf("### Graph view")).toBeLessThan(
+      notes.indexOf("### WebSocket paths")
+    );
+  });
+
+  it("skips groups with no sections", () => {
+    expect(renderReleaseNotes(groupedEntry(), opts)).not.toContain(
+      "## Changed"
+    );
+  });
+
+  it("renders a section with an empty body as its title alone", () => {
+    const notes = renderReleaseNotes(groupedEntry(), opts);
+    expect(notes).toContain("### Pinned topics\n\n## Fixed");
+    expect(notes).not.toContain("\n\n\n");
+  });
+
+  it("puts ungrouped sections last, under no heading", () => {
+    const notes = renderReleaseNotes(
+      entry({
+        sections: [
+          { title: "An old-style section", body: "No group here." },
+          { group: "Added", title: "Graph view", body: "Topics as a graph." },
+        ],
+      }),
+      opts
+    );
+    expect(notes.indexOf("## Added")).toBeLessThan(
+      notes.indexOf("### An old-style section")
+    );
+    // One group heading; the sections beneath it and after it are "###".
+    expect(notes.split("\n").filter((l) => l.startsWith("## ")).length).toBe(1);
+  });
+
+  it("renders an entry with no groups exactly as it did before groups", () => {
+    // An independent copy of the pre-group renderer: flat sections, no
+    // headings. The 1.0.0 entry must still come out byte for byte the same.
+    const legacy = (e: ChangelogEntry): string => {
+      const blocks: string[] = [`# ${e.headline.trim()}`, e.intro.trim()];
+      for (const s of e.sections) {
+        blocks.push(`## ${s.title.trim()}`);
+        if (s.body.trim()) blocks.push(s.body.trim());
+        const thanks = s.thanks ?? [];
+        if (thanks.length) {
+          const links = thanks.map((t) => `[${t.name}](${t.url})`);
+          const list =
+            links.length <= 1
+              ? links.join("")
+              : `${links.slice(0, -1).join(", ")} and ${links[links.length - 1]}`;
+          blocks.push(`Thanks to ${list}.`);
+        }
+      }
+      if (e.outro?.trim()) blocks.push(e.outro.trim());
+      blocks.push(`[Full changelog](${REPO_URL}/compare/v0.7.0...v1.0.0)`);
+      return `${blocks.join("\n\n")}\n`;
+    };
+
+    const oneOh = entryForVersion("1.0.0");
+    expect(oneOh).not.toBeNull();
+    expect(oneOh!.sections.some((s) => s.group)).toBe(false);
+    expect(releaseNotesForVersion("v1.0.0", { prevTag: "v0.7.0" })).toBe(
+      legacy(oneOh!)
+    );
+  });
+
+  it("renders the unreleased entry's groups in order", () => {
+    const staging = unreleasedEntry();
+    if (!staging) return; // No staging entry right after a release.
+    const notes = renderReleaseNotes(staging, opts);
+    const headings = notes
+      .split("\n")
+      .filter((l) => l.startsWith("## "))
+      .map((l) => l.slice(3));
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings).toEqual(
+      CHANGELOG_GROUPS.filter((g) =>
+        staging.sections.some((s) => s.group === g)
+      )
+    );
+    expect(notes).not.toContain("\n\n\n");
   });
 });
