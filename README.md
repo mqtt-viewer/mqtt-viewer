@@ -15,7 +15,7 @@ But wait, there's more:
 | Feature | Notes |
 | --- | --- |
 | Live topic tree | Every topic on the broker, with counts, last values and a text filter. |
-| Topic Graph | The namespace drawn as a tree where node size is message rate and colour is recency. Collapse branches, follow the hottest, pause, go fullscreen. |
+| Topic Graph | The namespace drawn as a tree where node size is message rate and colour is recency. Collapse branches, follow the hottest, pause. |
 | Topic actions | Right-click any topic to copy its path or payload, export its history, or clear retained messages below it. Retained topics are marked. |
 | Up to 10 connections at once | Each in its own tab. MQTT v3.1.1 and v5, TCP, TLS, mutual TLS and WebSocket. |
 | Interactive message timeline | Scrub through a topic's history. Hover a marker to preview the payload. |
