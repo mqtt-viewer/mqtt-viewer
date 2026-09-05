@@ -168,6 +168,21 @@ export class CollectionCollapsedState {
   }
 }
 
+export class PinnedTopic {
+  id = 0;
+  connectionId = 0;
+  topic = "";
+  position = 0;
+
+  static createFrom(source: any = {}) {
+    return new PinnedTopic(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class SortState {
   id = "";
   sortCriteria = "topic";

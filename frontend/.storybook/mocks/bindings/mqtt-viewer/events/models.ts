@@ -9,6 +9,7 @@ export enum GlobalEvent {
   UpdateAvailable = "UpdateAvailable",
   TopicWindowSelect = "TopicWindowSelect",
   TopicPanelDockChanged = "TopicPanelDockChanged",
+  PinnedTopicsChanged = "PinnedTopicsChanged",
 }
 
 export class ConnectionEventsSet {
