@@ -58,12 +58,23 @@ export interface ReleaseNotesOptions {
   repoUrl: string;
 }
 
-// Heading level for a group name. Sections keep their own level, so an entry
-// written before groups existed renders byte for byte as it always did.
-// Grouped entries put the group at "##" and demote section titles to "###",
-// so the group reads as the larger heading on GitHub. Ungrouped entries keep
-// "##" sections, byte for byte as before.
+// A grouped entry renders as one "## Group" heading per group with a bullet
+// list beneath it: "- **Title.** Body. Thanks to ...". That keeps the release
+// page short. Ungrouped entries (written before groups existed) keep their
+// "## Section" layout byte for byte.
 const GROUP_HEADING = "##";
+
+// One bullet for a grouped section. The title is bold and ends with a full
+// stop so it reads as a lead-in; an empty body leaves the title on its own.
+const bulletLine = (section: ChangelogSection): string => {
+  const title = section.title.trim().replace(/[.:]$/, "");
+  const parts = [`**${title}.**`];
+  const body = section.body.trim();
+  if (body) parts.push(body);
+  const thanks = thanksLine(section);
+  if (thanks) parts.push(thanks);
+  return `- ${parts.join(" ")}`;
+};
 
 /**
  * GitHub-flavoured markdown for one changelog entry: the headline as an H1,
@@ -92,12 +103,17 @@ export const renderReleaseNotes = (
 
   const buckets = groupSections(entry.sections);
   const grouped = buckets.some((b) => b.group);
-  const sectionHeading = grouped ? "###" : "##";
   for (const bucket of buckets) {
-    if (bucket.group) blocks.push(`${GROUP_HEADING} ${bucket.group}`);
+    if (grouped) {
+      if (bucket.group) blocks.push(`${GROUP_HEADING} ${bucket.group}`);
+      // One list per bucket: bullets are joined by single newlines so they
+      // form a single markdown list, and the list is one block.
+      blocks.push(bucket.sections.map(bulletLine).join("\n"));
+      continue;
+    }
     for (const section of bucket.sections) {
       const title = section.title.trim();
-      if (title) blocks.push(`${sectionHeading} ${title}`);
+      if (title) blocks.push(`## ${title}`);
       const body = section.body.trim();
       if (body) blocks.push(body);
       const thanks = thanksLine(section);

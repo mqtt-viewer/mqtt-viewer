@@ -223,8 +223,8 @@ describe("section groups", () => {
       .filter((l) => l.startsWith("## "))
       .map((l) => l.slice(3));
     expect(headings).toEqual(["Added", "Fixed", "Miscellaneous"]);
-    expect(notes.indexOf("### Graph view")).toBeLessThan(
-      notes.indexOf("### WebSocket paths")
+    expect(notes.indexOf("- **Graph view.**")).toBeLessThan(
+      notes.indexOf("- **WebSocket paths.**")
     );
   });
 
@@ -236,7 +236,7 @@ describe("section groups", () => {
 
   it("renders a section with an empty body as its title alone", () => {
     const notes = renderReleaseNotes(groupedEntry(), opts);
-    expect(notes).toContain("### Pinned topics\n\n## Fixed");
+    expect(notes).toContain("- **Pinned topics.**\n\n## Fixed");
     expect(notes).not.toContain("\n\n\n");
   });
 
@@ -251,9 +251,9 @@ describe("section groups", () => {
       opts
     );
     expect(notes.indexOf("## Added")).toBeLessThan(
-      notes.indexOf("### An old-style section")
+      notes.indexOf("- **An old-style section.**")
     );
-    // One group heading; the sections beneath it and after it are "###".
+    // One group heading; every section, grouped or not, is a bullet.
     expect(notes.split("\n").filter((l) => l.startsWith("## ")).length).toBe(1);
   });
 
