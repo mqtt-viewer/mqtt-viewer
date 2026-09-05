@@ -12,7 +12,7 @@ this is safe to ship to `main`.
 - **fix/11** remember right panel width.
 - **fix/security-alerts** dependency bumps (paho.mqtt 1.5.1, golang.org/x
   crypto/net/sync/text, edwards25519), go 1.25.
-- **Wails v2 → v3** migration (alpha.98), bindings regenerated, all 47 App
+- **Wails v2 → v3** migration, bindings regenerated, all 47 App
   methods incl. collections CRUD.
 
 Verified green: `go build ./...`, `go vet`, `pnpm check` (0 errors),
@@ -62,9 +62,8 @@ Per `docs/wails-v3-migration-handover.md`:
 - [ ] go.mod still has a commented-out Windows `replace` directive
       (`// replace github.com/wailsapp/wails/v2 ... => C:\Users\sam\...`) —
       inert, but remove it if you want a clean file.
-- [ ] go.mod pins `wails/v3 v3.0.0-alpha.98-tui` (the variant exposing the
-      updater pkg); CLI is `alpha.98`. They build/boot together — confirm
-      you're happy pinning the `-tui` build, or align both.
+- [ ] go.mod, the wails3 CLI and `@wailsio/runtime` all pin `v3.0.0-beta.16`
+      and must move together.
 - [ ] Decide GTK4 timing (handover §4) before any future wails v3.1 bump.
 
 ### 5. Merge

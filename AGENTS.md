@@ -39,7 +39,7 @@ the real backend from a browser, build the app in Wails **server mode** instead 
 
 ### What works: server mode (`-tags server`)
 
-Wails v3 alpha (`v3.0.0-alpha.98-tui`) ships a supported headless server mode
+Wails v3 (`v3.0.0-beta.16`) ships a supported headless server mode
 behind the `server` build tag. It runs a real `http.Server` that:
 
 - serves the built frontend (`frontend/dist`, or proxies Vite if
