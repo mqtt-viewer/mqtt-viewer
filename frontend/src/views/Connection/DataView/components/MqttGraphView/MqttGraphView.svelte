@@ -613,8 +613,16 @@
     $pinnedTopicsStore.order.length - PINNED_HUD_LIMIT
   );
 
+  // Clicking a pinned entry does what clicking the node itself does (select
+  // it, opening the topic panel) and also brings the node into view. Select
+  // even when the node has not arrived yet: the panel can show history for it.
   const focusPinned = (topic: string) => {
     renderer?.focusTopic(topic);
+    renderer?.setSelected(topic);
+    lastSyncedTopic = topic;
+    if ($selectedTopicStore.selectedTopic !== topic) {
+      selectedTopicStore.selectTopic(topic);
+    }
   };
 
   // ---- performance stats HUD ----
