@@ -115,7 +115,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "A status page for your broker",
-        body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
+        body: "There's a new broker status window on the pulse icon above the topic tree, with a health strip that warns when the broker is dropping messages or its delivery queue is backing up, a traffic chart, and a table of the loudest topics over a window from a minute to a day. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and measures rates here as well, so a broker that publishes nothing still gives you numbers.",
         thanks: [
           {
             name: "m1dnight",
@@ -133,13 +133,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         title: "Make the status page your own",
-        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic too, and you can pin one as a tile straight from it. Your tiles are saved per connection.",
+        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic to pin from too, and your tiles are saved per connection.",
         thanks: [
           {
             name: "andyg2",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12604380",
           },
         ],
+      },
+      {
+        title: "Pop-out windows you can actually move",
+        body: "The pop-out chart window could not be dragged at all. Grab its header to move it now, and the same goes for the new broker status window, which on macOS also leaves room for the window buttons instead of hiding the connection name behind them.",
       },
       {
         title: "Chart values that arrive as text",
@@ -324,9 +328,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         title: "Run MQTT Viewer in your browser",
         body: "The whole app now ships as a Docker image too, for anyone who prefers a web UI or wants MQTT Viewer running on a server or NAS. Pull ghcr.io/mqtt-viewer/mqtt-viewer, open it in a browser and it's the same app: live topic tree, charts, publishing, everything. Exports arrive as browser downloads and pop-out charts open as tabs; broker status stays desktop-only until it has an in-page web view. It lets you know when a newer image is available, with the pull command to update, and you can turn that check off if you'd rather it stayed off the network. One thing worth knowing: every browser tab talks to the same backend session, so connecting or disconnecting in one tab does it for all of them. This one was asked for in issue #119; setup lives in docs/DOCKER.md.",
-      },
-      {
-        body: "MQTT Viewer now ships as a Docker image with the live topic tree, charts, publishing and browser downloads. It works under a reverse-proxy subpath for Home Assistant ingress; every tab shares one backend session, and broker status stays desktop-only until it has an in-page web view.",
         thanks: [
           {
             name: "Jake W",

@@ -74,13 +74,17 @@ Caveats:
 - **Headless, not the native window.** It's the real Go backend + services (DB,
   MQTT, etc.), so bindings behave for real — but there's no OS window, menus,
   dialogs, screens, or native file pickers (those are no-ops in server mode).
-- **Backend→frontend live events ride a WebSocket set up by `/wails/custom.js`.**
-  The pinned `@wailsio/runtime` loads that script itself on every page: its index
-  module runs `loadOptionalScript('/wails/custom.js')`, which HEAD-probes the
-  path and appends the tag only where the route exists. So live pushes (incoming
-  MQTT messages, etc.) work with no extra markup, and adding a tag by hand opens
-  a second socket and delivers every event twice. In the native webview the
-  probe 404s and is a no-op.
+- **Live events already flow. Do not add a script tag for them.** Events are
+  pushed over a WebSocket set up by `/wails/custom.js`, and the pinned
+  `@wailsio/runtime` loads that script itself on every page: its index module
+  runs `loadOptionalScript('/wails/custom.js')`, which HEAD-probes the path and
+  appends the tag only where the route exists. So live pushes (incoming MQTT
+  messages, etc.) work in server mode with no extra markup, and in the native
+  webview the probe 404s and is a no-op. Adding
+  `<script src="/wails/custom.js"></script>` by hand loads it a second time,
+  opens a second WebSocket, and delivers every event twice: message counts and
+  rates then read double, which looks like a backend bug and is not one. Plain
+  request/response binding calls need nothing extra either.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
 
