@@ -118,13 +118,16 @@ const makeLiveMessages = (startId: number, count: number, topic = "a/b") =>
     retain: false,
   }));
 
-// Manually resolvable promise, for controlling fetch timing in tests.
+// Manually resolvable (or rejectable) promise, for controlling fetch timing
+// in tests.
 const deferred = <T>() => {
   let resolve!: (v: T) => void;
-  const promise = new Promise<T>((r) => {
-    resolve = r;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 // Drains the microtask queue far enough for a fire-and-forget ensurePayload
@@ -283,6 +286,7 @@ describe("loadRecordedHistory", () => {
       newestId: 10,
       isNewest: true,
       atOldest: true,
+      newestMs: 10000,
     });
     expect(s.totalCount).toBe(10);
     expect(s.recordedCount).toBe(10);
@@ -1162,6 +1166,233 @@ describe("jumpToLatest", () => {
 
     unsub();
   });
+
+  it("holds live messages during the fetch and merges only those newer than the fetched window", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(1);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 1));
+    await store.loadRecordedHistory();
+    expect(get(store).window?.isNewest).toBe(true);
+
+    const win = deferred<any[]>();
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const jumping = store.jumpToLatest();
+    await flushMicrotasks();
+    // A jump holds without the panel's loading state (see the next test).
+    expect(get(store).isLoadingHistory).toBe(false);
+
+    // "uuid-1" is row 1 under its live id (same millisecond, already on
+    // disk); "uuid-2" arrived after the read ran and is on no row yet.
+    fireLiveMessageBatch([
+      { id: "uuid-1", topic: "a/b", payload: btoa("1"), timeMs: 1000, retain: false },
+      { id: "uuid-2", topic: "a/b", payload: btoa("2"), timeMs: 2000, retain: false },
+    ]);
+    // Held, not appended: the landing fetch would discard an append.
+    expect(get(store).history.map((m) => m.id)).toEqual(["1"]);
+
+    win.resolve(makeStubs(1, 1));
+    await jumping;
+
+    const s = get(store);
+    expect(s.isLoadingHistory).toBe(false);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "uuid-2"]);
+    expect(s.window?.isNewest).toBe(true);
+    expect(s.window?.newestId).toBe(1);
+
+    unsub();
+  });
+
+  it("clears the loading state and keeps held live messages when the fetch fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(1);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 1));
+    await store.loadRecordedHistory();
+    const rev0 = get(store).historyRevision;
+
+    const win = deferred<any[]>();
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const jumping = store.jumpToLatest();
+    await flushMicrotasks();
+    fireLiveMessageBatch([
+      { id: "uuid-2", topic: "a/b", payload: btoa("2"), timeMs: 2000, retain: false },
+    ]);
+
+    win.reject(new Error("boom"));
+    await expect(jumping).resolves.toBeUndefined();
+
+    const s = get(store);
+    expect(s.isLoadingHistory).toBe(false);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "uuid-2"]);
+    expect(s.totalCount).toBe(2);
+    expect(s.historyRevision).toBe(rev0 + 1);
+    expect(s.window?.isNewest).toBe(true);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    errorSpy.mockRestore();
+    unsub();
+  });
+
+  it("holds live messages during a jump without entering the loading state", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(1);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 1));
+    await store.loadRecordedHistory();
+
+    const win = deferred<any[]>();
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const jumping = store.jumpToLatest();
+    await flushMicrotasks();
+    // The panel unmounts the timeline while isLoadingHistory is set, which
+    // a jump must not do: the hold is keyed to the request token instead.
+    expect(get(store).isLoadingHistory).toBe(false);
+
+    fireLiveMessageBatch([
+      { id: "uuid-2", topic: "a/b", payload: btoa("2"), timeMs: 2000, retain: false },
+    ]);
+    // Still held, still not loading.
+    expect(get(store).history.map((m) => m.id)).toEqual(["1"]);
+    expect(get(store).isLoadingHistory).toBe(false);
+
+    win.resolve(makeStubs(1, 1));
+    await jumping;
+
+    const s = get(store);
+    expect(s.isLoadingHistory).toBe(false);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "uuid-2"]);
+    expect(s.totalCount).toBe(2);
+
+    unsub();
+  });
+
+  it("holds live messages during a jump started from an older window", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    // Reach a non-newest window the way the cap eviction test does: page
+    // back far enough that the newest end is evicted.
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    GetReceivedMessageCount.mockResolvedValue(30000);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(
+      makeStubs(15001, HISTORY_WINDOW_SIZE)
+    );
+    await store.selectTopic("a/b");
+    await store.loadRecordedHistory();
+    for (const start of [10001, 5001, 1, 1 - HISTORY_WINDOW_SIZE]) {
+      GetReceivedTimelineWindow.mockResolvedValueOnce(
+        makeStubs(start, HISTORY_WINDOW_SIZE)
+      );
+      await store.loadOlderWindow();
+    }
+    expect(get(store).window?.isNewest).toBe(false);
+
+    const win = deferred<any[]>();
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const jumping = store.jumpToLatest();
+    await flushMicrotasks();
+    // Arrives during the jump: the frozen-window guard must not drop it,
+    // it belongs to the newest window the jump lands on.
+    fireLiveMessageBatch([
+      { id: "uuid-new", topic: "a/b", payload: btoa("n"), timeMs: 30_000_001, retain: false },
+    ]);
+    expect(get(store).history.some((m) => m.id === "uuid-new")).toBe(false);
+
+    win.resolve(makeStubs(29001, 1000));
+    await jumping;
+
+    const s = get(store);
+    expect(s.window?.isNewest).toBe(true);
+    expect(s.history[s.history.length - 1].id).toBe("uuid-new");
+    expect(s.history.filter((m) => m.id === "uuid-new")).toHaveLength(1);
+
+    unsub();
+  });
+
+  it("clears the older/newer single-flight guard when the fetch fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetReceivedTimelineWindow.mockResolvedValueOnce(
+      makeStubs(5001, HISTORY_WINDOW_SIZE)
+    );
+    GetReceivedMessageCount.mockResolvedValue(20000);
+    await store.selectTopic("a/b");
+    await store.loadRecordedHistory();
+
+    const olderDeferred = deferred<any[]>();
+    GetReceivedTimelineWindow.mockReturnValueOnce(olderDeferred.promise);
+    const olderPromise = store.loadOlderWindow();
+    expect(get(store).isLoadingWindow).toBe("older");
+
+    // The jump's token bump makes the older load land stale, and a stale
+    // return never touches the guard, so the failed jump must clear it or
+    // paging stays dead for this selection.
+    GetReceivedTimelineWindow.mockRejectedValueOnce(new Error("boom"));
+    await store.jumpToLatest();
+    expect(get(store).isLoadingWindow).toBeNull();
+
+    olderDeferred.resolve(makeStubs(1, HISTORY_WINDOW_SIZE));
+    await olderPromise;
+
+    const s = get(store);
+    expect(s.isLoadingWindow).toBeNull();
+    expect(s.history).toHaveLength(HISTORY_WINDOW_SIZE);
+    expect(s.history[0].id).toBe("5001");
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    errorSpy.mockRestore();
+    unsub();
+  });
+
+  it("feeds held messages into the chart cache too when the fetch fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(1);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 1));
+    await store.loadRecordedHistory();
+    GetReceivedMessageWindow.mockResolvedValueOnce(makeMessages(1, 1));
+    await store.ensureChartHistory();
+    expect(get(store).chartHistory).toHaveLength(1);
+
+    const win = deferred<any[]>();
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const jumping = store.jumpToLatest();
+    await flushMicrotasks();
+    fireLiveMessageBatch([
+      { id: "uuid-2", topic: "a/b", payload: btoa("2"), timeMs: 2000, retain: false },
+    ]);
+
+    win.reject(new Error("boom"));
+    await jumping;
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "uuid-2"]);
+    expect(s.chartHistory!.map((m) => m.id)).toEqual(["1", "uuid-2"]);
+    // The chart draws from decoded payloads, so the entry lands decoded.
+    expect(s.chartHistory![1].payload).toBe("2");
+    expect(s.chartHistory![1].payloadState).toBe("loaded");
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    errorSpy.mockRestore();
+    unsub();
+  });
 });
 
 describe("ensureChartHistory", () => {
@@ -1267,6 +1498,715 @@ describe("ensureChartHistory", () => {
     await store.selectTopic("other/topic");
 
     expect(get(store).chartHistory).toBeNull();
+
+    unsub();
+  });
+});
+
+// The backend appends a message to its in-RAM history the moment it arrives,
+// but the batched mqttMessages event carrying it fires up to 300ms later. A
+// timeline fetch issued inside that gap already contains the message, so the
+// live event must not append it a second time (a duplicate id used to wedge
+// the vis DataSet for good).
+describe("live append dedupe against the fetched window", () => {
+  it("does not append a live message that the timeline fetch already returned", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValue(makeStubs(1, 10));
+    await store.selectTopic("a/b");
+
+    const deltas: HistoryDelta[] = [];
+    store.setOnHistoryDelta((d) => deltas.push(d));
+
+    fireLiveMessage({
+      id: "10",
+      topic: "a/b",
+      payload: btoa("payload-10"),
+      timeMs: 10000,
+      retain: false,
+    });
+
+    const s = get(store);
+    expect(s.history).toHaveLength(10);
+    expect(s.totalCount).toBe(10);
+    expect(deltas).toHaveLength(0);
+
+    unsub();
+  });
+
+  it("appends only the new messages when a live batch partly overlaps the fetched window", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValue(makeStubs(1, 10));
+    await store.selectTopic("a/b");
+
+    const deltas: HistoryDelta[] = [];
+    store.setOnHistoryDelta((d) => deltas.push(d));
+
+    fireLiveMessageBatch([
+      { id: "9", topic: "a/b", payload: btoa("payload-9"), timeMs: 9000, retain: false },
+      { id: "10", topic: "a/b", payload: btoa("payload-10"), timeMs: 10000, retain: false },
+      {
+        id: "live-11",
+        topic: "a/b",
+        payload: btoa("payload-live"),
+        timeMs: 11000,
+        retain: false,
+      },
+    ]);
+
+    const s = get(store);
+    expect(s.history).toHaveLength(11);
+    expect(s.history[s.history.length - 1].id).toBe("live-11");
+    expect(s.totalCount).toBe(11);
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0].kind).toBe("append");
+    if (deltas[0].kind === "append") {
+      expect(deltas[0].messages.map((m) => m.id)).toEqual(["live-11"]);
+    }
+
+    unsub();
+  });
+
+  it("holds live messages that arrive while the timeline fetch is in flight and applies them once it lands, minus duplicates", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const selecting = store.selectTopic("a/b");
+    // Past the GetAppSettings await, now parked on GetMessageTimeline.
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+
+    // "10" is also in the window the fetch is about to return; "live-11" is
+    // genuinely new and exists in neither the fetch nor any later event.
+    fireLiveMessageBatch([
+      { id: "10", topic: "a/b", payload: btoa("payload-10"), timeMs: 10000, retain: false },
+      {
+        id: "live-11",
+        topic: "a/b",
+        payload: btoa("payload-live"),
+        timeMs: 11000,
+        retain: false,
+      },
+    ]);
+    // Nothing is applied while the fetch is outstanding.
+    expect(get(store).history).toHaveLength(0);
+
+    inFlight.resolve(makeStubs(1, 10));
+    await selecting;
+
+    const s = get(store);
+    const ids = s.history.map((m) => m.id);
+    expect(ids).toEqual([...makeStubs(1, 10).map((st) => st.id), "live-11"]);
+    expect(s.totalCount).toBe(11);
+    expect(s.isLoadingHistory).toBe(false);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    unsub();
+  });
+
+  it("discards messages held during a fetch when the selection changes before it lands", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const selectingAB = store.selectTopic("a/b");
+    await flushMicrotasks();
+    fireLiveMessageBatch(makeLiveMessages(1, 3, "a/b"));
+
+    // User moves on before the a/b fetch lands.
+    GetMessageTimeline.mockResolvedValueOnce(makeStubs(20, 3));
+    await store.selectTopic("c/d");
+
+    inFlight.resolve(makeStubs(1, 10));
+    await selectingAB;
+
+    const s = get(store);
+    expect(s.selectedTopic).toBe("c/d");
+    expect(s.history.map((m) => m.id)).toEqual(["20", "21", "22"]);
+    expect(s.totalCount).toBe(3);
+    expect(s.history.some((m) => m.id.startsWith("live-"))).toBe(false);
+
+    unsub();
+  });
+  it("does not push a live message into the chart cache when the chart fetch already returned it", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValue(makeStubs(1, 10));
+    await store.selectTopic("a/b");
+
+    // Message 11 reached the backend between the timeline fetch and the
+    // chart fetch and has not been emitted yet, so the chart cache is one
+    // message ahead of the stub history.
+    GetMessageHistory.mockResolvedValue(makeMessages(1, 11));
+    await store.ensureChartHistory();
+    expect(get(store).chartHistory).toHaveLength(11);
+
+    fireLiveMessage({
+      id: "11",
+      topic: "a/b",
+      payload: btoa("payload-11"),
+      timeMs: 11000,
+      retain: false,
+    });
+
+    const s = get(store);
+    const expected = makeStubs(1, 11).map((st) => st.id);
+    expect(s.history.map((m) => m.id)).toEqual(expected);
+    expect(s.chartHistory!.map((m) => m.id)).toEqual(expected);
+
+    unsub();
+  });
+
+  it("still drops a re-delivered id when a newer entry carries an older receive time", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    // The fetch already holds "dup" (received, not yet emitted).
+    GetMessageTimeline.mockResolvedValue([
+      ...makeStubs(1, 3),
+      { id: "dup", timeMs: 10_500, qos: 0, retain: false },
+    ]);
+    await store.selectTopic("a/b");
+
+    // A message whose receive clock stepped back five seconds lands first,
+    // so the newest entry in history is now older than the dedupe cutoff.
+    fireLiveMessage({
+      id: "skew",
+      topic: "a/b",
+      payload: btoa("payload-skew"),
+      timeMs: 5000,
+      retain: false,
+    });
+    // Then the batch that re-delivers "dup".
+    fireLiveMessageBatch([
+      { id: "dup", topic: "a/b", payload: btoa("payload-dup"), timeMs: 10_500, retain: false },
+      { id: "fresh", topic: "a/b", payload: btoa("payload-fresh"), timeMs: 10_600, retain: false },
+    ]);
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "dup", "skew", "fresh"]);
+    expect(s.totalCount).toBe(6);
+
+    unsub();
+  });
+});
+
+describe("live messages held during a load", () => {
+  it("holds live messages during selectTopic when the previous selection was in disk mode", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(3);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.loadRecordedHistory();
+    expect(get(store).historySource).toBe("disk");
+    expect(get(store).window?.isNewest).toBe(true);
+
+    // Select another topic; a batch for it lands while its fetch is in
+    // flight. The listener's disk-mode guard must not swallow it: the new
+    // selection is a memory view from the moment it opens.
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const selecting = store.selectTopic("c/d");
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+    fireLiveMessageBatch(makeLiveMessages(1, 1, "c/d"));
+
+    inFlight.resolve(makeStubs(20, 2));
+    await selecting;
+
+    const s = get(store);
+    expect(s.historySource).toBe("memory");
+    expect(s.history.map((m) => m.id)).toEqual(["20", "21", "live-1"]);
+    expect(s.totalCount).toBe(3);
+
+    unsub();
+  });
+
+  it("holds only the selected topic's messages from a batch that spans topics", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const selecting = store.selectTopic("a/b");
+    await flushMicrotasks();
+    fireLiveMessageBatch([
+      { id: "o1", topic: "other", payload: btoa("x"), timeMs: 1, retain: false },
+      { id: "m1", topic: "a/b", payload: btoa("x"), timeMs: 2, retain: false },
+      { id: "o2", topic: "other", payload: btoa("x"), timeMs: 3, retain: false },
+    ]);
+
+    inFlight.resolve([]);
+    await selecting;
+
+    expect(get(store).history.map((m) => m.id)).toEqual(["m1"]);
+
+    unsub();
+  });
+
+  it("applies the memory cap to messages held while the timeline fetch was in flight", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const deltas: HistoryDelta[] = [];
+    const selecting = store.selectTopic("a/b", (d) => deltas.push(d));
+    await flushMicrotasks();
+
+    // Enough held messages that fetched + held overshoots MAX + TRIM_SLACK.
+    const heldCount = MAX_LOADED_MESSAGES + TRIM_SLACK + 1000;
+    fireLiveMessageBatch(makeLiveMessages(1, heldCount, "a/b"));
+
+    inFlight.resolve(makeStubs(1, 5000));
+    await selecting;
+
+    const s = get(store);
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
+    // Trimmed from the oldest end: the fetched stubs and the oldest held
+    // messages went, the newest held message is still last.
+    const excess = 5000 + heldCount - MAX_LOADED_MESSAGES;
+    expect(s.history[0].id).toBe(`live-${excess - 5000 + 1}`);
+    expect(s.history[s.history.length - 1].id).toBe(`live-${heldCount}`);
+    // The hold itself is bounded at MAX_LOADED_MESSAGES (see the listener),
+    // so the oldest held messages never reached `history` and only the
+    // fetched stubs are evicted, and reported, on landing.
+    const trims = deltas.filter((d) => d.kind === "trim");
+    expect(trims).toHaveLength(1);
+    if (trims[0].kind === "trim") {
+      expect(trims[0].ids).toHaveLength(5000);
+      expect(trims[0].ids[0]).toBe("1");
+      expect(trims[0].ids[trims[0].ids.length - 1]).toBe("5000");
+    }
+
+    unsub();
+  });
+
+  it("applies the memory cap to messages held while a not-found timeline fetch was in flight", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    let rejectFetch!: (e: unknown) => void;
+    GetMessageTimeline.mockReturnValueOnce(
+      new Promise((_, rej) => {
+        rejectFetch = rej;
+      })
+    );
+    const selecting = store.selectTopic("a/b");
+    await flushMicrotasks();
+
+    const heldCount = MAX_LOADED_MESSAGES + TRIM_SLACK + 1;
+    fireLiveMessageBatch(makeLiveMessages(1, heldCount, "a/b"));
+
+    rejectFetch(new Error("topic not found"));
+    await selecting;
+
+    const s = get(store);
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
+    expect(s.history[s.history.length - 1].id).toBe(`live-${heldCount}`);
+
+    unsub();
+  });
+
+  it("applies the memory cap to messages held while the recorded window was loading", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.selectTopic("a/b");
+
+    const win = deferred<any[]>();
+    GetReceivedMessageCount.mockResolvedValueOnce(5000);
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const loading = store.loadRecordedHistory();
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+
+    const heldCount = MAX_LOADED_MESSAGES + TRIM_SLACK + 1;
+    fireLiveMessageBatch(makeLiveMessages(1, heldCount, "a/b"));
+
+    win.resolve(makeStubs(1, 5000));
+    await loading;
+
+    const s = get(store);
+    expect(s.historySource).toBe("disk");
+    expect(s.window?.isNewest).toBe(true);
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES);
+    expect(s.history[s.history.length - 1].id).toBe(`live-${heldCount}`);
+
+    unsub();
+  });
+
+  it("appends held messages, minus already-loaded ids, when the recorded window fetch fails", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce(makeStubs(1, 3));
+    const deltas: HistoryDelta[] = [];
+    await store.selectTopic("a/b", (d) => deltas.push(d));
+    const rev0 = get(store).historyRevision;
+
+    const win = deferred<any[]>();
+    GetReceivedMessageCount.mockResolvedValueOnce(3);
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const loading = store.loadRecordedHistory();
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+
+    // "3" is already loaded; "live-x" is new.
+    fireLiveMessageBatch([
+      { id: "3", topic: "a/b", payload: btoa("payload-3"), timeMs: 3000, retain: false },
+      { id: "live-x", topic: "a/b", payload: btoa("payload-live"), timeMs: 4000, retain: false },
+    ]);
+    expect(get(store).history).toHaveLength(3);
+
+    win.reject(new Error("boom"));
+    await loading;
+
+    const s = get(store);
+    expect(s.historySource).toBe("memory");
+    expect(s.isLoadingHistory).toBe(false);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "live-x"]);
+    expect(s.historyRevision).toBe(rev0 + 1);
+    expect(s.totalCount).toBe(4);
+    expect(deltas.filter((d) => d.kind === "append")).toHaveLength(0);
+
+    unsub();
+  });
+
+  it("drops held live messages the recorded window already returned under their disk ids", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([
+      { id: "uuid-1", timeMs: 1000, qos: 0, retain: false },
+    ]);
+    await store.selectTopic("a/b");
+
+    // A disk row carries the numeric id SQLite gave it; the live copy of the
+    // same message carries its UUID, so ids cannot match the two up. The
+    // recorder writes in arrival order, so a held message not yet on disk
+    // is newer than every row the read returned: only those survive.
+    const win = deferred<any[]>();
+    GetReceivedMessageCount.mockResolvedValueOnce(3);
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const loading = store.loadRecordedHistory();
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+
+    // "uuid-3" is row 3 (same millisecond, already recorded); "uuid-4"
+    // arrived after the read and is not on disk yet.
+    fireLiveMessageBatch([
+      { id: "uuid-3", topic: "a/b", payload: btoa("3"), timeMs: 3000, retain: false },
+      { id: "uuid-4", topic: "a/b", payload: btoa("4"), timeMs: 4000, retain: false },
+    ]);
+
+    win.resolve(makeStubs(1, 3));
+    await loading;
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "uuid-4"]);
+    expect(s.history.filter((m) => m.timeMs === 3000)).toHaveLength(1);
+    expect(s.totalCount).toBe(4);
+    expect(s.window?.newestId).toBe(3);
+
+    unsub();
+  });
+
+  it("keeps every held live message when the recorded window is empty", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+
+    const win = deferred<any[]>();
+    GetReceivedMessageCount.mockResolvedValueOnce(0);
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const loading = store.loadRecordedHistory();
+    await flushMicrotasks();
+    fireLiveMessageBatch([
+      { id: "uuid-1", topic: "a/b", payload: btoa("1"), timeMs: 1000, retain: false },
+      { id: "uuid-2", topic: "a/b", payload: btoa("2"), timeMs: 2000, retain: false },
+    ]);
+
+    win.resolve([]);
+    await loading;
+
+    const s = get(store);
+    expect(s.historySource).toBe("disk");
+    expect(s.history.map((m) => m.id)).toEqual(["uuid-1", "uuid-2"]);
+    expect(s.totalCount).toBe(2);
+
+    unsub();
+  });
+
+  it("feeds held messages into the chart cache too when the recorded window fetch fails", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([
+      { id: "uuid-1", timeMs: 1000, qos: 0, retain: false },
+    ]);
+    await store.selectTopic("a/b");
+    GetMessageHistory.mockResolvedValueOnce([
+      { id: "uuid-1", topic: "a/b", payload: btoa("1"), timeMs: 1000, retain: false },
+    ]);
+    await store.ensureChartHistory();
+    expect(get(store).chartHistory).toHaveLength(1);
+
+    const win = deferred<any[]>();
+    GetReceivedMessageCount.mockResolvedValueOnce(1);
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const loading = store.loadRecordedHistory();
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+
+    // "uuid-1" is already in both caches; "uuid-2" is new to both.
+    fireLiveMessageBatch([
+      { id: "uuid-1", topic: "a/b", payload: btoa("1"), timeMs: 1000, retain: false },
+      { id: "uuid-2", topic: "a/b", payload: btoa("2"), timeMs: 2000, retain: false },
+    ]);
+
+    win.reject(new Error("disk unavailable"));
+    await loading;
+
+    const s = get(store);
+    expect(s.historySource).toBe("memory");
+    expect(s.isLoadingHistory).toBe(false);
+    expect(s.history.map((m) => m.id)).toEqual(["uuid-1", "uuid-2"]);
+    expect(s.chartHistory!.map((m) => m.id)).toEqual(["uuid-1", "uuid-2"]);
+    // The chart draws from decoded payloads, so the entry lands decoded.
+    expect(s.chartHistory![1].payload).toBe("2");
+    expect(s.chartHistory![1].payloadState).toBe("loaded");
+
+    unsub();
+  });
+
+  it("feeds held messages into a chart cache that loaded during the timeline fetch", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const selecting = store.selectTopic("a/b");
+    await flushMicrotasks();
+    expect(get(store).isLoadingHistory).toBe(true);
+
+    // The Chart tab is visible, so it asks for the chart cache as soon as
+    // the selection opens, and that fetch lands before the timeline's.
+    GetMessageHistory.mockResolvedValueOnce(makeMessages(1, 3));
+    await store.ensureChartHistory();
+    expect(get(store).chartHistory).toHaveLength(3);
+
+    fireLiveMessageBatch([
+      { id: "live-4", topic: "a/b", payload: btoa("4"), timeMs: 4000, retain: false },
+    ]);
+    expect(get(store).history).toHaveLength(0);
+
+    inFlight.resolve(makeStubs(1, 3));
+    await selecting;
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "live-4"]);
+    expect(s.chartHistory!.map((m) => m.id)).toEqual(["1", "2", "3", "live-4"]);
+    expect(s.chartHistory![3].payload).toBe("4");
+    expect(s.chartHistory![3].payloadState).toBe("loaded");
+
+    unsub();
+  });
+
+  it("drops a held live copy of a fetched row when a later row carries an older receive time", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+
+    const win = deferred<any[]>();
+    GetReceivedMessageCount.mockResolvedValueOnce(2);
+    GetReceivedTimelineWindow.mockReturnValueOnce(win.promise);
+    const loading = store.loadRecordedHistory();
+    await flushMicrotasks();
+
+    // "uuid-1" is row 1's live copy. The clock stepped back between rows 1
+    // and 2, so the last fetched row is older than the first; a bound taken
+    // from the last row alone would let the copy through.
+    fireLiveMessageBatch([
+      { id: "uuid-1", topic: "a/b", payload: btoa("1"), timeMs: 5000, retain: false },
+    ]);
+
+    win.resolve([
+      { id: "1", timeMs: 5000, qos: 0, retain: false },
+      { id: "2", timeMs: 3000, qos: 0, retain: false },
+    ]);
+    await loading;
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2"]);
+    expect(s.totalCount).toBe(2);
+    expect(s.window?.newestMs).toBe(5000);
+
+    unsub();
+  });
+
+  it("bounds the hold at MAX_LOADED_MESSAGES + TRIM_SLACK while the fetch hangs", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const inFlight = deferred<any[]>();
+    GetMessageTimeline.mockReturnValueOnce(inFlight.promise);
+    const selecting = store.selectTopic("a/b");
+    await flushMicrotasks();
+
+    // Drains of 1000 while the fetch hangs. The drain that pushes the
+    // holder past MAX + TRIM_SLACK must trim it back to MAX (dropping the
+    // oldest TRIM_SLACK + 1000), and one more drain then lands on top. An
+    // unbounded holder would be indistinguishable after enforceCap trimmed
+    // the landed history to exactly MAX; a bounded one lands MAX + 1000
+    // entries, under the landing trim threshold, so the length and the
+    // first id together prove where the trim happened.
+    const batch = 1000;
+    const total = MAX_LOADED_MESSAGES + TRIM_SLACK + 2 * batch;
+    for (let start = 1; start <= total; start += batch) {
+      fireLiveMessageBatch(makeLiveMessages(start, batch, "a/b"));
+    }
+    expect(get(store).history).toHaveLength(0);
+
+    inFlight.resolve([]);
+    await selecting;
+
+    const s = get(store);
+    expect(s.history).toHaveLength(MAX_LOADED_MESSAGES + batch);
+    expect(s.history[0].id).toBe(`live-${TRIM_SLACK + batch + 1}`);
+    expect(s.history[s.history.length - 1].id).toBe(`live-${total}`);
+    expect(s.totalCount).toBe(MAX_LOADED_MESSAGES + batch);
+
+    unsub();
+  });
+});
+
+// In disk mode a row and its live copy never share an id (numeric SQLite id
+// against the receive-time UUID), so the listener's id dedupe cannot catch a
+// live event for a row the window read already returned. Receive time can:
+// the recorder writes in arrival order, so anything genuinely new is after
+// the newest disk row in the window.
+describe("disk-mode live dedupe against the loaded window", () => {
+  it("lets an older-stamped live message through once the read's race window has passed", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(3);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.loadRecordedHistory();
+
+    // A broker-host clock step backwards well after the window landed:
+    // live messages now stamp before window.newestMs. The gate against
+    // re-delivered rows only covers the drain that can trail the read, so
+    // these must not be dropped.
+    const realNow = Date.now;
+    const later = realNow() + 5000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => later);
+    try {
+      fireLiveMessageBatch([
+        { id: "uuid-old", topic: "a/b", payload: btoa("o"), timeMs: 2500, retain: false },
+      ]);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "uuid-old"]);
+    expect(s.window?.newestMs).toBe(3000);
+
+    unsub();
+  });
+
+  it("drops a live copy of a row the window read already returned", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce([]);
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(3);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.loadRecordedHistory();
+    expect(get(store).window?.newestMs).toBe(3000);
+
+    const deltas: HistoryDelta[] = [];
+    store.setOnHistoryDelta((d) => deltas.push(d));
+
+    // Row 3's live event was processed after the response landed: same
+    // message under its UUID, same millisecond. "uuid-4" arrived after the
+    // read ran and is on no row yet.
+    fireLiveMessageBatch([
+      { id: "uuid-3", topic: "a/b", payload: btoa("3"), timeMs: 3000, retain: false },
+      { id: "uuid-4", topic: "a/b", payload: btoa("4"), timeMs: 4000, retain: false },
+    ]);
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["1", "2", "3", "uuid-4"]);
+    expect(s.totalCount).toBe(4);
+    // Live UUID appends never move the disk-side bounds.
+    expect(s.window?.newestId).toBe(3);
+    expect(s.window?.newestMs).toBe(3000);
+    expect(deltas).toHaveLength(1);
+    if (deltas[0].kind === "append") {
+      expect(deltas[0].messages.map((m) => m.id)).toEqual(["uuid-4"]);
+    }
+
+    unsub();
+  });
+});
+
+describe("disk window cursor with live ids", () => {
+  it("does not move the cursor for a live UUID that starts with digits", async () => {
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValueOnce(makeStubs(1, 3));
+    await store.selectTopic("a/b");
+    GetReceivedMessageCount.mockResolvedValueOnce(50);
+    GetReceivedTimelineWindow.mockResolvedValueOnce(makeStubs(48, 3));
+    await store.loadRecordedHistory();
+    expect(get(store).window?.newestId).toBe(50);
+
+    const uuid = "9876abcd-0000-4000-8000-000000000000";
+    fireLiveMessage({
+      id: uuid,
+      topic: "a/b",
+      payload: btoa("payload-live"),
+      timeMs: 60_000,
+      retain: false,
+    });
+
+    const s = get(store);
+    expect(s.history.map((m) => m.id)).toEqual(["48", "49", "50", uuid]);
+    expect(s.window?.newestId).toBe(50);
 
     unsub();
   });

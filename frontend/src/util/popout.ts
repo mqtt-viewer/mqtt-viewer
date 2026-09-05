@@ -6,12 +6,34 @@ import {
   FocusTopicWindow,
 } from "bindings/mqtt-viewer/backend/app/app";
 import envStore from "@/stores/env";
+import { addToast } from "@/components/Toast/Toast.svelte";
+
+// openTab wraps window.open so a blocked pop-up says so. A pop-up blocker, or
+// an embedding iframe without allow-popups (Home Assistant ingress frames the
+// app), returns null and the click otherwise does nothing at all.
+const openTab = (url: string, name: string) => {
+  const opened = window.open(url, name);
+  if (opened) return;
+  addToast({
+    data: {
+      title: "Could not open the view",
+      description:
+        "Pop-ups are blocked. Allow pop-ups for this site to open the view.",
+      type: "error",
+    },
+  });
+};
 
 // buildChartWindowURL mirrors backend/app/windows.go buildChartWindowURL so the
 // browser build routes to the same standalone chart view (App.svelte reads
 // view/conn/topic/fields). Keys are set in sorted order because Go's
-// url.Values.Encode() sorts them; that keeps the two builders byte-identical.
-// Kept pure so it is unit-testable.
+// url.Values.Encode() sorts them; that keeps the query byte-identical to the
+// backend. The reference is path-relative ("?..." with no leading slash), not
+// root-absolute like the Go builder: window.open resolves it against the
+// current document, so under a reverse-proxy prefix (Home Assistant ingress)
+// the popout tab inherits the prefix instead of jumping to the origin root.
+// Served at "/" it opens "/?..." exactly as before. Kept pure so it is
+// unit-testable.
 export const buildChartWindowURL = (params: {
   connectionId: number;
   topic: string;
@@ -24,7 +46,7 @@ export const buildChartWindowURL = (params: {
   }
   query.set("topic", params.topic);
   query.set("view", "chart");
-  return "/?" + query.toString();
+  return "?" + query.toString();
 };
 
 // buildStatusWindowURL mirrors backend/app/windows.go buildStatusWindowURL.
@@ -32,12 +54,13 @@ export const buildStatusWindowURL = (connectionId: number): string => {
   const query = new URLSearchParams();
   query.set("conn", String(connectionId));
   query.set("view", "status");
-  return "/?" + query.toString();
+  return "?" + query.toString();
 };
 
 // buildTopicWindowURL mirrors backend/app/windows.go buildTopicWindowURL. Keys
 // are set in sorted order because Go's url.Values.Encode() sorts them, and an
-// empty topic is omitted, as the Go builder does.
+// empty topic is omitted, as the Go builder does. Path-relative for the same
+// reason as buildChartWindowURL: the tab must inherit a reverse-proxy prefix.
 export const buildTopicWindowURL = (params: {
   connectionId: number;
   topic: string;
@@ -48,7 +71,7 @@ export const buildTopicWindowURL = (params: {
     query.set("topic", params.topic);
   }
   query.set("view", "topic");
-  return "/?" + query.toString();
+  return "?" + query.toString();
 };
 
 // openChartWindow opens (or focuses) the detached chart. On desktop this is a
@@ -62,7 +85,7 @@ export const openChartWindow = (params: {
   fields: string[];
 }) => {
   if (get(envStore).isServerMode) {
-    window.open(
+    openTab(
       buildChartWindowURL(params),
       `mv-chart-${params.connectionId}-${params.topic}`
     );
@@ -78,7 +101,7 @@ export const openChartWindow = (params: {
 // openBrokerStatusWindow opens (or focuses) the detached broker-status window.
 export const openBrokerStatusWindow = (connectionId: number) => {
   if (get(envStore).isServerMode) {
-    window.open(buildStatusWindowURL(connectionId), `mv-status-${connectionId}`);
+    openTab(buildStatusWindowURL(connectionId), `mv-status-${connectionId}`);
     return;
   }
   OpenBrokerStatusWindow(connectionId);

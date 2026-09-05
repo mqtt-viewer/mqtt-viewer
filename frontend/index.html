@@ -4,6 +4,149 @@
     <meta charset="UTF-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <script>
+      // Path-prefix shim for reverse proxies that serve the UI under a subpath
+      // (Home Assistant ingress mounts it at /api/hassio_ingress/<token>/). The
+      // bundled @wailsio/runtime and the server's custom.js hardcode root-
+      // absolute /wails/* URLs: the runtime POSTs to origin + "/wails/runtime",
+      // loads "/wails/custom.js", and custom.js opens a WebSocket to
+      // "/wails/events". Under a prefix those bypass the proxy and 404, so no
+      // binding call or live event ever reaches the backend. I cannot edit the
+      // bundled runtime, so I rewrite /wails/* access at the page level before
+      // anything else loads: fetch (runtime calls and the runtime's own
+      // custom.js probe), WebSocket (events), and <script src> (the injected
+      // custom.js tag) are wrapped to resolve /wails/* relative to the
+      // document directory instead of the origin root. Served at the root
+      // (desktop webview, or server mode at /) the directory is "/", so the
+      // rewrite is a no-op and behaviour is unchanged.
+      //
+      // rewrite() and redirectTarget() below are hand-copied mirrors of
+      // src/util/prefix-rewrite.ts, which holds the canonical implementation
+      // and its tests. This script has to run before any module loads, so it
+      // cannot import them. Change one, change the other.
+      (function () {
+        try {
+          var rewrite = function (value) {
+            try {
+              var resolved = new URL(value, document.baseURI);
+              if (
+                resolved.host === location.host &&
+                resolved.pathname.indexOf("/wails/") === 0
+              ) {
+                var dir = new URL(".", document.baseURI).pathname;
+                // Preserve protocol (ws/wss/http/https), search and hash; only
+                // reparent the path under the document directory.
+                resolved.pathname = dir + resolved.pathname.slice(1);
+                return resolved.href;
+              }
+            } catch (e) {}
+            return value;
+          };
+
+          // Entered at /prefix instead of /prefix/, the document directory is
+          // the origin root: every relative asset URL and every rewrite above
+          // escapes the prefix, so the page 404s its own bundle and stays
+          // blank. Proxies that do not redirect the prefix root (nginx and
+          // Caddy strip_prefix, unlike HA ingress) hit this, so heal it here
+          // by reloading at the directory form before anything else loads.
+          var redirectTarget = function (loc) {
+            var path = loc.pathname;
+            if (
+              path === "" ||
+              path === "/" ||
+              path.charAt(path.length - 1) === "/"
+            ) {
+              return null;
+            }
+            // A last segment with a dot is a file (/index.html), not a prefix
+            // missing its slash. Appending a slash there would only 404.
+            var last = path.slice(path.lastIndexOf("/") + 1);
+            if (last.indexOf(".") !== -1) return null;
+            return path + "/" + loc.search + loc.hash;
+          };
+          var target = redirectTarget(location);
+          if (target) {
+            // The target ends in "/", so this cannot loop through us twice.
+            location.replace(target);
+            return;
+          }
+
+          var origFetch = window.fetch;
+          if (origFetch) {
+            window.fetch = function (input, init) {
+              var self = this;
+              try {
+                if (typeof input === "string" || input instanceof URL) {
+                  input = rewrite(String(input));
+                } else if (input && typeof input.url === "string") {
+                  var next = rewrite(input.url);
+                  if (next !== input.url) {
+                    if (input.body) {
+                      // new Request(next, input) re-wraps a streaming body and
+                      // the send fails, so buffer the body first and rebuild
+                      // the Request from plain parts. Returning a promise from
+                      // here is fine: fetch is promise-returning anyway.
+                      var src = input;
+                      return src
+                        .clone()
+                        .arrayBuffer()
+                        .then(function (body) {
+                          return origFetch.call(
+                            self,
+                            new Request(next, {
+                              method: src.method,
+                              headers: src.headers,
+                              body: body,
+                              mode: src.mode === "navigate" ? undefined : src.mode,
+                              credentials: src.credentials,
+                              cache: src.cache,
+                              redirect: src.redirect,
+                              integrity: src.integrity,
+                              keepalive: src.keepalive,
+                              signal: src.signal,
+                            }),
+                            init
+                          );
+                        });
+                    }
+                    input = new Request(next, input);
+                  }
+                }
+              } catch (e) {
+                console.warn("[MQTT Viewer] prefix rewrite skipped", e);
+              }
+              return origFetch.call(this, input, init);
+            };
+          }
+
+          if (window.WebSocket) {
+            window.WebSocket = new Proxy(window.WebSocket, {
+              construct: function (target, args) {
+                if (args.length > 0) args[0] = rewrite(String(args[0]));
+                return Reflect.construct(target, args);
+              },
+            });
+          }
+
+          var scriptSrc = Object.getOwnPropertyDescriptor(
+            HTMLScriptElement.prototype,
+            "src"
+          );
+          if (scriptSrc && scriptSrc.set) {
+            Object.defineProperty(HTMLScriptElement.prototype, "src", {
+              configurable: true,
+              enumerable: scriptSrc.enumerable,
+              get: function () {
+                return scriptSrc.get.call(this);
+              },
+              set: function (value) {
+                scriptSrc.set.call(this, rewrite(String(value)));
+              },
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script>
       // Apply the stored theme before first paint to avoid a flash of the
       // wrong theme. Kept in sync by src/stores/theme.ts afterwards.
       try {
@@ -13,9 +156,17 @@
         }
       } catch (e) {}
     </script>
+    <!-- Server mode pushes backend->frontend events over a WebSocket
+         bootstrapped by /wails/custom.js. No loader is needed here: the
+         bundled @wailsio/runtime probes for and injects that script itself
+         (loadOptionalScript in its index module), and the shim above makes
+         both the probe and the injected src resolve under a reverse-proxy
+         prefix. The native webview has no such route, so the probe 404s and
+         is a no-op there. See AGENTS.md "Driving the app from a browser". -->
     <!-- Served from Vite's public dir. The browser tab is the main handle on
-         the app in web mode, and pop-outs mean several tabs at once. -->
-    <link href="/favicon.png" rel="icon" type="image/png" />
+         the app in web mode, and pop-outs mean several tabs at once. Kept
+         document-relative so it resolves under a reverse-proxy prefix. -->
+    <link href="./favicon.png" rel="icon" type="image/png" />
     <link href="./src/style.css" rel="stylesheet" />
     <title>MQTT Viewer</title>
   </head>

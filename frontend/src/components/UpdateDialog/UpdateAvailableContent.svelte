@@ -105,10 +105,15 @@
         iconType="download"
         iconSize={16}
         disabled={updating}
+        data-update-primary-focus
         on:click={onUpdate}>Update now</Button
       >
     {:else if update.releases_url}
-      <Button variant="primary" on:click={onUpdate}>Open releases page</Button>
+      <Button
+        variant="primary"
+        data-update-primary-focus
+        on:click={onUpdate}>Open releases page</Button
+      >
     {/if}
   </div>
 </div>

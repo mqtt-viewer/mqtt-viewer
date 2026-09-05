@@ -803,7 +803,6 @@
     );
     io.observe(containerEl);
 
-    document.addEventListener("fullscreenchange", onFullscreenChange);
     window.addEventListener("pointerdown", clearMenuOpen, true);
     window.addEventListener("keydown", onWindowKeydown, true);
   });
@@ -820,7 +819,6 @@
     unsubSearch?.();
     ro?.disconnect();
     io?.disconnect();
-    document.removeEventListener("fullscreenchange", onFullscreenChange);
     stopLiveTimer();
     stopStatsTimer();
     // a pending trailing resize would otherwise fire into a destroyed renderer
@@ -903,23 +901,6 @@
     renderer?.setMaxNodeSize(r);
     saveSettings();
   };
-  const toggleFullscreen = () => {
-    const el = containerEl?.parentElement ?? containerEl;
-    if (!document.fullscreenElement) el?.requestFullscreen?.();
-    else document.exitFullscreen?.();
-  };
-  const onFullscreenChange = () => {
-    // the container resizes when entering/leaving fullscreen; refit once settled
-    requestAnimationFrame(() => {
-      const cw = containerEl?.clientWidth ?? 0;
-      const ch = containerEl?.clientHeight ?? 0;
-      if (cw > 0 && ch > 0 && renderer) {
-        renderer.resize(cw, ch);
-        renderer.fitView();
-      }
-    });
-  };
-
   const filterFieldColor = untypedColors["outline"]["DEFAULT"];
 
   // A blank canvas reads as broken. Say which kind of nothing it is instead.
@@ -1048,14 +1029,6 @@
           </DropdownMenuItem>
         </div>
       </DropdownMenu>
-      <div class="ml-auto">
-        <Tooltip placement="bottom">
-          <Button on:click={toggleFullscreen}>
-            <Icon type="fullscreen" width={20} height={20} />
-          </Button>
-          <span slot="tooltip-content">Fullscreen</span>
-        </Tooltip>
-      </div>
     </div>
   </PanelHeader>
   <div
@@ -1065,9 +1038,8 @@
     bind:clientHeight={containerH}
     class="relative min-h-0 w-full grow bg-elevation-0"
   >
-    <!-- Portalled into this container, never document.body: fullscreen is
-         requested on the container's parent, so a body-portalled menu would
-         vanish the moment the user goes fullscreen. The id is per-connection
+    <!-- Portalled into this container, never document.body, so the menu
+         stays inside the graph's stacking context. The id is per-connection
          because several connection tabs can each hold a graph. -->
     <ContextMenu portal={`#${graphContainerId}`} onOpen={resolveGraphMenuTarget}>
       <canvas slot="trigger" bind:this={canvasEl} class="block h-full w-full"

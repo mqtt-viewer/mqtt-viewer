@@ -21,6 +21,11 @@ vi.mock("@/stores/env", () => ({
   },
 }));
 
+const addToast = vi.fn();
+vi.mock("@/components/Toast/Toast.svelte", () => ({
+  addToast: (...args: unknown[]) => addToast(...args),
+}));
+
 import {
   buildChartWindowURL,
   buildStatusWindowURL,
@@ -38,8 +43,8 @@ describe("buildChartWindowURL", () => {
       topic: "home/sensors/temp",
       fields: ["payload.temp", "payload.humidity"],
     });
-    expect(url.startsWith("/?")).toBe(true);
-    const params = new URLSearchParams(url.slice(2));
+    expect(url.startsWith("?")).toBe(true);
+    const params = new URLSearchParams(url.slice(1));
     expect(params.get("view")).toBe("chart");
     expect(params.get("conn")).toBe("7");
     expect(params.get("topic")).toBe("home/sensors/temp");
@@ -55,7 +60,7 @@ describe("buildChartWindowURL", () => {
       topic: "a/b",
       fields: [],
     });
-    const params = new URLSearchParams(url.slice(2));
+    const params = new URLSearchParams(url.slice(1));
     expect(params.has("fields")).toBe(false);
   });
 
@@ -66,17 +71,20 @@ describe("buildChartWindowURL", () => {
       topic,
       fields: ["a b", "c&d"],
     });
-    const params = new URLSearchParams(url.slice(2));
+    const params = new URLSearchParams(url.slice(1));
     expect(params.get("topic")).toBe(topic);
     expect(JSON.parse(params.get("fields") ?? "[]")).toEqual(["a b", "c&d"]);
   });
 });
 
 describe("buildStatusWindowURL", () => {
-  it("matches the backend's encoding exactly for the simple case", () => {
-    // Go's url.Values.Encode() sorts keys, so conn precedes view.
-    // buildStatusWindowURL in backend/app/windows.go yields this string.
-    expect(buildStatusWindowURL(3)).toBe("/?conn=3&view=status");
+  it("matches the backend's query encoding exactly for the simple case", () => {
+    // Go's url.Values.Encode() sorts keys, so conn precedes view. The frontend
+    // reference is path-relative (no leading slash) so window.open carries a
+    // reverse-proxy prefix; the query bytes after "?" stay identical to
+    // buildStatusWindowURL in backend/app/windows.go, which yields
+    // "/?conn=3&view=status".
+    expect(buildStatusWindowURL(3)).toBe("?conn=3&view=status");
   });
 });
 
@@ -86,15 +94,15 @@ describe("buildTopicWindowURL", () => {
     // topic, so this is exactly what buildTopicWindowURL in
     // backend/app/windows.go yields.
     expect(buildTopicWindowURL({ connectionId: 3, topic: "" })).toBe(
-      "/?conn=3&view=topic"
+      "?conn=3&view=topic"
     );
   });
 
   it("survives topics with reserved and non-ASCII characters", () => {
     const topic = "spaced topic/+/ü&?=#/end";
     const url = buildTopicWindowURL({ connectionId: 2, topic });
-    expect(url.startsWith("/?")).toBe(true);
-    const params = new URLSearchParams(url.slice(2));
+    expect(url.startsWith("?")).toBe(true);
+    const params = new URLSearchParams(url.slice(1));
     expect(params.get("view")).toBe("topic");
     expect(params.get("conn")).toBe("2");
     expect(params.get("topic")).toBe(topic);
@@ -107,6 +115,7 @@ describe("open helpers", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    windowOpen.mockReturnValue({} as Window);
     (globalThis as any).window = { open: windowOpen };
   });
 
@@ -140,7 +149,21 @@ describe("open helpers", () => {
 
     openBrokerStatusWindow(4);
     expect(OpenBrokerStatusWindow).not.toHaveBeenCalled();
-    expect(windowOpen).toHaveBeenCalledWith("/?conn=4&view=status", "mv-status-4");
+    expect(windowOpen).toHaveBeenCalledWith("?conn=4&view=status", "mv-status-4");
+    expect(addToast).not.toHaveBeenCalled();
+  });
+
+  it("toasts when the tab is blocked instead of failing silently", () => {
+    // A pop-up blocker, or an iframe without allow-popups, returns null.
+    mockEnv.set({ isServerMode: true });
+    windowOpen.mockReturnValue(null);
+
+    openBrokerStatusWindow(4);
+    expect(addToast).toHaveBeenCalledTimes(1);
+    expect(addToast.mock.calls[0][0].data.type).toBe("error");
+
+    openChartWindow({ connectionId: 4, topic: "a/b", fields: [] });
+    expect(addToast).toHaveBeenCalledTimes(2);
   });
 
   // The topic tests below each use their own connection id: popout.ts keeps a
