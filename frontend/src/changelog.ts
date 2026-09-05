@@ -55,6 +55,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "unreleased",
+    released: false,
+    date: "In development",
+    headline: "In the next update",
+    intro:
+      "Here's what's landed since 1.1.0. I'll tidy these notes up and give them a version when the update ships.",
+    sections: [
+      {
+        group: "Fixed",
+        title: "Startup failures show an error instead of a blank window",
+        body: "If the app cannot initialise it now tells you what went wrong and where to report it.",
+      },
+      {
+        group: "Miscellaneous",
+        title: "Updated the Wails desktop shell to the current beta",
+        body: "The app runtime and the native shell now come from the same Wails release.",
+      },
+    ],
+  },
+  {
     version: "1.1.0",
     released: true,
     date: "September 2026",
