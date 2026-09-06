@@ -83,7 +83,7 @@ Builds cover x86_64 and ARM64. [mqttviewer.app/download/linux](https://mqttviewe
 
 | Format | Install | Updates |
 | --- | --- | --- |
-| AppImage | `chmod +x MQTT_Viewer-*.AppImage && ./MQTT_Viewer-*.AppImage` | The app tells you; download the next AppImage |
+| AppImage | `chmod +x MQTT_Viewer_*.AppImage && ./MQTT_Viewer_*.AppImage` | The app tells you; download the next AppImage |
 | deb | `sudo apt install ./MQTT_Viewer_*.deb` | The app tells you; install the next deb |
 | rpm | `sudo dnf install ./MQTT_Viewer_*.rpm` | The app tells you; install the next rpm |
 | Flatpak | See below | `flatpak update` |
