@@ -35,6 +35,10 @@ gh run list --limit 6
 # 6. flip `released` on the new release_v3 record in the PocketBase admin UI
 #    (https://cloud.mqttviewer.app/_/) once you're happy. This is what makes
 #    in-app update checks see the version.
+
+# 7. rebuild the website so /download shows the new version (after step 6)
+gh api repos/mqtt-viewer/mqttviewer.app/dispatches \
+  -f event_type=app-release -f "client_payload[version]=v0.X.Y"
 ```
 
 To re-run a failed release after fixing CI: delete + recreate the release.
@@ -120,6 +124,15 @@ Shared foundations that have bitten before:
   records with `released=true`.
 - Deploy the portal with `fly deploy -a mqttviewer-cloud` from the cloud repo;
   the same `CI_RELEASES_*` values must exist as fly secrets.
+
+## Website
+
+mqttviewer.app builds its download pages from the GitHub Releases API, using
+the newest non-prerelease release that has every expected asset. It rebuilds
+only on a push to its `main`, so after go-live send it a `repository_dispatch`
+(TL;DR step 7). The site repo's `Rebuild after app release` workflow commits a
+marker file, which triggers the Cloudflare build. `gh workflow run
+rebuild-on-release.yml -R mqtt-viewer/mqttviewer.app` does the same by hand.
 
 ## Expected assets per release
 
