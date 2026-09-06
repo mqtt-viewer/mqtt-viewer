@@ -50,7 +50,9 @@ Don't see a feature that would make your life easier? [I really, really want to 
 
 ## Installing
 
-Every release ships builds for all three platforms. The app checks for updates itself and, where the install type allows it, updates in place.
+The [download page](https://mqttviewer.app/download) picks the build for your machine and lists every file with its size and sha256 checksum. Every release ships macOS, Windows and Linux builds.
+
+Installed apps on macOS and Windows update themselves. AppImage, deb and rpm installs show a notice when a new version is out and link to it. Flatpak and Nix update through their own tools.
 
 ### Docker and Home Assistant
 
@@ -69,21 +71,21 @@ For Home Assistant, add [github.com/mqtt-viewer/home-assistant-addon](https://gi
 
 ### macOS
 
-Download the zip for Apple Silicon or Intel from [mqttviewer.app/download/mac](https://mqttviewer.app/download/mac), unzip, and drag MQTT Viewer to Applications. The app is signed and notarised.
+[mqttviewer.app/download/mac](https://mqttviewer.app/download/mac) has zips for Apple Silicon and Intel. Unzip and drag MQTT Viewer to Applications. The app is signed and notarised. macOS 12 or later.
 
 ### Windows
 
-Download the installer from [mqttviewer.app/download/windows](https://mqttviewer.app/download/windows). There are separate installers for x64 and ARM64, so Snapdragon laptops get a native build rather than emulation. A portable zip is on the releases page too.
+[mqttviewer.app/download/windows](https://mqttviewer.app/download/windows) has signed installers and portable zips for x64 and ARM64, so Snapdragon laptops get a native build rather than emulation. Windows 10 or later.
 
 ### Linux
 
-Builds cover x86_64 and ARM64. Pick whichever fits your distribution:
+Builds cover x86_64 and ARM64. [mqttviewer.app/download/linux](https://mqttviewer.app/download/linux) has the files, checksums and install steps for each format. Pick whichever fits your distribution:
 
 | Format | Install | Updates |
 | --- | --- | --- |
-| AppImage | `chmod +x MQTT_Viewer-*.AppImage && ./MQTT_Viewer-*.AppImage` | In-app |
-| deb | `sudo apt install ./MQTT_Viewer_*.deb` | Download the next deb |
-| rpm | `sudo dnf install ./MQTT_Viewer_*.rpm` | Download the next rpm |
+| AppImage | `chmod +x MQTT_Viewer-*.AppImage && ./MQTT_Viewer-*.AppImage` | The app tells you; download the next AppImage |
+| deb | `sudo apt install ./MQTT_Viewer_*.deb` | The app tells you; install the next deb |
+| rpm | `sudo dnf install ./MQTT_Viewer_*.rpm` | The app tells you; install the next rpm |
 | Flatpak | See below | `flatpak update` |
 | Nix | See below | `nix profile upgrade --all` |
 

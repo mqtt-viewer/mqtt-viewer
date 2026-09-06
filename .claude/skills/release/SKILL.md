@@ -1,6 +1,6 @@
 ---
 name: release
-description: Publish a MQTT Viewer release end to end. Use when the user says "release", "cut a release", "publish vX.Y.Z", "ship it", or "do a release". First drafts the changelog for user approval, then promotes it, creates the GitHub release that triggers the mac/windows/linux build+sign+portal workflows, watches them, and hands off the final go-live step.
+description: Publish a MQTT Viewer release end to end. Use when the user says "release", "cut a release", "publish vX.Y.Z", "ship it", or "do a release". First drafts the changelog for user approval, then promotes it, creates the GitHub release that triggers the mac/windows/linux build+sign+portal workflows, watches them, hands off the final go-live step, and triggers the website rebuild.
 ---
 
 # Release MQTT Viewer
@@ -136,6 +136,22 @@ with `released=false`. It reaches users only when someone flips `released=true`.
   it, and flip `released` when happy. The in-app updater
   (`POST /api/cv1/updates/v3/check`) only serves `released=true`.
 - This step is the user's to do. Do not attempt to flip it yourself.
+
+## 7. Rebuild the website
+
+The download pages on mqttviewer.app read the latest complete GitHub release at
+build time, but the site only rebuilds on a push. Once the user has flipped
+`released`, fire the site's rebuild workflow so the new version shows up:
+
+```sh
+gh api repos/mqtt-viewer/mqttviewer.app/dispatches \
+  -f event_type=app-release -f "client_payload[version]=VERSION"
+```
+
+It commits a marker file to the site's `main`, which Cloudflare builds and
+deploys. Check https://mqttviewer.app/download shows VERSION a few minutes
+later. Run it after step 6, not before: the site would otherwise advertise
+a version the in-app updater does not serve yet.
 
 ## Notes
 
