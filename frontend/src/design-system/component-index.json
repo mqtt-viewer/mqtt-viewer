@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-23T02:20:18.643Z",
+  "generatedAt": "2026-09-23T02:40:20.620Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3614,6 +3614,66 @@
       "specMissing": false
     },
     {
+      "name": "ConfirmRebirthDialog",
+      "tier": "component",
+      "description": "Confirms a Sparkplug rebirth request for one or more edge nodes before any NCMD is published.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "store",
+          "required": false,
+          "default": "writable(false)",
+          "description": "A boolean store, matching Dialog's open-state contract."
+        },
+        {
+          "name": "targets",
+          "type": "array",
+          "required": false,
+          "default": "[]",
+          "description": "The {group, node} edge nodes that will be asked to rebirth. More than one switches to the bulk wording and a list of up to 10."
+        },
+        {
+          "name": "busy",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "True while the requests are in flight. Both buttons disable and the dialog does not close until the parent closes it."
+        },
+        {
+          "name": "onConfirm",
+          "type": "function",
+          "required": true,
+          "description": "Called on confirm; returns a promise. The parent closes isOpen once it resolves."
+        }
+      ],
+      "tokens": [
+        "emphasis",
+        "outline",
+        "elevation-0",
+        "secondary-text"
+      ],
+      "dependencies": [
+        "Button",
+        "Dialog",
+        "IconButton",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. Mirrors ConfirmClearRetainedDialog: both publish something every other client on the broker sees.",
+      "sourcePath": "src/views/Connection/DataView/components/ConfirmRebirthDialog/ConfirmRebirthDialog.svelte",
+      "specPath": "src/views/Connection/DataView/components/ConfirmRebirthDialog/ConfirmRebirthDialog.spec.json",
+      "storyPath": "src/views/Connection/DataView/components/ConfirmRebirthDialog/ConfirmRebirthDialog.stories.svelte",
+      "storyId": "Components/Connection/DataView/ConfirmRebirthDialog",
+      "specMissing": false
+    },
+    {
       "name": "MqttDataPanel",
       "tier": "view",
       "description": "Storybook coverage for MqttDataPanel.",
@@ -3668,6 +3728,12 @@
           "type": "store",
           "required": true,
           "description": "This connection's pinned topics, shared with the selected-topic panel."
+        },
+        {
+          "name": "onRequestRebirth",
+          "type": "function",
+          "required": false,
+          "description": "Opens the rebirth confirmation for the Sparkplug view's node and bulk actions."
         }
       ],
       "tokens": [
@@ -3678,9 +3744,10 @@
       ],
       "dependencies": [
         "Button",
-        "SearchActionBar",
         "MqttTopicTree",
-        "SparkplugPanel"
+        "SearchActionBar",
+        "SparkplugPanel",
+        "ViewToggle"
       ],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.svelte",
@@ -3995,7 +4062,7 @@
     {
       "name": "SparkplugPanel",
       "tier": "view",
-      "description": "Sparkplug session tree: host state strip, virtualized group/node/device/metric tree with health meta, pinned warnings strip.",
+      "description": "Sparkplug session view: connection and alias banners with a bulk rebirth request, fleet summary with a problems filter, host state strip, virtualised group/node/device/metric tree, and a clickable warnings strip. Explains and offers to turn on decoding when it is off.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -4022,35 +4089,68 @@
           "type": "string",
           "required": false,
           "default": "",
-          "description": "Case-insensitive substring filter on node/device/metric names."
+          "description": "Case-insensitive substring filter on group/node/device/metric names. Opens everything while set."
+        },
+        {
+          "name": "decodingState",
+          "type": "string",
+          "required": false,
+          "default": "on",
+          "options": [
+            "on",
+            "off",
+            "needs-reconnect"
+          ],
+          "description": "off or needs-reconnect replaces the tree with an explanation and a button."
+        },
+        {
+          "name": "onEnableDecoding",
+          "type": "function",
+          "required": false,
+          "description": "Turns decoding on for the connection and reconnects."
         },
         {
           "name": "onRequestRebirth",
           "type": "function",
           "required": true,
-          "description": "(group, node) callback for the Request rebirth actions."
+          "description": "([{group, node}]) asks for rebirths; the caller confirms before anything is published."
         },
         {
           "name": "onCopyMetricList",
           "type": "function",
           "required": true,
           "description": "(node) callback for the Copy metric list action."
+        },
+        {
+          "name": "onSelectMetric",
+          "type": "function",
+          "required": false,
+          "description": "(metric) opens the topic of the message that last updated the metric."
+        },
+        {
+          "name": "onCopyValue",
+          "type": "function",
+          "required": false,
+          "description": "(metric) copies the metric's full value."
         }
       ],
       "tokens": [
         "secondary-text",
         "white-text",
+        "emphasis",
         "success",
         "error",
         "warning",
         "divider",
-        "hovered"
+        "hovered",
+        "elevation-2"
       ],
       "dependencies": [
         "SparkplugRow",
-        "Icon"
+        "Icon",
+        "Button"
       ],
-      "notes": "Figma is not linked yet; stories use local fixtures. Expansion state is panel-local (everything defaults expanded).",
+      "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and the user's clicks override per key.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.stories.svelte",
@@ -4060,7 +4160,7 @@
     {
       "name": "SparkplugRow",
       "tier": "view",
-      "description": "One virtualized Sparkplug tree row: group, edge node (with health meta and hover actions), device, or metric (type/value/last-seen/badges).",
+      "description": "One virtualised Sparkplug tree row: group, edge node (status, problem badges, hover actions), device, or metric (value with unit, quality, flags, type, age, copy). Rows are keyboard-reachable tree items.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -4083,19 +4183,48 @@
           "description": "Reference now for relative ages (from the store snapshot)."
         },
         {
+          "name": "isSelected",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "The metric row last opened."
+        },
+        {
+          "name": "isHighlighted",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Flashes a node row revealed from a warning."
+        },
+        {
           "name": "onToggleExpansion",
           "type": "function",
-          "required": true
+          "required": true,
+          "description": "(key) toggles a group, node or device row."
         },
         {
           "name": "onRequestRebirth",
           "type": "function",
-          "required": true
+          "required": true,
+          "description": "(group, node) asks for a rebirth (confirmed by the caller)."
         },
         {
           "name": "onCopyMetricList",
           "type": "function",
-          "required": true
+          "required": true,
+          "description": "(node) copies the node's metric list as JSON."
+        },
+        {
+          "name": "onSelectMetric",
+          "type": "function",
+          "required": true,
+          "description": "(metric, rowKey) opens the metric's topic."
+        },
+        {
+          "name": "onCopyValue",
+          "type": "function",
+          "required": true,
+          "description": "(metric) copies the full value."
         }
       ],
       "tokens": [
@@ -4104,10 +4233,10 @@
         "success",
         "error",
         "warning",
-        "hovered"
+        "hovered",
+        "primary"
       ],
       "dependencies": [
-        "Button",
         "Icon",
         "DropdownMenu",
         "DropdownMenuItem",
@@ -4515,6 +4644,13 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "onRequestRebirth",
+          "type": "function",
+          "required": false,
+          "default": null,
+          "description": "Passed to PayloadTab for the Sparkplug banner's Request rebirth action."
         }
       ],
       "tokens": [
@@ -4967,14 +5103,14 @@
           "type": "object",
           "required": false,
           "default": null,
-          "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders the decode banner when present."
+          "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders a one-line banner saying where the names came from (published, filled in from a birth, carried over a connection drop, or unresolved)."
         },
         {
-          "name": "connectionId",
-          "type": "number",
+          "name": "onRequestRebirth",
+          "type": "function",
           "required": false,
           "default": null,
-          "description": "Needed for the unresolved banner's Request rebirth action."
+          "description": "([{group, node}]) asks for a rebirth from the banner when names are unresolved or unverified. The caller confirms first."
         }
       ],
       "tokens": [
@@ -4985,8 +5121,9 @@
         "warning"
       ],
       "dependencies": [
+        "Button",
         "SparkplugLogo",
-        "Button"
+        "Tooltip"
       ],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
       "sourcePath": "src/views/Connection/DataView/components/SelectedTopicPanel/components/PayloadTab.svelte",

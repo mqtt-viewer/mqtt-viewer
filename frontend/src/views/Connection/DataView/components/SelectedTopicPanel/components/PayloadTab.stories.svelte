@@ -84,7 +84,7 @@
     payload: SPARKPLUG_PAYLOAD,
     payloadB64: null,
     format: "json-prettier",
-    connectionId: 1,
+    onRequestRebirth: () => {},
     sparkplugMeta: {
       msgType: "NDATA",
       group: "EnergyCo",
@@ -104,12 +104,34 @@
     payload: SPARKPLUG_UNRESOLVED_PAYLOAD,
     payloadB64: null,
     format: "json-prettier",
-    connectionId: 1,
+    onRequestRebirth: () => {},
     sparkplugMeta: {
       msgType: "NDATA",
       group: "EnergyCo",
       edgeNode: "substation-2",
       resolution: "unresolved",
+    },
+  }}
+  {template}
+/>
+
+<Story
+  name="Sparkplug names carried over"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: SPARKPLUG_PAYLOAD,
+    payloadB64: null,
+    format: "json-prettier",
+    onRequestRebirth: () => {},
+    sparkplugMeta: {
+      msgType: "NDATA",
+      group: "EnergyCo",
+      edgeNode: "substation-7",
+      resolution: "resolved",
+      carriedOver: true,
+      birthAtMs: Date.now() - 45 * 60_000,
+      seqGap: { expected: 12, got: 15 },
     },
   }}
   {template}
@@ -123,7 +145,7 @@
     payload: SPARKPLUG_PAYLOAD,
     payloadB64: null,
     format: "json-prettier",
-    connectionId: 1,
+    onRequestRebirth: () => {},
     sparkplugMeta: {
       msgType: "NBIRTH",
       group: "EnergyCo",

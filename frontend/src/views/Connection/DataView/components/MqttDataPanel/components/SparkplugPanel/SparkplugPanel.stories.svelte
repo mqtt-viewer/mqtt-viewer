@@ -9,6 +9,8 @@
     mockSparkplugTreeStateEmpty,
     mockSparkplugTreeStateUnresolved,
     mockSparkplugTreeStateHostOffline,
+    mockSparkplugTreeStateReconnected,
+    mockSparkplugTreeStateDisconnected,
   } from "@/stories/fixtures";
 
   const componentName = "SparkplugPanel";
@@ -17,8 +19,12 @@
     "treeState",
     "width",
     "filter",
+    "decodingState",
+    "onEnableDecoding",
     "onRequestRebirth",
     "onCopyMetricList",
+    "onSelectMetric",
+    "onCopyValue",
   ];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
@@ -57,6 +63,30 @@
 <Story
   name="HostOffline"
   args={{ ...storyArgs, treeState: mockSparkplugTreeStateHostOffline }}
+  {template}
+/>
+<Story
+  name="Reconnected"
+  args={{ ...storyArgs, treeState: mockSparkplugTreeStateReconnected }}
+  {template}
+/>
+<Story
+  name="Disconnected"
+  args={{ ...storyArgs, treeState: mockSparkplugTreeStateDisconnected }}
+  {template}
+/>
+<Story
+  name="DecodingOff"
+  args={{ ...storyArgs, treeState: mockSparkplugTreeStateEmpty, decodingState: "off" }}
+  {template}
+/>
+<Story
+  name="NeedsReconnect"
+  args={{
+    ...storyArgs,
+    treeState: mockSparkplugTreeStateEmpty,
+    decodingState: "needs-reconnect",
+  }}
   {template}
 />
 <Story

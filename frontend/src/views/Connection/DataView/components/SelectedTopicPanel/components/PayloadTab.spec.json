@@ -60,14 +60,14 @@
       "type": "object",
       "required": false,
       "default": null,
-      "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders the decode banner when present."
+      "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders a one-line banner saying where the names came from (published, filled in from a birth, carried over a connection drop, or unresolved)."
     },
     {
-      "name": "connectionId",
-      "type": "number",
+      "name": "onRequestRebirth",
+      "type": "function",
       "required": false,
       "default": null,
-      "description": "Needed for the unresolved banner's Request rebirth action."
+      "description": "([{group, node}]) asks for a rebirth from the banner when names are unresolved or unverified. The caller confirms first."
     }
   ],
   "tokens": [
@@ -77,6 +77,10 @@
     "divider",
     "warning"
   ],
-  "dependencies": ["SparkplugLogo", "Button"],
+  "dependencies": [
+    "Button",
+    "SparkplugLogo",
+    "Tooltip"
+  ],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
 }

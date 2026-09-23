@@ -1,0 +1,56 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "ConfirmRebirthDialog",
+  "tier": "component",
+  "description": "Confirms a Sparkplug rebirth request for one or more edge nodes before any NCMD is published.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "isOpen",
+      "type": "store",
+      "required": false,
+      "default": "writable(false)",
+      "description": "A boolean store, matching Dialog's open-state contract."
+    },
+    {
+      "name": "targets",
+      "type": "array",
+      "required": false,
+      "default": "[]",
+      "description": "The {group, node} edge nodes that will be asked to rebirth. More than one switches to the bulk wording and a list of up to 10."
+    },
+    {
+      "name": "busy",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "True while the requests are in flight. Both buttons disable and the dialog does not close until the parent closes it."
+    },
+    {
+      "name": "onConfirm",
+      "type": "function",
+      "required": true,
+      "description": "Called on confirm; returns a promise. The parent closes isOpen once it resolves."
+    }
+  ],
+  "tokens": [
+    "emphasis",
+    "outline",
+    "elevation-0",
+    "secondary-text"
+  ],
+  "dependencies": [
+    "Button",
+    "Dialog",
+    "IconButton",
+    "Icon"
+  ],
+  "notes": "Figma is not linked yet. Mirrors ConfirmClearRetainedDialog: both publish something every other client on the broker sees."
+}

@@ -7,6 +7,7 @@
     getStoryArgs,
     mockSparkplugTreeState,
     mockSparkplugTreeStateUnresolved,
+    mockSparkplugTreeStateReconnected,
   } from "@/stories/fixtures";
 
   const componentName = "SparkplugRow";
@@ -15,9 +16,13 @@
   const props: string[] = [
     "row",
     "nowMs",
+    "isSelected",
+    "isHighlighted",
     "onToggleExpansion",
     "onRequestRebirth",
     "onCopyMetricList",
+    "onSelectMetric",
+    "onCopyValue",
   ];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
@@ -25,8 +30,9 @@
   const onlineNode = group.nodes.find((n) => n.name === "substation-7")!;
   const gapNode = group.nodes.find((n) => n.name === "substation-4")!;
   const offlineNode = group.nodes.find((n) => n.name === "substation-9")!;
-  const unresolvedMetric =
-    mockSparkplugTreeStateUnresolved.groups[0].nodes[0].metrics[0];
+  const unresolvedNode = mockSparkplugTreeStateUnresolved.groups[0].nodes[0];
+  const unresolvedMetric = unresolvedNode.metrics[0];
+  const unknownNode = mockSparkplugTreeStateReconnected.groups[0].nodes[1];
 
   const { Story } = defineMeta({
     // prettier-ignore
@@ -111,7 +117,7 @@
   {template}
 />
 <Story
-  name="MetricStale"
+  name="MetricBadQuality"
   args={{
     ...storyArgs,
     row: {
@@ -119,7 +125,79 @@
       key: "EnergyCo/substation-7",
       levelCount: 2,
       isExpanded: false,
+      metric: onlineNode.metrics[4],
+    },
+  }}
+  {template}
+/>
+<Story
+  name="MetricArray"
+  args={{
+    ...storyArgs,
+    row: {
+      kind: "metric",
+      key: "EnergyCo/substation-7",
+      levelCount: 2,
+      isExpanded: false,
+      metric: onlineNode.metrics[2],
+    },
+  }}
+  {template}
+/>
+<Story
+  name="MetricSelected"
+  args={{
+    ...storyArgs,
+    isSelected: true,
+    row: {
+      kind: "metric",
+      key: "EnergyCo/substation-7",
+      levelCount: 2,
+      isExpanded: false,
       metric: onlineNode.metrics[3],
+    },
+  }}
+  {template}
+/>
+<Story
+  name="NodeNoBirth"
+  args={{
+    ...storyArgs,
+    row: {
+      kind: "node",
+      key: "EnergyCo/substation-2",
+      levelCount: 1,
+      isExpanded: true,
+      node: unresolvedNode,
+    },
+  }}
+  {template}
+/>
+<Story
+  name="NodeUnknownAfterDrop"
+  args={{
+    ...storyArgs,
+    row: {
+      kind: "node",
+      key: "EnergyCo/substation-8",
+      levelCount: 1,
+      isExpanded: true,
+      node: unknownNode,
+    },
+  }}
+  {template}
+/>
+<Story
+  name="DeviceAwaitingBirth"
+  args={{
+    ...storyArgs,
+    row: {
+      kind: "device",
+      key: "EnergyCo/substation-8/meter-02",
+      levelCount: 2,
+      isExpanded: true,
+      node: unknownNode,
+      device: unknownNode.devices[0],
     },
   }}
   {template}

@@ -24,6 +24,8 @@
     ExportTopicMessagesData,
   } from "bindings/mqtt-viewer/backend/app/app";
   import ConfirmClearRetainedDialog from "./components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
+  import ConfirmRebirthDialog from "./components/ConfirmRebirthDialog/ConfirmRebirthDialog.svelte";
+  import { createRebirthFlow } from "./sparkplug-rebirth";
   import { createClearRetainedFlow, onRetainedCleared } from "./clear-retained";
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
@@ -254,6 +256,11 @@
   const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
     clearRetained;
 
+  // Sparkplug rebirth requests command a live edge node, so every surface
+  // (tree rows, the bulk banner, the payload banner) confirms through here.
+  const rebirth = createRebirthFlow(connection.connectionDetails.id);
+  const { isOpen: isRebirthOpen, request: rebirthRequest } = rebirth;
+
   // This is how clears done in the pop-out window reach this window's tree
   // and graph: the pop-out is a separate webview with no access to dataPanel.
   let unlistenRetainedCleared: (() => void) | null = null;
@@ -376,6 +383,7 @@
             {exportTopicMessages}
             onClearRetained={clearRetained.requestClear}
             onClearRetainedBelow={clearRetained.requestClearBelow}
+            onRequestRebirth={rebirth.requestRebirth}
           />
         {/if}
       </div>
@@ -397,6 +405,7 @@
             onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
             onClearRetained={clearRetained.requestClear}
             onClearRetainedBelow={clearRetained.requestClearBelow}
+            onRequestRebirth={rebirth.requestRebirth}
             firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
             mqttVersion={connection.connectionDetails.mqttVersion === "3"
               ? "3"
@@ -433,6 +442,7 @@
           onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
           onClearRetained={clearRetained.requestClear}
           onClearRetainedBelow={clearRetained.requestClearBelow}
+          onRequestRebirth={rebirth.requestRebirth}
           firstConnectedAtMs={connection.firstConnectedThisSessionAtMs ?? 0}
           mqttVersion={connection.connectionDetails.mqttVersion === "3"
             ? "3"
@@ -499,4 +509,11 @@
   topics={$clearRetainedRequest.topics}
   busy={$clearRetainedRequest.busy}
   onConfirm={clearRetained.confirm}
+/>
+
+<ConfirmRebirthDialog
+  isOpen={isRebirthOpen}
+  targets={$rebirthRequest.targets}
+  busy={$rebirthRequest.busy}
+  onConfirm={rebirth.confirm}
 />

@@ -39,6 +39,10 @@
   export let copyTopicPath: (topic: string) => void;
   export let onClearRetained: (topic: string) => void;
   export let onClearRetainedBelow: (prefix: string) => void;
+  /** Sparkplug rebirth requests from the payload banner (confirmed upstream). */
+  export let onRequestRebirth:
+    | ((targets: { group: string; node: string }[]) => void)
+    | null = null;
   /** Whether the selected topic is pinned to the top of the topic tree. */
   export let isPinned = false;
   export let onTogglePin: (topic: string) => void = () => {};
@@ -491,7 +495,7 @@
                 selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
-              {connectionId}
+              {onRequestRebirth}
               sparkplugMeta={selectedMessageSparkplugMeta}
             />
           {:else}
@@ -566,7 +570,7 @@
                 selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
-              {connectionId}
+              {onRequestRebirth}
               sparkplugMeta={selectedMessageSparkplugMeta}
             />
           {:else}

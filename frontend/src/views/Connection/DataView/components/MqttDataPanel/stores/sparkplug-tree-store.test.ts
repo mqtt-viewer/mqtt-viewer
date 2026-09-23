@@ -25,13 +25,13 @@ vi.mock("bindings/mqtt-viewer/backend/app/app", () => ({
 
 import {
   createSparkplugTreeStore,
-  STALE_AFTER_MS,
   WARNING_CAP,
   TICKER_MS,
   BACKFILL_IDLE_MS,
   MAX_TRACKED_NODES,
   MAX_TRACKED_DEVICES,
   MAX_PLACEHOLDER_METRICS,
+  MAX_TRACKED_HOSTS,
   type SparkplugTreeState,
   type SparkplugNode,
 } from "./sparkplug-tree-store";
@@ -120,6 +120,7 @@ const ndata = (
     seqGap?: { expected: number; got: number };
     resolution?: string;
     birthAtMs?: number;
+    carriedOver?: boolean;
   } = {}
 ) => {
   const group = opts.group ?? "EnergyCo";
@@ -135,6 +136,7 @@ const ndata = (
   };
   if (opts.seqGap) meta.seqGap = opts.seqGap;
   if (opts.birthAtMs !== undefined) meta.birthAtMs = opts.birthAtMs;
+  if (opts.carriedOver) meta.carriedOver = true;
   return msg(
     `spBv1.0/${group}/NDATA/${node}`,
     JSON.stringify({ timestamp: String(timeMs), metrics, seq: "1" }),
@@ -308,12 +310,13 @@ describe("createSparkplugTreeStore — births and datas", () => {
     store.destroy();
   });
 
-  it("formats numbers to at most 6 significant digits, keeping the raw value", async () => {
+  it("shows exact values, keeping the raw value for copy", async () => {
     const store = await makeStore();
     emit("msgs", [
       ndata(BASE_MS, {
         metrics: [
           { name: "Pi", doubleValue: 3.14159265358979, timestamp: String(BASE_MS) },
+          { name: "Energy", datatype: 10, doubleValue: 152340.5, timestamp: String(BASE_MS) },
           { name: "Big", longValue: "9007199254740993", timestamp: String(BASE_MS) },
           { name: "Null", isNull: true, timestamp: String(BASE_MS) },
         ],
@@ -321,14 +324,88 @@ describe("createSparkplugTreeStore — births and datas", () => {
     ]);
     const node = findNode(get(store), "EnergyCo", "substation-7");
     const pi = node.metrics.find((m) => m.name === "Pi")!;
-    expect(pi.value).toBe("3.14159");
-    expect(pi.valueRaw).toBe("3.14159265358979");
+    expect(pi.value).toBe("3.14159265358979");
+    // Rounding to 6 significant digits used to show this as 152341.
+    expect(node.metrics.find((m) => m.name === "Energy")!.value).toBe("152340.5");
     const big = node.metrics.find((m) => m.name === "Big")!;
     expect(big.value).toBe("9007199254740993");
     expect(big.valueRaw).toBe("9007199254740993");
     const nul = node.metrics.find((m) => m.name === "Null")!;
     expect(nul.value).toBe("null");
     expect(nul.isNull).toBe(true);
+    store.destroy();
+  });
+
+  it("formats data values with the datatype declared in the birth", async () => {
+    const store = await makeStore();
+    emit("msgs", [
+      nbirth(BASE_MS, {
+        metrics: [
+          { name: "Offset", alias: "1", datatype: 3, intValue: 0 },
+          {
+            name: "Temp",
+            alias: "2",
+            datatype: 9,
+            floatValue: 20,
+            properties: { keys: ["engUnit"], values: [{ type: 12, stringValue: "degC" }] },
+          },
+        ],
+      }),
+    ]);
+    // NDATA omits datatype; -5 as an Int32 arrives as its two's complement.
+    emit("msgs", [
+      ndata(BASE_MS + 1000, {
+        metrics: [
+          { name: "Offset", alias: "1", intValue: 4294967291 },
+          { name: "Temp", alias: "2", floatValue: 21.100000381469727 },
+        ],
+      }),
+    ]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics.find((m) => m.name === "Offset")!.value).toBe("-5");
+    const temp = node.metrics.find((m) => m.name === "Temp")!;
+    expect(temp.value).toBe("21.1");
+    // The unit rides on the birth only and survives data updates.
+    expect(temp.unit).toBe("degC");
+    store.destroy();
+  });
+
+  it("flags metrics whose published quality is not good", async () => {
+    const store = await makeStore();
+    emit("msgs", [
+      ndata(BASE_MS, {
+        metrics: [
+          {
+            name: "Flow",
+            datatype: 10,
+            doubleValue: 1,
+            properties: { keys: ["Quality"], values: [{ type: 3, intValue: 0 }] },
+          },
+          {
+            name: "Level",
+            datatype: 10,
+            doubleValue: 2,
+            properties: { keys: ["Quality"], values: [{ type: 3, intValue: 192 }] },
+          },
+        ],
+      }),
+    ]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics.find((m) => m.name === "Flow")!.quality).toBe("bad");
+    expect(node.metrics.find((m) => m.name === "Level")!.quality).toBeUndefined();
+    store.destroy();
+  });
+
+  it("records the topic that last updated each metric", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS), ndata(BASE_MS + 1000)]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics.find((m) => m.name === "Volts/L1")!.topic).toBe(
+      "spBv1.0/EnergyCo/NDATA/substation-7"
+    );
+    expect(node.metrics.find((m) => m.name === "Amps/L1")!.topic).toBe(
+      "spBv1.0/EnergyCo/NBIRTH/substation-7"
+    );
     store.destroy();
   });
 });
@@ -421,7 +498,7 @@ describe("createSparkplugTreeStore — rebirth storms", () => {
     );
     expect(state.warnings[0].timeMs).toBe(BASE_MS + 50_000);
     const node = findNode(state, "EnergyCo", "substation-7");
-    expect(node.rebirthCount90s).toBeGreaterThanOrEqual(4);
+    expect(node.storm).toBe(true);
     store.destroy();
   });
 
@@ -534,37 +611,40 @@ describe("createSparkplugTreeStore — host STATE", () => {
   });
 });
 
-describe("createSparkplugTreeStore — staleness", () => {
-  it("flags an online node's quiet metric stale after the threshold", async () => {
+describe("createSparkplugTreeStore — status", () => {
+  it("treats a node that only sends data as online", async () => {
+    // The mid-session case: births are rarely retained, so most nodes are
+    // first seen through their data.
     const store = await makeStore();
-    emit("msgs", [nbirth(BASE_MS)]);
-    vi.advanceTimersByTime(STALE_AFTER_MS + 2000); // ticker recomputes
+    emit("msgs", [ndata(BASE_MS, { resolution: "unresolved", metrics: [{ alias: "3", floatValue: 1 }] })]);
     const node = findNode(get(store), "EnergyCo", "substation-7");
-    expect(node.metrics.every((m) => m.stale)).toBe(true);
+    expect(node.status).toBe("online");
+    expect(node.hasBirth).toBe(false);
     store.destroy();
   });
 
-  it("does not mark offline nodes' metrics stale", async () => {
+  it("brings a dead node back online on newer data", async () => {
     const store = await makeStore();
-    emit("msgs", [nbirth(BASE_MS), ndeath(BASE_MS + 100)]);
-    vi.advanceTimersByTime(STALE_AFTER_MS + 2000);
+    emit("msgs", [nbirth(BASE_MS), ndeath(BASE_MS + 1000)]);
+    expect(findNode(get(store), "EnergyCo", "substation-7").status).toBe("offline");
+    emit("msgs", [ndata(BASE_MS + 2000, { resolution: "unresolved", metrics: [{ alias: "3", floatValue: 1 }] })]);
     const node = findNode(get(store), "EnergyCo", "substation-7");
-    expect(node.metrics.some((m) => m.stale)).toBe(false);
+    expect(node.status).toBe("online");
+    // The dead session's names are retired rather than shown beside the new
+    // session's unresolved aliases.
+    expect(node.metrics.map((m) => m.name)).toEqual(["alias_3"]);
     store.destroy();
   });
 
-  it("freezes staleness while disconnected and resumes on reconnect", async () => {
+  it("does not age metrics into a warning state", async () => {
+    // Sparkplug reports by exception: a metric that hasn't changed for an
+    // hour is normal, so nothing flags it.
     const store = await makeStore();
     emit("msgs", [nbirth(BASE_MS)]);
-    emit("disc");
-    vi.advanceTimersByTime(STALE_AFTER_MS * 3);
-    // Frozen at the disconnect time: nothing went stale while down.
-    let node = findNode(store.snapshot(), "EnergyCo", "substation-7");
-    expect(node.metrics.some((m) => m.stale)).toBe(false);
-    emit("conn");
-    vi.advanceTimersByTime(2000);
-    node = findNode(get(store), "EnergyCo", "substation-7");
-    expect(node.metrics.every((m) => m.stale)).toBe(true); // real time elapsed
+    vi.advanceTimersByTime(3_600_000);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.status).toBe("online");
+    expect(Object.keys(node.metrics[0])).not.toContain("stale");
     store.destroy();
   });
 });
@@ -763,11 +843,14 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     resolveHist([shared]);
     await backfillPromise;
 
+    // If `shared` had been ingested twice its ring would hold 2 entries, and
+    // two more distinct births would already make a storm of 4.
+    emit("msgs", [
+      nbirth(BASE_MS + 20, { node: "dup-node" }),
+      nbirth(BASE_MS + 30, { node: "dup-node" }),
+    ]);
     const state = get(store);
-    const dupNode = findNode(state, "EnergyCo", "dup-node");
-    // If `shared` had been ingested twice, birthRing would hold 2 entries
-    // and rebirthCount90s would read 2 instead of 1.
-    expect(dupNode.rebirthCount90s).toBe(1);
+    expect(findNode(state, "EnergyCo", "dup-node").storm).toBe(false);
 
     const liveOnlyNode = findNode(state, "EnergyCo", "live-only-node");
     expect(liveOnlyNode.hasBirth).toBe(true);
@@ -790,8 +873,15 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
   });
 });
 
-describe("createSparkplugTreeStore — reconnect", () => {
-  it("clears the tree and freezes staleness on mqttReconnecting, keeping the toggle", async () => {
+describe("createSparkplugTreeStore — connection drops", () => {
+  const dropAndReturn = (store: any, event = "reconnecting") => {
+    vi.advanceTimersByTime(1000);
+    emit(event);
+    vi.advanceTimersByTime(5000);
+    emit("conn");
+  };
+
+  it("keeps the tree through a drop but stops vouching for it", async () => {
     const store = await makeStore();
     emit("msgs", [
       nbirth(BASE_MS),
@@ -804,39 +894,86 @@ describe("createSparkplugTreeStore — reconnect", () => {
         { msgType: "STATE", hostId: "scada-primary" }
       ),
     ]);
-    expect(get(store).groups).toHaveLength(1);
 
     vi.advanceTimersByTime(1000);
     emit("reconnecting");
-
-    const state = get(store);
-    // The backend session store resets too, so nothing pre-drop stays live.
-    expect(state.groups).toHaveLength(0);
-    expect(state.hosts).toHaveLength(0);
-    expect(state.warnings).toHaveLength(0);
-    expect(state.warningCount).toBe(0);
-    // ...but the toggle must not vanish under the user.
-    expect(state.hasSparkplug).toBe(true);
-
-    // Staleness is frozen at the drop, and no fresh backfill is kicked off.
+    let state = get(store);
+    expect(state.connected).toBe(false);
+    expect(state.droppedAtMs).toBe(BASE_MS + 1000);
+    let node = findNode(state, "EnergyCo", "substation-7");
+    // Values and warnings stay browsable.
+    expect(node.metrics.length).toBeGreaterThan(0);
+    expect(state.warnings).toHaveLength(1);
+    expect(state.hosts).toHaveLength(1);
+    // Nothing can be known while away.
+    expect(node.status).toBe("unknown");
+    expect(node.verified).toBe(false);
+    // The clock freezes at the drop.
     const frozen = state.nowMs;
     vi.advanceTimersByTime(60_000);
-    emit("msgs", [nbirth(BASE_MS + 61_000)]);
-    expect(get(store).nowMs).toBe(frozen);
-    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+    expect(store.snapshot().nowMs).toBe(frozen);
+
+    emit("conn");
+    state = get(store);
+    node = findNode(state, "EnergyCo", "substation-7");
+    // Back, but nothing heard from the node since the drop yet.
+    expect(node.status).toBe("unknown");
+    expect(node.hasBirth).toBe(true);
+    expect(node.verified).toBe(false);
     store.destroy();
   });
 
-  it("resumes ticking once reconnected", async () => {
+  it("confirms a node online when it is heard from after the drop", async () => {
     const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS)]);
+    dropAndReturn(store);
+    emit("msgs", [ndata(Date.now(), { carriedOver: true })]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.status).toBe("online");
+    // Names still come from the pre-drop birth.
+    expect(node.verified).toBe(false);
+    store.destroy();
+  });
+
+  it("verifies names again on a birth after the drop", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS)]);
+    dropAndReturn(store, "disc");
+    emit("msgs", [nbirth(Date.now())]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.status).toBe("online");
+    expect(node.verified).toBe(true);
+    store.destroy();
+  });
+
+  it("marks names unverified from backend meta alone", async () => {
+    // A drop that happened before this store was created is only known to
+    // the backend, which flags the data it resolves from pre-drop births.
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS), ndata(BASE_MS + 1000, { carriedOver: true })]);
+    expect(findNode(get(store), "EnergyCo", "substation-7").verified).toBe(false);
+    store.destroy();
+  });
+
+  it("starts unknown when created while disconnected", async () => {
+    const store = createSparkplugTreeStore(CONN, eventSet, { connected: false });
+    store.init();
+    await store.activate();
+    emit("msgs", [nbirth(BASE_MS - 10_000)]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.status).toBe("unknown");
+    expect(node.verified).toBe(false);
+    store.destroy();
+  });
+
+  it("does not refetch history after a reconnect and resumes ticking", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS)]);
     emit("reconnecting");
     expect(vi.getTimerCount()).toBe(0);
     emit("conn");
-    emit("msgs", [nbirth(BASE_MS)]);
     expect(vi.getTimerCount()).toBe(1);
-    vi.advanceTimersByTime(STALE_AFTER_MS + 2000);
-    const node = findNode(get(store), "EnergyCo", "substation-7");
-    expect(node.metrics.every((m) => m.stale)).toBe(true);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
     store.destroy();
   });
 });
@@ -951,8 +1088,11 @@ describe("createSparkplugTreeStore — duplicate delivery", () => {
     const store = await makeStore();
     const birth = nbirth(BASE_MS);
     for (let i = 0; i < 6; i++) emit("msgs", [birth]);
+    // Three more distinct births make 4 only if the redeliveries were not
+    // counted.
+    emit("msgs", [nbirth(BASE_MS + 10), nbirth(BASE_MS + 20)]);
     const state = get(store);
-    expect(findNode(state, "EnergyCo", "substation-7").rebirthCount90s).toBe(1);
+    expect(findNode(state, "EnergyCo", "substation-7").storm).toBe(false);
     expect(state.warnings).toHaveLength(0);
     store.destroy();
   });
@@ -1003,7 +1143,6 @@ describe("createSparkplugTreeStore — out-of-order replay", () => {
     const node = findNode(get(store), "EnergyCo", "substation-7");
     expect(node.metrics.map((m) => m.name)).toEqual(["New"]);
     expect(node.birthAtMs).toBe(BASE_MS + 5000);
-    expect(node.rebirthCount90s).toBe(1);
     store.destroy();
   });
 
@@ -1014,6 +1153,141 @@ describe("createSparkplugTreeStore — out-of-order replay", () => {
     const node = findNode(get(store), "EnergyCo", "substation-7");
     expect(node.hasBirth).toBe(true);
     expect(node.birthAtMs).toBe(BASE_MS);
+    store.destroy();
+  });
+
+  it("keeps newer live values when an older birth is replayed", async () => {
+    // The first live batch always lands before the backfill it triggers.
+    const store = await makeStore();
+    emit("msgs", [
+      ndata(BASE_MS + 2000, {
+        metrics: [{ name: "Volts/L1", alias: "3", floatValue: 999 }],
+      }),
+    ]);
+    emit("msgs", [nbirth(BASE_MS + 1000)]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    const volts = node.metrics.find((m) => m.name === "Volts/L1")!;
+    expect(volts.value).toBe("999");
+    expect(volts.lastSeenMs).toBe(BASE_MS + 2000);
+    // The birth's other metrics still arrive, and its type sticks.
+    expect(node.metrics.find((m) => m.name === "Amps/L1")).toBeDefined();
+    expect(volts.typeName).toBe("Float");
+    store.destroy();
+  });
+
+  it("does not let an older replayed death take down a revived node", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS + 10_000)]);
+    emit("msgs", [ndeath(BASE_MS + 5_000)]);
+    const node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.status).toBe("online");
+    expect(node.hasBirth).toBe(true);
+    store.destroy();
+  });
+
+  it("does not let an older replayed seq gap re-flag a node a birth cleared", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS + 10_000)]);
+    emit("msgs", [ndata(BASE_MS + 5_000, { seqGap: { expected: 1, got: 3 } })]);
+    expect(findNode(get(store), "EnergyCo", "substation-7").seqOk).toBe(true);
+    store.destroy();
+  });
+
+  it("lands on the same tree whatever order the messages arrive in", async () => {
+    const messages = [
+      nbirth(BASE_MS),
+      dbirth(BASE_MS + 100),
+      ndata(BASE_MS + 200, { metrics: [{ name: "Volts/L1", alias: "3", floatValue: 241 }] }),
+      ddata(BASE_MS + 300),
+      ndeath(BASE_MS + 400),
+      nbirth(BASE_MS + 500),
+      ndata(BASE_MS + 600, { metrics: [{ name: "Amps/L1", alias: "5", floatValue: 13 }] }),
+    ];
+    const settle = async (order: any[]) => {
+      const store = await makeStore();
+      for (const m of order) emit("msgs", [m]);
+      const node = findNode(get(store), "EnergyCo", "substation-7");
+      store.destroy();
+      return JSON.stringify({
+        status: node.status,
+        hasBirth: node.hasBirth,
+        metrics: node.metrics.map((m) => [m.name, m.value]),
+        devices: node.devices.map((d) => [d.name, d.status, d.metrics.map((m) => m.value)]),
+      });
+    };
+    const forward = await settle(messages);
+    expect(await settle([...messages].reverse())).toBe(forward);
+    expect(await settle([messages[3], messages[6], messages[0], messages[4], messages[1], messages[5], messages[2]])).toBe(forward);
+  });
+});
+
+describe("createSparkplugTreeStore — node rebirth and devices", () => {
+  it("retires a device's metrics when its node rebirths, until a new DBIRTH", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS), dbirth(BASE_MS + 100)]);
+    emit("msgs", [nbirth(BASE_MS + 1000)]);
+    let device = findNode(get(store), "EnergyCo", "substation-7").devices[0];
+    expect(device.metrics).toHaveLength(0);
+    expect(device.awaitingBirth).toBe(true);
+    expect(device.hasBirth).toBe(false);
+
+    emit("msgs", [dbirth(BASE_MS + 1100)]);
+    device = findNode(get(store), "EnergyCo", "substation-7").devices[0];
+    expect(device.metrics).toHaveLength(1);
+    expect(device.awaitingBirth).toBe(false);
+    expect(device.hasBirth).toBe(true);
+    store.destroy();
+  });
+
+  it("ignores a replayed DBIRTH older than its node's latest NBIRTH", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS + 1000)]);
+    emit("msgs", [dbirth(BASE_MS + 100)]);
+    const device = findNode(get(store), "EnergyCo", "substation-7").devices[0];
+    expect(device.metrics).toHaveLength(0);
+    store.destroy();
+  });
+});
+
+describe("createSparkplugTreeStore — bounds", () => {
+  it("does not create a group for a node rejected by the node cap", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = await makeStore();
+    const births = [];
+    for (let i = 0; i < MAX_TRACKED_NODES; i++) births.push(nbirth(BASE_MS, { group: "G", node: `n${i}` }));
+    emit("msgs", births);
+    const extra = [];
+    for (let i = 0; i < 50; i++) extra.push(nbirth(BASE_MS, { group: `other-${i}`, node: "x" }));
+    emit("msgs", extra);
+    expect(get(store).groups.map((g) => g.name)).toEqual(["G"]);
+    warn.mockRestore();
+    store.destroy();
+  });
+
+  it("caps STATE hosts", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = await makeStore();
+    const states = [];
+    for (let i = 0; i < MAX_TRACKED_HOSTS + 20; i++) {
+      states.push(msg(`spBv1.0/STATE/h${i}`, "ONLINE", BASE_MS, { msgType: "STATE", hostId: `h${i}` }));
+    }
+    emit("msgs", states);
+    expect(get(store).hosts).toHaveLength(MAX_TRACKED_HOSTS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    store.destroy();
+  });
+});
+
+describe("createSparkplugTreeStore — snapshots", () => {
+  it("reuses untouched groups between snapshots", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS, { group: "A" }), nbirth(BASE_MS, { group: "B" })]);
+    const before = get(store);
+    emit("msgs", [ndata(BASE_MS + 1000, { group: "B" })]);
+    const after = get(store);
+    expect(after.groups[0]).toBe(before.groups[0]);
+    expect(after.groups[1]).not.toBe(before.groups[1]);
     store.destroy();
   });
 });

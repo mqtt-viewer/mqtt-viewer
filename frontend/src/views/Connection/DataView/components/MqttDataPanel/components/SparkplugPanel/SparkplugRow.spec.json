@@ -2,7 +2,7 @@
   "$schema": "../../../../../../../design-system/component-spec.schema.json",
   "name": "SparkplugRow",
   "tier": "view",
-  "description": "One virtualized Sparkplug tree row: group, edge node (with health meta and hover actions), device, or metric (type/value/last-seen/badges).",
+  "description": "One virtualised Sparkplug tree row: group, edge node (status, problem badges, hover actions), device, or metric (value with unit, quality, flags, type, age, copy). Rows are keyboard-reachable tree items.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -25,19 +25,48 @@
       "description": "Reference now for relative ages (from the store snapshot)."
     },
     {
+      "name": "isSelected",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "The metric row last opened."
+    },
+    {
+      "name": "isHighlighted",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Flashes a node row revealed from a warning."
+    },
+    {
       "name": "onToggleExpansion",
       "type": "function",
-      "required": true
+      "required": true,
+      "description": "(key) toggles a group, node or device row."
     },
     {
       "name": "onRequestRebirth",
       "type": "function",
-      "required": true
+      "required": true,
+      "description": "(group, node) asks for a rebirth (confirmed by the caller)."
     },
     {
       "name": "onCopyMetricList",
       "type": "function",
-      "required": true
+      "required": true,
+      "description": "(node) copies the node's metric list as JSON."
+    },
+    {
+      "name": "onSelectMetric",
+      "type": "function",
+      "required": true,
+      "description": "(metric, rowKey) opens the metric's topic."
+    },
+    {
+      "name": "onCopyValue",
+      "type": "function",
+      "required": true,
+      "description": "(metric) copies the full value."
     }
   ],
   "tokens": [
@@ -46,10 +75,10 @@
     "success",
     "error",
     "warning",
-    "hovered"
+    "hovered",
+    "primary"
   ],
   "dependencies": [
-    "Button",
     "Icon",
     "DropdownMenu",
     "DropdownMenuItem",

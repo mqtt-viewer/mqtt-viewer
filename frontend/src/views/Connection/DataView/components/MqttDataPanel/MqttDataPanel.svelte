@@ -13,8 +13,12 @@
   import { createSearchStore } from "./stores/search";
   import {
     createSparkplugTreeStore,
+    type SparkplugMetric,
     type SparkplugNode,
   } from "./stores/sparkplug-tree-store";
+  import type { RebirthTarget } from "../../sparkplug-rebirth";
+  import connectionsStore from "@/stores/connections";
+  import { errorMessage } from "@/util/strings";
   import {
     createSortStore,
     DEFAULT_SORT_PERSIST_KEY,
@@ -25,7 +29,6 @@
   import type { PinnedTopicsStore } from "../../stores/pinned-topics";
   import { createHighlightedMqttTopicsStore } from "./stores/highlighted-topics";
   import defaultSorts from "@/stores/default-sorts";
-  import { PublishSparkplugRebirth } from "bindings/mqtt-viewer/backend/app/app";
   import { get } from "svelte/store";
   import ContextMenu from "@/components/ContextMenu/ContextMenu.svelte";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
@@ -52,6 +55,8 @@
   export let exportTopicMessages: (topic: string) => void;
   export let onClearRetained: (topic: string) => void;
   export let onClearRetainedBelow: (prefix: string) => void;
+  /** Opens the rebirth confirmation; nothing is published before it. */
+  export let onRequestRebirth: (targets: RebirthTarget[]) => void = () => {};
 
   const mqttHighlightStore = createHighlightedMqttTopicsStore();
   const mqttDataStore = createMqttDataStore(
@@ -155,23 +160,72 @@
     return () => sparkplugStore.destroy();
   });
 
-  const onRequestRebirth = async (group: string, node: string) => {
+  const copyText = async (text: string, what: string) => {
     try {
-      await PublishSparkplugRebirth(
-        connection.connectionDetails.id,
-        group,
-        node
-      );
+      await copyToClipboard(text);
     } catch (e) {
-      console.error("sparkplug: rebirth request failed", e);
+      addToast({
+        data: {
+          title: `Failed to copy ${what}`,
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
     }
   };
 
-  const onCopyMetricList = async (node: SparkplugNode) => {
+  const onCopyMetricList = (node: SparkplugNode) =>
+    copyText(metricListJson(node), "metric list");
+
+  const onCopyMetricValue = (metric: SparkplugMetric) =>
+    copyText(metric.valueRaw, "value");
+
+  // A metric row opens the topic of the message that last carried it, so the
+  // payload and its history are one click from the tree.
+  const onSelectMetric = (metric: SparkplugMetric) => {
+    if ($selectedTopicStore.selectedTopic !== metric.topic) {
+      selectedTopicStore.selectTopic(metric.topic);
+    }
+  };
+
+  // With decoding off the Sparkplug payloads never reach the tree, so the
+  // Sparkplug view is still offered whenever spBv1.0 topics exist, to explain
+  // that and turn it on.
+  $: sparkplugTopicsSeen = $mqttDataStore["spBv1.0"] !== undefined;
+  $: showSparkplug = $sparkplugStore.hasSparkplug || sparkplugTopicsSeen;
+  $: decodingState = $sparkplugStore.hasSparkplug
+    ? ("on" as const)
+    : connection.connectionDetails.isProtoEnabled
+      ? ("needs-reconnect" as const)
+      : ("off" as const);
+
+  let enablingDecoding = false;
+  const onEnableDecoding = async () => {
+    if (enablingDecoding) return;
+    enablingDecoding = true;
+    const id = connection.connectionDetails.id;
     try {
-      await navigator.clipboard.writeText(metricListJson(node));
+      if (!connection.connectionDetails.isProtoEnabled) {
+        await connectionsStore.updateConnectionDetails({
+          ...connection.connectionDetails,
+          isProtoEnabled: true,
+        });
+      }
+      // The decode middleware is installed on connect.
+      if (connection.connectionState === "connected") {
+        await connectionsStore.disconnect(id);
+        await connectionsStore.connect(id);
+      }
     } catch (e) {
-      console.error("sparkplug: copy metric list failed", e);
+      addToast({
+        data: {
+          title: "Failed to turn on Sparkplug decoding",
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
+    } finally {
+      enablingDecoding = false;
     }
   };
 
@@ -204,9 +258,7 @@
   // The Sparkplug option only exists once the connection has seen Sparkplug
   // traffic, so a saved Sparkplug preference shows the list until then.
   $: view =
-    preferredView === "sparkplug" && !$sparkplugStore.hasSparkplug
-      ? "list"
-      : preferredView;
+    preferredView === "sparkplug" && !showSparkplug ? "list" : preferredView;
   // The store defers its history backfill; opening the view is one of the
   // triggers for it. activate() is idempotent.
   $: if (view === "sparkplug") sparkplugStore.activate();
@@ -234,7 +286,7 @@
       <ViewToggle
         slot="leading"
         {view}
-        showSparkplug={$sparkplugStore.hasSparkplug}
+        {showSparkplug}
         sparkplugWarningCount={$sparkplugStore.warningCount}
         onChange={(v) => setView(v)}
       />
@@ -298,18 +350,25 @@
       <ViewToggle
         slot="leading"
         {view}
-        showSparkplug={$sparkplugStore.hasSparkplug}
+        {showSparkplug}
         sparkplugWarningCount={$sparkplugStore.warningCount}
         onChange={(v) => setView(v)}
       />
     </SearchActionBar>
-    <div class="grow min-w-0 w-full max-w-full overflow-hidden">
+    <div
+      class="grow min-h-0 min-w-0 w-full max-w-full overflow-hidden"
+      bind:clientWidth={treeWidth}
+    >
       <SparkplugPanel
         treeState={$sparkplugStore}
-        {width}
+        width={treeWidth || width}
         filter={$searchStore.text}
+        {decodingState}
+        {onEnableDecoding}
         {onRequestRebirth}
         {onCopyMetricList}
+        {onSelectMetric}
+        onCopyValue={onCopyMetricValue}
       />
     </div>
   {:else}
@@ -332,7 +391,7 @@
         <ViewToggle
           slot="leading"
           {view}
-          showSparkplug={$sparkplugStore.hasSparkplug}
+          {showSparkplug}
           sparkplugWarningCount={$sparkplugStore.warningCount}
           onChange={(v) => setView(v)}
         />

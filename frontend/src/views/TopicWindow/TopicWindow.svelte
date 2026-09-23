@@ -21,6 +21,8 @@
   import SelectedTopicPanel from "@/views/Connection/DataView/components/SelectedTopicPanel/SelectedTopicPanel.svelte";
   import ConfirmClearRetainedDialog from "@/views/Connection/DataView/components/ConfirmClearRetainedDialog/ConfirmClearRetainedDialog.svelte";
   import { createClearRetainedFlow } from "@/views/Connection/DataView/clear-retained";
+  import ConfirmRebirthDialog from "@/views/Connection/DataView/components/ConfirmRebirthDialog/ConfirmRebirthDialog.svelte";
+  import { createRebirthFlow } from "@/views/Connection/DataView/sparkplug-rebirth";
   import { createPinnedTopicsStore } from "@/views/Connection/DataView/stores/pinned-topics";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { copyToClipboard } from "@/util/copy";
@@ -56,6 +58,9 @@
   const pinnedTopicsStore = createPinnedTopicsStore(connectionId);
   const { isOpen: isClearRetainedOpen, request: clearRetainedRequest } =
     clearRetained;
+  // Same reason as clearRetained: a separate webview confirms its own.
+  const rebirth = createRebirthFlow(connectionId);
+  const { isOpen: isRebirthOpen, request: rebirthRequest } = rebirth;
 
   const copyTopicPath = async (topic: string) => {
     try {
@@ -214,6 +219,7 @@
             onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
             onClearRetained={clearRetained.requestClear}
             onClearRetainedBelow={clearRetained.requestClearBelow}
+            onRequestRebirth={rebirth.requestRebirth}
             firstConnectedAtMs={timelineStartMs(
               connection?.firstConnectedThisSessionAtMs,
               oldestMessageMs,
@@ -245,6 +251,12 @@
       topics={$clearRetainedRequest.topics}
       busy={$clearRetainedRequest.busy}
       onConfirm={clearRetained.confirm}
+    />
+    <ConfirmRebirthDialog
+      isOpen={isRebirthOpen}
+      targets={$rebirthRequest.targets}
+      busy={$rebirthRequest.busy}
+      onConfirm={rebirth.confirm}
     />
   </main>
 </IconContext>

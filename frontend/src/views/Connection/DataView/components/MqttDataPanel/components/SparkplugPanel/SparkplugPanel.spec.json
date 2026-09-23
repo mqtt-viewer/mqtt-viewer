@@ -2,7 +2,7 @@
   "$schema": "../../../../../../../design-system/component-spec.schema.json",
   "name": "SparkplugPanel",
   "tier": "view",
-  "description": "Sparkplug session tree: host state strip, virtualized group/node/device/metric tree with health meta, pinned warnings strip.",
+  "description": "Sparkplug session view: connection and alias banners with a bulk rebirth request, fleet summary with a problems filter, host state strip, virtualised group/node/device/metric tree, and a clickable warnings strip. Explains and offers to turn on decoding when it is off.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -29,30 +29,66 @@
       "type": "string",
       "required": false,
       "default": "",
-      "description": "Case-insensitive substring filter on node/device/metric names."
+      "description": "Case-insensitive substring filter on group/node/device/metric names. Opens everything while set."
+    },
+    {
+      "name": "decodingState",
+      "type": "string",
+      "required": false,
+      "default": "on",
+      "options": [
+        "on",
+        "off",
+        "needs-reconnect"
+      ],
+      "description": "off or needs-reconnect replaces the tree with an explanation and a button."
+    },
+    {
+      "name": "onEnableDecoding",
+      "type": "function",
+      "required": false,
+      "description": "Turns decoding on for the connection and reconnects."
     },
     {
       "name": "onRequestRebirth",
       "type": "function",
       "required": true,
-      "description": "(group, node) callback for the Request rebirth actions."
+      "description": "([{group, node}]) asks for rebirths; the caller confirms before anything is published."
     },
     {
       "name": "onCopyMetricList",
       "type": "function",
       "required": true,
       "description": "(node) callback for the Copy metric list action."
+    },
+    {
+      "name": "onSelectMetric",
+      "type": "function",
+      "required": false,
+      "description": "(metric) opens the topic of the message that last updated the metric."
+    },
+    {
+      "name": "onCopyValue",
+      "type": "function",
+      "required": false,
+      "description": "(metric) copies the metric's full value."
     }
   ],
   "tokens": [
     "secondary-text",
     "white-text",
+    "emphasis",
     "success",
     "error",
     "warning",
     "divider",
-    "hovered"
+    "hovered",
+    "elevation-2"
   ],
-  "dependencies": ["SparkplugRow", "Icon"],
-  "notes": "Figma is not linked yet; stories use local fixtures. Expansion state is panel-local (everything defaults expanded)."
+  "dependencies": [
+    "SparkplugRow",
+    "Icon",
+    "Button"
+  ],
+  "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and the user's clicks override per key."
 }

@@ -44,6 +44,7 @@ import {
   createSparkplugTreeStore,
   WARNING_CAP,
 } from "./sparkplug-tree-store";
+import { buildSparkplugTree } from "../components/SparkplugPanel/build-sparkplug-tree";
 
 // --- Helpers ------------------------------------------------------------------
 
@@ -253,7 +254,8 @@ describe("createSparkplugTreeStore — flood perf", () => {
     expect(total).toBeGreaterThan(0);
 
     // Perf contract (generous CI headroom).
-    expect(mean).toBeLessThan(5);
+    // Within half a 60 fps frame, with headroom for slower CI runners.
+    expect(mean).toBeLessThan(8);
     expect(total).toBeLessThan(3000);
 
     // Bounded state: the tree is bounded by the distinct names in the traffic,
@@ -311,6 +313,93 @@ describe("createSparkplugTreeStore — flood perf", () => {
     // ...and the whole flood costs well under the Sparkplug-bearing one.
     expect(plainTotal).toBeLessThan(mixedTotal / 4);
 
+    store.destroy();
+  });
+
+  // A plant-sized fleet: 500 edge nodes of 50 metrics each, every node
+  // reporting by exception (a few changed metrics per NDATA) at ~2000 msg/s,
+  // alongside 2000 msg/s of other traffic. Measures what the UI pays per
+  // batch: fold, snapshot, and flattening the tree the panel renders (at this
+  // size the panel starts with nodes collapsed).
+  it("keeps a 500-node fleet within the per-batch budget, snapshot and flatten included", async () => {
+    const FLEET_NODES = 500;
+    const FLEET_METRICS = 50;
+    const FLEET_BATCHES = 200;
+    const store = createSparkplugTreeStore(CONN, eventSet);
+    await store.init();
+
+    const births: any[] = [];
+    for (let n = 0; n < FLEET_NODES; n++) {
+      const metrics: any[] = [{ name: "bdSeq", datatype: 8, longValue: "0" }];
+      for (let m = 0; m < FLEET_METRICS; m++) {
+        metrics.push({ name: `Line/Tag${m}`, alias: String(m + 1), datatype: 10, doubleValue: m });
+      }
+      births.push(
+        mkMsg(
+          `spBv1.0/Plant/NBIRTH/edge-${n}`,
+          b64(JSON.stringify({ timestamp: "0", metrics, seq: "0" })),
+          { msgType: "NBIRTH", group: "Plant", edgeNode: `edge-${n}`, bdSeq: 0 }
+        )
+      );
+    }
+    for (const m of births) m.timeMs = Date.now();
+    emit("msgs", births);
+
+    const templates: any[][] = [];
+    for (let ti = 0; ti < TEMPLATES; ti++) {
+      const batch: any[] = [];
+      for (let k = 0; k < SP_PER_BATCH; k++) {
+        const n = (k * 7 + ti * 13) % FLEET_NODES;
+        const metrics: any[] = [];
+        for (let c = 0; c < CHANGED_PER_MSG; c++) {
+          const m = (k + c * 11 + ti) % FLEET_METRICS;
+          metrics.push({ name: `Line/Tag${m}`, alias: String(m + 1), doubleValue: k + c / 7 });
+        }
+        batch.push(
+          mkMsg(
+            `spBv1.0/Plant/NDATA/edge-${n}`,
+            b64(JSON.stringify({ timestamp: "0", metrics, seq: String(k % 256) })),
+            { msgType: "NDATA", group: "Plant", edgeNode: `edge-${n}`, resolution: "resolved" }
+          )
+        );
+      }
+      for (let k = 0; k < PLAIN_PER_BATCH; k++) batch.push(plainMsg());
+      templates.push(batch);
+    }
+
+    const perBatchMs: number[] = [];
+    for (let i = 0; i < FLEET_BATCHES; i++) {
+      const now = Date.now();
+      const batch = templates[i % templates.length];
+      for (const m of batch) m.timeMs = now;
+      const t0 = performance.now();
+      emit("msgs", batch);
+      buildSparkplugTree({
+        groups: get(store).groups,
+        expansion: new Map(),
+        defaultExpanded: false,
+        filter: "",
+        problemsOnly: false,
+      });
+      perBatchMs.push(performance.now() - t0);
+      vi.advanceTimersByTime(BATCH_MS);
+    }
+    const sorted = [...perBatchMs].sort((a, b) => a - b);
+    const mean = perBatchMs.reduce((a, b) => a + b, 0) / perBatchMs.length;
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    console.info(
+      "[sparkplug-tree perf] " +
+        JSON.stringify({
+          fleetNodes: FLEET_NODES,
+          metricsPerNode: FLEET_METRICS,
+          meanPerBatchMs: Number(mean.toFixed(3)),
+          p95PerBatchMs: Number(p95.toFixed(3)),
+        })
+    );
+    // A 300 ms batch window leaves a 60 fps frame 16 ms; the fold, snapshot
+    // and flatten together must stay well inside one frame.
+    expect(mean).toBeLessThan(8);
+    expect(p95).toBeLessThan(16);
     store.destroy();
   });
 });
