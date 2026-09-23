@@ -86,7 +86,10 @@ const init = async () => {
       isServerMode: false,
     }));
   } catch (e) {
+    // Without the environment nothing else can start, so let init() reject and
+    // App.svelte show the failure rather than a blank window.
     console.error(e);
+    throw e;
   }
 
   window.addEventListener("resize", debouncedCheckFullscreen, true);
@@ -108,6 +111,7 @@ const init = async () => {
     }));
   } catch (e) {
     console.error(e);
+    throw e;
   }
 };
 

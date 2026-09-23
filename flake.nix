@@ -137,7 +137,7 @@
 
             # On darwin the GTK stack does not apply and wails3 itself wants the
             # Xcode frameworks, so getting the CLI there is left to
-            #   go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98-tui
+            #   go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.16
             shellHook = ''
               # main.go has //go:embed all:frontend/dist, so `go build ./...`
               # fails outright on a fresh checkout. Stub it once, and never

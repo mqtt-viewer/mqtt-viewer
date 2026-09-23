@@ -10,16 +10,16 @@
 }:
 
 let
-  # go.mod pins the fork tag v3.0.0-alpha.98-tui, and that tag has since been
-  # DELETED from github.com/wailsapp/wails, so fetchFromGitHub cannot resolve
-  # it. proxy.golang.org keeps module zips permanently once published, so fetch
-  # the module zip from there instead. (This is also why `go install ...@tag`
-  # still works while `git checkout tag` does not.)
-  goModPath = "github.com/wailsapp/wails/v3@v3.0.0-alpha.98-tui";
+  # Fetch the module zip from proxy.golang.org rather than the git repo: the
+  # v3 module lives in a subdirectory of a large repo, and the zip is only the
+  # module tree, exactly as `go install ...@tag` sees it.
+  goModPath = "github.com/wailsapp/wails/v3@v3.0.0-beta.16";
 
   src = fetchzip {
-    url = "https://proxy.golang.org/github.com/wailsapp/wails/v3/@v/v3.0.0-alpha.98-tui.zip";
-    hash = "sha256-1/pt6p1pUp1HgWlEKym+5Ix9f2M0uwPZn7Uh/Ta2cAo=";
+    url = "https://proxy.golang.org/github.com/wailsapp/wails/v3/@v/v3.0.0-beta.16.zip";
+    # TODO: regenerate. nix was not available when the pin moved to beta.16;
+    # build once with this placeholder and paste the hash nix reports.
+    hash = lib.fakeHash;
     # The zip already contains the full module path as directory levels.
     stripRoot = false;
     extension = "zip";
@@ -28,15 +28,13 @@ in
 
 buildGoModule {
   pname = "wails3";
-  # `wails3 version` reports v3.0.0-alpha.98 because the fork tag never bumped
-  # internal/version/version.txt. The real module version is the -tui tag.
-  version = "3.0.0-alpha.98-tui";
+  version = "3.0.0-beta.16";
 
   # Caveat on CLAUDE.md's alignment check. Because this builds from an
   # extracted module zip rather than `go install module@version`, Go cannot
   # stamp a module version, so
   #   go version -m "$(which wails3)" | grep -E '^\s+mod\s'
-  # reports `github.com/wailsapp/wails/v3 (devel)`, not the -tui tag. The
+  # reports `github.com/wailsapp/wails/v3 (devel)`, not the tag. The
   # source is still exactly the pinned tag, guaranteed by the fixed-output
   # hash on `src` below rather than by the binary's own metadata.
 
@@ -50,7 +48,8 @@ buildGoModule {
   # keeps the module download cache instead of vendoring, so embeds are only
   # resolved for the packages actually built here.
   proxyVendor = true;
-  vendorHash = "sha256-Moerz6qIC9NMjl09FT1nzcuDjoeVHLeJLPL44H5ECro=";
+  # TODO: regenerate alongside the `src` hash above.
+  vendorHash = lib.fakeHash;
 
   subPackages = [ "cmd/wails3" ];
 
@@ -69,7 +68,7 @@ buildGoModule {
   doCheck = false;
 
   meta = {
-    description = "Wails v3 CLI, pinned to the -tui fork tag used by MQTT Viewer's go.mod";
+    description = "Wails v3 CLI, pinned to the tag used by MQTT Viewer's go.mod";
     homepage = "https://wails.io";
     license = lib.licenses.mit;
     mainProgram = "wails3";

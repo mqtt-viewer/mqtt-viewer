@@ -26,10 +26,20 @@ export type ConnectionState =
   | "reconnecting"
   | "error";
 
-export type Connection = DeepOmit<
+type AppConnection = DeepOmit<
   DeepOmit<app.Connection, "subscriptions" | "isConnected">,
   "convertValues"
-> & {
+>;
+
+// The generated bindings type Go time.Time as a string. The store converts
+// lastConnectedAt to a Date once (see getConnectionFromAppConnection) so the
+// UI can compare and format it without re-parsing.
+export type Connection = Omit<AppConnection, "connectionDetails"> & {
+  connectionDetails: Omit<
+    AppConnection["connectionDetails"],
+    "lastConnectedAt"
+  > & { lastConnectedAt: Date | null };
+} & {
   connectionString: string;
   protoLoadError?: string;
   connectionState: ConnectionState;
