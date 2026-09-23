@@ -177,9 +177,9 @@ func (a *App) ClearConnectionHistory(connId uint) error {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
 	appConnection.MqttManager.ClearConnectionHistory()
-	// Cleared history can no longer be replayed, so drop the Sparkplug
-	// session state derived from it.
-	appConnection.SparkplugStore.Reset()
+	// History is gone, so is everything the Sparkplug replay would rebuild
+	// from it; the edge nodes' aliases are not ours to forget.
+	appConnection.SparkplugStore.ClearHistory()
 	a.EventRuntime.EventsEmit(appConnection.EventSet.MqttClearHistory, nil)
 	return nil
 }

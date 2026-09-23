@@ -231,6 +231,9 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					a.connectedConnCount.Add(1)
 					a.recomputeMemoryLimit()
 				}
+				// A message from before the drop that paho delivers late must
+				// not become the seq baseline for the new session.
+				appConnection.SparkplugStore.ResyncSeq()
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				appConnection.MqttManager.MessageBuffer.StartHandlingBuffer(MQTT_BUFFER_EMIT_INTERVAL, func(messages []mqtt.MqttMessage) {
 					if len(messages) == 0 {

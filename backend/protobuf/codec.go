@@ -35,6 +35,17 @@ func UnmarshalToDynamic(protoBytes []byte, descriptor protoreflect.MessageDescri
 // protojson then refuses, so on failure every string in the message is made
 // valid (bad bytes become U+FFFD) and the marshal is retried once. A publisher
 // with one garbled metric name still gets the rest of its payload decoded.
+// UnmarshalWithoutRequiredCheck is UnmarshalToDynamic for schemas with no
+// required fields, such as Sparkplug B's. The required-field walk it skips
+// finds nothing there but costs a fifth of a decode on the hot path.
+func UnmarshalWithoutRequiredCheck(protoBytes []byte, descriptor protoreflect.MessageDescriptor) (*dynamicpb.Message, error) {
+	msg := dynamicpb.NewMessage(descriptor)
+	if err := (proto.UnmarshalOptions{AllowPartial: true}).Unmarshal(protoBytes, msg); err != nil {
+		return nil, fmt.Errorf("error unmarshalling proto bytes: %w", err)
+	}
+	return msg, nil
+}
+
 func MarshalDynamicToJSON(msg *dynamicpb.Message) ([]byte, error) {
 	jsonBytes, err := protojson.Marshal(msg)
 	if err == nil {

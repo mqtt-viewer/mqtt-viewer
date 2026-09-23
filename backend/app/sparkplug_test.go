@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"mqtt-viewer/backend/mqtt"
 	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
@@ -27,8 +28,8 @@ func TestGetSparkplugMessageHistoryEmptyForFreshConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if len(messages) != 0 {
-		t.Errorf("Expected no messages for a fresh connection, got %v", len(messages))
+	if len(messages.Messages) != 0 {
+		t.Errorf("Expected no messages for a fresh connection, got %v", len(messages.Messages))
 	}
 }
 
@@ -97,52 +98,146 @@ func idsOf(messages []mqtt.MqttMessage) []string {
 	return ids
 }
 
+// replayed flattens a replay into "topic metric=value" lines, rebuilt data
+// messages included, in the order the frontend would fold them.
+func replayed(t *testing.T, history SparkplugHistory) []string {
+	t.Helper()
+	out := []string{}
+	for _, m := range history.Messages {
+		var payload struct {
+			Metrics []struct {
+				Name        string  `json:"name"`
+				DoubleValue float64 `json:"doubleValue"`
+			} `json:"metrics"`
+		}
+		line := m.Topic
+		if json.Unmarshal(m.Payload, &payload) == nil {
+			for _, metric := range payload.Metrics {
+				line += fmt.Sprintf(" %s=%v", metric.Name, metric.DoubleValue)
+			}
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
 func TestGetSparkplugMessageHistoryReplaysLatestValuePerMetric(t *testing.T) {
 	app := getSeededTestApp(t)
 	p := newSparkplugPipeline(t, testConn(t, app, 1))
 
-	birth := p.receive("spBv1.0/G/NBIRTH/N", 1000,
+	p.receive("spBv1.0/G/NBIRTH/N", 1000,
 		`{"seq":"0","metrics":[{"name":"A","alias":"1","datatype":10,"doubleValue":1},{"name":"B","alias":"2","datatype":10,"doubleValue":2}]}`)
 	p.receive("spBv1.0/G/NDATA/N", 1100, `{"seq":"1","metrics":[{"alias":"1","doubleValue":10}]}`)
-	onlyB := p.receive("spBv1.0/G/NDATA/N", 1200, `{"seq":"2","metrics":[{"alias":"2","doubleValue":20}]}`)
-	latestA := p.receive("spBv1.0/G/NDATA/N", 1300, `{"seq":"3","metrics":[{"alias":"1","doubleValue":11}]}`)
-	state := p.receive("STATE/scada-primary", 1400, `{"online":true,"timestamp":1400}`)
+	p.receive("spBv1.0/G/NDATA/N", 1200, `{"seq":"2","metrics":[{"alias":"2","doubleValue":20}]}`)
+	p.receive("spBv1.0/G/NDATA/N", 1300, `{"seq":"3","metrics":[{"alias":"1","doubleValue":11}]}`)
+	p.receive("STATE/scada-primary", 1400, `{"online":true,"timestamp":1400}`)
 
-	messages, err := app.GetSparkplugMessageHistory(1)
+	history, err := app.GetSparkplugMessageHistory(1)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 	// The newest NDATA only carries A (report by exception), so B's latest
 	// value has to come from the older message, and the first A update is
 	// superseded.
-	got := idsOf(messages)
-	want := []string{birth, onlyB, latestA, state}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("Expected replay %v in arrival order, got %v (%v)", want, got, topicsOf(messages))
+	got := strings.Join(replayed(t, history), " | ")
+	want := strings.Join([]string{
+		"spBv1.0/G/NBIRTH/N A=1 B=2",
+		"spBv1.0/G/NDATA/N B=20",
+		"spBv1.0/G/NDATA/N A=11",
+		"STATE/scada-primary",
+	}, " | ")
+	if got != want {
+		t.Fatalf("Expected replay\n  %s\ngot\n  %s", want, got)
 	}
-	// Replayed messages carry the decoded payload and meta, as they were
-	// stored.
-	meta, ok := (*messages[1].MiddlewareProperties)["sparkplug"].(map[string]any)
-	if !ok || meta["resolution"] != "resolved" {
-		t.Errorf("Expected replayed NDATA to keep its sparkplug meta, got %v", messages[1].MiddlewareProperties)
+	meta, ok := (*history.Messages[1].MiddlewareProperties)["sparkplug"].(map[string]any)
+	if !ok || meta["resolution"] != "resolved" || meta["msgType"] != "NDATA" {
+		t.Errorf("Expected rebuilt NDATA to carry sparkplug meta, got %v", history.Messages[1].MiddlewareProperties)
 	}
 }
 
-func TestGetSparkplugMessageHistorySkipsEvictedMessages(t *testing.T) {
+// Report by exception meets a busy history: X's latest value lives in an
+// NDATA that ages out of the window long before the NBIRTH (pinned as its
+// topic's latest message) does. The replay must still show X's latest value,
+// not fall back to the birth's.
+func TestGetSparkplugMessageHistorySurvivesEviction(t *testing.T) {
+	app := getSeededTestApp(t)
+	conn := testConn(t, app, 1)
+	conn.MqttManager.MessageHistory.SetBudgetBytes(256 * 1024)
+	p := newSparkplugPipeline(t, conn)
+
+	p.receive("spBv1.0/G/NBIRTH/N", 1000,
+		`{"seq":"0","metrics":[{"name":"X","alias":"1","datatype":10,"doubleValue":1},{"name":"Y","alias":"2","datatype":10,"doubleValue":1}]}`)
+	p.receive("spBv1.0/G/NDATA/N", 1100, `{"seq":"1","metrics":[{"alias":"1","doubleValue":2}]}`)
+	for i := 0; i < 5000; i++ {
+		p.receive("spBv1.0/G/NDATA/N", int64(1200+i),
+			fmt.Sprintf(`{"seq":"%d","metrics":[{"alias":"2","doubleValue":%d}]}`, (i+2)%256, i))
+	}
+	history, _ := app.GetSparkplugMessageHistory(1)
+	lines := replayed(t, history)
+	last := map[string]string{}
+	for _, line := range lines {
+		for _, field := range strings.Fields(line)[1:] {
+			kv := strings.SplitN(field, "=", 2)
+			last[kv[0]] = kv[1]
+		}
+	}
+	if last["X"] != "2" || last["Y"] != "4999" {
+		t.Fatalf("Expected X=2 and Y=4999 after the replay, got %v from %v", last, lines)
+	}
+}
+
+// After an NBIRTH, a device that hasn't sent its new DBIRTH yet is still in
+// the live tree (awaiting its birth), so the replay must still mention it.
+func TestGetSparkplugMessageHistoryKeepsAwaitingBirthDevices(t *testing.T) {
+	app := getSeededTestApp(t)
+	p := newSparkplugPipeline(t, testConn(t, app, 1))
+	p.receive("spBv1.0/G/NBIRTH/N", 1000, `{"seq":"0","metrics":[{"name":"A","alias":"1","datatype":10,"doubleValue":1}]}`)
+	p.receive("spBv1.0/G/DBIRTH/N/D", 1100, `{"seq":"1","metrics":[{"name":"T","alias":"1","datatype":10,"doubleValue":1}]}`)
+	p.receive("spBv1.0/G/DDATA/N/D", 1200, `{"seq":"2","metrics":[{"alias":"1","doubleValue":2}]}`)
+	p.receive("spBv1.0/G/NBIRTH/N", 1300, `{"seq":"0","metrics":[{"name":"A","alias":"1","datatype":10,"doubleValue":1}]}`)
+	history, _ := app.GetSparkplugMessageHistory(1)
+	for _, line := range replayed(t, history) {
+		if strings.Contains(line, "DDATA") {
+			t.Errorf("Expected the previous device session's values dropped, got %s", line)
+		}
+	}
+	for _, m := range history.Messages {
+		if strings.Contains(m.Topic, "/N/D") {
+			return
+		}
+	}
+	t.Fatalf("Expected device D in the replay, got %v", topicsOf(history.Messages))
+}
+
+// Messages in one millisecond (a node's connect burst) must replay in
+// arrival order, every time.
+func TestGetSparkplugMessageHistoryKeepsArrivalOrder(t *testing.T) {
+	app := getSeededTestApp(t)
+	p := newSparkplugPipeline(t, testConn(t, app, 1))
+	want := []string{
+		p.receive("spBv1.0/G/NBIRTH/N", 1000, `{"seq":"0","metrics":[{"name":"X","alias":"1","datatype":10,"doubleValue":1}]}`),
+	}
+	for i := 0; i < 8; i++ {
+		want = append(want, p.receive(fmt.Sprintf("spBv1.0/G/DBIRTH/N/D%d", i), 1000,
+			fmt.Sprintf(`{"seq":"%d","metrics":[{"name":"T","alias":"1","datatype":10,"doubleValue":1}]}`, i+1)))
+	}
+	for run := 0; run < 50; run++ {
+		history, _ := app.GetSparkplugMessageHistory(1)
+		if strings.Join(idsOf(history.Messages), ",") != strings.Join(want, ",") {
+			t.Fatalf("run %d: replay order %v, arrival order %v", run, idsOf(history.Messages), want)
+		}
+	}
+}
+
+func TestGetSparkplugMessageHistoryReportsTheLastDrop(t *testing.T) {
 	app := getSeededTestApp(t)
 	conn := testConn(t, app, 1)
 	p := newSparkplugPipeline(t, conn)
-
-	p.receive("spBv1.0/G/NBIRTH/N", 1000, `{"seq":"0","metrics":[{"name":"A","alias":"1","datatype":10,"doubleValue":1}]}`)
-	conn.MqttManager.MessageHistory.Clear()
-	// History was cleared without resetting the store: its refs now point at
-	// nothing, and the replay must come back empty rather than fail.
-	messages, err := app.GetSparkplugMessageHistory(1)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if len(messages) != 0 {
-		t.Errorf("Expected no messages once history is gone, got %v", topicsOf(messages))
+	p.receive("spBv1.0/G/NBIRTH/N", 1000, `{"seq":"0","metrics":[{"name":"X","alias":"1","datatype":10,"doubleValue":1}]}`)
+	conn.SparkplugStore.Suspend()
+	history, _ := app.GetSparkplugMessageHistory(1)
+	if history.SuspendedOrd == 0 {
+		t.Errorf("Expected the drop's arrival order reported, got 0")
 	}
 }
 

@@ -670,80 +670,126 @@ func refIDs(refs []MessageRef) map[string]bool {
 	return ids
 }
 
-func TestReplayRefsKeepLatestMessagePerMetric(t *testing.T) {
-	descriptor := loadPayloadDescriptor(t)
-	store := NewSessionStore()
-
-	birth := at(1)
-	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0,
-		testMetric{name: "A", alias: u64(1)},
-		testMetric{name: "B", alias: u64(2)},
-	), birth)
-	firstA := at(2)
-	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(1), doubleValue: f64(42)}), firstA)
-	onlyB := at(3)
-	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 2, testMetric{alias: u64(2), doubleValue: f64(7)}), onlyB)
-	secondA := at(4)
-	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 3, testMetric{alias: u64(1), doubleValue: f64(43)}), secondA)
-
-	// Report by exception: the latest NDATA carries only A, so B's value lives
-	// in an older message that must still be replayed.
-	ids := refIDs(store.ReplayRefs())
-	for _, want := range []MessageRef{birth, onlyB, secondA} {
-		if !ids[want.ID] {
-			t.Errorf("expected %s in replay, got %v", want.ID, ids)
+// dataValues flattens a replay's rebuilt data into "ord:metric=value" so tests
+// can assert which message each latest value came from.
+func dataValues(t *testing.T, data []ReplayData) map[string]uint64 {
+	t.Helper()
+	out := map[string]uint64{}
+	for _, d := range data {
+		list, ok := metricsList(d.Payload)
+		if !ok {
+			continue
+		}
+		for i := 0; i < list.Len(); i++ {
+			metric := list.Get(i).Message()
+			key := metricName(metric)
+			if key == "" {
+				alias, _ := metricAlias(metric)
+				key = aliasKey(alias)
+			}
+			out[key] = d.Ord
 		}
 	}
-	if ids[firstA.ID] {
-		t.Errorf("expected the superseded A update left out, got %v", ids)
-	}
-	if len(ids) != 3 {
-		t.Errorf("expected exactly 3 refs, got %v", ids)
-	}
+	return out
 }
 
-func TestReplayRefsDropDeviceStateOnNBirth(t *testing.T) {
+// handled runs a message through the store and returns the ref it was given,
+// Ord included.
+func handled(store *SessionStore, info TopicInfo, msg *dynamicpb.Message, ref MessageRef) MessageRef {
+	meta := store.HandleMessage(info, msg, ref)
+	if n, ok := meta["n"].(uint64); ok {
+		ref.Ord = n
+	}
+	return ref
+}
+
+func TestReplayKeepsTheLatestValueOfEveryMetric(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	store := NewSessionStore()
 
-	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(1))
-	oldDBirth := at(2)
-	store.HandleMessage(dbirthInfo, buildPayload(t, descriptor, 1, testMetric{name: "M", alias: u64(1)}), oldDBirth)
-	oldDData := at(3)
-	store.HandleMessage(ddataInfo, buildPayload(t, descriptor, 2, testMetric{alias: u64(1), doubleValue: f64(1)}), oldDData)
-	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(4))
+	birth := handled(store, nbirthInfo, buildPayload(t, descriptor, 0,
+		testMetric{name: "A", alias: u64(1)},
+		testMetric{name: "B", alias: u64(2)},
+	), at(1))
+	handled(store, ndataInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(1), doubleValue: f64(42)}), at(2))
+	onlyB := handled(store, ndataInfo, buildPayload(t, descriptor, 2, testMetric{alias: u64(2), doubleValue: f64(7)}), at(3))
+	secondA := handled(store, ndataInfo, buildPayload(t, descriptor, 3, testMetric{alias: u64(1), doubleValue: f64(43)}), at(4))
 
-	ids := refIDs(store.ReplayRefs())
-	if ids[oldDBirth.ID] || ids[oldDData.ID] {
-		t.Errorf("expected the previous device session left out of the replay, got %v", ids)
+	// Report by exception: the latest NDATA carries only A, so B's latest
+	// value comes from an older message. Both are rebuilt from the store, not
+	// fetched, so history evicting them changes nothing.
+	replay := store.Replay()
+	if ids := refIDs(replay.Refs); !ids[birth.ID] || len(ids) != 1 {
+		t.Errorf("expected only the birth to be fetched, got %v", ids)
+	}
+	values := dataValues(t, replay.Data)
+	if values["A"] != secondA.Ord || values["B"] != onlyB.Ord || len(values) != 2 {
+		t.Errorf("expected A from ord %d and B from ord %d, got %v", secondA.Ord, onlyB.Ord, values)
+	}
+	for _, d := range replay.Data {
+		if d.Meta["msgType"] != "NDATA" || d.Meta["resolution"] != ResolutionResolved || d.Meta["n"] != d.Ord {
+			t.Errorf("unexpected replay meta %v", d.Meta)
+		}
 	}
 }
 
-func TestReplayRefsIncludeDeathsGapsHostsAndRecentBirths(t *testing.T) {
+func TestReplayRebuildsTheValueItself(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	handled(store, nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "Volts", alias: u64(3)}), at(1))
+	handled(store, ndataInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(3), doubleValue: f64(239.5)}), at(2))
+
+	data := store.Replay().Data
+	if len(data) != 1 {
+		t.Fatalf("expected one rebuilt message, got %d", len(data))
+	}
+	list, _ := metricsList(data[0].Payload)
+	metric := list.Get(0).Message()
+	fd := metric.Descriptor().Fields().ByName("double_value")
+	if metricName(metric) != "Volts" || metric.Get(fd).Float() != 239.5 {
+		t.Errorf("expected Volts=239.5 rebuilt, got %s=%v", metricName(metric), metric.Get(fd))
+	}
+}
+
+func TestReplayKeepsDeviceExistenceButNotItsOldSessionAfterNBirth(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+
+	handled(store, nbirthInfo, buildPayload(t, descriptor, 0), at(1))
+	oldDBirth := handled(store, dbirthInfo, buildPayload(t, descriptor, 1, testMetric{name: "M", alias: u64(1)}), at(2))
+	handled(store, ddataInfo, buildPayload(t, descriptor, 2, testMetric{alias: u64(1), doubleValue: f64(1)}), at(3))
+	handled(store, nbirthInfo, buildPayload(t, descriptor, 0), at(4))
+
+	replay := store.Replay()
+	// The old DBIRTH stays so the device still appears (awaiting its birth),
+	// as it does in the live tree; the frontend ignores its metrics because
+	// it predates the NBIRTH. Its old values are gone.
+	if !refIDs(replay.Refs)[oldDBirth.ID] {
+		t.Errorf("expected the old DBIRTH kept for the device's existence, got %v", refIDs(replay.Refs))
+	}
+	if values := dataValues(t, replay.Data); len(values) != 0 {
+		t.Errorf("expected the previous device session's values dropped, got %v", values)
+	}
+}
+
+func TestReplayIncludesDeathsGapsHostsAndRecentBirths(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	store := NewSessionStore()
 
 	births := []MessageRef{}
 	for i := 0; i < maxBirthRefsPerNode+2; i++ {
-		ref := at(int64(i))
-		births = append(births, ref)
-		store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), ref)
+		births = append(births, handled(store, nbirthInfo, buildPayload(t, descriptor, 0), at(int64(i))))
 	}
-	gap := at(100)
-	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 9), gap)
-	death := at(101)
-	store.HandleMessage(ndeathInfo, nil, death)
-	host := at(102)
-	store.HandleMessage(TopicInfo{Type: MessageTypeState, HostID: "scada"}, nil, host)
+	gap := handled(store, ndataInfo, buildPayload(t, descriptor, 9), at(100))
+	death := handled(store, ndeathInfo, nil, at(101))
+	host := handled(store, TopicInfo{Type: MessageTypeState, HostID: "scada"}, nil, at(102))
 
-	ids := refIDs(store.ReplayRefs())
+	replay := store.Replay()
+	ids := refIDs(replay.Refs)
 	for _, want := range []MessageRef{gap, death, host, births[len(births)-1]} {
 		if !ids[want.ID] {
 			t.Errorf("expected %s in replay, got %v", want.ID, ids)
 		}
-	}
-	if ids[births[0].ID] {
-		t.Errorf("expected births beyond the ring cap left out, got %v", ids)
 	}
 	birthCount := 0
 	for _, b := range births {
@@ -754,38 +800,167 @@ func TestReplayRefsIncludeDeathsGapsHostsAndRecentBirths(t *testing.T) {
 	if birthCount != maxBirthRefsPerNode {
 		t.Errorf("expected %d recent births, got %d", maxBirthRefsPerNode, birthCount)
 	}
+	for _, ref := range replay.Refs {
+		if ref.Ord == 0 {
+			t.Errorf("expected every ref to carry its arrival order, got %+v", ref)
+		}
+	}
 }
 
-func TestReplayRefsAreCappedPerScope(t *testing.T) {
+func TestArrivalOrderIsTotal(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	// Same millisecond, as in a node's connect burst.
+	birth := handled(store, nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "A", alias: u64(1)}), at(5))
+	data := handled(store, ndataInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(1), doubleValue: f64(1)}), at(5))
+	if !(birth.Ord < data.Ord) {
+		t.Errorf("expected the birth ordered before the data, got %d and %d", birth.Ord, data.Ord)
+	}
+	state := store.HandleMessage(TopicInfo{Type: MessageTypeState, HostID: "h"}, nil, at(5))
+	if state["n"] != data.Ord+1 {
+		t.Errorf("expected STATE to take the next order too, got %v", state["n"])
+	}
+}
+
+func TestValueIndexIsCappedPerScope(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	store := NewSessionStore()
 
 	// An unbirthed publisher cycling aliases must not grow the index forever.
-	for i := 0; i < maxMetricRefsPerScope+10; i++ {
+	for i := 0; i < maxMetricsPerScope+10; i++ {
 		store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{alias: u64(uint64(i)), doubleValue: f64(1)}), at(int64(i)))
 	}
 	node := store.nodes[nodeKey{"G", "N"}]
-	if len(node.metricRefs) != maxMetricRefsPerScope {
-		t.Errorf("expected %d metric refs, got %d", maxMetricRefsPerScope, len(node.metricRefs))
+	if len(node.values) != maxMetricsPerScope {
+		t.Errorf("expected %d values, got %d", maxMetricsPerScope, len(node.values))
 	}
-	if store.metricRefsLen != maxMetricRefsPerScope {
-		t.Errorf("expected the total to track the scope, got %d", store.metricRefsLen)
+	if store.valuesTotal != maxMetricsPerScope || store.valueBytes != node.valueBytes || store.valueBytes == 0 {
+		t.Errorf("expected totals to track the scope, got %d values, %d bytes (scope %d)", store.valuesTotal, store.valueBytes, node.valueBytes)
 	}
 
-	// A birth releases the scope's refs from the total.
+	// A birth releases the scope's values from the totals.
 	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(99999))
-	if store.metricRefsLen != 0 {
-		t.Errorf("expected the total back at 0 after a birth, got %d", store.metricRefsLen)
+	if store.valuesTotal != 0 || store.valueBytes != 0 {
+		t.Errorf("expected totals back at 0 after a birth, got %d values, %d bytes", store.valuesTotal, store.valueBytes)
 	}
 }
 
-func TestResetClearsReplayRefs(t *testing.T) {
+func TestValueIndexIsCappedByBytes(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	// 1 KB names: the byte cap binds long before the count caps.
+	long := strings.Repeat("x", 1024)
+	for n := 0; n < 200; n++ {
+		info := TopicInfo{Group: "G", Type: MessageTypeNData, EdgeNode: fmt.Sprintf("N%d", n)}
+		metrics := []testMetric{}
+		for m := 0; m < 400; m++ {
+			metrics = append(metrics, testMetric{name: fmt.Sprintf("%s-%d", long, m), doubleValue: f64(1)})
+		}
+		store.HandleMessage(info, buildPayload(t, descriptor, -1, metrics...), at(int64(n)))
+	}
+	if store.valueBytes > maxValueBytesTotal {
+		t.Errorf("expected value bytes capped at %d, got %d", maxValueBytesTotal, store.valueBytes)
+	}
+}
+
+func TestAliasTableIsCapped(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	metrics := []testMetric{}
+	for i := 0; i < maxMetricsPerScope+500; i++ {
+		metrics = append(metrics, testMetric{name: fmt.Sprintf("M%d", i), alias: u64(uint64(i))})
+	}
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, metrics...), at(1))
+	if n := len(store.nodes[nodeKey{"G", "N"}].Aliases); n != maxMetricsPerScope {
+		t.Errorf("expected %d aliases, got %d", maxMetricsPerScope, n)
+	}
+}
+
+func TestDevicesAreCappedAcrossTheConnection(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.devicesTotal = maxTrackedDevicesTotal // as if the connection were full
+	meta := store.HandleMessage(TopicInfo{Group: "G", Type: MessageTypeDData, EdgeNode: "N", Device: "D"},
+		buildPayload(t, descriptor, -1, testMetric{alias: u64(1), doubleValue: f64(1)}), at(1))
+	if meta != nil {
+		t.Errorf("expected no meta for a device past the connection cap, got %v", meta)
+	}
+}
+
+func TestDDeathEndsTheDeviceSession(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(1))
+	store.HandleMessage(dbirthInfo, buildPayload(t, descriptor, 1, testMetric{name: "Old", alias: u64(1)}), at(2))
+	store.HandleMessage(ddeathInfo, buildPayload(t, descriptor, 2), at(3))
+
+	// The device must DBIRTH again, possibly with different aliases, before
+	// its data can be named.
+	data := buildPayload(t, descriptor, 3, testMetric{alias: u64(1), doubleValue: f64(1)})
+	meta := store.HandleMessage(ddataInfo, data, at(4))
+	if meta["resolution"] != ResolutionUnresolved {
+		t.Errorf("expected unresolved after DDEATH, got %v", meta["resolution"])
+	}
+}
+
+func TestClearHistoryKeepsTheNodesAliases(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "Volts", alias: u64(3)}), at(1))
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(3), doubleValue: f64(1)}), at(2))
+	store.HandleMessage(TopicInfo{Type: MessageTypeState, HostID: "h"}, nil, at(3))
+	store.ClearHistory()
+
+	replay := store.Replay()
+	if len(replay.Refs) != 0 || len(replay.Data) != 0 {
+		t.Errorf("expected nothing to replay after a history clear, got %d refs, %d data", len(replay.Refs), len(replay.Data))
+	}
+	if store.valuesTotal != 0 || store.valueBytes != 0 {
+		t.Errorf("expected the value index emptied, got %d, %d", store.valuesTotal, store.valueBytes)
+	}
+	// Clearing messages doesn't change what the node's aliases mean.
+	data := buildPayload(t, descriptor, 2, testMetric{alias: u64(3), doubleValue: f64(2)})
+	meta := store.HandleMessage(ndataInfo, data, at(4))
+	if meta["resolution"] != ResolutionResolved {
+		t.Errorf("expected names to keep resolving after a history clear, got %v", meta["resolution"])
+	}
+	if _, ok := meta["seqGap"]; ok {
+		t.Errorf("expected seq tracking to carry on, got %v", meta["seqGap"])
+	}
+}
+
+func TestResyncSeqForgetsALateBaseline(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(1))
+	store.Suspend()
+	// A pre-drop message delivered after Suspend re-seeds the counter...
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 5), at(2))
+	// ...until the connection comes back up.
+	store.ResyncSeq()
+	meta := store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 90), at(3))
+	if _, ok := meta["seqGap"]; ok {
+		t.Errorf("expected no gap against a pre-drop baseline, got %v", meta["seqGap"])
+	}
+}
+
+func TestSuspendRecordsItsOrder(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	birth := handled(store, nbirthInfo, buildPayload(t, descriptor, 0), at(1))
+	store.Suspend()
+	if replay := store.Replay(); replay.SuspendedOrd != birth.Ord {
+		t.Errorf("expected the drop recorded at ord %d, got %d", birth.Ord, replay.SuspendedOrd)
+	}
+}
+
+func TestResetClearsTheReplay(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	store := NewSessionStore()
 	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "M", alias: u64(1)}), at(1))
 	store.HandleMessage(TopicInfo{Type: MessageTypeState, HostID: "scada"}, nil, at(2))
 	store.Reset()
-	if refs := store.ReplayRefs(); len(refs) != 0 {
-		t.Errorf("expected no refs after reset, got %v", refs)
+	if replay := store.Replay(); len(replay.Refs) != 0 || len(replay.Data) != 0 {
+		t.Errorf("expected nothing after reset, got %+v", replay)
 	}
 }

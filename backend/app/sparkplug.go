@@ -4,40 +4,52 @@ import (
 	"fmt"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/backend/sparkplug"
+	"sort"
 	"time"
 )
 
-// GetSparkplugMessageHistory returns the retained messages a Sparkplug view
-// needs to rebuild its tree, sorted by arrival time, so a view opened
-// mid-session starts from the same state it would have reached watching live.
+// SparkplugHistory is what a Sparkplug view replays to rebuild its tree.
+// SuspendedOrd is the arrival order (the meta "n") of the connection's last
+// drop: births with a lower order predate it and their names are unverified.
+type SparkplugHistory struct {
+	Messages     []mqtt.MqttMessage `json:"messages"`
+	SuspendedOrd uint64             `json:"suspendedOrd"`
+}
+
+// GetSparkplugMessageHistory returns the messages a Sparkplug view needs to
+// rebuild the current tree, in arrival order, so a view opened mid-session
+// starts from the state it would have reached watching live.
 //
-// It is not a window of recent traffic. Sparkplug reports by exception, so the
-// latest NDATA for a node usually carries only the metrics that just changed,
-// and replaying a tail of the history would leave every quieter metric on its
-// birth value. The session store instead indexes, as messages arrive, the
-// latest message carrying each metric, plus each scope's latest birth and
-// death, recent NBIRTHs (for rebirth-storm counts), recent seq-gap messages
-// and each host's latest STATE. That set is bounded by the store's caps, not
-// by how long the session has run, and each message is fetched by id with a
-// time hint rather than by scanning the window.
-func (a *App) GetSparkplugMessageHistory(connectionId uint) ([]mqtt.MqttMessage, error) {
+// It is not a window of recent traffic. Sparkplug reports by exception, so
+// the latest NDATA for a node usually carries only the metrics that just
+// changed, and replaying a tail of the history would leave every quieter
+// metric on its birth value. Births, deaths, recent NBIRTHs, seq-gap messages
+// and host STATE are fetched from history by id (the latest message per topic
+// is always kept there, so the current birth and death are too). Metric
+// values come from the session store's own latest-value index and are rebuilt
+// into one data message per original message, because the message a quiet
+// metric last changed in may be long gone from history.
+func (a *App) GetSparkplugMessageHistory(connectionId uint) (SparkplugHistory, error) {
 	appConnection, ok := a.appConnection(connectionId)
 	if !ok {
-		return nil, fmt.Errorf("connection not found (%d)", connectionId)
+		return SparkplugHistory{}, fmt.Errorf("connection not found (%d)", connectionId)
 	}
 	return replaySparkplugHistory(appConnection.SparkplugStore, appConnection.MqttManager.MessageHistory), nil
 }
 
-// replaySparkplugHistory resolves the store's replay refs against history.
-// A ref whose message has aged out of the history window is skipped.
-func replaySparkplugHistory(store *sparkplug.SessionStore, history *mqtt.MessageHistory) []mqtt.MqttMessage {
+// replaySparkplugHistory resolves the store's replay against history. A ref
+// whose message has aged out of the history window is skipped.
+func replaySparkplugHistory(store *sparkplug.SessionStore, history *mqtt.MessageHistory) SparkplugHistory {
+	replay := store.Replay()
 	type topicRefs struct {
 		ids     []string
 		timesMs []int64
 	}
 	byTopic := map[string]*topicRefs{}
-	for _, ref := range store.ReplayRefs() {
+	ordByID := map[string]uint64{}
+	for _, ref := range replay.Refs {
 		refs, ok := byTopic[ref.Topic]
 		if !ok {
 			refs = &topicRefs{}
@@ -45,13 +57,43 @@ func replaySparkplugHistory(store *sparkplug.SessionStore, history *mqtt.Message
 		}
 		refs.ids = append(refs.ids, ref.ID)
 		refs.timesMs = append(refs.timesMs, ref.TimeMs)
+		ordByID[ref.ID] = ref.Ord
 	}
-	messages := []mqtt.MqttMessage{}
+	type ordered struct {
+		ord uint64
+		msg mqtt.MqttMessage
+	}
+	all := []ordered{}
 	for topic, refs := range byTopic {
-		messages = append(messages, history.GetMessagesByIds(topic, refs.ids, refs.timesMs)...)
+		for _, msg := range history.GetMessagesByIds(topic, refs.ids, refs.timesMs) {
+			all = append(all, ordered{ordByID[msg.Id], msg})
+		}
 	}
-	sortMessagesByTimeAsc(messages)
-	return messages
+	for _, data := range replay.Data {
+		payload, err := protobuf.MarshalDynamicToJSON(data.Payload)
+		if err != nil {
+			continue
+		}
+		props := map[string]any{"IsDecodedProto": true, "sparkplug": data.Meta}
+		all = append(all, ordered{data.Ord, mqtt.MqttMessage{
+			// The original message's id, so "open the message this value came
+			// from" finds it in history (when history still has it).
+			Id:                   data.ID,
+			Topic:                data.Topic,
+			Payload:              payload,
+			TimeMs:               data.TimeMs,
+			Time:                 time.UnixMilli(data.TimeMs),
+			MiddlewareProperties: &props,
+		}})
+	}
+	// Arrival order, not time order: messages in one millisecond are routine
+	// during a node's connect burst, and a birth must come before its data.
+	sort.Slice(all, func(i, j int) bool { return all[i].ord < all[j].ord })
+	out := SparkplugHistory{Messages: make([]mqtt.MqttMessage, len(all)), SuspendedOrd: replay.SuspendedOrd}
+	for i, o := range all {
+		out.Messages[i] = o.msg
+	}
+	return out
 }
 
 // PublishSparkplugRebirth publishes the standard NCMD Node Control/Rebirth

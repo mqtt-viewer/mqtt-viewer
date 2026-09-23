@@ -57,7 +57,8 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 		return nil
 	}
 
-	msg, err := protobuf.UnmarshalToDynamic(params.Payload, descriptor)
+	// Sparkplug B has no required fields, so skip the check for them.
+	msg, err := protobuf.UnmarshalWithoutRequiredCheck(params.Payload, descriptor)
 	if err != nil {
 		// Don't error - just use payload as normal
 		slog.Debug(fmt.Sprintf("sparkplug decode middleware error: %s", err.Error()))
