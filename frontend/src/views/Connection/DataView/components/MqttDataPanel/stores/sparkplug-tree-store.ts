@@ -579,10 +579,15 @@ export const createSparkplugTreeStore = (
    * coming within the storm window of the newest message seen: once a node
    * settles, the badge goes (the warning stays in the list).
    */
+  /** "Now" for ages and expiry: frozen at the drop while disconnected. */
+  const referenceNow = () => (connected || droppedAtMs === undefined ? Date.now() : droppedAtMs);
+
+  // Expires against the clock as well as the newest message, so a storm
+  // that stopped clears even when nothing else arrives.
   const stormActive = (n: NodeRt) => {
     if (n.stormWarning === null || !warnings.includes(n.stormWarning)) return false;
     const lastBirth = n.birthRing[n.birthRing.length - 1]?.timeMs ?? 0;
-    return maxTimeSeen - lastBirth <= REBIRTH_STORM_WINDOW_MS;
+    return Math.max(maxTimeSeen, referenceNow()) - lastBirth <= REBIRTH_STORM_WINDOW_MS;
   };
 
   /** A birth that no newer death has ended. */
@@ -686,7 +691,7 @@ export const createSparkplugTreeStore = (
   };
 
   const buildState = (): SparkplugTreeState => {
-    const nowMs = connected || droppedAtMs === undefined ? Date.now() : droppedAtMs;
+    const nowMs = referenceNow();
     const outHosts: SparkplugHost[] = [];
     for (const hostId of Array.from(hosts.keys()).sort()) {
       const h = hosts.get(hostId)!;

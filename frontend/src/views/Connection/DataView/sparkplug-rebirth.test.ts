@@ -80,6 +80,32 @@ describe("createRebirthFlow", () => {
     await flow.confirm();
     expect(toasts()[0]).toMatchObject({ title: "Rebirth request failed", type: "error" });
   });
+
+  it("counts requests as they go out, for the dialog's progress", async () => {
+    const seen: number[] = [];
+    const flow = createRebirthFlow(7);
+    PublishSparkplugRebirth.mockImplementation(async () => {
+      seen.push(get(flow.request).sent);
+    });
+    flow.requestRebirth([
+      { group: "G", node: "a" },
+      { group: "G", node: "b" },
+      { group: "G", node: "c" },
+    ]);
+    await flow.confirm();
+    expect(seen).toEqual([0, 1, 2]);
+    expect(get(flow.request).sent).toBe(3);
+  });
+
+  it("unwraps a runtime error envelope into its message", async () => {
+    PublishSparkplugRebirth.mockRejectedValue(
+      '{"message":"specified connection not connected","cause":{},"kind":"RuntimeError"}'
+    );
+    const flow = createRebirthFlow(7);
+    flow.requestRebirth([{ group: "G", node: "a" }]);
+    await flow.confirm();
+    expect(toasts()[0]).toMatchObject({ description: "specified connection not connected" });
+  });
 });
 
 describe("rebirthTopic", () => {

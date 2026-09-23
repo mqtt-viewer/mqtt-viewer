@@ -14,8 +14,15 @@ export type SparkplugRowKind = "group" | "node" | "device" | "metric";
 
 export interface SparkplugTreeRow {
   kind: SparkplugRowKind;
-  /** Expansion key for group/node/device rows: "group[/node[/device]]". */
+  /**
+   * Expansion key for group/node/device rows: "group[/node[/device]]". A
+   * metric row carries the key of the scope it belongs to.
+   */
   key: string;
+  /** Unique across the tree, stable across rebuilds (focus and selection). */
+  id: string;
+  /** Position in the flattened list. */
+  index: number;
   levelCount: number;
   isExpanded: boolean;
   group?: SparkplugGroup;
@@ -31,9 +38,9 @@ interface BuildParams {
   /** Whether node and device rows start open. Groups always do. */
   defaultExpanded: boolean;
   /**
-   * Case-insensitive substring filter on group/node/device/metric names.
-   * While it is set everything is shown open, so matches are never hidden
-   * under a collapsed row.
+   * Case-insensitive substring filter, see normaliseFilter. While it is set
+   * everything is shown open, so matches are never hidden under a collapsed
+   * row.
    */
   filter: string;
   /** Only nodes that need attention (see nodeProblems). */
@@ -43,7 +50,45 @@ interface BuildParams {
 const matches = (name: string, filter: string) =>
   name.toLowerCase().includes(filter);
 
+const MESSAGE_TYPES = new Set([
+  "nbirth",
+  "ndeath",
+  "ndata",
+  "ncmd",
+  "dbirth",
+  "ddeath",
+  "ddata",
+  "dcmd",
+]);
+
+/**
+ * Lower-cases and trims the search text, and reduces a pasted Sparkplug topic
+ * ("spBv1.0/Plant/NDATA/edge-1") to the path the tree and the warnings print
+ * ("plant/edge-1"), so either form finds the node.
+ */
+export const normaliseFilter = (text: string): string => {
+  const filter = text.trim().toLowerCase();
+  if (!filter.startsWith("spbv1.0/")) return filter;
+  const parts = filter.split("/").slice(1);
+  if (parts.length >= 2 && MESSAGE_TYPES.has(parts[1])) parts.splice(1, 1);
+  return parts.join("/");
+};
+
+/**
+ * A Sparkplug B topic whose payload is protobuf: everything under spBv1.0/
+ * except host STATE, which is JSON.
+ */
+export const isSparkplugProtobufTopic = (topic: string): boolean =>
+  topic.startsWith("spBv1.0/") && !topic.startsWith("spBv1.0/STATE/");
+
 export const nodeKeyOf = (group: string, node: string) => `${group}/${node}`;
+
+/** The row id for a metric, distinct from every scope row's id. */
+export const metricRowId = (scopeKey: string, name: string) => `m\u0000${scopeKey}\u0000${name}`;
+
+/** What a metric row prints in the name column. */
+export const metricLabel = (metric: SparkplugMetric) =>
+  metric.placeholder ? `alias ${metric.name.replace(/^alias_/, "")}` : metric.name;
 
 /**
  * What needs attention on a node, in the order it is worth reading. Empty
@@ -56,8 +101,10 @@ export const nodeProblems = (node: SparkplugNode): string[] => {
   if (!node.seqOk) problems.push("seq gap");
   const unresolved =
     node.placeholderCount > 0 || node.devices.some((d) => d.placeholderCount > 0);
+  // Names carried over a dropped connection are not a problem by
+  // themselves: after any blip every node has them, which would bury the
+  // real faults. The banner offers the rebirth instead.
   if (unresolved) problems.push("unresolved aliases");
-  else if (node.hasBirth && !node.verified) problems.push("names unverified");
   if (node.devices.some((d) => d.status === "offline")) problems.push("device offline");
   if (node.devices.some((d) => d.awaitingBirth)) problems.push("device awaiting birth");
   return problems;
@@ -78,17 +125,32 @@ const pushMetrics = (
   filter: string,
   parentMatched: boolean
 ) => {
+  // Paths are only built when the search could be one.
+  const pathSearch = filter.includes("/");
   for (const metric of metrics) {
-    if (filter !== "" && !parentMatched && !matches(metric.name, filter)) {
+    if (
+      filter !== "" &&
+      !parentMatched &&
+      !matches(metricLabel(metric), filter) &&
+      !(pathSearch && matches(`${key}/${metric.name}`, filter))
+    ) {
       continue;
     }
-    result.push({ kind: "metric", key, levelCount, isExpanded: false, metric });
+    result.push({
+      kind: "metric",
+      key,
+      id: metricRowId(key, metric.name),
+      index: result.length,
+      levelCount,
+      isExpanded: false,
+      metric,
+    });
   }
 };
 
 export const buildSparkplugTree = (params: BuildParams): SparkplugTreeRow[] => {
   const { groups, expansion, defaultExpanded, problemsOnly } = params;
-  const filter = params.filter.trim().toLowerCase();
+  const filter = normaliseFilter(params.filter);
   const filtering = filter !== "";
   const isOpen = (key: string, fallback: boolean) =>
     filtering || (expansion.get(key) ?? fallback);
@@ -102,6 +164,8 @@ export const buildSparkplugTree = (params: BuildParams): SparkplugTreeRow[] => {
     result.push({
       kind: "group",
       key: groupKey,
+      id: groupKey,
+      index: result.length,
       levelCount: 0,
       isExpanded: groupExpanded,
       group,
@@ -110,19 +174,22 @@ export const buildSparkplugTree = (params: BuildParams): SparkplugTreeRow[] => {
     let keptNodes = 0;
     for (const node of group.nodes) {
       if (problemsOnly && nodeProblems(node).length === 0) continue;
-      const nodeMatched = groupMatched || matches(node.name, filter);
+      const nodeKey = nodeKeyOf(group.name, node.name);
+      const nodeMatched =
+        groupMatched || matches(node.name, filter) || matches(nodeKey, filter);
       if (!groupExpanded) {
         // Collapsed (never while filtering): count what the group holds so
         // the problems filter can still drop a group with nothing to show.
         keptNodes++;
         continue;
       }
-      const nodeKey = nodeKeyOf(group.name, node.name);
       const nodeStart = result.length;
       const nodeExpanded = isOpen(nodeKey, defaultExpanded);
       result.push({
         kind: "node",
         key: nodeKey,
+        id: nodeKey,
+        index: result.length,
         levelCount: 1,
         isExpanded: nodeExpanded,
         node,
@@ -132,12 +199,15 @@ export const buildSparkplugTree = (params: BuildParams): SparkplugTreeRow[] => {
         pushMetrics(result, nodeKey, node.metrics, 2, filter, nodeMatched);
         for (const device of node.devices) {
           const deviceKey = `${nodeKey}/${device.name}`;
-          const deviceMatched = nodeMatched || matches(device.name, filter);
+          const deviceMatched =
+            nodeMatched || matches(device.name, filter) || matches(deviceKey, filter);
           const deviceStart = result.length;
           const deviceExpanded = isOpen(deviceKey, defaultExpanded);
           result.push({
             kind: "device",
             key: deviceKey,
+            id: deviceKey,
+            index: result.length,
             levelCount: 2,
             isExpanded: deviceExpanded,
             node,

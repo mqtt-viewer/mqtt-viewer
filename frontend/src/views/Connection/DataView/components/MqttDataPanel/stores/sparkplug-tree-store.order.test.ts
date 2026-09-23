@@ -176,6 +176,7 @@ describe("order independence (adversarial review repros)", () => {
 
 describe("incremental snapshot (adversarial review repros)", () => {
   it("clears a cached node's storm flag when its warning is evicted", async () => {
+    vi.setSystemTime(new Date(BASE + 3000));
     const store = createSparkplugTreeStore(1, eventSet);
     store.init();
     await store.activate();
@@ -188,7 +189,8 @@ describe("incremental snapshot (adversarial review repros)", () => {
     expect(n1().storm).toBe(true);
     // 50 distinct seq-gap warnings on another node push the storm warning out.
     const gaps = Array.from({ length: 50 }, (_, i) =>
-      ndata(BASE + 10_000 + i * 10_000, [], { seqGap: { expected: i, got: i + 100 } }, "n2")
+      // Inside the storm window, so only the eviction can clear the flag.
+      ndata(BASE + 3100 + i, [], { seqGap: { expected: i, got: i + 100 } }, "n2")
     );
     emit("msgs", gaps);
     s = get(store) as SparkplugTreeState;
@@ -267,17 +269,32 @@ describe("warnings and badges that end", () => {
   });
 
   it("expires the storm badge once births stop", async () => {
+    vi.setSystemTime(new Date(BASE + 3000));
     const store = createSparkplugTreeStore(1, eventSet);
     store.init();
     await store.activate();
     emit("msgs", [0, 1000, 2000, 3000].map((dt) => nbirth(BASE + dt, [])));
-    const node = () => (get(store) as SparkplugTreeState).groups[0].nodes[0];
+    const node = () =>
+      (get(store) as SparkplugTreeState).groups[0].nodes.find((n) => n.name === N)!;
     expect(node().storm).toBe(true);
     // Quiet for longer than the storm window, with other traffic flowing.
     emit("msgs", [ndata(BASE + 3000 + 91_000, [], {}, "other")]);
     expect(node().storm).toBe(false);
     // The warning itself stays in the list.
     expect((get(store) as SparkplugTreeState).warnings.some((w) => w.kind === "rebirth-storm")).toBe(true);
+    store.destroy();
+  });
+
+  it("expires the storm badge on the clock when nothing else arrives", async () => {
+    vi.setSystemTime(new Date(BASE + 3000));
+    const store = createSparkplugTreeStore(1, eventSet);
+    store.init();
+    await store.activate();
+    emit("msgs", [0, 1000, 2000, 3000].map((dt) => nbirth(BASE + dt, [])));
+    const node = () => (get(store) as SparkplugTreeState).groups[0].nodes[0];
+    expect(node().storm).toBe(true);
+    vi.advanceTimersByTime(91_000);
+    expect(node().storm).toBe(false);
     store.destroy();
   });
 

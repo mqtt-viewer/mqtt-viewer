@@ -2,7 +2,7 @@
   "$schema": "../../../../../../../design-system/component-spec.schema.json",
   "name": "SparkplugRow",
   "tier": "view",
-  "description": "One virtualised Sparkplug tree row: group, edge node (status, problem badges, hover actions), device, or metric (value with unit, quality, flags, type, age, copy). Rows are keyboard-reachable tree items.",
+  "description": "One virtualised Sparkplug tree row: group, edge node (status, problem badges, hover actions), device, or metric (value with unit, quality, flags, type, age, copy). Rows are aria-activedescendant items of a focusable tree, so the keyboard reaches every row however far it is scrolled.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -25,11 +25,31 @@
       "description": "Reference now for relative ages (from the store snapshot)."
     },
     {
+      "name": "domId",
+      "type": "string",
+      "required": true,
+      "description": "DOM id, referenced by the tree's aria-activedescendant."
+    },
+    {
       "name": "isSelected",
       "type": "boolean",
       "required": false,
       "default": false,
       "description": "The metric row last opened."
+    },
+    {
+      "name": "isActive",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "The keyboard cursor is on this row. Its actions join the tab order."
+    },
+    {
+      "name": "treeFocused",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "The tree has keyboard focus, so the active row shows a ring and its actions."
     },
     {
       "name": "isHighlighted",
@@ -39,28 +59,36 @@
       "description": "Flashes a node row revealed from a warning."
     },
     {
-      "name": "onToggleExpansion",
+      "name": "compact",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Narrow panel: drops the type column and folds status badges into one warning icon."
+    },
+    {
+      "name": "connected",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "description": "False disables the rebirth action."
+    },
+    {
+      "name": "onActivate",
       "type": "function",
       "required": true,
-      "description": "(key) toggles a group, node or device row."
+      "description": "(row) a click: moves the cursor here, toggles a scope row or opens a metric's message."
     },
     {
       "name": "onRequestRebirth",
       "type": "function",
       "required": true,
-      "description": "(group, node) asks for a rebirth (confirmed by the caller)."
+      "description": "(node) asks for a rebirth (confirmed by the caller). Disabled for offline nodes."
     },
     {
       "name": "onCopyMetricList",
       "type": "function",
       "required": true,
       "description": "(node) copies the node's metric list as JSON."
-    },
-    {
-      "name": "onSelectMetric",
-      "type": "function",
-      "required": true,
-      "description": "(metric, rowKey) opens the metric's topic."
     },
     {
       "name": "onCopyValue",
@@ -79,10 +107,7 @@
     "primary"
   ],
   "dependencies": [
-    "Icon",
-    "DropdownMenu",
-    "DropdownMenuItem",
-    "DropdownCloseOnClick"
+    "Icon"
   ],
-  "notes": "Figma is not linked yet; stories use local fixtures. Node actions are hover-revealed (same affordance as MqttTopicRow's broker-status button)."
+  "notes": "Figma is not linked yet; stories use local fixtures. Node actions are hover-revealed (same affordance as MqttTopicRow's broker-status button), and shown on the keyboard cursor row."
 }

@@ -5,7 +5,7 @@
   import { writable } from "svelte/store";
 
   const componentName = "ConfirmRebirthDialog";
-  const props: string[] = ["busy"];
+  const props: string[] = ["busy", "sent", "connected"];
 
   const { Story } = defineMeta({
     title: "Components/Connection/DataView/ConfirmRebirthDialog",
@@ -36,6 +36,18 @@
 
 <Story
   name="Busy"
-  args={{ targets: fleet.slice(0, 3), busy: true }}
+  args={{ targets: fleet, busy: true, sent: 6 }}
+  {template}
+/>
+
+<Story
+  name="Offline node"
+  args={{ targets: [{ group: "EnergyCo", node: "substation-4", offline: true }] }}
+  {template}
+/>
+
+<Story
+  name="Not connected"
+  args={{ targets: fleet.slice(0, 3), connected: false }}
   {template}
 />

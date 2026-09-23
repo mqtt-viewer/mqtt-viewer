@@ -256,6 +256,7 @@
       isOpen={isRebirthOpen}
       targets={$rebirthRequest.targets}
       busy={$rebirthRequest.busy}
+      sent={$rebirthRequest.sent}
       onConfirm={rebirth.confirm}
     />
   </main>

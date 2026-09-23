@@ -36,8 +36,10 @@
         on:click={() => onChange(option.value)}
         >{option.label}{#if option.value === "sparkplug" && sparkplugWarningCount > 0}<span
             class="ml-1 text-warning"
-            aria-label={`${sparkplugWarningCount} warnings`}
-            >{sparkplugWarningCount}</span
+            aria-hidden="true">{sparkplugWarningCount}</span
+          ><span class="sr-only"
+            >, {sparkplugWarningCount}
+            {sparkplugWarningCount === 1 ? "warning" : "warnings"}</span
           >{/if}</button
       >
     {/each}

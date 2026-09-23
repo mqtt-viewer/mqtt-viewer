@@ -29,7 +29,7 @@
       "type": "string",
       "required": false,
       "default": "",
-      "description": "Case-insensitive substring filter on group/node/device/metric names. Opens everything while set."
+      "description": "Search text. Matches group, node, device and metric names, Group/Node paths, \"alias N\" and pasted Sparkplug topics. Opens everything while set."
     },
     {
       "name": "decodingState",
@@ -44,16 +44,23 @@
       "description": "off or needs-reconnect replaces the tree with an explanation and a button."
     },
     {
+      "name": "enablingDecoding",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "True while decoding is being turned on; the button disables and says so."
+    },
+    {
       "name": "onEnableDecoding",
       "type": "function",
       "required": false,
-      "description": "Turns decoding on for the connection and reconnects."
+      "description": "Turns decoding on for the connection and connects, or reconnects when already connected."
     },
     {
       "name": "onRequestRebirth",
       "type": "function",
       "required": true,
-      "description": "([{group, node}]) asks for rebirths; the caller confirms before anything is published."
+      "description": "([{group, node, offline?}]) asks for rebirths; the caller confirms before anything is published."
     },
     {
       "name": "onCopyMetricList",
@@ -65,13 +72,25 @@
       "name": "onSelectMetric",
       "type": "function",
       "required": false,
-      "description": "(metric) opens the topic of the message that last updated the metric."
+      "description": "(metric) opens the message that last set the metric's value."
     },
     {
       "name": "onCopyValue",
       "type": "function",
       "required": false,
       "description": "(metric) copies the metric's full value."
+    },
+    {
+      "name": "onClearWarnings",
+      "type": "function",
+      "required": false,
+      "description": "Clears the warning list."
+    },
+    {
+      "name": "onClearFilter",
+      "type": "function",
+      "required": false,
+      "description": "Clears the search, so a warning click can reveal a node the search hides."
     }
   ],
   "tokens": [
@@ -90,5 +109,5 @@
     "Icon",
     "Button"
   ],
-  "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and the user's clicks override per key."
+  "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and that choice holds from the user's first click, scroll or key so rows never collapse under them, and the user's clicks override per key. The tree is one tab stop with arrow-key navigation (aria-activedescendant). Below 560px wide the rows go compact."
 }

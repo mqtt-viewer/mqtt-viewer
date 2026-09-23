@@ -45,6 +45,11 @@
   export let onRequestRebirth:
     | ((targets: { group: string; node: string }[]) => void)
     | null = null;
+  /**
+   * The message is on a Sparkplug B topic but reached the viewer as raw
+   * protobuf, because decoding is off for this connection.
+   */
+  export let sparkplugUndecoded = false;
 
   export let isComparing: boolean;
   export let payload: string;
@@ -226,12 +231,14 @@
   </div>
 
   {#if sparkplugMeta}
+    <!-- Wraps rather than truncates: the part that matters ("aliases only,
+         no birth seen") is at the end, and the panel is often narrow. -->
     <div
-      class="text-sm border-b border-divider py-1 px-2 flex items-center gap-2 text-secondary-text whitespace-nowrap overflow-hidden"
+      class="text-sm border-b border-divider py-1 px-2 flex items-start gap-2 text-secondary-text"
     >
-      <SparkplugLogo class="size-4 shrink-0" isActive />
+      <SparkplugLogo class="size-4 shrink-0 mt-px" isActive />
       <Tooltip
-        class={spTone === "warning" ? "text-warning truncate" : "truncate"}
+        class={spTone === "warning" ? "text-warning min-w-0 grow" : "min-w-0 grow"}
         text={spTooltip}>{spLabel}</Tooltip
       >
       {#if sparkplugMeta.seqGap}
@@ -242,11 +249,20 @@
         >
       {/if}
       {#if spOffersRebirth}
-        <div class="grow"></div>
         <Button variant="text" class="text-sm shrink-0" on:click={requestRebirth}
           >Request rebirth</Button
         >
       {/if}
+    </div>
+  {:else if sparkplugUndecoded}
+    <div
+      class="text-sm border-b border-divider py-1 px-2 flex items-start gap-2 text-secondary-text"
+    >
+      <SparkplugLogo class="size-4 shrink-0 mt-px" />
+      <span class="min-w-0"
+        >Sparkplug B, shown as raw protobuf. The Sparkplug view can turn on
+        decoding.</span
+      >
     </div>
   {/if}
 

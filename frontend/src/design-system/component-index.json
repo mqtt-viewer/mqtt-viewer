@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-23T02:40:20.620Z",
+  "generatedAt": "2026-09-23T04:30:05.748Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -1095,6 +1095,12 @@
         },
         {
           "name": "openFocus",
+          "type": "string",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "closeFocus",
           "type": "string",
           "required": false,
           "default": null
@@ -3638,7 +3644,7 @@
           "type": "array",
           "required": false,
           "default": "[]",
-          "description": "The {group, node} edge nodes that will be asked to rebirth. More than one switches to the bulk wording and a list of up to 10."
+          "description": "The {group, node, offline?} edge nodes that will be asked to rebirth. More than one switches to the bulk wording and a list of up to 10. Offline nodes are marked and warned about."
         },
         {
           "name": "busy",
@@ -3646,6 +3652,20 @@
           "required": false,
           "default": false,
           "description": "True while the requests are in flight. Both buttons disable and the dialog does not close until the parent closes it."
+        },
+        {
+          "name": "sent",
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Requests published so far. A bulk request shows it as progress on the confirm button while busy."
+        },
+        {
+          "name": "connected",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "False when the connection is down: the dialog says so and the confirm button disables."
         },
         {
           "name": "onConfirm",
@@ -3658,7 +3678,8 @@
         "emphasis",
         "outline",
         "elevation-0",
-        "secondary-text"
+        "secondary-text",
+        "warning"
       ],
       "dependencies": [
         "Button",
@@ -4009,6 +4030,12 @@
           "required": false,
           "default": true,
           "description": "Shows the topic tree's expand/collapse and sort controls. Off in the Sparkplug view."
+        },
+        {
+          "name": "searchPlaceholder",
+          "type": "string",
+          "required": false,
+          "description": "Search box placeholder override."
         }
       ],
       "tokens": [
@@ -4041,6 +4068,13 @@
           "type": "string",
           "required": false,
           "default": ""
+        },
+        {
+          "name": "placeholder",
+          "type": "string",
+          "required": false,
+          "default": "Filter by topic, payload or pattern",
+          "description": "Input placeholder; views that filter something else say what."
         }
       ],
       "tokens": [
@@ -4089,7 +4123,7 @@
           "type": "string",
           "required": false,
           "default": "",
-          "description": "Case-insensitive substring filter on group/node/device/metric names. Opens everything while set."
+          "description": "Search text. Matches group, node, device and metric names, Group/Node paths, \"alias N\" and pasted Sparkplug topics. Opens everything while set."
         },
         {
           "name": "decodingState",
@@ -4104,16 +4138,23 @@
           "description": "off or needs-reconnect replaces the tree with an explanation and a button."
         },
         {
+          "name": "enablingDecoding",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "True while decoding is being turned on; the button disables and says so."
+        },
+        {
           "name": "onEnableDecoding",
           "type": "function",
           "required": false,
-          "description": "Turns decoding on for the connection and reconnects."
+          "description": "Turns decoding on for the connection and connects, or reconnects when already connected."
         },
         {
           "name": "onRequestRebirth",
           "type": "function",
           "required": true,
-          "description": "([{group, node}]) asks for rebirths; the caller confirms before anything is published."
+          "description": "([{group, node, offline?}]) asks for rebirths; the caller confirms before anything is published."
         },
         {
           "name": "onCopyMetricList",
@@ -4125,13 +4166,25 @@
           "name": "onSelectMetric",
           "type": "function",
           "required": false,
-          "description": "(metric) opens the topic of the message that last updated the metric."
+          "description": "(metric) opens the message that last set the metric's value."
         },
         {
           "name": "onCopyValue",
           "type": "function",
           "required": false,
           "description": "(metric) copies the metric's full value."
+        },
+        {
+          "name": "onClearWarnings",
+          "type": "function",
+          "required": false,
+          "description": "Clears the warning list."
+        },
+        {
+          "name": "onClearFilter",
+          "type": "function",
+          "required": false,
+          "description": "Clears the search, so a warning click can reveal a node the search hides."
         }
       ],
       "tokens": [
@@ -4150,7 +4203,7 @@
         "Icon",
         "Button"
       ],
-      "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and the user's clicks override per key.",
+      "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and that choice holds from the user's first click, scroll or key so rows never collapse under them, and the user's clicks override per key. The tree is one tab stop with arrow-key navigation (aria-activedescendant). Below 560px wide the rows go compact.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugPanel.stories.svelte",
@@ -4160,7 +4213,7 @@
     {
       "name": "SparkplugRow",
       "tier": "view",
-      "description": "One virtualised Sparkplug tree row: group, edge node (status, problem badges, hover actions), device, or metric (value with unit, quality, flags, type, age, copy). Rows are keyboard-reachable tree items.",
+      "description": "One virtualised Sparkplug tree row: group, edge node (status, problem badges, hover actions), device, or metric (value with unit, quality, flags, type, age, copy). Rows are aria-activedescendant items of a focusable tree, so the keyboard reaches every row however far it is scrolled.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -4183,11 +4236,31 @@
           "description": "Reference now for relative ages (from the store snapshot)."
         },
         {
+          "name": "domId",
+          "type": "string",
+          "required": true,
+          "description": "DOM id, referenced by the tree's aria-activedescendant."
+        },
+        {
           "name": "isSelected",
           "type": "boolean",
           "required": false,
           "default": false,
           "description": "The metric row last opened."
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "The keyboard cursor is on this row. Its actions join the tab order."
+        },
+        {
+          "name": "treeFocused",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "The tree has keyboard focus, so the active row shows a ring and its actions."
         },
         {
           "name": "isHighlighted",
@@ -4197,28 +4270,36 @@
           "description": "Flashes a node row revealed from a warning."
         },
         {
-          "name": "onToggleExpansion",
+          "name": "compact",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Narrow panel: drops the type column and folds status badges into one warning icon."
+        },
+        {
+          "name": "connected",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "False disables the rebirth action."
+        },
+        {
+          "name": "onActivate",
           "type": "function",
           "required": true,
-          "description": "(key) toggles a group, node or device row."
+          "description": "(row) a click: moves the cursor here, toggles a scope row or opens a metric's message."
         },
         {
           "name": "onRequestRebirth",
           "type": "function",
           "required": true,
-          "description": "(group, node) asks for a rebirth (confirmed by the caller)."
+          "description": "(node) asks for a rebirth (confirmed by the caller). Disabled for offline nodes."
         },
         {
           "name": "onCopyMetricList",
           "type": "function",
           "required": true,
           "description": "(node) copies the node's metric list as JSON."
-        },
-        {
-          "name": "onSelectMetric",
-          "type": "function",
-          "required": true,
-          "description": "(metric, rowKey) opens the metric's topic."
         },
         {
           "name": "onCopyValue",
@@ -4237,12 +4318,9 @@
         "primary"
       ],
       "dependencies": [
-        "Icon",
-        "DropdownMenu",
-        "DropdownMenuItem",
-        "DropdownCloseOnClick"
+        "Icon"
       ],
-      "notes": "Figma is not linked yet; stories use local fixtures. Node actions are hover-revealed (same affordance as MqttTopicRow's broker-status button).",
+      "notes": "Figma is not linked yet; stories use local fixtures. Node actions are hover-revealed (same affordance as MqttTopicRow's broker-status button), and shown on the keyboard cursor row.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugRow.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugRow.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/SparkplugPanel/SparkplugRow.stories.svelte",

@@ -24,7 +24,7 @@
       "type": "array",
       "required": false,
       "default": "[]",
-      "description": "The {group, node} edge nodes that will be asked to rebirth. More than one switches to the bulk wording and a list of up to 10."
+      "description": "The {group, node, offline?} edge nodes that will be asked to rebirth. More than one switches to the bulk wording and a list of up to 10. Offline nodes are marked and warned about."
     },
     {
       "name": "busy",
@@ -32,6 +32,20 @@
       "required": false,
       "default": false,
       "description": "True while the requests are in flight. Both buttons disable and the dialog does not close until the parent closes it."
+    },
+    {
+      "name": "sent",
+      "type": "number",
+      "required": false,
+      "default": 0,
+      "description": "Requests published so far. A bulk request shows it as progress on the confirm button while busy."
+    },
+    {
+      "name": "connected",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "description": "False when the connection is down: the dialog says so and the confirm button disables."
     },
     {
       "name": "onConfirm",
@@ -44,7 +58,8 @@
     "emphasis",
     "outline",
     "elevation-0",
-    "secondary-text"
+    "secondary-text",
+    "warning"
   ],
   "dependencies": [
     "Button",

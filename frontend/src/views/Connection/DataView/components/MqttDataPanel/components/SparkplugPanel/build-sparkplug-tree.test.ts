@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   allExpansionKeys,
   buildSparkplugTree,
+  isSparkplugProtobufTopic,
   metricListJson,
   needsRebirth,
   nodeProblems,
+  normaliseFilter,
   totalMetricCount,
 } from "./build-sparkplug-tree";
 import type {
@@ -131,7 +133,9 @@ describe("nodeProblems and needsRebirth", () => {
     expect(nodeProblems(node("n", { placeholderCount: 2, hasBirth: false }))).toEqual([
       "unresolved aliases",
     ]);
-    expect(nodeProblems(node("n", { verified: false }))).toEqual(["names unverified"]);
+    // Names carried over a drop are offered a rebirth, not counted as a
+    // problem: after any blip every node has them.
+    expect(nodeProblems(node("n", { verified: false }))).toEqual([]);
   });
 
   it("offers a rebirth for unresolved or unverified live nodes only", () => {
@@ -151,5 +155,86 @@ describe("helpers", () => {
   it("includes units in the copied metric list", () => {
     const json = JSON.parse(metricListJson(node("n", { metrics: [metric("v", { unit: "V" })] })));
     expect(json).toEqual([{ name: "v", type: "Double", value: "1", unit: "V" }]);
+  });
+});
+
+describe("search", () => {
+  const fleet = (): SparkplugGroup[] => [
+    {
+      name: "Plant",
+      nodes: [
+        node("edge-1", {
+          group: "Plant",
+          metrics: [metric("Line 1/Motor/Current"), metric("alias_7", { placeholder: true })],
+          devices: [
+            {
+              name: "plc-12",
+              status: "online",
+              online: true,
+              hasBirth: true,
+              verified: true,
+              metrics: [metric("Speed")],
+              lastSeenMs: 0,
+              placeholderCount: 0,
+              awaitingBirth: false,
+            },
+          ],
+        }),
+        node("edge-2", { group: "Plant" }),
+      ],
+    },
+  ];
+  const names = (filter: string) =>
+    kinds(buildSparkplugTree({ ...base, groups: fleet(), filter }));
+
+  it("reduces a pasted Sparkplug topic to the tree's path", () => {
+    expect(normaliseFilter(" spBv1.0/Plant/NDATA/edge-1 ")).toBe("plant/edge-1");
+    expect(normaliseFilter("spBv1.0/Plant/DDATA/edge-1/plc-12")).toBe("plant/edge-1/plc-12");
+    expect(normaliseFilter("spBv1.0/Plant")).toBe("plant");
+    expect(normaliseFilter("Volts")).toBe("volts");
+  });
+
+  it("finds a node by the Group/Node path the warnings print", () => {
+    expect(names("Plant/edge-1")).toEqual([
+      "group:Plant",
+      "node:edge-1",
+      "metric:Line 1/Motor/Current",
+      "metric:alias_7",
+      "device:edge-1",
+      "metric:Speed",
+    ]);
+    expect(names("spBv1.0/Plant/NDATA/edge-2")).toEqual(["group:Plant", "node:edge-2", "metric:a", "metric:b"]);
+  });
+
+  it("finds a device by its path and a metric by its full path", () => {
+    expect(names("edge-1/plc-12")).toEqual(["group:Plant", "node:edge-1", "device:edge-1", "metric:Speed"]);
+    expect(names("edge-1/Line 1/Motor")).toEqual([
+      "group:Plant",
+      "node:edge-1",
+      "metric:Line 1/Motor/Current",
+    ]);
+  });
+
+  it("finds an unnamed metric by the alias label it shows", () => {
+    expect(names("alias 7")).toEqual(["group:Plant", "node:edge-1", "metric:alias_7"]);
+  });
+
+  it("gives every row a unique id and its own index", () => {
+    const rows = buildSparkplugTree({ ...base, groups: fleet() });
+    expect(new Set(rows.map((r) => r.id)).size).toBe(rows.length);
+    rows.forEach((r, i) => expect(r.index).toBe(i));
+    // A node metric named like a device's metric path stays distinct.
+    const tricky = fleet();
+    tricky[0].nodes[0].metrics.push(metric("plc-12/Speed"));
+    const trickyRows = buildSparkplugTree({ ...base, groups: tricky });
+    expect(new Set(trickyRows.map((r) => r.id)).size).toBe(trickyRows.length);
+  });
+});
+
+describe("isSparkplugProtobufTopic", () => {
+  it("covers node and device topics but not host state", () => {
+    expect(isSparkplugProtobufTopic("spBv1.0/G/NDATA/n")).toBe(true);
+    expect(isSparkplugProtobufTopic("spBv1.0/STATE/scada")).toBe(false);
+    expect(isSparkplugProtobufTopic("spAv1.0/G/NDATA/n")).toBe(false);
   });
 });

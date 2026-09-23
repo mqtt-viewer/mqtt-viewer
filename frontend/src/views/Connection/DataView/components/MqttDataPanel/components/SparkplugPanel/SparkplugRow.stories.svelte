@@ -16,12 +16,16 @@
   const props: string[] = [
     "row",
     "nowMs",
+    "domId",
     "isSelected",
+    "isActive",
+    "treeFocused",
     "isHighlighted",
-    "onToggleExpansion",
+    "compact",
+    "connected",
+    "onActivate",
     "onRequestRebirth",
     "onCopyMetricList",
-    "onSelectMetric",
     "onCopyValue",
   ];
   const storyArgs = getStoryArgs(storyId, componentName, props);
@@ -50,12 +54,18 @@
   </div>
 {/snippet}
 
+{#snippet narrowTemplate(args: any)}
+  <div class="w-[360px]">
+    <StoryRender component={Component} {args} {componentName} />
+  </div>
+{/snippet}
+
 <Story name="NodeOnline" args={storyArgs} {template} />
 <Story
   name="GroupRow"
   args={{
     ...storyArgs,
-    row: { kind: "group", key: "EnergyCo", levelCount: 0, isExpanded: true, group },
+    row: { kind: "group", key: "EnergyCo", id: "EnergyCo", index: 0, levelCount: 0, isExpanded: true, group },
   }}
   {template}
 />
@@ -66,6 +76,8 @@
     row: {
       kind: "node",
       key: "EnergyCo/substation-4",
+      id: "EnergyCo/substation-4",
+      index: 0,
       levelCount: 1,
       isExpanded: true,
       node: gapNode,
@@ -80,6 +92,8 @@
     row: {
       kind: "node",
       key: "EnergyCo/substation-9",
+      id: "EnergyCo/substation-9",
+      index: 0,
       levelCount: 1,
       isExpanded: false,
       node: offlineNode,
@@ -94,6 +108,8 @@
     row: {
       kind: "device",
       key: "EnergyCo/substation-7/meter-01",
+      id: "EnergyCo/substation-7/meter-01",
+      index: 0,
       levelCount: 2,
       isExpanded: true,
       node: onlineNode,
@@ -109,6 +125,8 @@
     row: {
       kind: "metric",
       key: "EnergyCo/substation-7",
+      id: "metric-story",
+      index: 0,
       levelCount: 2,
       isExpanded: false,
       metric: onlineNode.metrics[0],
@@ -123,6 +141,8 @@
     row: {
       kind: "metric",
       key: "EnergyCo/substation-7",
+      id: "metric-story",
+      index: 0,
       levelCount: 2,
       isExpanded: false,
       metric: onlineNode.metrics[4],
@@ -137,6 +157,8 @@
     row: {
       kind: "metric",
       key: "EnergyCo/substation-7",
+      id: "metric-story",
+      index: 0,
       levelCount: 2,
       isExpanded: false,
       metric: onlineNode.metrics[2],
@@ -152,6 +174,8 @@
     row: {
       kind: "metric",
       key: "EnergyCo/substation-7",
+      id: "metric-story",
+      index: 0,
       levelCount: 2,
       isExpanded: false,
       metric: onlineNode.metrics[3],
@@ -166,6 +190,8 @@
     row: {
       kind: "node",
       key: "EnergyCo/substation-2",
+      id: "EnergyCo/substation-2",
+      index: 0,
       levelCount: 1,
       isExpanded: true,
       node: unresolvedNode,
@@ -180,6 +206,8 @@
     row: {
       kind: "node",
       key: "EnergyCo/substation-8",
+      id: "EnergyCo/substation-8",
+      index: 0,
       levelCount: 1,
       isExpanded: true,
       node: unknownNode,
@@ -194,6 +222,8 @@
     row: {
       kind: "device",
       key: "EnergyCo/substation-8/meter-02",
+      id: "EnergyCo/substation-8/meter-02",
+      index: 0,
       levelCount: 2,
       isExpanded: true,
       node: unknownNode,
@@ -209,10 +239,56 @@
     row: {
       kind: "metric",
       key: "EnergyCo/substation-2",
+      id: "metric-story",
+      index: 0,
       levelCount: 2,
       isExpanded: false,
       metric: unresolvedMetric,
     },
   }}
+  {template}
+/>
+<Story
+  name="NodeKeyboardCursor"
+  args={{ ...storyArgs, isActive: true, treeFocused: true }}
+  {template}
+/>
+<Story
+  name="NodeCompact"
+  args={{
+    ...storyArgs,
+    compact: true,
+    row: {
+      kind: "node",
+      key: "EnergyCo/substation-4",
+      id: "EnergyCo/substation-4",
+      index: 0,
+      levelCount: 1,
+      isExpanded: true,
+      node: gapNode,
+    },
+  }}
+  template={narrowTemplate}
+/>
+<Story
+  name="MetricCompact"
+  args={{
+    ...storyArgs,
+    compact: true,
+    row: {
+      kind: "metric",
+      key: "EnergyCo/substation-7",
+      id: "metric-story",
+      index: 0,
+      levelCount: 2,
+      isExpanded: false,
+      metric: onlineNode.metrics[4],
+    },
+  }}
+  template={narrowTemplate}
+/>
+<Story
+  name="NodeDisconnected"
+  args={{ ...storyArgs, connected: false, isActive: true, treeFocused: true }}
   {template}
 />

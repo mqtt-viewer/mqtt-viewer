@@ -6,11 +6,15 @@ import { errorMessage } from "@/util/strings";
 export interface RebirthTarget {
   group: string;
   node: string;
+  /** The node last sent a death, so it won't answer until it reconnects. */
+  offline?: boolean;
 }
 
 export interface RebirthRequest {
   targets: RebirthTarget[];
   busy: boolean;
+  /** How many have been published so far, for the dialog's progress. */
+  sent: number;
 }
 
 export interface RebirthFlow {
@@ -33,17 +37,17 @@ export const rebirthTopic = (t: RebirthTarget) => `spBv1.0/${t.group}/NCMD/${t.n
 // separate webview and so cannot reach the main window's dialog.
 export const createRebirthFlow = (connectionId: number): RebirthFlow => {
   const isOpen = writable(false);
-  const request = writable<RebirthRequest>({ targets: [], busy: false });
+  const request = writable<RebirthRequest>({ targets: [], busy: false, sent: 0 });
 
   const requestRebirth = (targets: RebirthTarget[]) => {
     if (targets.length === 0) return;
-    request.set({ targets, busy: false });
+    request.set({ targets, busy: false, sent: 0 });
     isOpen.set(true);
   };
 
   const confirm = async () => {
     const { targets } = get(request);
-    request.update((r) => ({ ...r, busy: true }));
+    request.update((r) => ({ ...r, busy: true, sent: 0 }));
     let sent = 0;
     let firstError: string | null = null;
     // One at a time: each is a single QoS 0 publish, so this is quick, and a
@@ -52,6 +56,7 @@ export const createRebirthFlow = (connectionId: number): RebirthFlow => {
       try {
         await PublishSparkplugRebirth(connectionId, target.group, target.node);
         sent++;
+        request.update((r) => ({ ...r, sent }));
       } catch (e) {
         firstError ??= errorMessage(e);
       }

@@ -180,11 +180,15 @@
   const onCopyMetricValue = (metric: SparkplugMetric) =>
     copyText(metric.valueRaw, "value");
 
-  // A metric row opens the topic of the message that last carried it, so the
-  // payload and its history are one click from the tree.
+  // A metric row opens the message that last carried it, not just its topic:
+  // under report by exception the topic's newest message often doesn't
+  // contain that metric at all.
   const onSelectMetric = (metric: SparkplugMetric) => {
     if ($selectedTopicStore.selectedTopic !== metric.topic) {
       selectedTopicStore.selectTopic(metric.topic);
+    }
+    if (metric.messageId !== undefined) {
+      selectedTopicStore.focusMessage(metric.messageId);
     }
   };
 
@@ -212,10 +216,10 @@
         });
       }
       // The decode middleware is installed on connect.
-      if (connection.connectionState === "connected") {
+      if (connection.connectionState !== "disconnected") {
         await connectionsStore.disconnect(id);
-        await connectionsStore.connect(id);
       }
+      await connectionsStore.connect(id);
     } catch (e) {
       addToast({
         data: {
@@ -346,6 +350,7 @@
       {expandedTopicsStore}
       {sortStore}
       showTopicControls={false}
+      searchPlaceholder="Filter nodes and metrics"
     >
       <ViewToggle
         slot="leading"
@@ -364,7 +369,10 @@
         width={treeWidth || width}
         filter={$searchStore.text}
         {decodingState}
+        {enablingDecoding}
         {onEnableDecoding}
+        onClearWarnings={sparkplugStore.clearWarnings}
+        onClearFilter={() => searchStore.setSearchText("")}
         {onRequestRebirth}
         {onCopyMetricList}
         {onSelectMetric}

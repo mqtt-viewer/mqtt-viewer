@@ -17,7 +17,9 @@
     needsRebirth,
     nodeKeyOf,
     nodeProblems,
+    normaliseFilter,
     totalMetricCount,
+    type SparkplugTreeRow,
   } from "./build-sparkplug-tree";
   import SparkplugRow from "./SparkplugRow.svelte";
 
@@ -25,7 +27,10 @@
   export let treeState: SparkplugTreeState;
   /** Panel width for the virtual-list row max-width math. */
   export let width: number;
-  /** Case-insensitive substring filter on group/node/device/metric names. */
+  /**
+   * Search text. Matches group, node, device and metric names, their
+   * Group/Node paths, "alias N", and pasted Sparkplug topics.
+   */
   export let filter: string = "";
   /**
    * False when the connection has Sparkplug topics but decoding is off, or
@@ -33,18 +38,30 @@
    * showing a tree.
    */
   export let decodingState: "on" | "off" | "needs-reconnect" = "on";
+  /** True while decoding is being turned on (saving, then connecting). */
+  export let enablingDecoding = false;
   export let onEnableDecoding: () => void = () => {};
   /** Asks for a rebirth (the caller confirms before publishing anything). */
-  export let onRequestRebirth: (targets: { group: string; node: string }[]) => void;
+  export let onRequestRebirth: (
+    targets: { group: string; node: string; offline?: boolean }[]
+  ) => void;
   export let onCopyMetricList: (node: SparkplugNode) => void;
   export let onSelectMetric: (metric: SparkplugMetric) => void = () => {};
   export let onCopyValue: (metric: SparkplugMetric) => void = () => {};
+  export let onClearWarnings: () => void = () => {};
+  /** Clears the search, so a warning click can reveal a node it hides. */
+  export let onClearFilter: () => void = () => {};
 
   const ROW_HEIGHT_PX = 19;
   // Above this many metric rows the tree opens with nodes collapsed, so a
   // plant-sized fleet starts as a scannable list of nodes rather than tens of
   // thousands of rows.
   const EXPAND_BY_DEFAULT_MAX_METRICS = 400;
+  // Below this the type column goes and status badges fold into an icon, so
+  // a panel docked beside the payload still shows names and values.
+  const COMPACT_WIDTH_PX = 560;
+
+  $: compact = width > 0 && width < COMPACT_WIDTH_PX;
 
   // The user's own expand/collapse clicks, by key. Expand all and collapse
   // all replace the default and clear them.
@@ -53,8 +70,16 @@
   let problemsOnly = false;
 
   $: metricTotal = totalMetricCount(treeState.groups);
-  $: defaultExpanded =
-    defaultOverride ?? metricTotal <= EXPAND_BY_DEFAULT_MAX_METRICS;
+  // Follows the fleet's size until the user first touches the tree, then
+  // holds. Live traffic fills the tree over the first seconds, so deciding
+  // on the first snapshot would open a whole plant; deciding for good later
+  // would collapse rows the user is reading.
+  let userInteracted = false;
+  let heldDefault = true;
+  $: if (!userInteracted) heldDefault = metricTotal <= EXPAND_BY_DEFAULT_MAX_METRICS;
+  $: defaultExpanded = defaultOverride ?? heldDefault;
+  const markInteracted = () => (userInteracted = true);
+  $: filtering = normaliseFilter(filter) !== "";
 
   const toggleExpansion = (key: string) => {
     const isGroup = !key.includes("/");
@@ -80,6 +105,7 @@
   $: allNodes = treeState.groups.flatMap((g) => g.nodes);
   $: onlineCount = allNodes.filter((n) => n.status === "online").length;
   $: offlineCount = allNodes.filter((n) => n.status === "offline").length;
+  $: unknownCount = allNodes.length - onlineCount - offlineCount;
   $: problemCount = allNodes.filter((n) => nodeProblems(n).length > 0).length;
   $: rebirthCandidates = allNodes.filter(needsRebirth);
   $: unresolvedCount = rebirthCandidates.filter(
@@ -97,16 +123,173 @@
     (a, b) => b.timeMs - a.timeMs
   );
 
-  // --- Selection and reveal ---------------------------------------------------
-  let selectedRowKey: string | null = null;
+  // --- Scrolling --------------------------------------------------------------
+  let treeElement: HTMLDivElement;
+  const viewport = () =>
+    treeElement?.querySelector("svelte-virtual-list-viewport") as HTMLElement | null;
+
+  // The virtual list keeps its scroll offset when the row list shrinks, and
+  // past the new end it renders nothing at all. Pull it back into range.
+  const clampScroll = () => {
+    requestAnimationFrame(() => {
+      const vp = viewport();
+      if (!vp) return;
+      const max = Math.max(0, rows.length * ROW_HEIGHT_PX - vp.clientHeight);
+      if (vp.scrollTop > max) {
+        vp.scrollTop = max;
+        vp.dispatchEvent(new Event("scroll"));
+      }
+    });
+  };
+  $: rows, clampScroll();
+
+  // A new search or filter starts at the top of its results.
+  const scrollToTop = () => {
+    const vp = viewport();
+    if (vp && vp.scrollTop !== 0) {
+      vp.scrollTop = 0;
+      vp.dispatchEvent(new Event("scroll"));
+    }
+  };
+  $: filter, problemsOnly, scrollToTop();
+
+  const scrollRowIntoView = (index: number) => {
+    const vp = viewport();
+    if (!vp) return;
+    const top = index * ROW_HEIGHT_PX;
+    const bottom = top + ROW_HEIGHT_PX;
+    if (top < vp.scrollTop) {
+      vp.scrollTop = top;
+    } else if (bottom > vp.scrollTop + vp.clientHeight) {
+      vp.scrollTop = bottom - vp.clientHeight;
+    } else {
+      return;
+    }
+    vp.dispatchEvent(new Event("scroll"));
+  };
+
+  // --- Keyboard cursor and selection -----------------------------------------
+  // Focus stays on the tree element and the cursor row is its
+  // aria-activedescendant, because the virtual list only renders the rows in
+  // view: a roving tabindex would lose the cursor as soon as it scrolled out.
+  const treeId = `sparkplug-tree-${Math.random().toString(36).slice(2, 8)}`;
+  let activeRowId: string | null = null;
+  let activeIndexHint = 0;
+  // treeHasFocus drives the screen reader cursor, treeFocused the visible
+  // one (keyboard focus only).
+  let treeHasFocus = false;
+  let treeFocused = false;
+  let selectedRowId: string | null = null;
+
+  $: activeIndex = (() => {
+    if (rows.length === 0) return -1;
+    if (activeRowId !== null) {
+      // The hint is right unless rows moved; only then search.
+      const hinted = rows[activeIndexHint];
+      if (hinted?.id === activeRowId) return activeIndexHint;
+      const found = rows.findIndex((r) => r.id === activeRowId);
+      if (found !== -1) return found;
+    }
+    return Math.min(activeIndexHint, rows.length - 1);
+  })();
+  $: activeRow = activeIndex >= 0 ? rows[activeIndex] : undefined;
+  $: activeDescendant = activeRow && treeHasFocus ? `${treeId}-${activeRow.index}` : undefined;
+
+  const moveTo = (index: number) => {
+    const row = rows[index];
+    if (!row) return;
+    activeRowId = row.id;
+    activeIndexHint = index;
+    scrollRowIntoView(index);
+  };
+
+  const act = (row: SparkplugTreeRow) => {
+    if (row.kind !== "metric") {
+      toggleExpansion(row.key);
+    } else if (row.metric) {
+      selectedRowId = row.id;
+      onSelectMetric(row.metric);
+    }
+  };
+
+  const onRowActivate = (row: SparkplugTreeRow) => {
+    activeRowId = row.id;
+    activeIndexHint = row.index;
+    act(row);
+  };
+
+  const pageSize = () =>
+    Math.max(1, Math.floor((viewport()?.clientHeight ?? ROW_HEIGHT_PX * 10) / ROW_HEIGHT_PX) - 1);
+
+  // The cursor ring is for keyboard users: a mouse click that focuses the
+  // tree already shows its selection.
+  const onTreeFocus = () => {
+    treeHasFocus = true;
+    try {
+      treeFocused = treeElement.matches(":focus-visible");
+    } catch (_) {
+      treeFocused = true;
+    }
+  };
+
+  const onTreeKeydown = (e: KeyboardEvent) => {
+    markInteracted();
+    // Keys pressed on a row's own buttons are theirs.
+    if (e.target !== treeElement || activeIndex === -1) return;
+    treeFocused = true;
+    const i = activeIndex;
+    const row = rows[i];
+    const last = rows.length - 1;
+    const canToggle = row.kind !== "metric" && !filtering;
+    switch (e.key) {
+      case "ArrowDown":
+        moveTo(Math.min(last, i + 1));
+        break;
+      case "ArrowUp":
+        moveTo(Math.max(0, i - 1));
+        break;
+      case "PageDown":
+        moveTo(Math.min(last, i + pageSize()));
+        break;
+      case "PageUp":
+        moveTo(Math.max(0, i - pageSize()));
+        break;
+      case "Home":
+        moveTo(0);
+        break;
+      case "End":
+        moveTo(last);
+        break;
+      case "ArrowRight":
+        if (canToggle && !row.isExpanded) toggleExpansion(row.key);
+        else if (row.kind !== "metric") moveTo(Math.min(last, i + 1));
+        break;
+      case "ArrowLeft": {
+        if (canToggle && row.isExpanded) {
+          toggleExpansion(row.key);
+          break;
+        }
+        for (let j = i - 1; j >= 0; j--) {
+          if (rows[j].levelCount < row.levelCount) {
+            moveTo(j);
+            break;
+          }
+        }
+        break;
+      }
+      case "Enter":
+      case " ":
+        act(row);
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+  };
+
+  // --- Reveal from a warning ------------------------------------------------
   let highlightedKey: string | null = null;
   let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-  let treeElement: HTMLDivElement;
-
-  const selectMetric = (metric: SparkplugMetric, rowKey: string) => {
-    selectedRowKey = rowKey;
-    onSelectMetric(metric);
-  };
 
   /** Opens the path to a node, scrolls it into view and flashes it. */
   const revealNode = async (warning: SparkplugWarning) => {
@@ -116,10 +299,22 @@
     expansion = expansion;
     problemsOnly = false;
     await tick();
-    const index = rows.findIndex((r) => r.kind === "node" && r.key === key);
+    let index = rows.findIndex((r) => r.kind === "node" && r.key === key);
+    if (index === -1 && filtering) {
+      // The search hides it. Drop the search rather than do nothing.
+      onClearFilter();
+      filter = "";
+      await tick();
+      index = rows.findIndex((r) => r.kind === "node" && r.key === key);
+    }
     if (index === -1) return;
-    const viewport = treeElement?.querySelector("svelte-virtual-list-viewport") as HTMLElement | null;
-    if (viewport) viewport.scrollTop = Math.max(0, index * ROW_HEIGHT_PX - ROW_HEIGHT_PX * 2);
+    const vp = viewport();
+    if (vp) {
+      vp.scrollTop = Math.max(0, index * ROW_HEIGHT_PX - ROW_HEIGHT_PX * 2);
+      vp.dispatchEvent(new Event("scroll"));
+    }
+    activeRowId = rows[index].id;
+    activeIndexHint = index;
     highlightedKey = key;
     if (highlightTimer !== null) clearTimeout(highlightTimer);
     highlightTimer = setTimeout(() => (highlightedKey = null), 1500);
@@ -127,6 +322,9 @@
 
   const requestRebirthForCandidates = () =>
     onRequestRebirth(rebirthCandidates.map((n) => ({ group: n.group, node: n.name })));
+
+  const requestRebirthForNode = (node: SparkplugNode) =>
+    onRequestRebirth([{ group: node.group, node: node.name, offline: node.status === "offline" }]);
 
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 </script>
@@ -137,79 +335,108 @@
       {#if decodingState === "off"}
         <div class="text-base text-emphasis">Sparkplug decoding is off</div>
         <p class="max-w-[360px]">
-          This connection is receiving Sparkplug B messages, but they're shown
-          as raw protobuf. Turn on decoding to see metric names, values and the
-          node tree. I'll reconnect to start decoding.
+          This connection has Sparkplug B topics, but their payloads are shown
+          as raw protobuf. Turn on decoding to see the node tree with metric
+          names and values.
+          {treeState.connected ? "I'll reconnect to start decoding." : "I'll connect to start decoding."}
         </p>
-        <Button on:click={onEnableDecoding}>Turn on and reconnect</Button>
-      {:else}
+        <Button disabled={enablingDecoding} on:click={onEnableDecoding}
+          >{enablingDecoding
+            ? "Connecting…"
+            : treeState.connected
+              ? "Turn on and reconnect"
+              : "Turn on and connect"}</Button
+        >
+      {:else if treeState.connected}
         <div class="text-base text-emphasis">Reconnect to start decoding</div>
         <p class="max-w-[360px]">
           Sparkplug decoding was turned on after this connection started, so
           it applies from the next connect.
         </p>
-        <Button on:click={onEnableDecoding}>Reconnect</Button>
+        <Button disabled={enablingDecoding} on:click={onEnableDecoding}
+          >{enablingDecoding ? "Connecting…" : "Reconnect"}</Button
+        >
+      {:else}
+        <div class="text-base text-emphasis">Connect to start decoding</div>
+        <p class="max-w-[360px]">
+          Sparkplug decoding is on. The node tree fills in once the connection
+          is up and births or data arrive.
+        </p>
+        <Button disabled={enablingDecoding} on:click={onEnableDecoding}
+          >{enablingDecoding ? "Connecting…" : "Connect"}</Button
+        >
       {/if}
     </div>
   {:else}
     {#if !treeState.connected && treeState.droppedAtMs !== undefined}
       <div class="shrink-0 flex items-center gap-2 px-2 py-1 border-b border-divider text-secondary-text">
         <Icon type="info" size={14} />
-        <span class="truncate"
+        <span class="min-w-0"
           >Not connected. This is the state as of {formatClockTime(treeState.droppedAtMs)}.</span
         >
       </div>
     {:else if rebirthCandidates.length > 0}
-      <div class="shrink-0 flex items-center gap-2 px-2 py-1 border-b border-divider text-secondary-text">
-        <span class="shrink-0 text-warning"><Icon type="warning" size={14} /></span>
-        <span class="truncate min-w-0" title={unverifiedCount > 0
-          ? "Aliases belong to each node's session, which carried on while disconnected. A node that rebirthed in that time may have reassigned them."
-          : "Births are only sent when a node connects or is asked for one, so a viewer that connects later sees aliases until then."}>
-          {#if unresolvedCount > 0}
-            {plural(unresolvedCount, "node")} haven't sent a birth since connecting, so some metrics show aliases, not names.
-          {/if}
-          {#if unverifiedCount > 0}
-            {plural(unverifiedCount, "node")} {unverifiedCount === 1 ? "has" : "have"} names from before the connection dropped.
-          {/if}
-        </span>
-        <div class="grow"></div>
-        <Button variant="text" class="text-sm shrink-0" on:click={requestRebirthForCandidates}
-          >{rebirthCandidates.length === 1 ? "Request rebirth" : `Request ${rebirthCandidates.length} rebirths`}</Button
-        >
+      <div class="shrink-0 border-b border-divider text-secondary-text">
+        <div class="flex items-center gap-2 px-2 py-1 max-w-[1000px]">
+          <span class="shrink-0 text-warning"><Icon type="warning" size={14} /></span>
+          <span class="min-w-0 line-clamp-2" title={unverifiedCount > 0
+            ? "Aliases belong to each node's session, which carried on while disconnected. A node that rebirthed in that time may have reassigned them."
+            : "Births are only sent when a node connects or is asked for one, so a viewer that connects later sees aliases until then."}>
+            {#if unresolvedCount > 0}
+              {plural(unresolvedCount, "node")}
+              {unresolvedCount === 1 ? "hasn't" : "haven't"} sent a birth since connecting, so
+              some metrics show aliases, not names.
+            {/if}
+            {#if unverifiedCount > 0}
+              {plural(unverifiedCount, "node")}
+              {unverifiedCount === 1 ? "has" : "have"} names from before the connection dropped.
+            {/if}
+          </span>
+          <div class="grow"></div>
+          <Button
+            variant="text"
+            class="text-sm shrink-0"
+            disabled={!treeState.connected}
+            on:click={requestRebirthForCandidates}
+            >{rebirthCandidates.length === 1 ? "Request rebirth" : `Request ${rebirthCandidates.length} rebirths`}</Button
+          >
+        </div>
       </div>
     {/if}
 
     {#if !isEmpty}
-      <div class="shrink-0 flex items-center gap-3 px-2 py-0.5 border-b border-divider text-secondary-text whitespace-nowrap overflow-hidden">
-        <span class="truncate">
-          {plural(allNodes.length, "node")}: {onlineCount} online{#if offlineCount > 0}, {offlineCount} offline{/if}{#if allNodes.length - onlineCount - offlineCount > 0}, {allNodes.length - onlineCount - offlineCount} unknown{/if}
-        </span>
-        <div class="grow"></div>
-        <button
-          type="button"
-          class={twMerge(
-            "shrink-0 rounded px-1.5 hover:text-emphasis",
-            problemsOnly && "bg-elevation-2 text-white-text"
-          )}
-          aria-pressed={problemsOnly}
-          title="Show only nodes that are offline, have seq gaps or rebirth storms, or show aliases"
-          on:click={() => (problemsOnly = !problemsOnly)}
-          >Problems{#if problemCount > 0}<span class="ml-1 text-warning">{problemCount}</span>{/if}</button
-        >
-        <button
-          type="button"
-          class="shrink-0 rounded px-1 hover:text-emphasis"
-          title="Expand all"
-          aria-label="Expand all"
-          on:click={() => setAll(true)}><Icon type="expand" size={16} /></button
-        >
-        <button
-          type="button"
-          class="shrink-0 rounded px-1 hover:text-emphasis"
-          title="Collapse all"
-          aria-label="Collapse all"
-          on:click={() => setAll(false)}><Icon type="collapse" size={16} /></button
-        >
+      <div class="shrink-0 border-b border-divider text-secondary-text">
+        <div class="flex items-center gap-3 px-2 py-0.5 whitespace-nowrap overflow-hidden max-w-[1000px]">
+          <span class="truncate min-w-0">
+            {plural(allNodes.length, "node")}: {onlineCount} online{#if offlineCount > 0}, {offlineCount} offline{/if}{#if unknownCount > 0}, {unknownCount} unknown{/if}
+          </span>
+          <div class="grow"></div>
+          <button
+            type="button"
+            class={twMerge(
+              "shrink-0 rounded px-1.5 hover:text-emphasis",
+              problemsOnly && "bg-elevation-2 text-white-text"
+            )}
+            aria-pressed={problemsOnly}
+            title="Show only nodes that are offline, have a seq gap or rebirth storm, show aliases instead of names, or have a device offline or awaiting its birth"
+            on:click={() => (problemsOnly = !problemsOnly)}
+            >Problems{#if problemCount > 0}<span class="ml-1 text-warning">{problemCount}</span>{/if}</button
+          >
+          <button
+            type="button"
+            class="shrink-0 rounded px-1 hover:text-emphasis"
+            title="Expand all"
+            aria-label="Expand all"
+            on:click={() => setAll(true)}><Icon type="expand" size={16} /></button
+          >
+          <button
+            type="button"
+            class="shrink-0 rounded px-1 hover:text-emphasis"
+            title="Collapse all"
+            aria-label="Collapse all"
+            on:click={() => setAll(false)}><Icon type="collapse" size={16} /></button
+          >
+        </div>
       </div>
     {/if}
 
@@ -219,15 +446,21 @@
       >
         <span class="font-sans">Host applications</span>
         {#each treeState.hosts as host (host.hostId)}
+          <!-- A host's state is only known while connected: its death can
+               be missed while the viewer is away. -->
+          {@const known = treeState.connected}
           <span class="flex items-center gap-1.5 min-w-0">
             <span class="truncate">{host.hostId}</span>
             <span
               class={twMerge(
                 "size-1.5 rounded-full shrink-0",
-                host.online ? "bg-success" : "bg-error"
+                !known ? "bg-secondary-text" : host.online ? "bg-success" : "bg-error"
               )}
             ></span>
-            <span>{host.online ? "online" : "offline"} since {formatClockTime(host.sinceMs)}</span>
+            <span
+              >{#if known}{host.online ? "online" : "offline"} since {formatClockTime(host.sinceMs)}{:else}unknown,
+                last {host.online ? "online" : "offline"} at {formatClockTime(host.sinceMs)}{/if}</span
+            >
           </span>
         {/each}
       </div>
@@ -241,14 +474,24 @@
       </div>
     {:else if rows.length === 0}
       <div class="grow flex items-center justify-center text-secondary-text">
-        {problemsOnly ? "No nodes need attention" : "Nothing matches the search"}
+        {problemsOnly && !filtering ? "No nodes need attention" : "Nothing matches the search"}
       </div>
     {:else}
       <div
-        class="grow min-h-0 w-full max-w-full overflow-hidden pl-2"
+        class="grow min-h-0 w-full max-w-full overflow-hidden pl-2 outline-none"
         role="tree"
         aria-label="Sparkplug nodes"
+        tabindex="0"
+        aria-activedescendant={activeDescendant}
         bind:this={treeElement}
+        on:keydown={onTreeKeydown}
+        on:pointerdown={markInteracted}
+        on:wheel|passive={markInteracted}
+        on:focus={onTreeFocus}
+        on:blur={() => {
+          treeHasFocus = false;
+          treeFocused = false;
+        }}
       >
         <VirtualList items={rows} let:item itemHeight={ROW_HEIGHT_PX}>
           {@const marginLeftPx = item.levelCount * 18}
@@ -259,14 +502,16 @@
               <SparkplugRow
                 row={item}
                 nowMs={treeState.nowMs}
-                isSelected={item.kind === "metric" &&
-                  item.metric !== undefined &&
-                  selectedRowKey === `${item.key}/${item.metric.name}`}
+                domId={`${treeId}-${item.index}`}
+                isSelected={selectedRowId === item.id}
+                isActive={activeRow?.id === item.id}
+                {treeFocused}
                 isHighlighted={item.kind === "node" && highlightedKey === item.key}
-                onToggleExpansion={toggleExpansion}
-                onRequestRebirth={(group, node) => onRequestRebirth([{ group, node }])}
+                {compact}
+                connected={treeState.connected}
+                onActivate={onRowActivate}
+                onRequestRebirth={requestRebirthForNode}
                 {onCopyMetricList}
-                onSelectMetric={selectMetric}
                 {onCopyValue}
               />
             </div>
@@ -276,23 +521,33 @@
     {/if}
 
     {#if treeState.warnings.length > 0}
-      <div
-        class="shrink-0 border-t border-divider max-h-24 overflow-y-auto px-2 py-0.5"
-      >
-        {#each warningsNewestFirst as warning}
+      <div class="shrink-0 border-t border-divider">
+        <div class="flex items-center gap-2 px-2 pt-0.5 text-secondary-text max-w-[1000px]">
+          <span>{plural(treeState.warnings.length, "warning")}</span>
+          <div class="grow"></div>
           <button
             type="button"
-            class="w-full flex items-center gap-1.5 text-warning font-mono whitespace-nowrap overflow-hidden text-left rounded hover:bg-hovered"
-            title="Show this node in the tree"
-            on:click={() => revealNode(warning)}
+            class="shrink-0 rounded px-1.5 hover:text-emphasis"
+            title="Clear these warnings"
+            on:click={onClearWarnings}>Clear</button
           >
-            <span class="shrink-0"><Icon type="warning" size={14} /></span>
-            <span class="truncate">
-              {formatClockTime(warning.timeMs)}
-              {warning.group}/{warning.node}: {warning.text}
-            </span>
-          </button>
-        {/each}
+        </div>
+        <div class="max-h-24 overflow-y-auto px-2 pb-0.5">
+          {#each warningsNewestFirst as warning}
+            <button
+              type="button"
+              class="w-full flex items-center gap-1.5 text-warning font-mono whitespace-nowrap overflow-hidden text-left rounded hover:bg-hovered"
+              title="Show this node in the tree"
+              on:click={() => revealNode(warning)}
+            >
+              <span class="shrink-0"><Icon type="warning" size={14} /></span>
+              <span class="truncate">
+                {formatClockTime(warning.timeMs)}
+                {warning.group}/{warning.node}: {warning.text}
+              </span>
+            </button>
+          {/each}
+        </div>
       </div>
     {/if}
   {/if}

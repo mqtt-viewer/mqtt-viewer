@@ -16,9 +16,13 @@
 
   export let isOpen = writable(false);
   /** The edge nodes that will be asked to rebirth. */
-  export let targets: { group: string; node: string }[] = [];
+  export let targets: { group: string; node: string; offline?: boolean }[] = [];
   /** True while the requests are in flight; the dialog stays open and says so. */
   export let busy = false;
+  /** How many requests have gone out, shown as progress while busy. */
+  export let sent = 0;
+  /** False when the connection is down, so nothing can be published. */
+  export let connected = true;
   export let onConfirm: () => Promise<void>;
 
   // Enough to check a bulk request by eye without the dialog turning into a
@@ -28,9 +32,35 @@
   $: listed = targets.slice(0, MAX_LISTED);
   $: remaining = Math.max(0, targets.length - listed.length);
   $: single = targets[0];
+  $: offlineCount = targets.filter((t) => t.offline).length;
+
+  $: confirmLabel = busy
+    ? isBulk
+      ? `Requesting ${sent} of ${targets.length}`
+      : "Requesting…"
+    : isBulk
+      ? "Request rebirths"
+      : "Request rebirth";
+
+  // The dialog is opened from a store, so melt has no trigger to hand focus
+  // back to. Remember what had it (the row button, or the tree) instead.
+  // Kept after closing: melt asks for it a tick after the close.
+  let opener: HTMLElement | null = null;
+  let wasOpen = false;
+  $: {
+    if ($isOpen && !wasOpen) {
+      const active = document.activeElement;
+      opener = active instanceof HTMLElement && active !== document.body ? active : null;
+    }
+    wasOpen = $isOpen;
+  }
+  const closeFocus = () => {
+    const el = opener;
+    return el?.isConnected ? el : null;
+  };
 
   const confirm = () => {
-    if (busy) return;
+    if (busy || !connected) return;
     onConfirm();
   };
 
@@ -56,7 +86,7 @@
   };
 </script>
 
-<Dialog isOpen={guardedIsOpen} startEmpty>
+<Dialog isOpen={guardedIsOpen} startEmpty {closeFocus}>
   <div class="relative w-[440px] max-w-[85vw] p-6">
     <h2 class="m-0 pr-6 text-lg font-medium">
       {#if isBulk}
@@ -75,15 +105,17 @@
     <div class="mt-4 flex flex-col gap-3 text-secondary-text">
       {#if isBulk}
         <p>
-          Each one gets a Node Control/Rebirth command and resends its births,
-          so their metrics show names again.
+          Each node gets a Node Control/Rebirth command and resends its births,
+          so its metrics show names again.
         </p>
         <div
           class="max-h-40 overflow-y-auto rounded border border-outline bg-elevation-0 p-2"
         >
           {#each listed as target (`${target.group}/${target.node}`)}
             <div class="break-all font-mono text-xs text-secondary-text">
-              {target.group}/{target.node}
+              {target.group}/{target.node}{#if target.offline}<span
+                  class="font-sans"> (offline)</span
+                >{/if}
             </div>
           {/each}
           {#if remaining > 0}
@@ -100,21 +132,41 @@
           >. The node resends its births, so its metrics show names again.
         </p>
       {/if}
+      {#if offlineCount > 0}
+        <p class="flex gap-2 text-warning">
+          <span class="shrink-0 pt-0.5"><Icon type="warning" size={14} /></span>
+          <span>
+            {#if isBulk}
+              {offlineCount === 1 ? "1 of these nodes is" : `${offlineCount} of these nodes are`}
+              offline and won't answer. A node sends its births by itself when it
+              reconnects.
+            {:else}
+              This node is offline and won't answer. It sends its births by itself
+              when it reconnects.
+            {/if}
+          </span>
+        </p>
+      {/if}
       <p>
         Every host application on this broker sees the new births too. Only
-        ask if you're allowed to command these nodes.
+        ask if you're allowed to command {isBulk ? "these nodes" : "this node"}.
       </p>
+      {#if !connected}
+        <p class="flex gap-2 text-warning">
+          <span class="shrink-0 pt-0.5"><Icon type="warning" size={14} /></span>
+          <span>Not connected to the broker. Connect first, then ask again.</span>
+        </p>
+      {/if}
       <div class="flex items-center justify-end gap-3">
         <Button variant="text" disabled={busy} on:click={requestClose}
           >Cancel</Button
         >
         <Button
           iconType="refresh"
-          disabled={busy}
+          disabled={busy || !connected}
           iconPlacement="left"
           iconSize={16}
-          on:click={confirm}
-          >{busy ? "Requesting…" : isBulk ? "Request rebirths" : "Request rebirth"}</Button
+          on:click={confirm}>{confirmLabel}</Button
         >
       </div>
     </div>

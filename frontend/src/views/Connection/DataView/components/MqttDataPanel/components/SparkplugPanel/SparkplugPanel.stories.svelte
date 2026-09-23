@@ -20,11 +20,14 @@
     "width",
     "filter",
     "decodingState",
+    "enablingDecoding",
     "onEnableDecoding",
     "onRequestRebirth",
     "onCopyMetricList",
     "onSelectMetric",
     "onCopyValue",
+    "onClearWarnings",
+    "onClearFilter",
   ];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
@@ -40,6 +43,12 @@
 
 {#snippet template(args: any)}
   <div class="h-[360px] w-[700px]">
+    <StoryRender component={Component} {args} {componentName} />
+  </div>
+{/snippet}
+
+{#snippet narrowTemplate(args: any)}
+  <div class="h-[360px] w-[400px]">
     <StoryRender component={Component} {args} {componentName} />
   </div>
 {/snippet}
@@ -92,5 +101,24 @@
 <Story
   name="Filtered"
   args={{ ...storyArgs, treeState: mockSparkplugTreeState, filter: "volts" }}
+  {template}
+/>
+<Story
+  name="Narrow"
+  args={{ ...storyArgs, width: 400 }}
+  template={narrowTemplate}
+/>
+<Story
+  name="DecodingOffDisconnected"
+  args={{
+    ...storyArgs,
+    treeState: { ...mockSparkplugTreeStateEmpty, connected: false },
+    decodingState: "off",
+  }}
+  {template}
+/>
+<Story
+  name="PathSearch"
+  args={{ ...storyArgs, treeState: mockSparkplugTreeState, filter: "spBv1.0/EnergyCo/NDATA/substation-4" }}
   {template}
 />

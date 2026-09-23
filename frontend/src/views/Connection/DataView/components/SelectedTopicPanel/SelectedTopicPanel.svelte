@@ -21,6 +21,7 @@
   import ChartView from "./components/Chart/ChartView.svelte";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
   import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
+  import { isSparkplugProtobufTopic } from "../MqttDataPanel/components/SparkplugPanel/build-sparkplug-tree";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { copyToClipboard } from "@/util/copy";
   import { decodePayload } from "@/components/CodeEditor/codec";
@@ -123,6 +124,11 @@
   // Sparkplug middleware meta drives PayloadTab's decode banner.
   $: selectedMessageSparkplugMeta =
     (selectedMessage?.middlewareProperties as any)?.sparkplug ?? null;
+  // A Sparkplug B payload the decoder never saw (decoding is off). STATE
+  // messages are JSON, so they read fine without it.
+  $: selectedMessageSparkplugUndecoded =
+    selectedMessageSparkplugMeta === null &&
+    isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "");
 
   // history[] only carries stubs until fetched. Ensure the selected
   // message's payload as soon as it's picked (timeline click or
@@ -503,6 +509,7 @@
               onViewChart={viewChart}
               {onRequestRebirth}
               sparkplugMeta={selectedMessageSparkplugMeta}
+              sparkplugUndecoded={selectedMessageSparkplugUndecoded}
             />
           {:else}
             <div class="mt-12 flex justify-center text-secondary-text">
@@ -578,6 +585,7 @@
               onViewChart={viewChart}
               {onRequestRebirth}
               sparkplugMeta={selectedMessageSparkplugMeta}
+              sparkplugUndecoded={selectedMessageSparkplugUndecoded}
             />
           {:else}
             <div class="mt-12 flex justify-center text-secondary-text">

@@ -40,7 +40,22 @@
   export let searchPlaceholder: string | undefined = undefined;
 
   let searchText = $searchStore.text;
-  const debouncedSetSearchText = _.debounce(searchStore.setSearchText, 200);
+  // The last text this bar wrote to the store. A store value that differs
+  // was set from outside (the Sparkplug view clearing its search to reveal
+  // a node), and the box follows it.
+  let lastPushed = searchText;
+  const pushSearchText = (text: string) => {
+    lastPushed = text;
+    searchStore.setSearchText(text);
+  };
+  const debouncedSetSearchText = _.debounce(pushSearchText, 200);
+  const followStore = (text: string) => {
+    if (text === lastPushed) return;
+    lastPushed = text;
+    debouncedSetSearchText.cancel();
+    searchText = text;
+  };
+  $: followStore($searchStore.text);
   // Flush any pending debounced text on unmount so a List -> Graph toggle within
   // 200ms of typing doesn't leave the graph opening unfiltered (the filter would
   // otherwise flash in late once the trailing call fires against a dead view).
@@ -49,7 +64,7 @@
     (() => {
       if (searchText === "") {
         debouncedSetSearchText.cancel();
-        searchStore.setSearchText("");
+        pushSearchText("");
         return;
       }
       debouncedSetSearchText(searchText);
