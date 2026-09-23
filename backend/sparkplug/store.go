@@ -45,6 +45,20 @@ const (
 	// valueOverheadBytes approximates a latest-value entry's map slot, struct
 	// and ref beyond its key and encoded metric.
 	valueOverheadBytes = 96
+	// maxIndexedValueBytes is the largest metric the value index keeps whole.
+	// A bigger one (a long string, a file, a big dataset) is indexed without
+	// its value, so one camera snapshot can't take the budget of thousands of
+	// ordinary metrics. The replay marks it as omitted.
+	maxIndexedValueBytes = 256 << 10
+	// maxAliasesTotal and maxAliasBytesTotal bound the alias tables across
+	// the connection, which otherwise only have a per-scope cap.
+	maxAliasesTotal    = 1 << 18
+	maxAliasBytesTotal = 32 << 20
+	aliasOverheadBytes = 96
+	// maxStoredBytesTotal bounds the birth and death payloads kept for the
+	// replay. Past it a birth is left to history, as before this store kept
+	// them.
+	maxStoredBytesTotal = 32 << 20
 )
 
 // MessageRef identifies a message in the connection's history: enough for
@@ -56,6 +70,22 @@ type MessageRef struct {
 	ID     string
 	TimeMs int64
 	Ord    uint64
+	// Retained is set when the broker delivered the message from its
+	// retained store, on subscribe: old news, however recent it looks.
+	Retained bool
+}
+
+// storedMessage is a birth or death kept for the replay. Births and deaths are
+// the edge nodes' session state: the replay needs the current ones however
+// long ago they arrived, and history is free to evict a quiet node's birth
+// under topic churn. raw is the payload re-encoded (births carry no injected
+// names); inHistory means it was over maxStoredBytesTotal and the replay
+// fetches it from history by ref instead.
+type storedMessage struct {
+	ref       MessageRef
+	raw       []byte
+	meta      map[string]any
+	inHistory bool
 }
 
 // metricValue is the latest value of one metric: the Metric submessage as it
@@ -67,6 +97,9 @@ type metricValue struct {
 	raw   []byte
 	named bool
 	ref   MessageRef
+	// omitted is the encoded size of a value too big to index
+	// (maxIndexedValueBytes); raw then holds the metric without its value.
+	omitted int
 }
 
 type nodeKey struct {
@@ -78,16 +111,17 @@ type nodeKey struct {
 // birth that established it, and the latest value of each metric (used to
 // replay the tree without replaying every message).
 type scopeState struct {
-	Aliases  map[uint64]string
-	BirthAt  time.Time
-	hasBirth bool
-	// verified is false when the aliases were carried over a connection drop:
-	// the edge node may have rebirthed with new aliases while this client was
-	// away, so names resolved from them are shown as unverified until the
-	// next birth.
+	Aliases    map[uint64]string
+	aliasBytes int
+	BirthAt    time.Time
+	hasBirth   bool
+	// verified is false when the aliases were carried over a connection drop
+	// or came from a retained birth: the edge node may have rebirthed with
+	// new aliases while this client wasn't watching, so names resolved from
+	// them are shown as unverified until the next live birth.
 	verified   bool
-	birthRef   *MessageRef
-	deathRef   *MessageRef
+	birth      *storedMessage
+	death      *storedMessage
 	values     map[string]*metricValue
 	valueBytes int
 }
@@ -98,10 +132,16 @@ type deviceState struct {
 
 type nodeState struct {
 	scopeState
-	BdSeq     *uint64 // nil until an NBIRTH in this session carried one
-	LastSeq   int16   // -1 until a seq has been observed
+	BdSeq *uint64 // nil until an NBIRTH in this session carried one
+	// lastBdSeq is the bdSeq of the newest birth seen, kept across a drop so
+	// a retained will from an older session can still be recognised.
+	lastBdSeq *uint64
+	LastSeq   int16 // -1 until a seq has been observed
 	Devices   map[string]*deviceState
 	birthRefs []MessageRef // recent NBIRTHs, oldest first
+	// lastOrd is the arrival order of the node's newest message (its devices'
+	// included), for evicting the least recently heard node at the cap.
+	lastOrd uint64
 }
 
 // SessionStore tracks Sparkplug B birth/alias state for one connection.
@@ -119,6 +159,9 @@ type SessionStore struct {
 	devicesTotal int
 	valuesTotal  int
 	valueBytes   int
+	aliasesTotal int
+	aliasBytes   int
+	storedBytes  int
 	// ord counts every Sparkplug message handled, in arrival order.
 	ord uint64
 	// suspendedOrd is ord at the last Suspend: anything at or below it was
@@ -144,14 +187,27 @@ func (s *SessionStore) Reset() {
 	s.devicesTotal = 0
 	s.valuesTotal = 0
 	s.valueBytes = 0
+	s.aliasesTotal = 0
+	s.aliasBytes = 0
+	s.storedBytes = 0
 	s.suspendedOrd = 0
 }
 
-// ClearHistory forgets everything the replay would fetch from or rebuild out
-// of history (births, deaths, latest values, warnings, host STATE), for when
-// the user clears the connection's history. Aliases, seq and bdSeq stay: they
-// are the edge nodes' session state, and wiping them would turn every name
-// back into an alias until each node happened to rebirth.
+// SuspendedOrd is the arrival order at the most recent connection drop.
+// Messages at or below it were received before the drop, including any the
+// client still delivers after reconnecting.
+func (s *SessionStore) SuspendedOrd() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.suspendedOrd
+}
+
+// ClearHistory forgets the traffic the user asked to clear: latest data
+// values, warnings, recent NBIRTHs and host STATE. The session state stays:
+// aliases, seq, bdSeq and each scope's current birth and death, because they
+// are the edge nodes' state, not the history's, and without them every name
+// would turn back into an alias and every type be lost until each node
+// happened to rebirth.
 func (s *SessionStore) ClearHistory() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -168,8 +224,13 @@ func (s *SessionStore) ClearHistory() {
 
 func (s *SessionStore) forgetHistory(scope *scopeState) {
 	s.clearValues(scope)
-	scope.birthRef = nil
-	scope.deathRef = nil
+	// A birth or death only kept as a history ref is gone with the history.
+	if scope.birth != nil && scope.birth.inHistory {
+		scope.birth = nil
+	}
+	if scope.death != nil && scope.death.inHistory {
+		scope.death = nil
+	}
 }
 
 // Suspend marks every alias table as carried over a connection drop. Messages
@@ -185,6 +246,7 @@ func (s *SessionStore) Suspend() {
 	for _, node := range s.nodes {
 		node.verified = false
 		node.LastSeq = -1
+		// lastBdSeq stays, for recognising a retained will once reconnected.
 		node.BdSeq = nil
 		for _, device := range node.Devices {
 			device.verified = false
@@ -241,6 +303,17 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		if node == nil {
 			return nil
 		}
+		node.lastOrd = ref.Ord
+	}
+
+	// A retained message was stored by the broker at some unknown time and
+	// replayed on subscribe. Its seq says nothing about the live counter.
+	trackSeqIfLive := func(meta map[string]any) {
+		if ref.Retained {
+			node.LastSeq = -1
+			return
+		}
+		trackSeq(node, msg, meta)
 	}
 
 	var device *deviceState
@@ -250,7 +323,7 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		if device == nil {
 			// All messages from an edge node share one seq counter, so a
 			// device past the cap still advances it. It just gets no meta.
-			trackSeq(node, msg, map[string]any{})
+			trackSeqIfLive(map[string]any{})
 			return nil
 		}
 	}
@@ -266,19 +339,41 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 	if info.Device != "" {
 		meta["device"] = info.Device
 	}
+	if ref.Retained {
+		meta["retained"] = true
+	}
+
+	// The birth or death this message becomes, kept for the replay with the
+	// meta built below.
+	var kept *storedMessage
 
 	switch info.Type {
 	case MessageTypeNBirth:
 		// Flush + rebuild, never merge: stale mappings resolve silently to
 		// wrong names.
-		s.birthScope(&node.scopeState, msg, ref)
+		kept = s.birthScope(&node.scopeState, msg, ref)
 		// Every device's session ends with its node's: Sparkplug requires a
 		// fresh DBIRTH for each device after an NBIRTH, and until one arrives
 		// the old device aliases may already be reassigned. The device's
-		// birth and death refs stay, so a replay still shows it exists (as
+		// birth and death stay, so a replay still shows it exists (as
 		// awaiting a birth), the same as the live tree does.
 		for _, d := range node.Devices {
 			s.endSession(&d.scopeState)
+		}
+		var bdSeq *uint64
+		if v, ok := findBdSeq(msg); ok {
+			bdSeq = &v
+			meta["bdSeq"] = v
+		}
+		node.lastBdSeq = bdSeq
+		if ref.Retained {
+			// A retained birth (the spec forbids them, some stacks do it so
+			// late joiners get names) is the best name source there is, but
+			// not a live one: no storm count, no seq baseline, no bdSeq to
+			// judge the next death by, and names unverified.
+			node.LastSeq = -1
+			node.BdSeq = nil
+			break
 		}
 		node.birthRefs = append(node.birthRefs, ref)
 		if len(node.birthRefs) > maxBirthRefsPerNode {
@@ -298,18 +393,14 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		}
 		// A birth without a bdSeq must not inherit the previous session's,
 		// or that session's number would be used to reject the next death.
-		node.BdSeq = nil
-		if bdSeq, ok := findBdSeq(msg); ok {
-			node.BdSeq = &bdSeq
-			meta["bdSeq"] = bdSeq
-		}
+		node.BdSeq = bdSeq
 
 	case MessageTypeDBirth:
-		s.birthScope(&device.scopeState, msg, ref)
-		trackSeq(node, msg, meta)
+		kept = s.birthScope(&device.scopeState, msg, ref)
+		trackSeqIfLive(meta)
 
 	case MessageTypeNData, MessageTypeDData:
-		trackSeq(node, msg, meta)
+		trackSeqIfLive(meta)
 
 		scope := &node.scopeState
 		if device != nil {
@@ -342,43 +433,51 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		if hasDeathBdSeq {
 			meta["bdSeq"] = deathBdSeq
 		}
-		if node.BdSeq != nil && hasDeathBdSeq && *node.BdSeq != deathBdSeq {
-			// A retained will from a previous session, replayed after the node
-			// has already rebirthed. Killing the live session's aliases here
-			// would blank a node that is plainly still publishing.
+		// A will from a previous session, replayed after the node has already
+		// rebirthed, would blank a node that is plainly still publishing.
+		// Live, that shows as a bdSeq mismatch with this session's birth. A
+		// retained will is judged against the newest birth seen at all, since
+		// it can arrive just after a reconnect, when this session's bdSeq is
+		// not confirmed yet.
+		expected := node.BdSeq
+		if expected == nil && ref.Retained {
+			expected = node.lastBdSeq
+		}
+		if expected != nil && hasDeathBdSeq && *expected != deathBdSeq {
 			meta["staleDeath"] = true
 			break
 		}
-		// LastSeq survives: the next NBIRTH is what resets it. Metric refs
+		// LastSeq survives: the next NBIRTH is what resets it. Metric values
 		// survive too: the tree keeps showing a dead node's last values.
-		deathRef := ref
-		node.deathRef = &deathRef
+		kept = s.keepMessage(&node.death, msg, ref)
 		node.hasBirth = false
 		node.verified = false
-		node.Aliases = map[uint64]string{}
+		s.setAliases(&node.scopeState, map[uint64]string{}, 0)
 		node.BirthAt = time.Time{}
 		for _, d := range node.Devices {
 			d.hasBirth = false
 			d.verified = false
-			d.Aliases = map[uint64]string{}
+			s.setAliases(&d.scopeState, map[uint64]string{}, 0)
 			d.BirthAt = time.Time{}
 		}
 
 	case MessageTypeDDeath:
-		trackSeq(node, msg, meta)
-		deathRef := ref
-		device.deathRef = &deathRef
+		trackSeqIfLive(meta)
+		kept = s.keepMessage(&device.death, msg, ref)
 		// A dead device must DBIRTH again before its data means anything, and
 		// that birth may assign different aliases. Its last values stay.
 		device.hasBirth = false
 		device.verified = false
-		device.Aliases = map[uint64]string{}
+		s.setAliases(&device.scopeState, map[uint64]string{}, 0)
 		device.BirthAt = time.Time{}
 
 	case MessageTypeNCmd, MessageTypeDCmd:
 		// Passthrough: commands don't alter session state.
 	}
 
+	if kept != nil {
+		kept.meta = meta
+	}
 	if _, ok := meta["seqGap"]; ok {
 		s.seqGapRefs = append(s.seqGapRefs, ref)
 		if len(s.seqGapRefs) > maxSeqGapRefs {
@@ -388,24 +487,25 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 	return meta
 }
 
-// birthScope replaces a scope's aliases and latest values with the birth's.
-func (s *SessionStore) birthScope(scope *scopeState, msg *dynamicpb.Message, ref MessageRef) {
+// birthScope replaces a scope's aliases and latest values with the birth's,
+// and keeps the birth for the replay.
+func (s *SessionStore) birthScope(scope *scopeState, msg *dynamicpb.Message, ref MessageRef) *storedMessage {
 	s.endSession(scope)
 	scope.BirthAt = time.UnixMilli(ref.TimeMs)
 	scope.hasBirth = true
-	scope.verified = true
-	scope.Aliases = buildAliasMap(msg)
-	birthRef := ref
-	scope.birthRef = &birthRef
-	scope.deathRef = nil
+	scope.verified = !ref.Retained
+	aliases, bytes := buildAliasMap(msg, maxAliasesTotal-s.aliasesTotal, maxAliasBytesTotal-s.aliasBytes)
+	s.setAliases(scope, aliases, bytes)
+	s.dropStored(&scope.death)
+	return s.keepMessage(&scope.birth, msg, ref)
 }
 
 // endSession forgets a scope's session: its aliases, its birth, and the
-// metric values that belonged to it. The birth and death refs are left for
+// metric values that belonged to it. The stored birth and death are left for
 // the caller to decide.
 func (s *SessionStore) endSession(scope *scopeState) {
 	s.clearValues(scope)
-	scope.Aliases = map[uint64]string{}
+	s.setAliases(scope, map[uint64]string{}, 0)
 	scope.BirthAt = time.Time{}
 	scope.hasBirth = false
 	scope.verified = false
@@ -418,9 +518,47 @@ func (s *SessionStore) clearValues(scope *scopeState) {
 	scope.valueBytes = 0
 }
 
+// setAliases swaps a scope's alias table, keeping the connection-wide totals.
+func (s *SessionStore) setAliases(scope *scopeState, aliases map[uint64]string, bytes int) {
+	s.aliasesTotal += len(aliases) - len(scope.Aliases)
+	s.aliasBytes += bytes - scope.aliasBytes
+	scope.Aliases = aliases
+	scope.aliasBytes = bytes
+}
+
+// keepMessage stores msg in *slot for the replay, replacing what was there.
+// Past maxStoredBytesTotal only the ref is kept, and the replay falls back to
+// history for it.
+func (s *SessionStore) keepMessage(slot **storedMessage, msg *dynamicpb.Message, ref MessageRef) *storedMessage {
+	s.dropStored(slot)
+	kept := &storedMessage{ref: ref}
+	if msg != nil {
+		raw, err := (proto.MarshalOptions{AllowPartial: true}).Marshal(msg)
+		switch {
+		case err != nil:
+			kept.inHistory = true
+		case s.storedBytes+len(raw) > maxStoredBytesTotal:
+			kept.inHistory = true
+		default:
+			kept.raw = raw
+			s.storedBytes += len(raw)
+		}
+	}
+	*slot = kept
+	return kept
+}
+
+func (s *SessionStore) dropStored(slot **storedMessage) {
+	if *slot != nil {
+		s.storedBytes -= len((*slot).raw)
+		*slot = nil
+	}
+}
+
 // indexValues records each of msg's metrics as that metric's latest value.
 // Called after name injection, so a resolved metric is keyed by its name
-// (matching the birth's key) and an unresolved one by its alias.
+// (matching the birth's key) and an unresolved one by its alias. Repeated
+// samples of one metric in a payload leave the last one.
 func (s *SessionStore) indexValues(scope *scopeState, msg *dynamicpb.Message, ref MessageRef) {
 	list, ok := metricsList(msg)
 	if !ok {
@@ -442,16 +580,28 @@ func (s *SessionStore) indexValues(scope *scopeState, msg *dynamicpb.Message, re
 		if err != nil {
 			continue
 		}
+		omitted := 0
+		if len(raw) > maxIndexedValueBytes {
+			omitted = len(raw)
+			if raw, err = marshalWithoutValue(metric); err != nil {
+				continue
+			}
+		}
 		existing, exists := scope.values[key]
 		size := len(key) + len(raw) + valueOverheadBytes
 		if exists {
 			old := len(key) + len(existing.raw) + valueOverheadBytes
 			if s.valueBytes-old+size > maxValueBytesTotal {
+				// Keeping the old value would replay it as current forever.
+				delete(scope.values, key)
+				s.valuesTotal--
+				s.valueBytes -= old
+				scope.valueBytes -= old
 				continue
 			}
 			s.valueBytes += size - old
 			scope.valueBytes += size - old
-			existing.raw, existing.named, existing.ref = raw, named, ref
+			existing.raw, existing.named, existing.ref, existing.omitted = raw, named, ref, omitted
 			continue
 		}
 		if len(scope.values) >= maxMetricsPerScope || s.valuesTotal >= maxValuesTotal ||
@@ -461,11 +611,30 @@ func (s *SessionStore) indexValues(scope *scopeState, msg *dynamicpb.Message, re
 		if scope.values == nil {
 			scope.values = map[string]*metricValue{}
 		}
-		scope.values[key] = &metricValue{raw: raw, named: named, ref: ref}
+		scope.values[key] = &metricValue{raw: raw, named: named, ref: ref, omitted: omitted}
 		s.valuesTotal++
 		s.valueBytes += size
 		scope.valueBytes += size
 	}
+}
+
+// valueFields are the Metric fields that carry its value.
+var valueFields = []protoreflect.Name{
+	"int_value", "long_value", "float_value", "double_value", "boolean_value",
+	"string_value", "bytes_value", "dataset_value", "template_value", "extension_value",
+}
+
+// marshalWithoutValue encodes a metric with its value fields cleared: its
+// name, alias, datatype and timestamp, for a value too big to index.
+func marshalWithoutValue(metric protoreflect.Message) ([]byte, error) {
+	stub := proto.Clone(metric.Interface()).ProtoReflect()
+	fields := stub.Descriptor().Fields()
+	for _, name := range valueFields {
+		if fd := fields.ByName(name); fd != nil {
+			stub.Clear(fd)
+		}
+	}
+	return (proto.MarshalOptions{AllowPartial: true}).Marshal(stub.Interface())
 }
 
 // aliasKey keys an unresolved metric in the value index. The leading '#'
@@ -475,8 +644,9 @@ func aliasKey(alias uint64) string {
 	return "#" + strconv.FormatUint(alias, 10)
 }
 
-// ReplayData is one rebuilt data message: the latest values that all came
-// from the same original message, re-encoded as a payload.
+// ReplayData is one message of the replay: a kept birth or death, or a
+// data message rebuilt from the latest values that all came from the same
+// original message. Payload is nil only for a message that had none.
 type ReplayData struct {
 	Topic   string
 	ID      string
@@ -486,25 +656,41 @@ type ReplayData struct {
 	Meta    map[string]any
 }
 
-// Replay is what a Sparkplug view needs to rebuild the current tree: Refs
-// are messages to fetch from history (every scope's latest birth and death,
-// recent NBIRTHs for rebirth-storm counts, the messages behind recent seq-gap
-// warnings, and each host's latest STATE), Data rebuilds the latest value of
-// every metric from the store itself. SuspendedOrd is the arrival order of the
-// last connection drop, so a view created later still knows which births
-// predate it.
+// Replay is what a Sparkplug view needs to rebuild the current tree. Data
+// holds every scope's current birth and death and the latest value of every
+// metric, all from the store itself. Refs are messages to fetch from history:
+// older NBIRTHs for rebirth-storm counts, the messages behind recent seq-gap
+// warnings, each host's latest STATE, and any birth or death too big to
+// keep. SuspendedOrd is the arrival order of the last connection drop, so a
+// view created later still knows which births predate it.
 type Replay struct {
 	Refs         []MessageRef
 	Data         []ReplayData
 	SuspendedOrd uint64
 }
 
+// replayScope is one scope's share of a replay, copied out under the lock so
+// the payloads can be rebuilt without holding it.
+type replayScope struct {
+	key      nodeKey
+	device   string
+	values   []metricValue
+	hasBirth bool
+	verified bool
+	birthAt  time.Time
+}
+
 // Replay snapshots the store for a Sparkplug view. Refs are deduplicated by
-// id; nothing is in a particular order (the caller sorts by Ord).
+// id; nothing is in a particular order (the caller sorts by Ord). Only the
+// copying happens under the lock: rebuilding payloads for a full index takes
+// hundreds of milliseconds, and the receive goroutine needs the lock for
+// every message.
 func (s *SessionStore) Replay() Replay {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	out := Replay{SuspendedOrd: s.suspendedOrd}
+	desc := s.payloadDesc
+	var stored []storedMessage
+	var scopes []replayScope
 	seen := map[string]bool{}
 	add := func(ref MessageRef) {
 		if seen[ref.ID] {
@@ -513,22 +699,39 @@ func (s *SessionStore) Replay() Replay {
 		seen[ref.ID] = true
 		out.Refs = append(out.Refs, ref)
 	}
+	keep := func(m *storedMessage) {
+		if m == nil {
+			return
+		}
+		if m.inHistory {
+			add(m.ref)
+			return
+		}
+		seen[m.ref.ID] = true
+		stored = append(stored, *m)
+	}
 	addScope := func(scope *scopeState, key nodeKey, device string) {
-		if scope.birthRef != nil {
-			add(*scope.birthRef)
+		keep(scope.birth)
+		keep(scope.death)
+		if len(scope.values) == 0 {
+			return
 		}
-		if scope.deathRef != nil {
-			add(*scope.deathRef)
+		rs := replayScope{key: key, device: device, hasBirth: scope.hasBirth, verified: scope.verified, birthAt: scope.BirthAt}
+		rs.values = make([]metricValue, 0, len(scope.values))
+		for _, v := range scope.values {
+			rs.values = append(rs.values, *v)
 		}
-		out.Data = append(out.Data, s.replayValues(scope, key, device)...)
+		scopes = append(scopes, rs)
 	}
 	for key, node := range s.nodes {
 		addScope(&node.scopeState, key, "")
-		for _, ref := range node.birthRefs {
-			add(ref)
-		}
 		for name, device := range node.Devices {
 			addScope(&device.scopeState, key, name)
+		}
+	}
+	for _, node := range s.nodes {
+		for _, ref := range node.birthRefs {
+			add(ref)
 		}
 	}
 	for _, ref := range s.seqGapRefs {
@@ -537,72 +740,103 @@ func (s *SessionStore) Replay() Replay {
 	for _, ref := range s.hosts {
 		add(ref)
 	}
+	s.mu.Unlock()
+
+	if desc == nil {
+		return out
+	}
+	for _, m := range stored {
+		payload := dynamicpb.NewMessage(desc)
+		if err := (proto.UnmarshalOptions{AllowPartial: true}).Unmarshal(m.raw, payload); err != nil {
+			continue
+		}
+		out.Data = append(out.Data, ReplayData{
+			Topic:   m.ref.Topic,
+			ID:      m.ref.ID,
+			TimeMs:  m.ref.TimeMs,
+			Ord:     m.ref.Ord,
+			Payload: payload,
+			Meta:    m.meta,
+		})
+	}
+	for _, rs := range scopes {
+		out.Data = append(out.Data, replayValues(desc, rs)...)
+	}
 	return out
 }
 
 // replayValues groups a scope's latest values by the message they came from
-// and rebuilds one data message per group. Caller holds mu.
-func (s *SessionStore) replayValues(scope *scopeState, key nodeKey, device string) []ReplayData {
-	if len(scope.values) == 0 || s.payloadDesc == nil {
-		return nil
-	}
-	metricsField := s.payloadDesc.Fields().ByName("metrics")
+// and rebuilds one data message per group.
+func replayValues(desc protoreflect.MessageDescriptor, rs replayScope) []ReplayData {
+	metricsField := desc.Fields().ByName("metrics")
 	if metricsField == nil {
 		return nil
 	}
 	type group struct {
-		ref   MessageRef
-		raws  [][]byte
-		named int
+		ref     MessageRef
+		values  []metricValue
+		named   int
+		omitted map[string]int
 	}
 	groups := map[uint64]*group{}
-	for _, v := range scope.values {
+	for _, v := range rs.values {
 		g, ok := groups[v.ref.Ord]
 		if !ok {
 			g = &group{ref: v.ref}
 			groups[v.ref.Ord] = g
 		}
-		g.raws = append(g.raws, v.raw)
+		g.values = append(g.values, v)
 		if v.named {
 			g.named++
 		}
 	}
 	msgType := MessageTypeNData
-	if device != "" {
+	if rs.device != "" {
 		msgType = MessageTypeDData
 	}
 	out := make([]ReplayData, 0, len(groups))
 	for _, g := range groups {
-		payload := dynamicpb.NewMessage(s.payloadDesc)
+		payload := dynamicpb.NewMessage(desc)
 		list := payload.Mutable(metricsField).List()
-		for _, raw := range g.raws {
+		for _, v := range g.values {
 			metric := list.NewElement()
-			if err := (proto.UnmarshalOptions{AllowPartial: true}).Unmarshal(raw, metric.Message().Interface()); err != nil {
+			if err := (proto.UnmarshalOptions{AllowPartial: true}).Unmarshal(v.raw, metric.Message().Interface()); err != nil {
 				continue
 			}
 			list.Append(metric)
+			if v.omitted > 0 {
+				if g.omitted == nil {
+					g.omitted = map[string]int{}
+				}
+				g.omitted[frontendMetricKey(metric.Message())] = v.omitted
+			}
 		}
 		meta := map[string]any{
 			"msgType":  string(msgType),
-			"group":    key.group,
-			"edgeNode": key.edgeNode,
+			"group":    rs.key.group,
+			"edgeNode": rs.key.edgeNode,
 			"n":        g.ref.Ord,
 			"replayed": true,
 		}
-		if device != "" {
-			meta["device"] = device
+		if rs.device != "" {
+			meta["device"] = rs.device
+		}
+		if g.omitted != nil {
+			// Values too big to index: the view shows their size and sends
+			// you to the message for the value.
+			meta["omitted"] = g.omitted
 		}
 		switch {
-		case g.named == len(g.raws):
+		case g.named == len(g.values):
 			meta["resolution"] = ResolutionResolved
 		case g.named > 0:
 			meta["resolution"] = ResolutionPartial
 		default:
 			meta["resolution"] = ResolutionUnresolved
 		}
-		if g.named > 0 && scope.hasBirth {
-			meta["birthAtMs"] = scope.BirthAt.UnixMilli()
-			if !scope.verified {
+		if g.named > 0 && rs.hasBirth {
+			meta["birthAtMs"] = rs.birthAt.UnixMilli()
+			if !rs.verified {
 				meta["carriedOver"] = true
 			}
 		}
@@ -616,6 +850,16 @@ func (s *SessionStore) replayValues(scope *scopeState, key nodeKey, device strin
 		})
 	}
 	return out
+}
+
+// frontendMetricKey is how the frontend keys a metric: its name, or
+// "alias_<n>" for one still unnamed.
+func frontendMetricKey(metric protoreflect.Message) string {
+	if name := metricName(metric); name != "" {
+		return name
+	}
+	alias, _ := metricAlias(metric)
+	return "alias_" + strconv.FormatUint(alias, 10)
 }
 
 // trackSeq advances the node's seq counter and records a gap in meta when the
@@ -636,14 +880,16 @@ func trackSeq(node *nodeState, msg *dynamicpb.Message, meta map[string]any) {
 	node.LastSeq = got
 }
 
-// ensureNode returns nil, without inserting, if key is new and the store is
-// already at maxTrackedNodes. Callers must tolerate a nil node.
+// ensureNode returns the node for info, creating it. At maxTrackedNodes it
+// first evicts the least recently heard node, preferring one whose last word
+// was a death, so a connection that churns through ephemeral node ids keeps
+// following the live ones. Returns nil only if nothing could be evicted.
 func (s *SessionStore) ensureNode(info TopicInfo) *nodeState {
 	key := nodeKey{info.Group, info.EdgeNode}
 	if node, ok := s.nodes[key]; ok {
 		return node
 	}
-	if len(s.nodes) >= maxTrackedNodes {
+	if len(s.nodes) >= maxTrackedNodes && !s.evictNode() {
 		return nil
 	}
 	node := &nodeState{
@@ -653,6 +899,42 @@ func (s *SessionStore) ensureNode(info TopicInfo) *nodeState {
 	}
 	s.nodes[key] = node
 	return node
+}
+
+// evictNode drops the least recently heard node, dead ones first. A scan,
+// but only when a new node arrives at the cap.
+func (s *SessionStore) evictNode() bool {
+	var victimKey nodeKey
+	var victim *nodeState
+	victimDead := false
+	for key, node := range s.nodes {
+		dead := node.death != nil && node.death.ref.Ord == node.lastOrd
+		switch {
+		case victim == nil,
+			dead && !victimDead,
+			dead == victimDead && node.lastOrd < victim.lastOrd:
+			victimKey, victim, victimDead = key, node, dead
+		}
+	}
+	if victim == nil {
+		return false
+	}
+	s.forgetScope(&victim.scopeState)
+	for _, device := range victim.Devices {
+		s.forgetScope(&device.scopeState)
+	}
+	s.devicesTotal -= len(victim.Devices)
+	delete(s.nodes, victimKey)
+	return true
+}
+
+// forgetScope releases everything a scope holds against the connection-wide
+// caps.
+func (s *SessionStore) forgetScope(scope *scopeState) {
+	s.clearValues(scope)
+	s.setAliases(scope, map[uint64]string{}, 0)
+	s.dropStored(&scope.birth)
+	s.dropStored(&scope.death)
 }
 
 // ensureDevice returns nil, without inserting, if name is new and either the
@@ -711,29 +993,47 @@ func metricAlias(metric protoreflect.Message) (uint64, bool) {
 	return metric.Get(fd).Uint(), true
 }
 
-// buildAliasMap collects alias->name pairs from a birth payload's metrics.
-// Metrics missing either half are skipped (aliases are optional in Sparkplug).
-func buildAliasMap(msg *dynamicpb.Message) map[uint64]string {
+// buildAliasMap collects alias->name pairs from a birth payload's metrics,
+// at most maxMetricsPerScope of them and no more than the connection-wide
+// alias budget left (count and bytes). Returns the map and its accounted
+// bytes. Metrics missing either half are skipped (aliases are optional in
+// Sparkplug); ones past the budget stay unresolved.
+func buildAliasMap(msg *dynamicpb.Message, countLeft, bytesLeft int) (map[uint64]string, int) {
 	aliases := map[uint64]string{}
+	bytes := 0
 	list, ok := metricsList(msg)
 	if !ok {
-		return aliases
+		return aliases, 0
 	}
+	limit := min(maxMetricsPerScope, countLeft)
 	for i := 0; i < list.Len(); i++ {
 		metric := list.Get(i).Message()
 		name := metricName(metric)
 		alias, hasAlias := metricAlias(metric)
-		if name != "" && hasAlias {
-			if _, exists := aliases[alias]; !exists && len(aliases) >= maxMetricsPerScope {
-				continue
-			}
-			// proto2 lets Unmarshal through invalid UTF-8 in string fields;
-			// protojson.Marshal rejects it later. Sanitise now so an injected
-			// name never poisons every subsequent message on this alias.
-			aliases[alias] = strings.ToValidUTF8(name, "�")
+		if name == "" || !hasAlias {
+			continue
 		}
+		// proto2 lets Unmarshal through invalid UTF-8 in string fields;
+		// protojson.Marshal rejects it later. Sanitise now so an injected
+		// name never poisons every subsequent message on this alias.
+		name = strings.ToValidUTF8(name, "\uFFFD")
+		old, exists := aliases[alias]
+		if exists {
+			bytes -= len(old) + aliasOverheadBytes
+		} else if len(aliases) >= limit {
+			continue
+		}
+		size := len(name) + aliasOverheadBytes
+		if bytes+size > bytesLeft {
+			if exists {
+				delete(aliases, alias)
+			}
+			continue
+		}
+		aliases[alias] = name
+		bytes += size
 	}
-	return aliases
+	return aliases, bytes
 }
 
 // resolveMetricNames injects birth-established names into alias-only metrics,

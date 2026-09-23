@@ -25,18 +25,30 @@ type SparkplugHistory struct {
 // It is not a window of recent traffic. Sparkplug reports by exception, so
 // the latest NDATA for a node usually carries only the metrics that just
 // changed, and replaying a tail of the history would leave every quieter
-// metric on its birth value. Births, deaths, recent NBIRTHs, seq-gap messages
-// and host STATE are fetched from history by id (the latest message per topic
-// is always kept there, so the current birth and death are too). Metric
-// values come from the session store's own latest-value index and are rebuilt
-// into one data message per original message, because the message a quiet
-// metric last changed in may be long gone from history.
+// metric on its birth value. The current births and deaths come from the
+// session store, which keeps them, and metric values from its latest-value
+// index, rebuilt into one data message per original message: the message a
+// quiet metric last changed in, or a quiet node's birth, may be long gone
+// from history. Older NBIRTHs, seq-gap messages and host STATE are fetched
+// from history by id, best effort.
 func (a *App) GetSparkplugMessageHistory(connectionId uint) (SparkplugHistory, error) {
 	appConnection, ok := a.appConnection(connectionId)
 	if !ok {
 		return SparkplugHistory{}, fmt.Errorf("connection not found (%d)", connectionId)
 	}
 	return replaySparkplugHistory(appConnection.SparkplugStore, appConnection.MqttManager.MessageHistory), nil
+}
+
+// GetSparkplugSuspendedOrd returns the arrival order (the meta "n") at the
+// connection's last drop. A view asks for it on reconnect: messages received
+// just before a drop can still be delivered after it, and must not count as
+// signs of life since.
+func (a *App) GetSparkplugSuspendedOrd(connectionId uint) (uint64, error) {
+	appConnection, ok := a.appConnection(connectionId)
+	if !ok {
+		return 0, fmt.Errorf("connection not found (%d)", connectionId)
+	}
+	return appConnection.SparkplugStore.SuspendedOrd(), nil
 }
 
 // replaySparkplugHistory resolves the store's replay against history. A ref

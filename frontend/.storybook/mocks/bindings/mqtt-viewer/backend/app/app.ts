@@ -500,8 +500,14 @@ export async function GetSysMessageHistory(
 
 export async function GetSparkplugMessageHistory(
   _connectionId: number
-): Promise<any[]> {
-  return [];
+): Promise<{ messages: any[]; suspendedOrd: number }> {
+  return { messages: [], suspendedOrd: 0 };
+}
+
+export async function GetSparkplugSuspendedOrd(
+  _connectionId: number
+): Promise<number> {
+  return 0;
 }
 
 export async function PublishSparkplugRebirth(

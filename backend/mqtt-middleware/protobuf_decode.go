@@ -82,7 +82,7 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 }
 
 func messageRef(params *mqtt.MqttMessage) sparkplug.MessageRef {
-	return sparkplug.MessageRef{Topic: params.Topic, ID: params.Id, TimeMs: params.TimeMs}
+	return sparkplug.MessageRef{Topic: params.Topic, ID: params.Id, TimeMs: params.TimeMs, Retained: params.Retain}
 }
 
 // setSparkplugMeta attaches the session store's meta, skipping it entirely when

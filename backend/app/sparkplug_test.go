@@ -281,3 +281,48 @@ func testConn(t *testing.T, a *App, id uint) *AppConnection {
 	}
 	return conn
 }
+
+// A quiet node's birth is the least recently updated topic there is, so
+// plain traffic across enough topics evicts it from history. The replay keeps
+// it anyway: births are session state and the store holds them.
+func TestSparkplugReplayKeepsBirthsHistoryEvicted(t *testing.T) {
+	app := getSeededTestApp(t)
+	conn := testConn(t, app, 1)
+	conn.MqttManager.MessageHistory.SetBudgetBytes(64 << 20)
+	p := newSparkplugPipeline(t, conn)
+	p.receive("spBv1.0/G/NBIRTH/N", 1000,
+		`{"seq":"0","metrics":[{"name":"Quiet","alias":"1","datatype":10,"doubleValue":7},{"name":"Busy","alias":"2","datatype":10,"doubleValue":1}]}`)
+	payload := []byte(strings.Repeat("x", 100))
+	for i := 0; i < 1000000; i++ {
+		conn.MqttManager.MessageHistory.AddMessage(mqtt.MqttMessage{
+			Id: fmt.Sprintf("x%d", i), Topic: fmt.Sprintf("site/area/sensor/%d/value", i),
+			Payload: payload, TimeMs: int64(2000 + i), MiddlewareProperties: &map[string]any{},
+		})
+		if i%1000 == 0 && len(conn.MqttManager.MessageHistory.GetMessagesByIds("spBv1.0/G/NBIRTH/N", []string{"msg-1"}, []int64{1000})) == 0 {
+			break
+		}
+	}
+	if len(conn.MqttManager.MessageHistory.GetMessagesByIds("spBv1.0/G/NBIRTH/N", []string{"msg-1"}, []int64{1000})) != 0 {
+		t.Fatal("setup: expected history to have evicted the birth")
+	}
+	p.receive("spBv1.0/G/NDATA/N", 500000, `{"seq":"1","metrics":[{"alias":"2","doubleValue":2}]}`)
+
+	history, _ := app.GetSparkplugMessageHistory(1)
+	got := strings.Join(replayed(t, history), " | ")
+	if !strings.Contains(got, "NBIRTH/N Quiet=7") {
+		t.Fatalf("expected the birth-only metric Quiet=7 replayed, got %s", got)
+	}
+}
+
+// Repeated samples of one metric in one payload: the latest value is the
+// last sample, live and in the replay.
+func TestSparkplugReplayKeepsLastSampleOfRepeatedMetric(t *testing.T) {
+	app := getSeededTestApp(t)
+	p := newSparkplugPipeline(t, testConn(t, app, 1))
+	p.receive("spBv1.0/G/NBIRTH/N", 1000, `{"seq":"0","metrics":[{"name":"X","alias":"1","datatype":10,"doubleValue":0}]}`)
+	p.receive("spBv1.0/G/NDATA/N", 2000, `{"seq":"1","metrics":[{"alias":"1","timestamp":"1100","doubleValue":1},{"alias":"1","timestamp":"1200","doubleValue":2},{"alias":"1","timestamp":"1300","doubleValue":3}]}`)
+	history, _ := app.GetSparkplugMessageHistory(1)
+	if got := strings.Join(replayed(t, history), " | "); !strings.Contains(got, "NDATA/N X=3") {
+		t.Fatalf("expected the replay to hold the last sample X=3, got %s", got)
+	}
+}

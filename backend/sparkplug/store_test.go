@@ -36,6 +36,7 @@ type testMetric struct {
 	alias       *uint64
 	longValue   *uint64
 	doubleValue *float64
+	stringValue *string
 }
 
 func u64(v uint64) *uint64 { return &v }
@@ -74,6 +75,9 @@ func buildPayload(t *testing.T, descriptor protoreflect.MessageDescriptor, seq i
 		}
 		if m.doubleValue != nil {
 			metric.Set(metricFields.ByName("double_value"), protoreflect.ValueOfFloat64(*m.doubleValue))
+		}
+		if m.stringValue != nil {
+			metric.Set(metricFields.ByName("string_value"), protoreflect.ValueOfString(*m.stringValue))
 		}
 		list.Append(protoreflect.ValueOfMessage(metric))
 	}
@@ -477,7 +481,7 @@ func TestBuildAliasMapSanitisesInvalidUTF8(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	msg := buildPayload(t, descriptor, 0, testMetric{name: "\xff\xfe\x00", alias: u64(3)})
 
-	aliases := buildAliasMap(msg)
+	aliases, _ := buildAliasMap(msg, maxAliasesTotal, maxAliasBytesTotal)
 	name, ok := aliases[3]
 	if !ok {
 		t.Fatal("expected alias 3 in map")
@@ -512,19 +516,43 @@ func TestSessionStoreCapsNodeTracking(t *testing.T) {
 		t.Errorf("expected existing node to keep resolving, got %v", meta["resolution"])
 	}
 
-	// A brand-new node past the cap gets no meta at all, so the frontend never
-	// builds tree state for a node the store isn't following.
+	// A brand-new node past the cap evicts the least recently heard one, so
+	// a connection churning through node ids keeps following live nodes.
 	newNodeInfo := TopicInfo{Group: "G", Type: MessageTypeNData, EdgeNode: "new-node"}
 	data := buildPayload(t, descriptor, 5, testMetric{alias: u64(3), doubleValue: f64(2.0)})
 	meta = store.HandleMessage(newNodeInfo, data, at(4000))
-	if meta != nil {
-		t.Errorf("expected nil meta for capped node, got %v", meta)
-	}
-	if names := payloadMetricNames(data); names[0] != "" {
-		t.Errorf("expected no name injected for capped node, got %v", names)
+	if meta == nil {
+		t.Fatal("expected the new node tracked after an eviction")
 	}
 	if len(store.nodes) != maxTrackedNodes {
 		t.Errorf("expected node count to stay capped at %d, got %d", maxTrackedNodes, len(store.nodes))
+	}
+	if _, ok := store.nodes[nodeKey{"G", "N0"}]; !ok {
+		t.Error("expected the recently heard N0 kept")
+	}
+	if _, ok := store.nodes[nodeKey{"G", "N1"}]; ok {
+		t.Error("expected the least recently heard N1 evicted")
+	}
+}
+
+func TestNodeEvictionPrefersDeadNodes(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	for i := 0; i < maxTrackedNodes; i++ {
+		info := TopicInfo{Group: "G", Type: MessageTypeNBirth, EdgeNode: fmt.Sprintf("N%d", i)}
+		store.HandleMessage(info, buildPayload(t, descriptor, 0, testMetric{name: "M", alias: u64(1)}), at(int64(i)))
+	}
+	// N4000 is the newest to be heard from, but its last word was a death.
+	store.HandleMessage(TopicInfo{Group: "G", Type: MessageTypeNDeath, EdgeNode: "N4000"}, nil, at(9000))
+	store.HandleMessage(TopicInfo{Group: "G", Type: MessageTypeNBirth, EdgeNode: "fresh"}, buildPayload(t, descriptor, 0), at(9001))
+	if _, ok := store.nodes[nodeKey{"G", "N4000"}]; ok {
+		t.Error("expected the dead node evicted first")
+	}
+	if _, ok := store.nodes[nodeKey{"G", "N0"}]; !ok {
+		t.Error("expected live nodes kept while a dead one could go")
+	}
+	if store.aliasesTotal != maxTrackedNodes-1 {
+		t.Errorf("expected the evicted node's aliases released, got %d", store.aliasesTotal)
 	}
 }
 
@@ -670,12 +698,32 @@ func refIDs(refs []MessageRef) map[string]bool {
 	return ids
 }
 
+func dataIDs(data []ReplayData) map[string]bool {
+	ids := map[string]bool{}
+	for _, d := range data {
+		ids[d.ID] = true
+	}
+	return ids
+}
+
+// rebuilt keeps the data messages rebuilt from the value index, leaving out
+// the kept births and deaths.
+func rebuilt(data []ReplayData) []ReplayData {
+	out := []ReplayData{}
+	for _, d := range data {
+		if d.Meta["replayed"] == true {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // dataValues flattens a replay's rebuilt data into "ord:metric=value" so tests
 // can assert which message each latest value came from.
 func dataValues(t *testing.T, data []ReplayData) map[string]uint64 {
 	t.Helper()
 	out := map[string]uint64{}
-	for _, d := range data {
+	for _, d := range rebuilt(data) {
 		list, ok := metricsList(d.Payload)
 		if !ok {
 			continue
@@ -719,14 +767,17 @@ func TestReplayKeepsTheLatestValueOfEveryMetric(t *testing.T) {
 	// value comes from an older message. Both are rebuilt from the store, not
 	// fetched, so history evicting them changes nothing.
 	replay := store.Replay()
-	if ids := refIDs(replay.Refs); !ids[birth.ID] || len(ids) != 1 {
-		t.Errorf("expected only the birth to be fetched, got %v", ids)
+	if len(replay.Refs) != 0 {
+		t.Errorf("expected nothing fetched from history, got %v", refIDs(replay.Refs))
+	}
+	if !dataIDs(replay.Data)[birth.ID] {
+		t.Error("expected the birth replayed from the store")
 	}
 	values := dataValues(t, replay.Data)
 	if values["A"] != secondA.Ord || values["B"] != onlyB.Ord || len(values) != 2 {
 		t.Errorf("expected A from ord %d and B from ord %d, got %v", secondA.Ord, onlyB.Ord, values)
 	}
-	for _, d := range replay.Data {
+	for _, d := range rebuilt(replay.Data) {
 		if d.Meta["msgType"] != "NDATA" || d.Meta["resolution"] != ResolutionResolved || d.Meta["n"] != d.Ord {
 			t.Errorf("unexpected replay meta %v", d.Meta)
 		}
@@ -739,7 +790,7 @@ func TestReplayRebuildsTheValueItself(t *testing.T) {
 	handled(store, nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "Volts", alias: u64(3)}), at(1))
 	handled(store, ndataInfo, buildPayload(t, descriptor, 1, testMetric{alias: u64(3), doubleValue: f64(239.5)}), at(2))
 
-	data := store.Replay().Data
+	data := rebuilt(store.Replay().Data)
 	if len(data) != 1 {
 		t.Fatalf("expected one rebuilt message, got %d", len(data))
 	}
@@ -764,8 +815,8 @@ func TestReplayKeepsDeviceExistenceButNotItsOldSessionAfterNBirth(t *testing.T) 
 	// The old DBIRTH stays so the device still appears (awaiting its birth),
 	// as it does in the live tree; the frontend ignores its metrics because
 	// it predates the NBIRTH. Its old values are gone.
-	if !refIDs(replay.Refs)[oldDBirth.ID] {
-		t.Errorf("expected the old DBIRTH kept for the device's existence, got %v", refIDs(replay.Refs))
+	if !dataIDs(replay.Data)[oldDBirth.ID] {
+		t.Errorf("expected the old DBIRTH kept for the device's existence, got %v", dataIDs(replay.Data))
 	}
 	if values := dataValues(t, replay.Data); len(values) != 0 {
 		t.Errorf("expected the previous device session's values dropped, got %v", values)
@@ -786,6 +837,9 @@ func TestReplayIncludesDeathsGapsHostsAndRecentBirths(t *testing.T) {
 
 	replay := store.Replay()
 	ids := refIDs(replay.Refs)
+	for id := range dataIDs(replay.Data) {
+		ids[id] = true
+	}
 	for _, want := range []MessageRef{gap, death, host, births[len(births)-1]} {
 		if !ids[want.ID] {
 			t.Errorf("expected %s in replay, got %v", want.ID, ids)
@@ -911,9 +965,10 @@ func TestClearHistoryKeepsTheNodesAliases(t *testing.T) {
 	store.HandleMessage(TopicInfo{Type: MessageTypeState, HostID: "h"}, nil, at(3))
 	store.ClearHistory()
 
+	// The birth is session state and stays for the replay; the traffic goes.
 	replay := store.Replay()
-	if len(replay.Refs) != 0 || len(replay.Data) != 0 {
-		t.Errorf("expected nothing to replay after a history clear, got %d refs, %d data", len(replay.Refs), len(replay.Data))
+	if len(replay.Refs) != 0 || len(replay.Data) != 1 || replay.Data[0].Meta["msgType"] != "NBIRTH" {
+		t.Errorf("expected only the birth to replay after a history clear, got %d refs, %d data", len(replay.Refs), len(replay.Data))
 	}
 	if store.valuesTotal != 0 || store.valueBytes != 0 {
 		t.Errorf("expected the value index emptied, got %d, %d", store.valuesTotal, store.valueBytes)
@@ -962,5 +1017,142 @@ func TestResetClearsTheReplay(t *testing.T) {
 	store.Reset()
 	if replay := store.Replay(); len(replay.Refs) != 0 || len(replay.Data) != 0 {
 		t.Errorf("expected nothing after reset, got %+v", replay)
+	}
+}
+
+func retained(ref MessageRef) MessageRef {
+	ref.Retained = true
+	return ref
+}
+
+// A retained will from an older session, re-delivered on resubscribe after a
+// drop, must not end the session the node is still publishing in.
+func TestRetainedStaleDeathAfterReconnectIsIgnored(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0,
+		testMetric{name: "bdSeq", longValue: u64(5)},
+		testMetric{name: "Volts", alias: u64(3)}), at(1))
+	store.Suspend()
+	store.ResyncSeq()
+	death := store.HandleMessage(ndeathInfo, buildPayload(t, descriptor, -1, testMetric{name: "bdSeq", longValue: u64(4)}), retained(at(3)))
+	if death["staleDeath"] != true {
+		t.Errorf("expected the retained bdSeq 4 will marked stale, got %v", death)
+	}
+	meta := store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 2, testMetric{alias: u64(3), doubleValue: f64(2)}), at(4))
+	if meta["resolution"] != ResolutionResolved || meta["carriedOver"] != true {
+		t.Errorf("expected carried-over names to keep resolving, got %v", meta)
+	}
+	// A live (not retained) death after the drop can belong to a session
+	// this client missed, so it is accepted whatever its bdSeq.
+	live := store.HandleMessage(ndeathInfo, buildPayload(t, descriptor, -1, testMetric{name: "bdSeq", longValue: u64(9)}), at(5))
+	if _, stale := live["staleDeath"]; stale {
+		t.Errorf("expected a live death accepted after a drop, got %v", live)
+	}
+}
+
+// A retained birth (non-compliant, but some stacks retain them for late
+// joiners) names metrics, but is not a live birth: no seq baseline, no storm
+// count, names unverified.
+func TestRetainedBirthNamesButDoesNotVerify(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	birth := store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "Volts", alias: u64(3)}), retained(at(100)))
+	if birth["retained"] != true {
+		t.Errorf("expected the birth flagged retained, got %v", birth)
+	}
+	meta := store.HandleMessage(ndataInfo, buildPayload(t, descriptor, 57, testMetric{alias: u64(3), doubleValue: f64(2)}), at(101))
+	if gap, ok := meta["seqGap"]; ok {
+		t.Errorf("expected no seq gap against a retained birth's seq, got %v", gap)
+	}
+	if meta["resolution"] != ResolutionResolved || meta["carriedOver"] != true {
+		t.Errorf("expected names resolved but unverified, got %v", meta)
+	}
+	if n := len(store.nodes[nodeKey{"G", "N"}].birthRefs); n != 0 {
+		t.Errorf("expected a retained birth kept out of the storm count, got %d", n)
+	}
+}
+
+// At the value-byte cap an update that doesn't fit drops the old value
+// rather than leaving it to replay as current.
+func TestValueIndexDropsWhatItCannotUpdate(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{name: "Status", doubleValue: f64(1)}), at(1))
+	store.valueBytes = maxValueBytesTotal // as if the rest of the connection filled it
+	long := strings.Repeat("x", 4096)
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{name: "Status/" + long, doubleValue: f64(2)}), at(2))
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{name: "Status", stringValue: &long}), at(3))
+	if _, ok := store.nodes[nodeKey{"G", "N"}].values["Status"]; ok {
+		t.Error("expected the stale Status value dropped at the cap")
+	}
+}
+
+// A value too big to index keeps its metric, without the value, and the
+// replay says how big it was.
+func TestOversizedValuesAreIndexedWithoutTheValue(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	big := strings.Repeat("x", maxIndexedValueBytes+1)
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{name: "Snapshot", stringValue: &big}), at(1))
+	data := rebuilt(store.Replay().Data)
+	if len(data) != 1 {
+		t.Fatalf("expected one rebuilt message, got %d", len(data))
+	}
+	omitted, _ := data[0].Meta["omitted"].(map[string]int)
+	if omitted["Snapshot"] <= maxIndexedValueBytes {
+		t.Errorf("expected Snapshot marked omitted with its size, got %v", data[0].Meta)
+	}
+	list, _ := metricsList(data[0].Payload)
+	metric := list.Get(0).Message()
+	if metricName(metric) != "Snapshot" || metric.Has(metric.Descriptor().Fields().ByName("string_value")) {
+		t.Errorf("expected the metric without its value, got %v", metric)
+	}
+	if store.valueBytes > 4096 {
+		t.Errorf("expected the omitted value to cost next to nothing, got %d bytes", store.valueBytes)
+	}
+}
+
+// Alias tables are capped across the connection, not only per scope.
+func TestAliasTablesAreCappedAcrossTheConnection(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	pad := strings.Repeat("n", 240)
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(1))
+	for d := 0; d < 256; d++ {
+		metrics := make([]testMetric, 1024)
+		for m := range metrics {
+			metrics[m] = testMetric{name: fmt.Sprintf("%s%08d%08d", pad, d, m), alias: u64(uint64(m))}
+		}
+		info := TopicInfo{Group: "G", Type: MessageTypeDBirth, EdgeNode: "N", Device: fmt.Sprintf("D%d", d)}
+		store.HandleMessage(info, buildPayload(t, descriptor, int64(d%256), metrics...), at(int64(2+d)))
+	}
+	if store.aliasBytes > maxAliasBytesTotal || store.aliasesTotal > maxAliasesTotal {
+		t.Errorf("expected aliases capped at %d bytes, got %d (%d entries)", maxAliasBytesTotal, store.aliasBytes, store.aliasesTotal)
+	}
+	if store.storedBytes > maxStoredBytesTotal {
+		t.Errorf("expected kept births capped at %d bytes, got %d", maxStoredBytesTotal, store.storedBytes)
+	}
+	// Births past the budget are left to history rather than dropped.
+	replay := store.Replay()
+	if len(replay.Refs) == 0 || len(replay.Data) == 0 {
+		t.Errorf("expected some births kept and the rest fetched, got %d refs, %d data", len(replay.Refs), len(replay.Data))
+	}
+	// A death releases its scope's aliases.
+	before := store.aliasesTotal
+	store.HandleMessage(ndeathInfo, nil, at(1000))
+	if store.aliasesTotal != 0 || before == 0 {
+		t.Errorf("expected every alias released by the node's death, had %d, now %d", before, store.aliasesTotal)
+	}
+}
+
+func TestSuspendedOrdMarksTheLastDrop(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0), at(1))
+	last := handled(store, ndataInfo, buildPayload(t, descriptor, 1), at(2))
+	store.Suspend()
+	if store.SuspendedOrd() != last.Ord {
+		t.Errorf("expected the drop at ord %d, got %d", last.Ord, store.SuspendedOrd())
 	}
 }
