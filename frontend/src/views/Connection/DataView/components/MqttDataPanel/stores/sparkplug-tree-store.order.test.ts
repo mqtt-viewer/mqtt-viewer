@@ -19,6 +19,7 @@ vi.mock("@wailsio/runtime", () => ({
 
 vi.mock("bindings/mqtt-viewer/backend/app/app", () => ({
   GetSparkplugMessageHistory: mocks.getSparkplugHistory,
+  GetSparkplugSuspendedOrd: async () => 0,
 }));
 
 import { createSparkplugTreeStore, type SparkplugTreeState } from "./sparkplug-tree-store";

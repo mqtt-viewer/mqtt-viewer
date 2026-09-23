@@ -21,6 +21,7 @@ vi.mock("@wailsio/runtime", () => ({
 
 vi.mock("bindings/mqtt-viewer/backend/app/app", () => ({
   GetSparkplugMessageHistory: mocks.getSparkplugHistory,
+  GetSparkplugSuspendedOrd: async () => 0,
 }));
 
 import {
@@ -767,7 +768,7 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("resets everything on the clear-history event", async () => {
+  it("clears the traffic on the clear-history event and keeps the view", async () => {
     const store = await makeStore();
     emit("msgs", [
       nbirth(BASE_MS),
@@ -776,8 +777,11 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     expect(get(store).hasSparkplug).toBe(true);
 
     emit("clear");
+    await vi.waitFor(() => expect(get(store).replaying).toBe(false));
     const state = get(store);
-    expect(state.hasSparkplug).toBe(false);
+    // The view stays offered, and rebuilds from what the backend kept (here,
+    // nothing).
+    expect(state.hasSparkplug).toBe(true);
     expect(state.groups).toHaveLength(0);
     expect(state.hosts).toHaveLength(0);
     expect(state.warnings).toHaveLength(0);
@@ -786,12 +790,12 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
   });
 
   it("discards a backfill whose clear-history landed mid-fetch", async () => {
-    let resolveHist!: (v: any) => void;
+    const resolvers: ((v: any) => void)[] = [];
     let signalCalled!: () => void;
     const called = new Promise<void>((r) => (signalCalled = r));
     mocks.getSparkplugHistory.mockImplementation(() => {
       signalCalled();
-      return new Promise((res) => (resolveHist = res));
+      return new Promise((res) => resolvers.push(res));
     });
 
     const store = createSparkplugTreeStore(CONN, eventSet);
@@ -799,9 +803,14 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     const backfillPromise = store.activate();
     await called; // fetch in flight; epoch captured
 
+    // The clear starts a fresh replay for the open view; the old one lands
+    // after it and must be discarded.
     emit("clear");
-    resolveHist([nbirth(BASE_MS)]);
+    expect(resolvers).toHaveLength(2);
+    resolvers[1]({ messages: [], suspendedOrd: 0 });
+    resolvers[0]({ messages: [nbirth(BASE_MS)], suspendedOrd: 0 });
     await backfillPromise;
+    await vi.waitFor(() => expect(get(store).replaying).toBe(false));
 
     const state = get(store);
     expect(state.hasSparkplug).toBe(false);
@@ -1269,7 +1278,7 @@ describe("createSparkplugTreeStore — node rebirth and devices", () => {
 });
 
 describe("createSparkplugTreeStore — bounds", () => {
-  it("does not create a group for a node rejected by the node cap", async () => {
+  it("evicts the least recently heard node at the node cap", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const store = await makeStore();
     const births = [];
@@ -1278,7 +1287,13 @@ describe("createSparkplugTreeStore — bounds", () => {
     const extra = [];
     for (let i = 0; i < 50; i++) extra.push(nbirth(BASE_MS, { group: `other-${i}`, node: "x" }));
     emit("msgs", extra);
-    expect(get(store).groups.map((g) => g.name)).toEqual(["G"]);
+    const groups = get(store).groups;
+    const total = groups.reduce((n, g) => n + g.nodes.length, 0);
+    expect(total).toBe(MAX_TRACKED_NODES);
+    expect(groups.map((g) => g.name)).toContain("other-49");
+    const kept = groups.find((g) => g.name === "G")!.nodes.map((n) => n.name);
+    expect(kept).not.toContain("n0");
+    expect(kept).toContain(`n${MAX_TRACKED_NODES - 1}`);
     warn.mockRestore();
     store.destroy();
   });
