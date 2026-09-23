@@ -164,6 +164,41 @@
         ? "Request a rebirth to resolve names"
         : "Request a rebirth";
 
+  // The virtual list reuses a row's DOM for whatever row scrolls or shifts
+  // into its slot. If one of this row's buttons has focus when that happens,
+  // it would silently act on a different node, so focus goes back to the
+  // tree, whose cursor still follows the row it was on.
+  let rowElement: HTMLDivElement;
+  let shownRowId = row.id;
+  $: if (row.id !== shownRowId) {
+    shownRowId = row.id;
+    const focused = document.activeElement;
+    if (rowElement && focused instanceof HTMLElement && focused !== rowElement && rowElement.contains(focused)) {
+      (rowElement.closest('[role="tree"]') as HTMLElement | null)?.focus();
+    }
+  }
+
+  // The row's accessible name, without its action buttons' labels.
+  $: accessibleName = (() => {
+    if (row.kind === "group" && row.group) {
+      return `${row.group.name}, ${row.group.nodes.length} node${row.group.nodes.length === 1 ? "" : "s"}`;
+    }
+    const scope = row.kind === "node" ? node : row.kind === "device" ? device : undefined;
+    if (scope) {
+      const parts = [scope.name, scope.status, ...badges.map((b) => b.label)];
+      const count = row.kind === "node" && node ? node.metricCount : scope.metrics.length;
+      parts.push(`${count} metric${count === 1 ? "" : "s"}`);
+      return parts.join(", ");
+    }
+    if (metric) {
+      const parts = [label, `${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`];
+      if (metric.quality) parts.push(metric.quality);
+      if (metric.typeName) parts.push(metric.typeName);
+      return parts.join(", ");
+    }
+    return "";
+  })();
+
   const actionButtonClass =
     "inline-flex items-center rounded p-[1px] hover:text-white-text hover:bg-hovered disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text";
 </script>
@@ -187,7 +222,9 @@
   <!-- svelte-ignore a11y_interactive_supports_focus -->
   <div
     id={domId}
+    bind:this={rowElement}
     role="treeitem"
+    aria-label={accessibleName}
     aria-level={row.levelCount + 1}
     aria-expanded={expandable ? row.isExpanded : undefined}
     aria-selected={isSelected}
@@ -246,7 +283,9 @@
           {#if node.bdSeq !== undefined && !compact}
             <span class="text-sm shrink-0" title="Birth/death sequence number">bdSeq {node.bdSeq}</span>
           {/if}
-          <span class="text-sm shrink-0"
+          <span
+            class="text-sm shrink-0"
+            title={`${node.metricCount} metric${node.metricCount === 1 ? "" : "s"}, ${node.devices.length} device${node.devices.length === 1 ? "" : "s"}`}
             >{node.metricCount}{compact ? "" : node.metricCount === 1 ? " metric" : " metrics"}{#if node.devices.length > 0 && !compact},
               {node.devices.length} device{node.devices.length === 1 ? "" : "s"}{/if}</span
           >
@@ -289,7 +328,9 @@
             </button>
           </div>
         {:else if device}
-          <span class="text-sm shrink-0"
+          <span
+            class="text-sm shrink-0"
+            title={`${device.metrics.length} metric${device.metrics.length === 1 ? "" : "s"}`}
             >{device.metrics.length}{compact ? "" : device.metrics.length === 1 ? " metric" : " metrics"}</span
           >
         {/if}
@@ -312,9 +353,9 @@
       <span
         class={twMerge(
           "grow min-w-0 truncate",
-          metric.isNull ? "italic text-secondary-text" : "text-white-text"
+          metric.isNull || metric.omitted ? "italic text-secondary-text" : "text-white-text"
         )}
-        title={metric.valueRaw}
+        title={metric.omitted ? metric.value : metric.valueRaw}
         >{metric.value}{#if metric.unit}<span class="ml-1 text-secondary-text">{metric.unit}</span>{/if}</span
       >
       {#if metric.quality}
@@ -339,6 +380,7 @@
       <span class="w-9 shrink-0 text-sm text-right" title={ageTitle}
         >{formatAge(metric.lastSeenMs, nowMs)}</span
       >
+      {#if !metric.omitted}
       <button
         type="button"
         tabindex={actionTabIndex}
@@ -354,6 +396,7 @@
       >
         <Icon type="copy" size={12} />
       </button>
+      {/if}
     {/if}
   </div>
 </div>

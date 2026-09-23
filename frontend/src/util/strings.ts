@@ -31,7 +31,8 @@ const unwrapRuntimeError = (s: string): string => {
  */
 export const errorMessage = (e: unknown): string => {
   if (typeof e === "string") return unwrapRuntimeError(e);
-  if (e instanceof Error) return e.message;
+  // Bindings reject with an Error whose message is the envelope's JSON.
+  if (e instanceof Error) return unwrapRuntimeError(e.message);
   if (e === null || e === undefined) return "Unknown error";
   try {
     const json = JSON.stringify(e);

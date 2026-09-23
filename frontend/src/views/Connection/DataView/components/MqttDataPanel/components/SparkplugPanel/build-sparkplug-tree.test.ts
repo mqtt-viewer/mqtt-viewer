@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   allExpansionKeys,
   buildSparkplugTree,
+  formatClockTime,
   isSparkplugProtobufTopic,
   metricListJson,
   needsRebirth,
@@ -228,6 +229,14 @@ describe("search", () => {
     tricky[0].nodes[0].metrics.push(metric("plc-12/Speed"));
     const trickyRows = buildSparkplugTree({ ...base, groups: tricky });
     expect(new Set(trickyRows.map((r) => r.id)).size).toBe(trickyRows.length);
+  });
+});
+
+describe("formatClockTime", () => {
+  it("adds the date when it isn't today", () => {
+    const now = new Date(2026, 8, 23, 12, 0, 0).getTime();
+    expect(formatClockTime(new Date(2026, 8, 23, 9, 5, 7).getTime(), now)).toBe("09:05:07");
+    expect(formatClockTime(new Date(2026, 8, 20, 22, 2, 58).getTime(), now)).toBe("2026-09-20 22:02:58");
   });
 });
 

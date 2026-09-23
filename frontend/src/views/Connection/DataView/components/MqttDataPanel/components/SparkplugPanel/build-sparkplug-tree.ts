@@ -275,11 +275,21 @@ export const formatAge = (ms: number, nowMs: number): string => {
   return `${Math.floor(h / 24)}d`;
 };
 
-/** Wall-clock HH:MM:SS for warning rows and the host "since" column. */
-export const formatClockTime = (ms: number): string => {
+/**
+ * Wall-clock HH:MM:SS for warning rows and the host "since" column, with the
+ * date in front when it isn't today: a session can run for days, and a
+ * retained STATE can be older still.
+ */
+export const formatClockTime = (ms: number, nowMs: number = Date.now()): string => {
   const d = new Date(ms);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const now = new Date(nowMs);
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  return sameDay ? time : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
 };
 
 /** JSON of {name, type, value, unit} rows for "Copy metric list". */

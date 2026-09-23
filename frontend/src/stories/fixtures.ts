@@ -1490,6 +1490,7 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
     width: 680,
     filter: "",
     decodingState: "on",
+    connectionState: "connected",
     enablingDecoding: false,
     onEnableDecoding: noop,
     onRequestRebirth: noop,

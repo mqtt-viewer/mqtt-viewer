@@ -257,6 +257,7 @@
       targets={$rebirthRequest.targets}
       busy={$rebirthRequest.busy}
       sent={$rebirthRequest.sent}
+      connected={connection?.connectionState === "connected"}
       onConfirm={rebirth.confirm}
     />
   </main>

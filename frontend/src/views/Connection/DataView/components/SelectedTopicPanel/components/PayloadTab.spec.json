@@ -68,6 +68,14 @@
       "required": false,
       "default": null,
       "description": "([{group, node}]) asks for a rebirth from the banner when names are unresolved or unverified. The caller confirms first."
+    },
+    {
+      "name": "sparkplugUndecoded",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "options": ["off", "failed"],
+      "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, failed says the payload isn't Sparkplug B."
     }
   ],
   "tokens": [

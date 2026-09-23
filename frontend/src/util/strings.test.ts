@@ -33,6 +33,12 @@ test("errorMessage stringifies other primitives", () => {
   expect(errorMessage(false)).toBe("false");
 });
 
+test("errorMessage unwraps the envelope inside an Error too", () => {
+  expect(
+    errorMessage(new Error('{"message":"connect: refused","cause":{},"kind":"RuntimeError"}'))
+  ).toBe("connect: refused");
+});
+
 test("errorMessage unwraps the Wails runtime error envelope", () => {
   expect(
     errorMessage('{"message":"specified connection not connected","cause":{},"kind":"RuntimeError"}')

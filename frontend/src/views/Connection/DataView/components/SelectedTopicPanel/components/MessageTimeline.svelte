@@ -33,6 +33,7 @@
     type PayloadPreview,
   } from "./hover-preview";
   import { sampleEvenly } from "./timeline-sampling";
+  import { addToast } from "@/components/Toast/Toast.svelte";
   import {
     computeInitialWindow,
     computeTimelineBounds,
@@ -749,8 +750,20 @@
   // if missing. A message no longer in history leaves the selection alone.
   const applyFocus = (id: string) => {
     const message = $selectedTopicStore.history.find((m) => m.id.toString() === id);
-    selectedTopicStore.consumeFocus();
-    if (!message) return;
+    selectedTopicStore.consumeFocus(message !== undefined);
+    if (!message) {
+      // Report by exception keeps a quiet metric's value in an old message;
+      // on a busy topic it can be past the loaded history.
+      addToast({
+        data: {
+          title: "Showing the latest message instead",
+          description:
+            "The message that set this value is older than the history loaded for this topic.",
+          type: "info",
+        },
+      });
+      return;
+    }
     if (!timelineDataSet.get(message.id)) {
       timelineDataSet.update(getTimelineData([message]));
     }

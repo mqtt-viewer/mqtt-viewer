@@ -215,15 +215,31 @@
           isProtoEnabled: true,
         });
       }
-      // The decode middleware is installed on connect.
-      if (connection.connectionState !== "disconnected") {
-        await connectionsStore.disconnect(id);
-      }
-      await connectionsStore.connect(id);
     } catch (e) {
       addToast({
         data: {
           title: "Failed to turn on Sparkplug decoding",
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
+      enablingDecoding = false;
+      return;
+    }
+    // The decode middleware is installed on a connect. While the client is
+    // retrying on its own, leave it be: interrupting would stop the retries.
+    const state = connection.connectionState;
+    if (state === "connecting" || state === "reconnecting") {
+      enablingDecoding = false;
+      return;
+    }
+    try {
+      if (state === "connected") await connectionsStore.disconnect(id);
+      await connectionsStore.connect(id);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Sparkplug decoding is on, but connecting failed",
           description: errorMessage(e),
           type: "error",
         },
@@ -369,6 +385,7 @@
         width={treeWidth || width}
         filter={$searchStore.text}
         {decodingState}
+        connectionState={connection.connectionState}
         {enablingDecoding}
         {onEnableDecoding}
         onClearWarnings={sparkplugStore.clearWarnings}

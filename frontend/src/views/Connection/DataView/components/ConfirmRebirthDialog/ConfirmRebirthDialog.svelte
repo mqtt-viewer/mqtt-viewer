@@ -54,10 +54,19 @@
     }
     wasOpen = $isOpen;
   }
+  // When the opener is gone (a banner that resolved) or disabled (a row
+  // button after a drop), the Sparkplug tree is the next best place.
   const closeFocus = () => {
     const el = opener;
-    return el?.isConnected ? el : null;
+    if (el?.isConnected && !(el as HTMLButtonElement).disabled) return el;
+    return document.querySelector<HTMLElement>('[role="tree"][aria-label="Sparkplug nodes"]');
   };
+
+  $: dialogLabel = isBulk
+    ? `Request rebirths from ${targets.length} edge nodes`
+    : single
+      ? `Request a rebirth from ${single.node}`
+      : "Request a rebirth";
 
   const confirm = () => {
     if (busy || !connected) return;
@@ -86,7 +95,7 @@
   };
 </script>
 
-<Dialog isOpen={guardedIsOpen} startEmpty {closeFocus}>
+<Dialog isOpen={guardedIsOpen} startEmpty ariaLabel={dialogLabel} {closeFocus}>
   <div class="relative w-[440px] max-w-[85vw] p-6">
     <h2 class="m-0 pr-6 text-lg font-medium">
       {#if isBulk}
@@ -101,6 +110,7 @@
       onClick={requestClose}
     >
       <Icon type="close" size={16} />
+      <span class="sr-only">Close</span>
     </IconButton>
     <div class="mt-4 flex flex-col gap-3 text-secondary-text">
       {#if isBulk}

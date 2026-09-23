@@ -155,3 +155,27 @@
   }}
   {template}
 />
+
+<Story
+  name="Sparkplug not decoded"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: "\u0008\u0001\u0012\u0005Volts",
+    payloadB64: null,
+    sparkplugUndecoded: "off",
+  }}
+  {template}
+/>
+
+<Story
+  name="Sparkplug decode failed"
+  args={{
+    ...storyArgs,
+    isComparing: false,
+    payload: '{"temp": 21.5}',
+    payloadB64: null,
+    sparkplugUndecoded: "failed",
+  }}
+  {template}
+/>

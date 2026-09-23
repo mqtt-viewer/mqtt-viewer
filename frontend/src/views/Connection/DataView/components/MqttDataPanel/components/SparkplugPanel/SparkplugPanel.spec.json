@@ -44,6 +44,20 @@
       "description": "off or needs-reconnect replaces the tree with an explanation and a button."
     },
     {
+      "name": "connectionState",
+      "type": "string",
+      "required": false,
+      "default": "connected",
+      "options": [
+        "connected",
+        "disconnected",
+        "connecting",
+        "reconnecting",
+        "error"
+      ],
+      "description": "Decides what turning decoding on does: reconnect, connect, or (while the client retries) save it for the next connect without interrupting the retries."
+    },
+    {
       "name": "enablingDecoding",
       "type": "boolean",
       "required": false,

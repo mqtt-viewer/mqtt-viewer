@@ -20,6 +20,7 @@
     "width",
     "filter",
     "decodingState",
+    "connectionState",
     "enablingDecoding",
     "onEnableDecoding",
     "onRequestRebirth",
@@ -114,6 +115,17 @@
     ...storyArgs,
     treeState: { ...mockSparkplugTreeStateEmpty, connected: false },
     decodingState: "off",
+    connectionState: "disconnected",
+  }}
+  {template}
+/>
+<Story
+  name="DecodingOffRetrying"
+  args={{
+    ...storyArgs,
+    treeState: { ...mockSparkplugTreeStateEmpty, connected: false },
+    decodingState: "off",
+    connectionState: "reconnecting",
   }}
   {template}
 />

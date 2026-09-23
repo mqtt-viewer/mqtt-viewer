@@ -117,7 +117,7 @@ func (a *App) PublishSparkplugRebirth(connectionId uint, group string, edgeNode 
 		return fmt.Errorf("group and edge node are required for a rebirth request")
 	}
 	if _, err := getConnectedConnection(a, connectionId); err != nil {
-		return err
+		return fmt.Errorf("the connection is down, so the request can't be sent")
 	}
 	connection := models.Connection{}
 	if err := a.Db.First(&connection, connectionId).Error; err != nil {

@@ -4,7 +4,7 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import Button from "@/components/Button/Button.svelte";
   import { twMerge } from "tailwind-merge";
-  import { tick } from "svelte";
+  import { onDestroy, tick } from "svelte";
   import type {
     SparkplugMetric,
     SparkplugNode,
@@ -38,6 +38,9 @@
    * showing a tree.
    */
   export let decodingState: "on" | "off" | "needs-reconnect" = "on";
+  /** The connection's state, which decides what turning decoding on does. */
+  export let connectionState: "connected" | "disconnected" | "connecting" | "reconnecting" | "error" =
+    "connected";
   /** True while decoding is being turned on (saving, then connecting). */
   export let enablingDecoding = false;
   export let onEnableDecoding: () => void = () => {};
@@ -80,6 +83,8 @@
   $: defaultExpanded = defaultOverride ?? heldDefault;
   const markInteracted = () => (userInteracted = true);
   $: filtering = normaliseFilter(filter) !== "";
+  // Searching counts as touching the tree too.
+  $: if (filtering) markInteracted();
 
   const toggleExpansion = (key: string) => {
     const isGroup = !key.includes("/");
@@ -143,15 +148,22 @@
   };
   $: rows, clampScroll();
 
-  // A new search or filter starts at the top of its results.
-  const scrollToTop = () => {
+  // A new search or filter starts at the top of its results, unless a
+  // warning click cleared the search to reveal a node: then it goes there.
+  const onFilterChange = () => {
+    if (pendingReveal !== null) {
+      const key = pendingReveal;
+      pendingReveal = null;
+      void tick().then(() => revealKey(key));
+      return;
+    }
     const vp = viewport();
     if (vp && vp.scrollTop !== 0) {
       vp.scrollTop = 0;
       vp.dispatchEvent(new Event("scroll"));
     }
   };
-  $: filter, problemsOnly, scrollToTop();
+  $: filter, problemsOnly, onFilterChange();
 
   const scrollRowIntoView = (index: number) => {
     const vp = viewport();
@@ -205,7 +217,9 @@
 
   const act = (row: SparkplugTreeRow) => {
     if (row.kind !== "metric") {
-      toggleExpansion(row.key);
+      // Everything shows open while searching; a toggle then would only
+      // change what shows after the search is cleared.
+      if (!filtering) toggleExpansion(row.key);
     } else if (row.metric) {
       selectedRowId = row.id;
       onSelectMetric(row.metric);
@@ -290,23 +304,11 @@
   // --- Reveal from a warning ------------------------------------------------
   let highlightedKey: string | null = null;
   let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+  // A node to reveal once a cleared search has reached this panel.
+  let pendingReveal: string | null = null;
 
-  /** Opens the path to a node, scrolls it into view and flashes it. */
-  const revealNode = async (warning: SparkplugWarning) => {
-    const key = nodeKeyOf(warning.group, warning.node);
-    expansion.set(warning.group, true);
-    expansion.set(key, true);
-    expansion = expansion;
-    problemsOnly = false;
-    await tick();
-    let index = rows.findIndex((r) => r.kind === "node" && r.key === key);
-    if (index === -1 && filtering) {
-      // The search hides it. Drop the search rather than do nothing.
-      onClearFilter();
-      filter = "";
-      await tick();
-      index = rows.findIndex((r) => r.kind === "node" && r.key === key);
-    }
+  const revealKey = (key: string) => {
+    const index = rows.findIndex((r) => r.kind === "node" && r.key === key);
     if (index === -1) return;
     const vp = viewport();
     if (vp) {
@@ -320,6 +322,40 @@
     highlightTimer = setTimeout(() => (highlightedKey = null), 1500);
   };
 
+  /** Opens the path to a node, scrolls it into view and flashes it. */
+  const revealNode = async (warning: SparkplugWarning) => {
+    markInteracted();
+    const key = nodeKeyOf(warning.group, warning.node);
+    expansion.set(warning.group, true);
+    expansion.set(key, true);
+    expansion = expansion;
+    problemsOnly = false;
+    await tick();
+    if (filtering && !rows.some((r) => r.kind === "node" && r.key === key)) {
+      // The search hides it. Drop the search; the reveal finishes when the
+      // cleared search arrives (see onFilterChange).
+      pendingReveal = key;
+      onClearFilter();
+      return;
+    }
+    revealKey(key);
+  };
+
+  // Keeps the keyboard cursor in view when the tree gets shorter (the
+  // warnings strip grows, the window shrinks): off screen it isn't rendered,
+  // and a screen reader's active descendant would point at nothing.
+  let resizeObserver: ResizeObserver | null = null;
+  $: if (treeElement && resizeObserver === null && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(() => {
+      if (treeHasFocus && activeIndex >= 0) scrollRowIntoView(activeIndex);
+    });
+    resizeObserver.observe(treeElement);
+  }
+  onDestroy(() => {
+    resizeObserver?.disconnect();
+    if (highlightTimer !== null) clearTimeout(highlightTimer);
+  });
+
   const requestRebirthForCandidates = () =>
     onRequestRebirth(rebirthCandidates.map((n) => ({ group: n.group, node: n.name })));
 
@@ -331,40 +367,51 @@
 
 <div class="h-full w-full min-w-0 flex flex-col overflow-hidden text-sm">
   {#if decodingState !== "on"}
+    {@const retrying = connectionState === "connecting" || connectionState === "reconnecting"}
     <div class="grow flex flex-col items-center justify-center gap-3 px-6 text-center text-secondary-text">
-      {#if decodingState === "off"}
+      {#if enablingDecoding}
+        <div class="text-base text-emphasis">Turning on Sparkplug decoding</div>
+      {:else if decodingState === "off"}
         <div class="text-base text-emphasis">Sparkplug decoding is off</div>
         <p class="max-w-[360px]">
           This connection has Sparkplug B topics, but their payloads are shown
           as raw protobuf. Turn on decoding to see the node tree with metric
           names and values.
-          {treeState.connected ? "I'll reconnect to start decoding." : "I'll connect to start decoding."}
+          {#if retrying}
+            It starts from the next connect, once the connection is back.
+          {:else if connectionState === "connected"}
+            I'll reconnect to start decoding.
+          {:else}
+            I'll connect to start decoding.
+          {/if}
         </p>
-        <Button disabled={enablingDecoding} on:click={onEnableDecoding}
-          >{enablingDecoding
-            ? "Connecting…"
-            : treeState.connected
+        <Button on:click={onEnableDecoding}
+          >{retrying
+            ? "Turn on"
+            : connectionState === "connected"
               ? "Turn on and reconnect"
               : "Turn on and connect"}</Button
         >
-      {:else if treeState.connected}
+      {:else if retrying}
+        <div class="text-base text-emphasis">Decoding starts on the next connect</div>
+        <p class="max-w-[360px]">
+          The connection is retrying now. Once it's back, reconnect to start
+          decoding.
+        </p>
+      {:else if connectionState === "connected"}
         <div class="text-base text-emphasis">Reconnect to start decoding</div>
         <p class="max-w-[360px]">
           Sparkplug decoding was turned on after this connection started, so
           it applies from the next connect.
         </p>
-        <Button disabled={enablingDecoding} on:click={onEnableDecoding}
-          >{enablingDecoding ? "Connecting…" : "Reconnect"}</Button
-        >
+        <Button on:click={onEnableDecoding}>Reconnect</Button>
       {:else}
         <div class="text-base text-emphasis">Connect to start decoding</div>
         <p class="max-w-[360px]">
           Sparkplug decoding is on. The node tree fills in once the connection
           is up and births or data arrive.
         </p>
-        <Button disabled={enablingDecoding} on:click={onEnableDecoding}
-          >{enablingDecoding ? "Connecting…" : "Connect"}</Button
-        >
+        <Button on:click={onEnableDecoding}>Connect</Button>
       {/if}
     </div>
   {:else}
@@ -404,7 +451,7 @@
       </div>
     {/if}
 
-    {#if !isEmpty}
+    {#if allNodes.length > 0}
       <div class="shrink-0 border-b border-divider text-secondary-text">
         <div class="flex items-center gap-3 px-2 py-0.5 whitespace-nowrap overflow-hidden max-w-[1000px]">
           <span class="truncate min-w-0">
@@ -419,7 +466,10 @@
             )}
             aria-pressed={problemsOnly}
             title="Show only nodes that are offline, have a seq gap or rebirth storm, show aliases instead of names, or have a device offline or awaiting its birth"
-            on:click={() => (problemsOnly = !problemsOnly)}
+            on:click={() => {
+              markInteracted();
+              problemsOnly = !problemsOnly;
+            }}
             >Problems{#if problemCount > 0}<span class="ml-1 text-warning">{problemCount}</span>{/if}</button
           >
           <button
@@ -537,7 +587,7 @@
             <button
               type="button"
               class="w-full flex items-center gap-1.5 text-warning font-mono whitespace-nowrap overflow-hidden text-left rounded hover:bg-hovered"
-              title="Show this node in the tree"
+              title={`${formatClockTime(warning.timeMs)} ${warning.group}/${warning.node}: ${warning.text}. Click to show the node.`}
               on:click={() => revealNode(warning)}
             >
               <span class="shrink-0"><Icon type="warning" size={14} /></span>

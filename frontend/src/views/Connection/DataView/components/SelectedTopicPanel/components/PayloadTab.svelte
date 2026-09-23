@@ -46,10 +46,11 @@
     | ((targets: { group: string; node: string }[]) => void)
     | null = null;
   /**
-   * The message is on a Sparkplug B topic but reached the viewer as raw
-   * protobuf, because decoding is off for this connection.
+   * The message is on a Sparkplug B topic but carries no Sparkplug decode:
+   * "off" when decoding is off for the connection, "failed" when it is on
+   * and the payload didn't decode as Sparkplug B.
    */
-  export let sparkplugUndecoded = false;
+  export let sparkplugUndecoded: "off" | "failed" | null = null;
 
   export let isComparing: boolean;
   export let payload: string;
@@ -259,10 +260,17 @@
       class="text-sm border-b border-divider py-1 px-2 flex items-start gap-2 text-secondary-text"
     >
       <SparkplugLogo class="size-4 shrink-0 mt-px" />
-      <span class="min-w-0"
-        >Sparkplug B, shown as raw protobuf. The Sparkplug view can turn on
-        decoding.</span
-      >
+      {#if sparkplugUndecoded === "off"}
+        <span class="min-w-0"
+          >Sparkplug B, shown as raw protobuf. The Sparkplug view can turn on
+          decoding.</span
+        >
+      {:else}
+        <span class="min-w-0 text-warning"
+          >Sparkplug B topic, but this payload didn't decode as Sparkplug B.
+          The publisher may be sending something else here.</span
+        >
+      {/if}
     </div>
   {/if}
 

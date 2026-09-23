@@ -1395,9 +1395,19 @@ export const createSelectedTopicStore = (
     }));
   };
 
-  const consumeFocus = () => {
+  /**
+   * Marks the focus request handled. When the message wasn't in the loaded
+   * history, the timeline goes back to following the newest.
+   */
+  const consumeFocus = (found = true) => {
     update((store) =>
-      store.focusMessageId === null ? store : { ...store, focusMessageId: null }
+      store.focusMessageId === null
+        ? store
+        : {
+            ...store,
+            focusMessageId: null,
+            options: found ? store.options : { ...store.options, autoSelect: true },
+          }
     );
   };
 

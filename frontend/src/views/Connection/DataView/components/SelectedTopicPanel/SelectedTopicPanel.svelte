@@ -22,6 +22,7 @@
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
   import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
   import { isSparkplugProtobufTopic } from "../MqttDataPanel/components/SparkplugPanel/build-sparkplug-tree";
+  import connectionsStore from "@/stores/connections";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { copyToClipboard } from "@/util/copy";
   import { decodePayload } from "@/components/CodeEditor/codec";
@@ -124,11 +125,18 @@
   // Sparkplug middleware meta drives PayloadTab's decode banner.
   $: selectedMessageSparkplugMeta =
     (selectedMessage?.middlewareProperties as any)?.sparkplug ?? null;
-  // A Sparkplug B payload the decoder never saw (decoding is off). STATE
-  // messages are JSON, so they read fine without it.
+  // A Sparkplug B topic whose payload arrived without Sparkplug meta: either
+  // decoding is off for the connection, or the payload isn't Sparkplug B at
+  // all. STATE messages are JSON, so they read fine without it.
+  $: isProtoEnabled =
+    $connectionsStore.connections[connectionId]?.connectionDetails.isProtoEnabled ?? false;
   $: selectedMessageSparkplugUndecoded =
     selectedMessageSparkplugMeta === null &&
-    isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "");
+    isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "")
+      ? isProtoEnabled
+        ? ("failed" as const)
+        : ("off" as const)
+      : null;
 
   // history[] only carries stubs until fetched. Ensure the selected
   // message's payload as soon as it's picked (timeline click or
