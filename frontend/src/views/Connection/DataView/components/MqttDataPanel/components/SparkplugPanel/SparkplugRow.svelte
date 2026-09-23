@@ -94,7 +94,9 @@
     aria-selected={isSelected}
     class={twMerge(
       "text-secondary-text font-thin font-mono text-base ring-inset px-1",
-      "flex grow items-center min-w-0 gap-2 h-full",
+      // Capped so a wide panel doesn't strand the type and age columns
+      // far from the name and value they describe.
+      "flex grow items-center min-w-0 max-w-[960px] gap-2 h-full",
       "rounded overflow-hidden outline-none",
       "hover:ring-1 hover:ring-secondary-text focus-visible:ring-1 focus-visible:ring-primary",
       isSelected && "ring-1 ring-primary",
@@ -263,7 +265,7 @@
           metric.isNull ? "italic text-secondary-text" : "text-white-text"
         )}
         title={metric.valueRaw}
-        >{metric.value}{#if metric.unit}<span class="text-secondary-text"> {metric.unit}</span>{/if}</span
+        >{metric.value}{#if metric.unit}<span class="ml-1 text-secondary-text">{metric.unit}</span>{/if}</span
       >
       {#if metric.quality}
         <span
