@@ -60,8 +60,11 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 	// Sparkplug B has no required fields, so skip the check for them.
 	msg, err := protobuf.UnmarshalWithoutRequiredCheck(params.Payload, descriptor)
 	if err != nil {
-		// Don't error - just use payload as normal
+		// Don't error - just use payload as normal. Flag it, so the payload
+		// view can say this isn't Sparkplug B rather than suggest turning
+		// on decoding that is already on.
 		slog.Debug(fmt.Sprintf("sparkplug decode middleware error: %s", err.Error()))
+		setMiddlewareProperty(params, "SparkplugDecodeFailed", true)
 		return nil
 	}
 	meta := store.HandleMessage(info, msg, messageRef(params))

@@ -197,11 +197,22 @@
   // that and turn it on.
   $: sparkplugTopicsSeen = $mqttDataStore["spBv1.0"] !== undefined;
   $: showSparkplug = $sparkplugStore.hasSparkplug || sparkplugTopicsSeen;
-  $: decodingState = $sparkplugStore.hasSparkplug
-    ? ("on" as const)
-    : connection.connectionDetails.isProtoEnabled
-      ? ("needs-reconnect" as const)
-      : ("off" as const);
+  // Whether the decoder was installed when this connection last connected:
+  // it only is on a connect, so a setting changed since then hasn't taken
+  // effect. Unknown (null) when the panel mounted on a live connection.
+  let decodingAtConnect: boolean | null = null;
+  let lastState = connection.connectionState;
+  $: if (connection.connectionState !== lastState) {
+    if (connection.connectionState === "connected") {
+      decodingAtConnect = !!connection.connectionDetails.isProtoEnabled;
+    }
+    lastState = connection.connectionState;
+  }
+  $: decodingState = !connection.connectionDetails.isProtoEnabled
+    ? ("off" as const)
+    : $sparkplugStore.hasSparkplug || decodingAtConnect === true
+      ? ("on" as const)
+      : ("needs-reconnect" as const);
 
   let enablingDecoding = false;
   const onEnableDecoding = async () => {

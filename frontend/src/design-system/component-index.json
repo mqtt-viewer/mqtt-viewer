@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-23T05:27:22.952Z",
+  "generatedAt": "2026-09-23T06:41:50.177Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -5211,9 +5211,10 @@
           "default": null,
           "options": [
             "off",
+            "earlier",
             "failed"
           ],
-          "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, failed says the payload isn't Sparkplug B."
+          "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, earlier says it arrived before decoding was on, failed says the payload isn't Sparkplug B."
         }
       ],
       "tokens": [

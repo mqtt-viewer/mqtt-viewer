@@ -72,6 +72,7 @@ import {
 export { datatypeName } from "./sparkplug-values";
 
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+const utf8Encoder = new TextEncoder();
 
 /**
  * Decodes a base64 payload to text. Perf-sensitive: this runs for every
@@ -128,15 +129,15 @@ export const WARNED_ID_CAP = 256;
 /** Fallback delay for the deferred backfill when no trigger fires first. */
 export const BACKFILL_IDLE_MS = 2000;
 /**
- * Largest value kept for display and copy, in characters (mirrors the
- * backend's 256 KB index limit). A bigger one shows its size and the
- * message it came from holds the value.
+ * Largest value kept for display and copy: bytes on the wire for strings and
+ * byte arrays (the backend's 256 KB index limit), characters once formatted.
+ * A bigger one shows its size, and the message it came from holds the value.
  */
 export const MAX_VALUE_CHARS = 256 * 1024;
 /** Characters of values kept across the connection (mirrors the backend). */
 export const MAX_VALUE_CHARS_TOTAL = 64 * 1024 * 1024;
 /** Deaths remembered per scope, to place restarts between them. */
-const DEATH_HISTORY_CAP = 16;
+const DEATH_HISTORY_CAP = 64;
 /** Replay folding yields to the renderer after about this much payload. */
 const REPLAY_CHUNK_CHARS = 1_000_000;
 
@@ -327,6 +328,11 @@ type DeviceRt = ScopeRt;
 
 interface NodeRt extends ScopeRt {
   group: string;
+  /**
+   * Order of the node's newest message of any kind (its devices' included),
+   * for evicting the least recently heard node, as the backend does.
+   */
+  lastOrd: number;
   bdSeq?: number;
   /** Order of the birth or death the bdSeq came from. */
   bdSeqOrd?: number;
@@ -364,11 +370,13 @@ interface SparkplugMeta {
    * take the current session offline.
    */
   staleDeath?: boolean;
-  /**
-   * Delivered from the broker's retained store on subscribe: old news, not
-   * a sign of life, and a birth from it names metrics without verifying.
-   */
+  /** The message's retain flag (with MQTT 5, live messages can carry it). */
   retained?: boolean;
+  /**
+   * A retained birth the broker delivered again, identical to the one the
+   * backend already holds: nothing changed, so it is ignored.
+   */
+  staleBirth?: boolean;
   /** Replayed values too big to index, by metric key, with their size. */
   omitted?: Record<string, number>;
 }
@@ -507,8 +515,9 @@ export const createSparkplugTreeStore = (
     let victimLast = 0;
     for (const nodes of groups.values()) {
       for (const n of nodes.values()) {
-        const last = Math.max(n.lastAliveOrd, n.deathOrd ?? 0);
-        const dead = n.deathOrd !== undefined && n.deathOrd >= n.lastAliveOrd;
+        const last = n.lastOrd;
+        // Its last word was its own death.
+        const dead = n.deathOrd !== undefined && n.deathOrd === n.lastOrd;
         if (victim === null || (dead && !victimDead) || (dead === victimDead && last < victimLast)) {
           victim = n;
           victimDead = dead;
@@ -557,6 +566,7 @@ export const createSparkplugTreeStore = (
       lastAliveOrd: 0,
       lastAliveMs: 0,
       deathOrds: [],
+      lastOrd: 0,
       birthRing: [],
       stormWarning: null,
       seqGapKeys: new Map(),
@@ -841,6 +851,19 @@ export const createSparkplugTreeStore = (
     }
   };
 
+  /** Bytes of a string or bytes value on the wire. */
+  const wireBytes = (pm: PayloadMetric): number => {
+    let n = 0;
+    const str = pm.stringValue;
+    if (str !== undefined) {
+      // UTF-8 is at most 3 bytes per UTF-16 unit; count exactly only when
+      // that bound could reach the limit.
+      n += str.length * 3 > MAX_VALUE_CHARS ? utf8Encoder.encode(str).length : str.length;
+    }
+    if (pm.bytesValue !== undefined) n += Math.floor((pm.bytesValue.length * 3) / 4);
+    return n;
+  };
+
   /** The payload metric with its value fields dropped. */
   const withoutValue = (pm: PayloadMetric): PayloadMetric => ({
     ...pm,
@@ -860,8 +883,9 @@ export const createSparkplugTreeStore = (
     let size = omittedSize;
     let formatted: { value: string; raw: string } | null = null;
     if (size === undefined) {
-      // Skip formatting a huge string just to measure it.
-      const wire = (pm.stringValue?.length ?? 0) + (pm.bytesValue?.length ?? 0);
+      // Measured in bytes, as the backend measures what it indexes, and
+      // without formatting a huge string just to measure it.
+      const wire = wireBytes(pm);
       if (wire > MAX_VALUE_CHARS) {
         size = wire;
       } else {
@@ -1175,21 +1199,17 @@ export const createSparkplugTreeStore = (
   const handleBirth = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
     if (!node) return;
+    node.lastOrd = Math.max(node.lastOrd, ord);
+    if (meta.staleBirth) return;
     node.dirty = true;
     const isDevice = meta.device !== undefined;
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
     if (!scope) return;
 
-    // A retained birth is old news: it names metrics but is no sign of
-    // life, no storm, and its names are unverified.
-    if (meta.retained) {
-      scope.carriedOverOrd = newest(scope.carriedOverOrd, ord);
-    } else {
-      if (!isDevice) recordStorm(node, m);
-      noteAlive(scope, ord, m.timeMs);
-      // A device can only birth through a live node.
-      if (isDevice) noteAlive(node, ord, m.timeMs);
-    }
+    if (!isDevice) recordStorm(node, m);
+    noteAlive(scope, ord, m.timeMs);
+    // A device can only birth through a live node.
+    if (isDevice) noteAlive(node, ord, m.timeMs);
     recordSeqGap(node, meta, m, ord);
 
     if (!isDevice && (node.bdSeqOrd === undefined || ord > node.bdSeqOrd)) {
@@ -1221,23 +1241,20 @@ export const createSparkplugTreeStore = (
     // Replace, never merge: the birth defines the metric set. Anything newer
     // than it (live data folded in before this replayed birth) stays.
     dropMetricsOlderThan(scope, ord);
-    const declared = new Set<string>();
     for (const pm of payloadMetrics) {
       // bdSeq is session plumbing; it is surfaced on the node row instead of
       // polluting the metric list.
       if (pm.name === "bdSeq") continue;
-      const key = metricKey(pm);
-      declared.add(key);
-      const existing = scope.metrics.get(key);
+      const existing = scope.metrics.get(metricKey(pm));
       if (existing && fromLaterSession(existing)) continue;
       upsertMetric(scope, pm, ord, m, payload?.timestamp);
     }
-    // Metrics newer than this birth that it doesn't declare lose what an
-    // older birth declared for them: in arrival order this birth would have
-    // dropped those rows and the data would have made them afresh.
-    for (const [key, rt] of scope.metrics) {
-      if (declared.has(key) || rt.lastSeenOrd <= ord) continue;
-      forgetDeclarationsBefore(rt, ord);
+    // This birth is the newest declaration for every metric of its session:
+    // what an older birth said about a type or unit goes, whether this birth
+    // restates it or not. In arrival order this birth would have dropped
+    // those rows, and the data after it would have made them afresh.
+    for (const rt of scope.metrics.values()) {
+      if (!fromLaterSession(rt)) forgetDeclarationsBefore(rt, ord);
     }
     scope.birthOrd = ord;
     scope.birthAtMs = m.timeMs;
@@ -1259,15 +1276,14 @@ export const createSparkplugTreeStore = (
   const handleData = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
     if (!node) return;
+    node.lastOrd = Math.max(node.lastOrd, ord);
     node.dirty = true;
     const isDevice = meta.device !== undefined;
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
     if (!scope) return;
 
-    if (!meta.retained) {
-      noteAlive(scope, ord, m.timeMs);
-      if (isDevice) noteAlive(node, ord, m.timeMs);
-    }
+    noteAlive(scope, ord, m.timeMs);
+    if (isDevice) noteAlive(node, ord, m.timeMs);
     recordSeqGap(node, meta, m, ord);
     if (meta.carriedOver) scope.carriedOverOrd = newest(scope.carriedOverOrd, ord);
 
@@ -1296,11 +1312,12 @@ export const createSparkplugTreeStore = (
   };
 
   const handleDeath = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
+    const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
+    if (!node) return;
+    node.lastOrd = Math.max(node.lastOrd, ord);
     // A death whose bdSeq does not match the live birth belongs to a
     // superseded session: it says nothing about the session on screen.
     if (meta.staleDeath) return;
-    const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
-    if (!node) return;
     node.dirty = true;
     recordSeqGap(node, meta, m, ord);
     if (meta.device !== undefined) {

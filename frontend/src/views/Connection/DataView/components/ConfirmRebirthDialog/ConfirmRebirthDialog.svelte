@@ -59,7 +59,9 @@
   const closeFocus = () => {
     const el = opener;
     if (el?.isConnected && !(el as HTMLButtonElement).disabled) return el;
-    return document.querySelector<HTMLElement>('[role="tree"][aria-label="Sparkplug nodes"]');
+    // Other connection tabs keep their trees mounted but hidden.
+    const trees = document.querySelectorAll<HTMLElement>('[role="tree"][aria-label="Sparkplug nodes"]');
+    return Array.from(trees).find((tree) => tree.getClientRects().length > 0) ?? null;
   };
 
   $: dialogLabel = isBulk

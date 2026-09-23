@@ -10,6 +10,7 @@ import { get, writable } from "svelte/store";
 import * as events from "bindings/mqtt-viewer/events/models";
 import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import { Events } from "@wailsio/runtime";
+import { errorMessage } from "@/util/strings";
 import tabsStore from "@/stores/tabs";
 import subscriptionsStore, { type Subscription } from "./subscriptions";
 import { markSaved } from "./last-saved";
@@ -322,19 +323,10 @@ const connect = async (connectionId: number) => {
   }
 };
 
-// toErrorMessage normalises whatever a rejected binding call throws (a plain
-// string from the Wails runtime today, but callers already treat this as
-// untyped) into a displayable string, so a non-string rejection can't render
-// as "[object Object]" in the connection's stored error state.
-const toErrorMessage = (e: unknown): string => {
-  if (e instanceof Error) return e.message;
-  if (typeof e === "string") return e;
-  try {
-    return JSON.stringify(e);
-  } catch {
-    return String(e);
-  }
-};
+// toErrorMessage normalises whatever a rejected binding call throws into a
+// displayable string (see errorMessage: it also unwraps the runtime's JSON
+// error envelope), so the connection's stored error reads as a sentence.
+const toErrorMessage = (e: unknown): string => errorMessage(e);
 
 // setConnectionError records why the last connect attempt failed, so the UI
 // still shows it after the toast that reported it disappears. Cleared on the

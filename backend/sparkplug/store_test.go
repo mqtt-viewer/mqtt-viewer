@@ -1052,9 +1052,10 @@ func TestRetainedStaleDeathAfterReconnectIsIgnored(t *testing.T) {
 }
 
 // A retained birth (non-compliant, but some stacks retain them for late
-// joiners) names metrics, but is not a live birth: no seq baseline, no storm
-// count, names unverified.
-func TestRetainedBirthNamesButDoesNotVerify(t *testing.T) {
+// joiners) may be old, so its seq is no baseline. With MQTT 5 the retain
+// flag also marks live births a publisher retained, so it is otherwise a
+// birth like any other.
+func TestRetainedBirthIsNoSeqBaseline(t *testing.T) {
 	descriptor := loadPayloadDescriptor(t)
 	store := NewSessionStore()
 	birth := store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "Volts", alias: u64(3)}), retained(at(100)))
@@ -1065,11 +1066,79 @@ func TestRetainedBirthNamesButDoesNotVerify(t *testing.T) {
 	if gap, ok := meta["seqGap"]; ok {
 		t.Errorf("expected no seq gap against a retained birth's seq, got %v", gap)
 	}
-	if meta["resolution"] != ResolutionResolved || meta["carriedOver"] != true {
-		t.Errorf("expected names resolved but unverified, got %v", meta)
+	if meta["resolution"] != ResolutionResolved || meta["carriedOver"] == true {
+		t.Errorf("expected names resolved and verified, got %v", meta)
 	}
-	if n := len(store.nodes[nodeKey{"G", "N"}].birthRefs); n != 0 {
-		t.Errorf("expected a retained birth kept out of the storm count, got %d", n)
+}
+
+// The broker sending a retained birth again (a reconnect, another
+// subscription) changes nothing: devices keep their sessions, and the view
+// is told to ignore it.
+func TestRetainedBirthRedeliveryIsIgnored(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	birth := func() *dynamicpb.Message {
+		return buildPayload(t, descriptor, 0, testMetric{name: "bdSeq", longValue: u64(1)}, testMetric{name: "A", alias: u64(1)})
+	}
+	store.HandleMessage(nbirthInfo, birth(), retained(at(1)))
+	store.HandleMessage(dbirthInfo, buildPayload(t, descriptor, 1, testMetric{name: "Temp", alias: u64(7)}), at(2))
+	store.HandleMessage(ddataInfo, buildPayload(t, descriptor, 2, testMetric{alias: u64(7), doubleValue: f64(1)}), at(3))
+	again := store.HandleMessage(nbirthInfo, birth(), retained(at(4)))
+	if again["staleBirth"] != true {
+		t.Errorf("expected the re-delivered birth marked stale, got %v", again)
+	}
+	meta := store.HandleMessage(ddataInfo, buildPayload(t, descriptor, 3, testMetric{alias: u64(7), doubleValue: f64(2)}), at(5))
+	if meta["resolution"] != ResolutionResolved {
+		t.Errorf("expected the device session to survive, got %v", meta)
+	}
+	if n := len(store.nodes[nodeKey{"G", "N"}].birthRefs); n != 1 {
+		t.Errorf("expected the re-delivery kept out of the storm count, got %d births", n)
+	}
+	// A different retained birth is a real one.
+	changed := store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "A", alias: u64(2)}), retained(at(6)))
+	if _, stale := changed["staleBirth"]; stale {
+		t.Errorf("expected a changed retained birth applied, got %v", changed)
+	}
+}
+
+// A retained will from a newer session than the newest birth seen (the node
+// rebirthed while this client was away, then died) is a real death.
+func TestRetainedNewerWillAfterReconnectIsAccepted(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 0, testMetric{name: "bdSeq", longValue: u64(255)}), at(1))
+	store.Suspend()
+	meta := store.HandleMessage(ndeathInfo, buildPayload(t, descriptor, -1, testMetric{name: "bdSeq", longValue: u64(0)}), retained(at(2)))
+	if meta["staleDeath"] == true {
+		t.Errorf("expected bdSeq 0 after 255 (wrapped) taken as newer, got %v", meta)
+	}
+}
+
+// Data after a death with no birth between is a new, unbirthed session: the
+// dead session's values go, as they do in the view.
+func TestUnbirthedRestartRetiresOldValues(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{name: "X", doubleValue: f64(1)}, testMetric{name: "Y", doubleValue: f64(1)}), at(1))
+	store.HandleMessage(ndeathInfo, nil, at(2))
+	store.HandleMessage(ndataInfo, buildPayload(t, descriptor, -1, testMetric{name: "X", doubleValue: f64(2)}), at(3))
+	store.HandleMessage(ndeathInfo, nil, at(4))
+	values := dataValues(t, store.Replay().Data)
+	if _, ok := values["Y"]; ok || len(values) != 1 {
+		t.Errorf("expected only X from the new session, got %v", values)
+	}
+}
+
+// ClearHistory clears the warnings, including those a kept birth carried.
+func TestClearHistoryStripsSeqGapsFromKeptBirths(t *testing.T) {
+	descriptor := loadPayloadDescriptor(t)
+	store := NewSessionStore()
+	store.HandleMessage(nbirthInfo, buildPayload(t, descriptor, 5, testMetric{name: "A", alias: u64(1)}), at(1))
+	store.ClearHistory()
+	for _, d := range store.Replay().Data {
+		if _, ok := d.Meta["seqGap"]; ok {
+			t.Errorf("expected no seq gap replayed after a clear, got %v", d.Meta)
+		}
 	}
 }
 

@@ -308,3 +308,15 @@ func TestNilRegistryLeavesMessageUntouched(t *testing.T) {
 		t.Errorf("expected raw payload with nil registry, got %v", msg.Payload)
 	}
 }
+
+func TestStatefulDecodeFlagsAPayloadThatIsNotSparkplug(t *testing.T) {
+	registry := loadTestRegistry(t)
+	mw := NewProtoDecodeMiddleware(registry, sparkplug.NewSessionStore())
+	msg := runMiddleware(t, mw, "spBv1.0/G/NDATA/N", []byte(`{"temp": 21.5}`))
+	if msg.MiddlewareProperties == nil || (*msg.MiddlewareProperties)["SparkplugDecodeFailed"] != true {
+		t.Fatalf("expected the failed decode flagged, got %v", msg.MiddlewareProperties)
+	}
+	if string(msg.Payload) != `{"temp": 21.5}` {
+		t.Errorf("expected the payload left as it was, got %s", msg.Payload)
+	}
+}

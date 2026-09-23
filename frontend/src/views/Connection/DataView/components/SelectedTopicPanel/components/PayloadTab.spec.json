@@ -74,8 +74,12 @@
       "type": "string",
       "required": false,
       "default": null,
-      "options": ["off", "failed"],
-      "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, failed says the payload isn't Sparkplug B."
+      "options": [
+        "off",
+        "earlier",
+        "failed"
+      ],
+      "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, earlier says it arrived before decoding was on, failed says the payload isn't Sparkplug B."
     }
   ],
   "tokens": [

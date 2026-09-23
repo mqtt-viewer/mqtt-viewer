@@ -154,7 +154,7 @@
     if (pendingReveal !== null) {
       const key = pendingReveal;
       pendingReveal = null;
-      void tick().then(() => revealKey(key));
+      void revealKey(key);
       return;
     }
     const vp = viewport();
@@ -164,6 +164,24 @@
     }
   };
   $: filter, problemsOnly, onFilterChange();
+
+  const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+  // svelte-virtual-list mis-measures a jump up into rows it has never
+  // rendered (its height map has gaps there) and scrolls to the top instead.
+  // A long jump up therefore goes to the top first, then down to the target.
+  const jumpTo = async (top: number) => {
+    const vp = viewport();
+    if (!vp) return;
+    if (top < vp.scrollTop - vp.clientHeight) {
+      vp.scrollTop = 0;
+      vp.dispatchEvent(new Event("scroll"));
+      await nextFrame();
+      await nextFrame();
+    }
+    vp.scrollTop = top;
+    vp.dispatchEvent(new Event("scroll"));
+  };
 
   const scrollRowIntoView = (index: number) => {
     const vp = viewport();
@@ -307,14 +325,13 @@
   // A node to reveal once a cleared search has reached this panel.
   let pendingReveal: string | null = null;
 
-  const revealKey = (key: string) => {
+  const revealKey = async (key: string) => {
+    // Let the list settle on the rows the expansion just changed.
+    await tick();
+    await nextFrame();
     const index = rows.findIndex((r) => r.kind === "node" && r.key === key);
     if (index === -1) return;
-    const vp = viewport();
-    if (vp) {
-      vp.scrollTop = Math.max(0, index * ROW_HEIGHT_PX - ROW_HEIGHT_PX * 2);
-      vp.dispatchEvent(new Event("scroll"));
-    }
+    await jumpTo(Math.max(0, index * ROW_HEIGHT_PX - ROW_HEIGHT_PX * 2));
     activeRowId = rows[index].id;
     activeIndexHint = index;
     highlightedKey = key;
@@ -338,21 +355,23 @@
       onClearFilter();
       return;
     }
-    revealKey(key);
+    await revealKey(key);
   };
 
   // Keeps the keyboard cursor in view when the tree gets shorter (the
   // warnings strip grows, the window shrinks): off screen it isn't rendered,
-  // and a screen reader's active descendant would point at nothing.
-  let resizeObserver: ResizeObserver | null = null;
-  $: if (treeElement && resizeObserver === null && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => {
+  // and a screen reader's active descendant would point at nothing. An
+  // action, so a tree element that remounts (after an empty search, say)
+  // gets its own observer.
+  const keepCursorInView = (el: HTMLElement) => {
+    if (typeof ResizeObserver === "undefined") return {};
+    const observer = new ResizeObserver(() => {
       if (treeHasFocus && activeIndex >= 0) scrollRowIntoView(activeIndex);
     });
-    resizeObserver.observe(treeElement);
-  }
+    observer.observe(el);
+    return { destroy: () => observer.disconnect() };
+  };
   onDestroy(() => {
-    resizeObserver?.disconnect();
     if (highlightTimer !== null) clearTimeout(highlightTimer);
   });
 
@@ -393,7 +412,7 @@
           as raw protobuf. Turn on decoding to see the node tree with metric
           names and values.
           {#if retrying}
-            It starts from the next connect, once the connection is back.
+            It starts from a connect: once the connection is back, reconnect.
           {:else if connectionState === "connected"}
             I'll reconnect to start decoding.
           {:else}
@@ -549,6 +568,7 @@
         tabindex="0"
         aria-activedescendant={activeDescendant}
         bind:this={treeElement}
+        use:keepCursorInView
         on:keydown={onTreeKeydown}
         on:pointerdown={markInteracted}
         on:wheel|passive={markInteracted}

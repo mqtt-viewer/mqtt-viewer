@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import { twMerge } from "tailwind-merge";
   import type {
@@ -177,6 +178,19 @@
       (rowElement.closest('[role="tree"]') as HTMLElement | null)?.focus();
     }
   }
+
+  // A row can also leave the list outright (a filter drops it, a birth
+  // resolves the problem that listed it). Focus on one of its buttons would
+  // fall to the page, so it goes to the tree.
+  onDestroy(() => {
+    const focused = document.activeElement;
+    if (!rowElement || !(focused instanceof HTMLElement) || !rowElement.contains(focused)) return;
+    const tree = rowElement.closest('[role="tree"]') as HTMLElement | null;
+    queueMicrotask(() => {
+      const now = document.activeElement;
+      if (tree?.isConnected && (now === null || now === document.body)) tree.focus();
+    });
+  });
 
   // The row's accessible name, without its action buttons' labels.
   $: accessibleName = (() => {

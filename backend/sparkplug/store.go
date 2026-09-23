@@ -1,6 +1,7 @@
 package sparkplug
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 	"sync"
@@ -70,8 +71,10 @@ type MessageRef struct {
 	ID     string
 	TimeMs int64
 	Ord    uint64
-	// Retained is set when the broker delivered the message from its
-	// retained store, on subscribe: old news, however recent it looks.
+	// Retained is the message's retain flag as delivered. It doesn't mean
+	// old news: MQTT 5 subscriptions here keep the publisher's flag, so a
+	// live message a publisher retained carries it too. Only a retained
+	// message identical to what the store already holds is a re-delivery.
 	Retained bool
 }
 
@@ -124,6 +127,10 @@ type scopeState struct {
 	death      *storedMessage
 	values     map[string]*metricValue
 	valueBytes int
+	// died is set by a death and cleared by the next birth or data: data
+	// after a death with no birth between starts an unbirthed session, and
+	// the dead session's values no longer describe the node.
+	died bool
 }
 
 type deviceState struct {
@@ -224,6 +231,21 @@ func (s *SessionStore) ClearHistory() {
 
 func (s *SessionStore) forgetHistory(scope *scopeState) {
 	s.clearValues(scope)
+	// The warnings are cleared, so the kept messages stop carrying them.
+	for _, kept := range []*storedMessage{scope.birth, scope.death} {
+		if kept == nil {
+			continue
+		}
+		if _, ok := kept.meta["seqGap"]; ok {
+			meta := make(map[string]any, len(kept.meta))
+			for k, v := range kept.meta {
+				if k != "seqGap" {
+					meta[k] = v
+				}
+			}
+			kept.meta = meta
+		}
+	}
 	// A birth or death only kept as a history ref is gone with the history.
 	if scope.birth != nil && scope.birth.inHistory {
 		scope.birth = nil
@@ -306,7 +328,7 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		node.lastOrd = ref.Ord
 	}
 
-	// A retained message was stored by the broker at some unknown time and
+	// A retained message may have been stored by the broker at any time and
 	// replayed on subscribe. Its seq says nothing about the live counter.
 	trackSeqIfLive := func(meta map[string]any) {
 		if ref.Retained {
@@ -314,6 +336,15 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 			return
 		}
 		trackSeq(node, msg, meta)
+	}
+	// A retained birth identical to the one already held is the broker
+	// sending it again (a reconnect, another subscription): nothing changed.
+	isRedelivery := func(scope *scopeState) bool {
+		if !ref.Retained || scope.birth == nil || scope.birth.inHistory || msg == nil {
+			return false
+		}
+		raw, err := (proto.MarshalOptions{AllowPartial: true, Deterministic: true}).Marshal(msg)
+		return err == nil && bytes.Equal(raw, scope.birth.raw)
 	}
 
 	var device *deviceState
@@ -349,6 +380,10 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 
 	switch info.Type {
 	case MessageTypeNBirth:
+		if isRedelivery(&node.scopeState) {
+			meta["staleBirth"] = true
+			break
+		}
 		// Flush + rebuild, never merge: stale mappings resolve silently to
 		// wrong names.
 		kept = s.birthScope(&node.scopeState, msg, ref)
@@ -366,23 +401,18 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 			meta["bdSeq"] = v
 		}
 		node.lastBdSeq = bdSeq
-		if ref.Retained {
-			// A retained birth (the spec forbids them, some stacks do it so
-			// late joiners get names) is the best name source there is, but
-			// not a live one: no storm count, no seq baseline, no bdSeq to
-			// judge the next death by, and names unverified.
-			node.LastSeq = -1
-			node.BdSeq = nil
-			break
-		}
 		node.birthRefs = append(node.birthRefs, ref)
 		if len(node.birthRefs) > maxBirthRefsPerNode {
 			node.birthRefs = node.birthRefs[1:]
 		}
 		// An NBIRTH restarts the sequence at 0. Anything else is a publisher
 		// bug worth reporting, but adopt it anyway so every following message
-		// isn't flagged against a counter the publisher isn't using.
-		if seq, ok := payloadSeq(msg); ok {
+		// isn't flagged against a counter the publisher isn't using. A
+		// retained birth (the spec forbids them; some stacks retain births
+		// for late joiners) may be old, so its seq is no baseline.
+		if ref.Retained {
+			node.LastSeq = -1
+		} else if seq, ok := payloadSeq(msg); ok {
 			got := int16(seq % 256)
 			if got != 0 {
 				meta["seqGap"] = map[string]any{"expected": 0, "got": int(got)}
@@ -396,8 +426,15 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		node.BdSeq = bdSeq
 
 	case MessageTypeDBirth:
+		if isRedelivery(&device.scopeState) {
+			meta["staleBirth"] = true
+			break
+		}
 		kept = s.birthScope(&device.scopeState, msg, ref)
 		trackSeqIfLive(meta)
+		// A device can only birth through a live node: one that had died
+		// has restarted.
+		s.restarted(&node.scopeState)
 
 	case MessageTypeNData, MessageTypeDData:
 		trackSeqIfLive(meta)
@@ -405,7 +442,9 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		scope := &node.scopeState
 		if device != nil {
 			scope = &device.scopeState
+			s.restarted(&node.scopeState)
 		}
+		s.restarted(scope)
 		needed, resolved := resolveMetricNames(msg, scope.Aliases)
 		switch {
 		case needed == 0:
@@ -439,22 +478,28 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		// retained will is judged against the newest birth seen at all, since
 		// it can arrive just after a reconnect, when this session's bdSeq is
 		// not confirmed yet.
-		expected := node.BdSeq
-		if expected == nil && ref.Retained {
-			expected = node.lastBdSeq
+		stale := node.BdSeq != nil && hasDeathBdSeq && *node.BdSeq != deathBdSeq
+		if node.BdSeq == nil && ref.Retained && node.lastBdSeq != nil && hasDeathBdSeq {
+			// After a drop this session's bdSeq isn't confirmed, and a
+			// retained will can be from any session. Only one older than the
+			// newest birth seen is stale; a newer one is a session this
+			// client missed, which has since died.
+			stale = bdSeqOlder(deathBdSeq, *node.lastBdSeq)
 		}
-		if expected != nil && hasDeathBdSeq && *expected != deathBdSeq {
+		if stale {
 			meta["staleDeath"] = true
 			break
 		}
 		// LastSeq survives: the next NBIRTH is what resets it. Metric values
 		// survive too: the tree keeps showing a dead node's last values.
 		kept = s.keepMessage(&node.death, msg, ref)
+		node.died = true
 		node.hasBirth = false
 		node.verified = false
 		s.setAliases(&node.scopeState, map[uint64]string{}, 0)
 		node.BirthAt = time.Time{}
 		for _, d := range node.Devices {
+			d.died = true
 			d.hasBirth = false
 			d.verified = false
 			s.setAliases(&d.scopeState, map[uint64]string{}, 0)
@@ -466,6 +511,7 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		kept = s.keepMessage(&device.death, msg, ref)
 		// A dead device must DBIRTH again before its data means anything, and
 		// that birth may assign different aliases. Its last values stay.
+		device.died = true
 		device.hasBirth = false
 		device.verified = false
 		s.setAliases(&device.scopeState, map[uint64]string{}, 0)
@@ -487,13 +533,29 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 	return meta
 }
 
+// restarted notes a sign of life for scope. Following a death, it starts an
+// unbirthed session: the dead session's values go, as the view retires them.
+func (s *SessionStore) restarted(scope *scopeState) {
+	if scope.died {
+		scope.died = false
+		s.clearValues(scope)
+	}
+}
+
+// bdSeqOlder reports whether bdSeq a comes before b, on the 0-255 wheel.
+func bdSeqOlder(a, b uint64) bool {
+	d := (b - a) % 256
+	return d > 0 && d < 128
+}
+
 // birthScope replaces a scope's aliases and latest values with the birth's,
 // and keeps the birth for the replay.
 func (s *SessionStore) birthScope(scope *scopeState, msg *dynamicpb.Message, ref MessageRef) *storedMessage {
 	s.endSession(scope)
+	scope.died = false
 	scope.BirthAt = time.UnixMilli(ref.TimeMs)
 	scope.hasBirth = true
-	scope.verified = !ref.Retained
+	scope.verified = true
 	aliases, bytes := buildAliasMap(msg, maxAliasesTotal-s.aliasesTotal, maxAliasBytesTotal-s.aliasBytes)
 	s.setAliases(scope, aliases, bytes)
 	s.dropStored(&scope.death)
@@ -533,7 +595,7 @@ func (s *SessionStore) keepMessage(slot **storedMessage, msg *dynamicpb.Message,
 	s.dropStored(slot)
 	kept := &storedMessage{ref: ref}
 	if msg != nil {
-		raw, err := (proto.MarshalOptions{AllowPartial: true}).Marshal(msg)
+		raw, err := (proto.MarshalOptions{AllowPartial: true, Deterministic: true}).Marshal(msg)
 		switch {
 		case err != nil:
 			kept.inHistory = true

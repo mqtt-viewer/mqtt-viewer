@@ -125,18 +125,24 @@
   // Sparkplug middleware meta drives PayloadTab's decode banner.
   $: selectedMessageSparkplugMeta =
     (selectedMessage?.middlewareProperties as any)?.sparkplug ?? null;
-  // A Sparkplug B topic whose payload arrived without Sparkplug meta: either
-  // decoding is off for the connection, or the payload isn't Sparkplug B at
-  // all. STATE messages are JSON, so they read fine without it.
+  // A Sparkplug B topic whose payload has no Sparkplug decode. The decoder
+  // flags a payload it couldn't read ("failed"); one it never saw arrived
+  // while decoding was off ("off", or "earlier" if it is on now). A payload
+  // decoded some other way (a topic outside the strict grammar, a device
+  // past the tracking cap) needs no hint. STATE messages are JSON.
   $: isProtoEnabled =
     $connectionsStore.connections[connectionId]?.connectionDetails.isProtoEnabled ?? false;
+  $: selectedMessageProps = (selectedMessage?.middlewareProperties ?? {}) as Record<string, unknown>;
   $: selectedMessageSparkplugUndecoded =
-    selectedMessageSparkplugMeta === null &&
-    isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "")
-      ? isProtoEnabled
+    selectedMessageSparkplugMeta !== null ||
+    selectedMessageProps.IsDecodedProto === true ||
+    !isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "")
+      ? null
+      : selectedMessageProps.SparkplugDecodeFailed === true
         ? ("failed" as const)
-        : ("off" as const)
-      : null;
+        : isProtoEnabled
+          ? ("earlier" as const)
+          : ("off" as const);
 
   // history[] only carries stubs until fetched. Ensure the selected
   // message's payload as soon as it's picked (timeline click or

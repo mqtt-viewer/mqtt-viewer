@@ -47,10 +47,11 @@
     | null = null;
   /**
    * The message is on a Sparkplug B topic but carries no Sparkplug decode:
-   * "off" when decoding is off for the connection, "failed" when it is on
-   * and the payload didn't decode as Sparkplug B.
+   * "off" when decoding is off for the connection, "earlier" when it
+   * arrived before decoding was turned on, "failed" when the decoder read
+   * it and it isn't Sparkplug B.
    */
-  export let sparkplugUndecoded: "off" | "failed" | null = null;
+  export let sparkplugUndecoded: "off" | "earlier" | "failed" | null = null;
 
   export let isComparing: boolean;
   export let payload: string;
@@ -264,6 +265,11 @@
         <span class="min-w-0"
           >Sparkplug B, shown as raw protobuf. The Sparkplug view can turn on
           decoding.</span
+        >
+      {:else if sparkplugUndecoded === "earlier"}
+        <span class="min-w-0"
+          >Sparkplug B, shown as raw protobuf: it arrived before decoding was
+          on.</span
         >
       {:else}
         <span class="min-w-0 text-warning"
