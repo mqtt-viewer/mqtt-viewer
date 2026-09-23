@@ -8,8 +8,8 @@
   export { className as class };
 
   $: sortedConnections = connections.sort((a, b) => {
-    const aMs = new Date(a.connectionDetails.lastConnectedAt)?.getTime() ?? 0;
-    const bMs = new Date(b.connectionDetails.lastConnectedAt)?.getTime() ?? 0;
+    const aMs = a.connectionDetails.lastConnectedAt?.getTime() ?? 0;
+    const bMs = b.connectionDetails.lastConnectedAt?.getTime() ?? 0;
     return bMs - aMs;
   });
 </script>

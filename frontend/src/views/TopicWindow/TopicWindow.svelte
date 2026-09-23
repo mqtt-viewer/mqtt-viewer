@@ -13,6 +13,7 @@
   import { openChartWindow } from "@/util/popout";
   import { downloadJson } from "@/util/download";
   import IconContext from "@/components/Icon/IconContext.svelte";
+  import StartupError from "@/components/StartupError/StartupError.svelte";
   import Toast from "@/components/Toast/Toast.svelte";
   import {
     createSelectedTopicStore,
@@ -36,6 +37,7 @@
   const initialTopic = params.get("topic") ?? "";
 
   let selectedTopicStore: SelectedTopicStore | null = null;
+  let startupError: unknown = null;
   let selectedTopic: string | null = null;
   // Oldest message this window holds, for the timeline's lower bound.
   let oldestMessageMs: number | null = null;
@@ -141,7 +143,13 @@
     );
 
     // env feeds the macOS traffic-light inset in the panel header.
-    await Promise.all([os.init(), connections.init(), topicPanelDock.init()]);
+    try {
+      await Promise.all([os.init(), connections.init(), topicPanelDock.init()]);
+    } catch (e) {
+      startupError = e;
+      console.error("Failed to initialise stores", e);
+      return;
+    }
     storesInitialised = true;
     const connection = get(connections).connections[connectionId];
     if (!connection) {
@@ -190,61 +198,65 @@
 </script>
 
 <IconContext>
-  <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
-    {#if error}
-      <div class="size-full flex items-center justify-center text-secondary-text">
-        {error}
-      </div>
-    {:else if selectedTopicStore}
-      <div class="grow min-h-0">
-        {#if selectedTopic === null}
-          <div
-            class="size-full flex items-center justify-center text-secondary-text"
-          >
-            No topic selected
-          </div>
-        {:else}
-          <SelectedTopicPanel
-            {connectionId}
-            {selectedTopicStore}
-            {exportTopicMessages}
-            {copyTopicPath}
-            isPinned={selectedTopic !== null &&
-              $pinnedTopicsStore.set.has(selectedTopic)}
-            onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
-            onClearRetained={clearRetained.requestClear}
-            onClearRetainedBelow={clearRetained.requestClearBelow}
-            firstConnectedAtMs={timelineStartMs(
-              connection?.firstConnectedThisSessionAtMs,
-              oldestMessageMs,
-              Date.now()
-            )}
-            {mqttVersion}
-            openChartWindow={(topic, fields) =>
-              openChartWindow({ connectionId, topic, fields })}
-            dockMode={$topicPanelDock.mode}
-            onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
-            showCloseButton={false}
-            headerDraggable={true}
-            headerLeftInset={$os.isMac && !$os.isFullscreen ? 62 : 0}
-          />
-        {/if}
-      </div>
-    {:else}
-      <div class="size-full flex items-center justify-center text-secondary-text">
-        Loading…
-      </div>
-    {/if}
-    <Toast />
-    <!-- The pop-out confirms its own clears: it is a separate webview, so the
-         main window's dialog is out of reach. -->
-    <ConfirmClearRetainedDialog
-      isOpen={isClearRetainedOpen}
-      topic={$clearRetainedRequest.topic}
-      count={$clearRetainedRequest.count}
-      topics={$clearRetainedRequest.topics}
-      busy={$clearRetainedRequest.busy}
-      onConfirm={clearRetained.confirm}
-    />
-  </main>
+  {#if startupError}
+    <StartupError error={startupError} />
+  {:else}
+    <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
+      {#if error}
+        <div class="size-full flex items-center justify-center text-secondary-text">
+          {error}
+        </div>
+      {:else if selectedTopicStore}
+        <div class="grow min-h-0">
+          {#if selectedTopic === null}
+            <div
+              class="size-full flex items-center justify-center text-secondary-text"
+            >
+              No topic selected
+            </div>
+          {:else}
+            <SelectedTopicPanel
+              {connectionId}
+              {selectedTopicStore}
+              {exportTopicMessages}
+              {copyTopicPath}
+              isPinned={selectedTopic !== null &&
+                $pinnedTopicsStore.set.has(selectedTopic)}
+              onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
+              onClearRetained={clearRetained.requestClear}
+              onClearRetainedBelow={clearRetained.requestClearBelow}
+              firstConnectedAtMs={timelineStartMs(
+                connection?.firstConnectedThisSessionAtMs,
+                oldestMessageMs,
+                Date.now()
+              )}
+              {mqttVersion}
+              openChartWindow={(topic, fields) =>
+                openChartWindow({ connectionId, topic, fields })}
+              dockMode={$topicPanelDock.mode}
+              onSetDockMode={(mode) => topicPanelDock.setMode(mode)}
+              showCloseButton={false}
+              headerDraggable={true}
+              headerLeftInset={$os.isMac && !$os.isFullscreen ? 62 : 0}
+            />
+          {/if}
+        </div>
+      {:else}
+        <div class="size-full flex items-center justify-center text-secondary-text">
+          Loading…
+        </div>
+      {/if}
+      <Toast />
+      <!-- The pop-out confirms its own clears: it is a separate webview, so the
+           main window's dialog is out of reach. -->
+      <ConfirmClearRetainedDialog
+        isOpen={isClearRetainedOpen}
+        topic={$clearRetainedRequest.topic}
+        count={$clearRetainedRequest.count}
+        topics={$clearRetainedRequest.topics}
+        busy={$clearRetainedRequest.busy}
+        onConfirm={clearRetained.confirm}
+      />
+    </main>
+  {/if}
 </IconContext>

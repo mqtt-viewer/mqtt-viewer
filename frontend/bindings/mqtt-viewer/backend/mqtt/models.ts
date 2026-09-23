@@ -5,10 +5,6 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as time$0 from "../../../time/models.js";
-
 /**
  * ConnectionStats is the snapshot handed to the frontend by GetStats. It is a
  * plain value type so the counters can never be read while a message is
@@ -145,7 +141,7 @@ export class MqttMessage {
     "properties"?: MessageProperties | null;
     "timeMs": number;
     "middlewareProperties"?: { [_ in string]?: any } | null;
-    "Time": time$0.Time;
+    "Time": string;
 
     /** Creates a new MqttMessage instance. */
     constructor($$source: Partial<MqttMessage> = {}) {
@@ -168,7 +164,7 @@ export class MqttMessage {
             this["timeMs"] = 0;
         }
         if (!("Time" in $$source)) {
-            this["Time"] = null;
+            this["Time"] = "0001-01-01T00:00:00.000Z";
         }
 
         Object.assign(this, $$source);

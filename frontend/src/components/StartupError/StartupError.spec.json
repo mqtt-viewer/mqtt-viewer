@@ -1,0 +1,25 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "StartupError",
+  "tier": "component",
+  "description": "Full-window notice shown when the app fails to initialise, with the error text and a link to the issue tracker.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "error",
+      "type": "unknown",
+      "required": true,
+      "description": "The rejection from initialization.init(). An Error renders its message and stack; anything else renders String(error)."
+    }
+  ],
+  "tokens": [],
+  "dependencies": [],
+  "notes": "Figma is not linked yet. Rendered by App.svelte's {:catch} branch before any store has loaded, so it renders from props alone and does not read stores or bindings. The issues link hands off to openExternal on click but keeps a plain href as a fallback in case the Wails runtime is what failed."
+}
