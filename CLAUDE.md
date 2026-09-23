@@ -113,6 +113,8 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
   head branches named `main` otherwise collide with local `main`).
 - Commits: conventional prefixes with optional scope,
   `feat(topic-graph): ...`, `fix:`, `perf:`, `chore:`, `docs:`.
+- PR descriptions: never end with a "Generated with Claude Code" or any
+  other "made with Claude" line or link.
 - Svelte: the codebase runs Svelte 5 but components use legacy syntax
   (`export let`, `on:click`). Do not rewrite to runes unless the task is
   that migration.
