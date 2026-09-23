@@ -17,9 +17,9 @@ let
 
   src = fetchzip {
     url = "https://proxy.golang.org/github.com/wailsapp/wails/v3/@v/v3.0.0-beta.16.zip";
-    # TODO: regenerate. nix was not available when the pin moved to beta.16;
-    # build once with this placeholder and paste the hash nix reports.
-    hash = lib.fakeHash;
+    # When the Wails pin or its Go module graph changes, regenerate both hashes.
+    # Set this to lib.fakeHash and run `nix build .#wails3` for the source hash.
+    hash = "sha256-qDJlsOib+yrA0VBPqCaEOqEu2J2Bp3lRuLciExMbQNk=";
     # The zip already contains the full module path as directory levels.
     stripRoot = false;
     extension = "zip";
@@ -48,8 +48,8 @@ buildGoModule {
   # keeps the module download cache instead of vendoring, so embeds are only
   # resolved for the packages actually built here.
   proxyVendor = true;
-  # TODO: regenerate alongside the `src` hash above.
-  vendorHash = lib.fakeHash;
+  # Then set vendorHash to lib.fakeHash and run `nix build .#wails3` again.
+  vendorHash = "sha256-bDSbGoEGaFMEyfKFQx2ZYBovTMmdl+QvwBeCH4gj4uI=";
 
   subPackages = [ "cmd/wails3" ];
 
