@@ -17,6 +17,13 @@
     "allowJs": true,
     "checkJs": true,
     "isolatedModules": true,
+    /**
+     * Vite does the emitting, so tsc is typecheck-only. That lets
+     * release-notes.ts import ./changelog.ts by its real filename, which is
+     * what scripts/release-notes.mjs needs to load it in plain Node.
+     */
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["src/*"],
       "bindings/*": ["./bindings/*"]

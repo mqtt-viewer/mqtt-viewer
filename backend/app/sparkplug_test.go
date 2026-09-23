@@ -42,7 +42,7 @@ func historyMessage(topic string, timeMs int64) mqtt.MqttMessage {
 
 func TestGetSparkplugMessageHistoryKeepsBirthsAndLatestData(t *testing.T) {
 	app := getSeededTestApp(t)
-	history := app.AppConnections[1].MqttManager.MessageHistory
+	history := testConn(t, app, 1).MqttManager.MessageHistory
 
 	history.AddMessage(historyMessage("spBv1.0/G/NBIRTH/N", 1000))
 	history.AddMessage(historyMessage("spBv1.0/G/DBIRTH/N/D", 1100))
@@ -125,4 +125,13 @@ func TestPublishSparkplugRebirthNotConnected(t *testing.T) {
 	if err := app.PublishSparkplugRebirth(1, "group", "node"); err == nil {
 		t.Error("Expected error for disconnected connection, got nil")
 	}
+}
+
+func testConn(t *testing.T, a *App, id uint) *AppConnection {
+	t.Helper()
+	conn, ok := a.appConnection(id)
+	if !ok {
+		t.Fatalf("connection %d not found", id)
+	}
+	return conn
 }

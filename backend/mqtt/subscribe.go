@@ -31,32 +31,26 @@ func subscribeV3(ctx context.Context, c mqttV3.Client, subs []SubscribeParams) e
 			if token.Error() != nil {
 				return newSubError(token.Error())
 			}
-
-			if token := c.Subscribe(sub.Topic, byte(sub.QoS), nil); token.Wait() && token.Error() != nil {
-				return newSubError(token.Error())
-			}
 		}
 	}
 	return nil
 }
 
 func subscribeV5(ctx context.Context, logCtx context.Context, cm *autopaho.ConnectionManager, subs []SubscribeParams) error {
-	var nonEmptySubCount = 0
+	var subscriptions = make([]mqttV5.SubscribeOptions, 0, len(subs))
 	for _, sub := range subs {
-		if sub.Topic != "" {
-			nonEmptySubCount++
+		if sub.Topic == "" {
+			continue
 		}
+		slog.InfoContext(logCtx, fmt.Sprintf("subscribing to topic %v with QoS %v", sub.Topic, sub.QoS))
+		subscriptions = append(subscriptions, mqttV5.SubscribeOptions{
+			Topic:             sub.Topic,
+			QoS:               byte(sub.QoS),
+			RetainAsPublished: true,
+		})
 	}
-	var subscriptions = make([]mqttV5.SubscribeOptions, nonEmptySubCount)
-	for i, sub := range subs {
-		if sub.Topic != "" {
-			slog.InfoContext(logCtx, fmt.Sprintf("subscribing to topic %v with QoS %v", sub.Topic, sub.QoS))
-			subscriptions[i] = mqttV5.SubscribeOptions{
-				Topic:             sub.Topic,
-				QoS:               byte(sub.QoS),
-				RetainAsPublished: true,
-			}
-		}
+	if len(subscriptions) == 0 {
+		return nil
 	}
 	res, err := cm.Subscribe(ctx, &mqttV5.Subscribe{
 		Subscriptions: subscriptions,

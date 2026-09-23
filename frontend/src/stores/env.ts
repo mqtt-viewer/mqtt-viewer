@@ -18,6 +18,7 @@ interface EnvStore {
   isLinux: boolean;
   isFullscreen: boolean;
   isBeta: boolean;
+  isServerMode: boolean;
 }
 
 const { subscribe, set, update } = writable<EnvStore>({
@@ -32,6 +33,7 @@ const { subscribe, set, update } = writable<EnvStore>({
   isLinux: false,
   isFullscreen: false,
   isBeta: IS_BETA,
+  isServerMode: false,
 });
 
 const debouncedCheckFullscreen = _.debounce(async () => {
@@ -44,26 +46,66 @@ const debouncedCheckFullscreen = _.debounce(async () => {
   });
 }, 100);
 
+// In server mode System.Environment() reports the container's GOOS, which is
+// always linux and says nothing about the machine the browser is running on.
+// The platform booleans drive OS-specific UI (macOS traffic-light padding, a
+// GTK resize workaround), so in the browser they have to come from the browser.
+const platformFromNavigator = (): string => {
+  const hint = `${navigator.userAgent} ${navigator.platform ?? ""}`;
+  if (/Mac|iPhone|iPad|iPod/i.test(hint)) return "darwin";
+  if (/Win/i.test(hint)) return "windows";
+  return "linux";
+};
+
 const init = async () => {
+  // GetEnvInfo is a normal binding in both modes. Read it before touching
+  // native Window/System APIs so browser mode never makes calls that can only
+  // fail in Wails' headless server.
   try {
-    window.addEventListener("resize", debouncedCheckFullscreen, true);
-    const info = await System.Environment();
-    const env = {
-      buildType: info.Debug ? "dev" : "production",
-      platform: info.OS,
-      arch: info.Arch,
-    };
-    const isFullscreen = await Window.IsFullscreen();
     const configuredEnv = await GetEnvInfo();
-    set({
-      env,
-      isFullscreen,
+    if (configuredEnv.isServerMode) {
+      const platform = platformFromNavigator();
+      update((store) => ({
+        ...store,
+        env: {
+          buildType: configuredEnv.isDev ? "dev" : "production",
+          platform,
+          arch: "",
+        },
+        version: configuredEnv.version,
+        isServerMode: true,
+        isMac: platform === "darwin",
+        isWindows: platform === "windows",
+        isLinux: platform === "linux",
+      }));
+      return;
+    }
+    update((store) => ({
+      ...store,
       version: configuredEnv.version,
-      isMac: env.platform === "darwin",
-      isWindows: env.platform === "windows",
-      isLinux: env.platform === "linux",
-      isBeta: IS_BETA,
-    });
+      isServerMode: false,
+    }));
+  } catch (e) {
+    console.error(e);
+  }
+
+  window.addEventListener("resize", debouncedCheckFullscreen, true);
+  try {
+    const info = await System.Environment();
+    const platform = info.OS;
+    const isFullscreen = await Window.IsFullscreen();
+    update((store) => ({
+      ...store,
+      env: {
+        buildType: info.Debug ? "dev" : "production",
+        platform,
+        arch: info.Arch,
+      },
+      isFullscreen,
+      isMac: platform === "darwin",
+      isWindows: platform === "windows",
+      isLinux: platform === "linux",
+    }));
   } catch (e) {
     console.error(e);
   }

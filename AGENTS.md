@@ -4,6 +4,16 @@ Start with `CLAUDE.md` in this directory: repo map, commands, conventions,
 performance bar, release process, and the skills index. For frontend and
 design-system work, `frontend/AGENTS.md` is the binding contract.
 
+## Delegate implementation work
+
+When the session is running on a high-capability model (Fable, Opus) and the
+task contains a well-scoped, delegatable chunk (writing or editing code,
+running builds, mechanical refactors), do not implement it inline. Plan the
+change yourself, hand the implementation to a subagent with a precise brief
+(files, exact edits or behaviour, constraints), then test and review the
+result yourself. This keeps the expensive model's context for design,
+verification, and judgement rather than token-heavy file editing.
+
 ## Driving the app from a browser (agents)
 
 Short version: **a normal `wails3 dev` run is NOT drivable from an external
@@ -40,7 +50,7 @@ behind the `server` build tag. It runs a real `http.Server` that:
 Run it:
 
 ```sh
-scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500
+scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500, data in _dev_resources/server
 SKIP_FRONTEND=1 scripts/serve-browser.sh 9500   # reuse an existing frontend/dist
 ```
 
@@ -64,13 +74,34 @@ Caveats:
 - **Headless, not the native window.** It's the real Go backend + services (DB,
   MQTT, etc.), so bindings behave for real — but there's no OS window, menus,
   dialogs, screens, or native file pickers (those are no-ops in server mode).
-- **Backend→frontend live events need one extra step.** Events are pushed over a
-  WebSocket set up by `/wails/custom.js`, which server mode serves but does *not*
-  auto-inject. If you need live pushes (incoming MQTT messages, etc.), add
-  `<script src="/wails/custom.js"></script>` to the page. Plain request/response
-  binding calls need nothing extra.
+- **Live events already flow. Do not add a script tag for them.** Events are
+  pushed over a WebSocket set up by `/wails/custom.js`, and the pinned
+  `@wailsio/runtime` loads that script itself on every page: its index module
+  runs `loadOptionalScript('/wails/custom.js')`, which HEAD-probes the path and
+  appends the tag only where the route exists. So live pushes (incoming MQTT
+  messages, etc.) work in server mode with no extra markup, and in the native
+  webview the probe 404s and is a no-op. Adding
+  `<script src="/wails/custom.js"></script>` by hand loads it a second time,
+  opens a second WebSocket, and delivers every event twice: message counts and
+  rates then read double, which looks like a backend bug and is not one. Plain
+  request/response binding calls need nothing extra either.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
+
+To test the app behind a path-prefixing reverse proxy (Home Assistant ingress),
+put `scripts/ingress-sim.go` in front of the server-mode app: it serves
+everything under `/prefix/` and strips the prefix before forwarding, mirroring
+how ingress mounts an add-on.
+
+```sh
+go build -o bin/ingress-sim ./scripts && bin/ingress-sim   # then open :9600/prefix/
+bin/ingress-sim -listen :9601 -redirect=false              # no trailing-slash redirect
+```
+
+Build the binary, don't `go run` it: `go run`'s temp binaries have been seen to
+die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
+mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
+trailing-slash self-heal (see the file's header for the rest).
 
 ### Field-tested walkthrough (Sparkplug e2e, 2026-07)
 
@@ -78,10 +109,6 @@ A full e2e drive of the app (create connection, connect to a local broker,
 watch live traffic, click UI actions, verify a publish round trip) works in
 server mode from an agent-driven browser. Lessons that save time:
 
-- **Inject the events script after every page load** (it is not auto-injected
-  and is lost on reload): append `<script src="/wails/custom.js"></script>`,
-  then look for "[Wails] Event WebSocket connected" in the console. Without it
-  the UI never sees mqttConnected/mqttMessages and looks frozen.
 - **Prefer accessibility refs over screenshot coordinates** for clicks; several
   panels (dialogs, tab strip) swallow coordinate clicks that land fine via refs.
 - **Bindings can be called directly from page JS** when the UI path is fiddly:

@@ -27,3 +27,7 @@ scripts/.venv/
 
 # Per-checkout dev-server ports; generate with scripts/dev-ports.sh write-launch
 .claude/launch.json
+
+# nix build symlinks
+result
+result-*

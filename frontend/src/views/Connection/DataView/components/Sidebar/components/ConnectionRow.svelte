@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
@@ -11,11 +10,13 @@
   import { writable } from "svelte/store";
   import InlineNameInput from "./InlineNameInput.svelte";
   import ConnectionDetailsDialog from "./ConnectionDetailsDialog.svelte";
+  import ConnectionLogsDialog from "./ConnectionLogsDialog.svelte";
 
   export let connection: Connection;
 
   let isDeleteOpen = writable(false);
   let isEditOpen = writable(false);
+  let isLogsOpen = writable(false);
   let isRenaming = false;
 
   $: details = connection.connectionDetails;
@@ -23,24 +24,35 @@
   $: isConnected = state === "connected";
   $: isBusy = state === "connecting" || state === "reconnecting";
 
+  $: isError = state === "error";
+
   // status text + dot colour shown at the top of the dropdown
   $: statusColorClass = isConnected
     ? "text-success"
     : isBusy
       ? "text-warning"
-      : "text-secondary-text";
+      : isError
+        ? "text-error"
+        : "text-secondary-text";
   $: statusLabel = isConnected
     ? `Connected${connection.latencyMs !== undefined ? ` · ${connection.latencyMs} ms` : ""}`
-    : capitalizeFirstLetter(state);
+    : isError
+      ? (connection.lastConnectionError ?? "Connection failed")
+      : capitalizeFirstLetter(state);
 
   // A connection just created this session opens straight into the details
-  // dialog so the user can configure it before connecting.
-  onMount(() => {
+  // dialog so the user can configure it before connecting, and so does one
+  // whose edit button was pressed on a Home or new-tab tile. Reactive rather
+  // than onMount only: the tab may already be mounted when the request lands.
+  $: if (connection.justCreated || connection.editRequested) {
+    $isEditOpen = true;
     if (connection.justCreated) {
-      $isEditOpen = true;
       connections.acknowledgeConnectionCreated(details.id);
     }
-  });
+    if (connection.editRequested) {
+      connections.acknowledgeEditRequest(details.id);
+    }
+  }
 
   const toggleConnect = async () => {
     // An unconfigured connection can't connect — send them to set it up first.
@@ -106,36 +118,50 @@
       onCancel={() => (isRenaming = false)}
     />
   {:else}
-    <DropdownMenu placement="bottom-start">
+    <DropdownMenu placement="bottom-start" triggerButtonClass="w-full">
       <div
         slot="trigger"
-        class="flex items-center gap-2 py-1 rounded hover:bg-hovered cursor-pointer max-w-full"
+        class="flex items-center gap-2 px-1 -mx-1 py-1 rounded hover:bg-hovered cursor-pointer"
       >
-        <div class="size-4 min-w-4"><ConnectionIdenticon {connection} /></div>
+        <div class="w-5 shrink-0 flex items-center justify-center">
+          <div class="size-4"><ConnectionIdenticon {connection} /></div>
+        </div>
         <span class="text-lg text-emphasis truncate">{details.name}</span>
-        <span class={`size-[6px] rounded-full ${isConnected ? "bg-success" : isBusy ? "bg-warning" : "bg-transparent"}`}
+        <span class={`size-[6px] rounded-full ${isConnected ? "bg-success" : isBusy ? "bg-warning" : isError ? "bg-error" : "bg-transparent"}`}
         ></span>
         <Icon type="down" size={10} />
       </div>
-      <div class="flex flex-col min-w-[220px]" slot="menu-content">
+      <div class="flex flex-col min-w-[220px] max-w-[280px]" slot="menu-content">
         <div class="px-2 pt-1 pb-2">
           <div class="text-sm text-secondary-text truncate">
             {connection.connectionString}
           </div>
-          <div class={`text-sm ${statusColorClass}`}>{statusLabel}</div>
+          <div class={`text-sm break-words ${statusColorClass}`}>
+            {statusLabel}
+          </div>
         </div>
         <div class="border-t border-divider my-1"></div>
-        <DropdownMenuItem onClick={toggleConnect}>
+        <DropdownMenuItem
+          iconType={isConnected || isBusy ? "disconnect" : "connect"}
+          onClick={toggleConnect}
+        >
           {isConnected || isBusy ? "Disconnect" : "Connect"}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => ($isEditOpen = true)}>
+        <DropdownMenuItem
+          iconType="edit"
+          onClick={() => ($isEditOpen = true)}
+        >
           Edit connection…
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => (isRenaming = true)}>
+        <DropdownMenuItem iconType="rename" onClick={() => (isRenaming = true)}>
           Rename
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => ($isLogsOpen = true)}>
+          View logs
+        </DropdownMenuItem>
         <DropdownMenuItem
-          class="hover:text-error"
+          iconType="delete"
+          class="text-error"
           onClick={() => ($isDeleteOpen = true)}>Delete</DropdownMenuItem
         >
       </div>
@@ -144,6 +170,8 @@
 </div>
 
 <ConnectionDetailsDialog {connection} isOpen={isEditOpen} />
+
+<ConnectionLogsDialog {connection} isOpen={isLogsOpen} />
 
 <ConfirmDeleteConnectionDialog
   isOpen={isDeleteOpen}

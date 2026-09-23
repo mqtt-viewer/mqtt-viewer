@@ -19,7 +19,7 @@ const maxSparkplugHistoryMessages = 10000
 // topics), sorted by arrival time, so a Sparkplug view opened mid-session can
 // replay births received earlier.
 func (a *App) GetSparkplugMessageHistory(connectionId uint) ([]mqtt.MqttMessage, error) {
-	appConnection, ok := a.AppConnections[connectionId]
+	appConnection, ok := a.appConnection(connectionId)
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connectionId)
 	}
@@ -80,7 +80,7 @@ func (a *App) PublishSparkplugRebirth(connectionId uint, group string, edgeNode 
 	}
 	// Mirrors the ConnectMqtt condition for registering the encode middleware:
 	// without it the payload would be published as raw JSON.
-	if connection.IsProtoEnabled == nil || !*connection.IsProtoEnabled || a.ProtoRegistry == nil {
+	if connection.IsProtoEnabled == nil || !*connection.IsProtoEnabled || a.protoRegistry() == nil {
 		return fmt.Errorf("rebirth requests need protobuf decoding enabled on the connection")
 	}
 	return a.PublishMqtt(connectionId, PublishParams{

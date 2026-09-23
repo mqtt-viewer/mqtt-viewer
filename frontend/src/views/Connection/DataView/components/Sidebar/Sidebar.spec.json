@@ -49,5 +49,5 @@
     "elevation-1"
   ],
   "dependencies": [],
-  "notes": "Figma is not linked yet."
+  "notes": "Figma is not linked yet. The scrolling library pane carries data-dnd-scroll so a drag near its edges auto-scrolls it."
 }

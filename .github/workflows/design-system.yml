@@ -38,3 +38,37 @@ jobs:
         run: pnpm build-storybook
       - name: Check generated files
         run: git diff --exit-code -- src/design-system/component-index.json src/design-system/COMPONENT_CHECKLIST.md src/design-system/design-tokens.json
+
+  # Topic Graph perf regression check. Non-blocking: CI runners have no GPU
+  # passthrough, so headless Chromium here uses software GL and its absolute
+  # numbers aren't comparable to a real browser session (see the caveat in
+  # scripts/perf-graph.mjs and perf-baseline.json's headlessAvgFrameMs field,
+  # which is what this run is actually checked against). continue-on-error
+  # keeps a slow/flaky CI runner from blocking merges; the JSON report is
+  # uploaded as an artifact so a real regression can still be spotted by eye.
+  perf-graph:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run Topic Graph perf check
+        run: pnpm perf:graph | tee perf-graph-report.txt
+      - name: Upload perf report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: topic-graph-perf-report
+          path: frontend/perf-graph-report.txt
+          retention-days: 30

@@ -53,7 +53,8 @@
     "secondary",
     "emphasis",
     "secondary-text",
-    "warning"
+    "warning",
+    "hovered"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet."

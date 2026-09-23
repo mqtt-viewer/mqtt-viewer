@@ -11,7 +11,10 @@
 set -eu
 
 name=mqtt-test-broker
-conf_dir="${TMPDIR:-/tmp}/$name"
+# Under $HOME, not $TMPDIR: on macOS $TMPDIR is /var/folders/... which Docker
+# Desktop does not share, so bind-mounting the config from there fails with
+# "not a directory".
+conf_dir="${XDG_CACHE_HOME:-$HOME/.cache}/$name"
 
 up() {
   if docker ps --format '{{.Names}}' | grep -qx "$name"; then
@@ -19,9 +22,13 @@ up() {
     return
   fi
   if docker ps -a --format '{{.Names}}' | grep -qx "$name"; then
-    docker start "$name" >/dev/null
-    echo "$name started"
-    return
+    if docker start "$name" >/dev/null 2>&1; then
+      echo "$name started"
+      return
+    fi
+    # A container left over from a failed create can never start; rebuild it.
+    echo "$name could not start, recreating"
+    docker rm -f "$name" >/dev/null 2>&1 || true
   fi
   mkdir -p "$conf_dir"
   cat >"$conf_dir/mosquitto.conf" <<'EOF'

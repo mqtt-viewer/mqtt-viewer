@@ -1,0 +1,64 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "UpdateAvailableContent",
+  "tier": "component",
+  "description": "Layout for the update dialog: lead line, version transition chips, scrollable release notes, install instructions with a copyable command, skip/remind/update actions.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "update",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "currentVersion",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "updating",
+      "type": "boolean",
+      "required": false
+    },
+    {
+      "name": "onUpdate",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onRemindLater",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onSkip",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onCopyCommand",
+      "type": "function",
+      "required": false
+    }
+  ],
+  "tokens": [
+    "secondary-text",
+    "emphasis",
+    "divider",
+    "primary",
+    "elevation-0",
+    "outline"
+  ],
+  "dependencies": [
+    "Button",
+    "Icon"
+  ],
+  "notes": "Figma is not linked yet. The copyable command block also uses elevation-2, matching the code chip styling elsewhere; a Code primitive should own those tokens eventually. The Copy button is secondary when a releases page button is present and primary when releases_url is empty (flatpak and nix installs), so there is always an affirmative primary action. Release notes are formatted by release-notes-parser.ts beside this component: headings and bullets keep their shape, markdown links and emphasis markers are stripped, and a line that is only a link (the Full changelog line) is dropped."
+}

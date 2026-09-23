@@ -39,12 +39,25 @@
       "required": false,
       "options": [
         "left",
-        "right"
+        "right",
+        "top"
       ],
       "default": "right"
     },
     {
+      "name": "defaultSize",
+      "type": "number",
+      "required": false,
+      "default": null
+    },
+    {
       "name": "width",
+      "type": "number",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "height",
       "type": "number",
       "required": false,
       "default": 0

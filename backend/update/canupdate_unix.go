@@ -9,16 +9,23 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// canSelfUpdate reports whether this installation can replace its own
+// binaryIsSelfUpdatable reports whether this installation can replace its own
 // binary. AppImage mounts are read-only and package-managed installs
 // (deb/rpm into /usr/local/bin) are root-owned, so both fail the
 // writability check and fall back to notification-only updates.
-func canSelfUpdate() bool {
+func binaryIsSelfUpdatable() bool {
 	if os.Getenv("APPIMAGE") != "" {
 		return false
 	}
 	if isFlatpak() {
 		// Flatpak's /app is read-only; updates come through `flatpak update`.
+		return false
+	}
+	if isNixInstall() {
+		// Nix store paths are immutable. On a single-user install the store can
+		// be user-writable, so the writability check below is not sufficient on
+		// its own: refuse explicitly rather than let the updater try to
+		// overwrite a store path.
 		return false
 	}
 	exe, err := os.Executable()

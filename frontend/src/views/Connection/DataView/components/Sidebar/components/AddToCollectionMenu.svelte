@@ -4,11 +4,14 @@
   import DropdownMenuItem from "@/components/DropdownMenu/DropdownMenuItem.svelte";
   import type { CollectionScope, CollectionsStore } from "../stores/collections";
   import { filterByScope } from "../stores/collections";
+  import { writable } from "svelte/store";
 
   export let collectionsStore: CollectionsStore;
+  // Menu open state, shared with the parent so it can react to it.
+  export let open = writable(false);
   // Collection currently holding the message (checked in the list), if any.
   export let currentCollectionId: number | null = null;
-  export let placeholder = "Add message to...";
+  export let placeholder = "Type to add new collection";
   export let onSelect: (collectionId: number) => void;
   // Creates the collection, then selects it.
   export let onCreate: (
@@ -40,9 +43,35 @@
     await onCreate(name, scope);
     query = "";
   };
+
+  const onKeydown = async (event: KeyboardEvent) => {
+    // stopPropagation keeps melt's typeahead off the input but also hides
+    // Escape from it, so close the menu here.
+    if (event.key === "Escape") {
+      event.preventDefault();
+      query = "";
+      $open = false;
+      return;
+    }
+    if (event.key !== "Enter") return;
+    const name = query.trim();
+    if (!name) return;
+    // Enter picks the connection-scoped collection with this name, or
+    // creates one; the global rows stay click-only.
+    const existing = filterByScope(collections, "connection").find(
+      (c) => c.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      onSelect(existing.id);
+      query = "";
+    } else {
+      await create("connection");
+    }
+    $open = false;
+  };
 </script>
 
-<DropdownMenu placement="bottom-end">
+<DropdownMenu placement="bottom-end" {open}>
   <slot name="trigger" slot="trigger" />
   <div class="flex flex-col min-w-[220px]" slot="menu-content">
     <!-- svelte-ignore a11y_autofocus -->
@@ -51,33 +80,35 @@
       autofocus
       {placeholder}
       bind:value={query}
-      on:keydown|stopPropagation={() => {}}
+      on:keydown|stopPropagation={onKeydown}
     />
     {#if connectionMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Connection</div>
       {#each connectionMatches as collection (collection.id)}
-        <DropdownMenuItem onClick={() => onSelect(collection.id)}>
-          <div class="flex items-center gap-2 w-full">
-            <Icon type="folder" size={14} />
-            <span class="truncate grow">{collection.name}</span>
-            {#if collection.id === currentCollectionId}
-              <Icon type="tick" size={14} />
-            {/if}
-          </div>
+        <DropdownMenuItem
+          iconType="folder"
+          class="w-full"
+          onClick={() => onSelect(collection.id)}
+        >
+          <span class="truncate grow">{collection.name}</span>
+          {#if collection.id === currentCollectionId}
+            <Icon type="tick" size={14} />
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}
     {#if globalMatches.length > 0}
       <div class="px-2 pt-1 pb-1 text-sm text-secondary-text">Global</div>
       {#each globalMatches as collection (collection.id)}
-        <DropdownMenuItem onClick={() => onSelect(collection.id)}>
-          <div class="flex items-center gap-2 w-full">
-            <Icon type="folder" size={14} />
-            <span class="truncate grow">{collection.name}</span>
-            {#if collection.id === currentCollectionId}
-              <Icon type="tick" size={14} />
-            {/if}
-          </div>
+        <DropdownMenuItem
+          iconType="folder"
+          class="w-full"
+          onClick={() => onSelect(collection.id)}
+        >
+          <span class="truncate grow">{collection.name}</span>
+          {#if collection.id === currentCollectionId}
+            <Icon type="tick" size={14} />
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}
@@ -87,19 +118,13 @@
       </div>
     {/if}
     {#if query.trim() && !connectionExactMatch}
-      <DropdownMenuItem onClick={() => create("connection")}>
-        <div class="flex items-center gap-2">
-          <Icon type="plus" size={14} />
-          <span class="truncate">Create “{query.trim()}”</span>
-        </div>
+      <DropdownMenuItem iconType="plus" onClick={() => create("connection")}>
+        <span class="truncate">Create “{query.trim()}”</span>
       </DropdownMenuItem>
     {/if}
     {#if query.trim() && !globalExactMatch}
-      <DropdownMenuItem onClick={() => create("global")}>
-        <div class="flex items-center gap-2">
-          <Icon type="plus" size={14} />
-          <span class="truncate">Create “{query.trim()}” (global)</span>
-        </div>
+      <DropdownMenuItem iconType="plus" onClick={() => create("global")}>
+        <span class="truncate">Create “{query.trim()}” (global)</span>
       </DropdownMenuItem>
     {/if}
     <slot name="extra-items" />

@@ -19,7 +19,7 @@ type MqttPublishParams struct {
 
 func (mm *MqttManager) Publish(message MqttPublishParams) error {
 	slog.DebugContext(mm.ctx, "publishing message", slog.String("topic", message.Topic))
-	if mm.ConnectionState != ConnectionStates.Connected ||
+	if mm.GetConnectionState() != ConnectionStates.Connected ||
 		mm.connection == nil {
 		return fmt.Errorf("no connection to broker")
 	}
@@ -43,7 +43,7 @@ func (mm *MqttManager) Publish(message MqttPublishParams) error {
 		return newPublishError(err)
 	}
 
-	mm.stats.SendMessageToStats(message)
+	mm.stats.sendMessageToStats(message)
 
 	if len(mm.middleware.AfterPublish) > 0 {
 		err := handlePublishMiddleware(&message, mm.middleware.AfterPublish)

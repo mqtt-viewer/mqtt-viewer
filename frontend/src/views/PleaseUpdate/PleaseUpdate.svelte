@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "@/components/Button/Button.svelte";
   import updateStore from "@/stores/update";
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
 </script>
 
 <div
@@ -18,7 +18,7 @@
         >
       {:else}
         <Button
-          on:click={() => Browser.OpenURL("https://mqttviewer.app/download")}
+          on:click={() => openExternal("https://mqttviewer.app/download")}
           >Download</Button
         >
       {/if}

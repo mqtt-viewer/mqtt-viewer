@@ -81,17 +81,19 @@
 </script>
 
 <Dialog {isOpen} startEmpty {onClose}>
-  <div class="flex flex-col w-[520px] max-w-[80vw] max-h-[70vh] min-h-0">
-    <BaseInput
-      bind:value={query}
-      name="search-messages"
-      icon="search"
-      placeholder="Search topic, payload, or headers"
-    />
-    <div class="grow min-h-0 overflow-y-auto mt-3 flex flex-col gap-4">
+  <div class="flex flex-col w-[520px] max-w-[80vw] max-h-[70vh] min-h-0 py-4">
+    <div class="px-4">
+      <BaseInput
+        bind:value={query}
+        name="search-messages"
+        icon="search"
+        placeholder="Search topic, payload, or headers"
+      />
+    </div>
+    <div class="grow min-h-0 overflow-y-auto mt-4 flex flex-col gap-4 px-2">
       {#if savedMatches.length > 0}
         <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-secondary-text"
+          <span class="px-2 text-sm font-semibold text-secondary-text"
             >Collections</span
           >
           {#each savedMatches as { collection, message } (message.id)}
@@ -143,11 +145,11 @@
       {/if}
 
       <div class="flex flex-col gap-1">
-        <span class="text-sm font-semibold text-secondary-text"
+        <span class="px-2 text-sm font-semibold text-secondary-text"
           >Previously published</span
         >
         {#if historyMatches.length === 0}
-          <div class="text-base text-secondary-text px-2 py-1">
+          <div class="text-base text-secondary-text px-2 py-2">
             {query.trim() ? "No matches" : "No publish history yet"}
           </div>
         {/if}

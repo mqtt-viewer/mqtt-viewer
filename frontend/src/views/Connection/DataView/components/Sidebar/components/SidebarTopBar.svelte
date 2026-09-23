@@ -43,19 +43,19 @@
   {:else if isBusy}
     <span class="size-[5px] rounded-full bg-warning mr-1"></span>
   {/if}
-  <Tooltip text={isConnected || isBusy ? "Disconnect" : "Connect"}>
+  <Tooltip text={isConnected || isBusy ? "Disconnect" : "Connect"} focusable>
     <IconButton onClick={toggleConnect}>
       <Icon type={isConnected ? "connected" : "disconnected"} size={16} />
     </IconButton>
   </Tooltip>
   {#if onSearch}
-    <Tooltip text="Search messages">
+    <Tooltip text="Search messages" focusable>
       <IconButton onClick={onSearch}>
         <Icon type="search" size={16} />
       </IconButton>
     </Tooltip>
   {/if}
-  <Tooltip text="Collapse sidebar">
+  <Tooltip text="Collapse sidebar" focusable>
     <IconButton onClick={collapseSidebar}>
       <Icon type="sidebar" size={16} />
     </IconButton>

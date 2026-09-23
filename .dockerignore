@@ -1,0 +1,40 @@
+# Keep the build context small and avoid leaking local/dev-only state into
+# the image. frontend/bindings (generated Go<->TS bindings) is intentionally
+# NOT excluded: the Go build stage needs it and no wails3 CLI runs in-image.
+
+.git
+.github
+.githooks
+.claude
+.dev_resources
+_dev_resources
+.vscode
+.task
+
+# Go/Wails build output, never needed as build input.
+bin
+build
+/mqtt-viewer
+
+# Frontend: node_modules and any stale local dist are rebuilt in-stage.
+node_modules
+frontend/node_modules
+frontend/dist
+frontend/storybook-static
+
+docs
+scripts
+
+# Local dev data, credentials, environment files.
+*.db
+secrets.json
+secrets.json.*
+.env
+.DS_Store
+
+# Root-level docs not needed to build the image.
+/*.md
+
+# Docker-related files (Dockerfile itself can be included; the rest of the
+# docker/ dir is compose/entrypoint source consumed by the build, so it is
+# NOT excluded here).

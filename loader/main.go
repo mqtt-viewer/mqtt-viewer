@@ -19,6 +19,7 @@ func main() {
 		&models.Tab{},
 		&models.Subscription{},
 		&models.SortState{},
+		&models.ChartWindow{},
 		&models.FilterHistory{},
 		&models.PanelSize{},
 		&models.PublishHistory{},
@@ -27,7 +28,9 @@ func main() {
 		&models.ReceivedMessage{},
 		&models.Collection{},
 		&models.CollectionMessage{},
+		&models.CollectionCollapsedState{},
 		&models.SysMetricMapping{},
+		&models.PinnedTopic{},
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load gorm schema: %v\n", err)

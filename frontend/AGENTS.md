@@ -7,6 +7,35 @@ touching `src/components`, `src/views`, or any `.spec.json` / `.stories.svelte`.
 
 Full design: `docs/design-system/STORYBOOK_SPEC.md`. Workflow: `docs/design-system/WORKFLOW.md`.
 
+> **Adding ANY new `.svelte` under `src/components/` or `src/views/`? (yes, even
+> mid-feature — this is not just for design-system tasks.)** It MUST ship two
+> colocated siblings or `pnpm ds:validate` **fails CI**
+> (`.github/workflows/design-system.yml`):
+>
+> 1. `pnpm ds:make-spec <Name>` — scaffolds `<Name>.spec.json`.
+> 2. Create `<Name>.stories.svelte` (copy a sibling; `title` = `<Tier>/<path>`
+>    exactly as `ds:validate` expects, `tags: ["autodocs"]`, `parameters.design`).
+> 3. `pnpm ds:validate` until green (it also regenerates `component-index.json`
+>    + `COMPONENT_CHECKLIST.md` — commit those too).
+>
+> No hardcoded colors: use token utilities (`bg-elevation-0`, `text-error`),
+> never hex like `bg-[#0c0c0c]` (rule 8 below).
+>
+> **Two CI steps, not one.** `ds:validate` is the spec/story/token gate;
+> **`pnpm test-storybook`** (also in the `validate` job) actually *renders* every
+> story in vitest and fails on any unhandled error. So also:
+> - If the component imports a **new Wails bound method**, add it to
+>   `.storybook/mocks/bindings/…` (and any new event to `mockEventSet` in
+>   `src/stories/fixtures.ts`) — otherwise the story fails to import and the
+>   error cascades to every parent story that renders it.
+> - The component **must not throw on mount** with story props: stories render
+>   dialogs *open* (`isOpen: writable(true)`) with `mockConnection`. Beware
+>   top-level `let x = reactiveVar.…` — reactive `$:` assignments haven't run
+>   yet, so read from props directly and guard optional data.
+> - Run **`pnpm test-storybook` AND `pnpm ds:validate`** locally before pushing
+>   any branch that touches `.svelte` files (svelte-check + vite build are not
+>   enough — they don't render stories).
+
 ## The design-system loop (why this library exists)
 
 ```

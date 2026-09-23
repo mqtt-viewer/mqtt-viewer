@@ -80,6 +80,27 @@
       "type": "function",
       "required": false,
       "default": "undefined"
+    },
+    {
+      "name": "isPinned",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether this topic is pinned. Renders the pin marker after the retained dot; the marker is also the unpin button."
+    },
+    {
+      "name": "onUnpin",
+      "type": "function",
+      "required": false,
+      "default": "undefined",
+      "description": "Unpins the topic. The pin marker is a button wherever a pinned row appears, in the tree as well as the pinned block; only pinned rows render it, so unpinned rows pay no listener cost."
+    },
+    {
+      "name": "showChevron",
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "description": "Hide the expansion chevron column, as the pinned block does."
     }
   ],
   "tokens": [

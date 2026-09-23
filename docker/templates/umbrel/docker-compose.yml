@@ -1,0 +1,20 @@
+# Umbrel compose file for MQTT Viewer. Pairs with umbrel-app.yml.
+#
+# Schema followed: the current umbrel-package-app skill in
+# getumbrel/umbrel-apps (.claude/skills/umbrel-package-app/SKILL.md, fetched
+# July 2026). Every Umbrel app needs an app_proxy service; umbrelOS injects
+# the real container name as <app-id>_<service-name>_1 at install time.
+#
+# The image tag below needs a version + sha256 digest pin (Umbrel App Store
+# rule) once a real image exists. See docker/templates/README.md.
+services:
+  app_proxy:
+    environment:
+      APP_HOST: mqtt-viewer_web_1
+      APP_PORT: 8080
+
+  web:
+    image: ghcr.io/mqtt-viewer/mqtt-viewer:latest
+    restart: on-failure
+    volumes:
+      - ${APP_DATA_DIR}/data:/data

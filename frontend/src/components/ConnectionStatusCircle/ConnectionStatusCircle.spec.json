@@ -20,7 +20,8 @@
         "connected",
         "disconnected",
         "connecting",
-        "reconnecting"
+        "reconnecting",
+        "error"
       ]
     }
   ],

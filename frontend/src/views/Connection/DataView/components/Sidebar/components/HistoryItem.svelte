@@ -9,6 +9,10 @@
   } from "../../PublishPanel/stores/publish-history";
   import type { CollectionScope, CollectionsStore } from "../stores/collections";
   import AddToCollectionMenu from "./AddToCollectionMenu.svelte";
+  import { historyEntryToMessage } from "../util/history-to-message";
+  import { draggable } from "../dnd/draggable";
+  import { dragState, isDraggedHistory, type DropTarget } from "../dnd/drag-store";
+  import { applyDrop } from "../dnd/handle-drop";
 
   export let entry: PublishHistory[number];
   export let collectionsStore: CollectionsStore;
@@ -16,6 +20,17 @@
   export let onClick: () => void;
 
   let isHovered = false;
+
+  $: isDragged = isDraggedHistory($dragState, entry.id);
+
+  // Dropping a history row into a folder saves it there, at the drop position.
+  const onDrop = (target: DropTarget) =>
+    applyDrop(
+      collectionsStore,
+      $collectionsStore.collections,
+      { kind: "history", entry },
+      target
+    );
 
   $: syntaxHighlightedPayload = entry.payload
     ? highlightJson(entry.payload)
@@ -30,24 +45,9 @@
   // Saves this history entry into a collection, named after its topic.
   const saveToCollection = async (collectionId: number) => {
     try {
-      await collectionsStore.saveMessage({
-        collectionId,
-        name: entry.topic || "Untitled message",
-        topic: entry.topic,
-        payload: entry.payload,
-        qos: entry.qos,
-        retain: entry.retain,
-        encoding: entry.encoding,
-        format: entry.format,
-        userProperties: entry.userProperties,
-        headerContentType: entry.headerContentType,
-        headerResponseTopic: entry.headerResponseTopic,
-        headerCorrelationData: entry.headerCorrelationData,
-        headerPayloadFormatIndicator: entry.headerPayloadFormatIndicator,
-        headerMessageExpiryInterval: entry.headerMessageExpiryInterval,
-        headerTopicAlias: entry.headerTopicAlias,
-        headerSubscriptionIdentifier: entry.headerSubscriptionIdentifier,
-      });
+      await collectionsStore.saveMessage(
+        historyEntryToMessage(entry, collectionId)
+      );
       addToast({
         data: {
           title: "Message saved to collection",
@@ -98,12 +98,13 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative"
+  class={`relative flex ${isDragged ? "opacity-40" : ""}`}
   on:mouseenter={() => (isHovered = true)}
   on:mouseleave={() => (isHovered = false)}
 >
   <button
-    class="w-full text-left rounded px-1 py-1 hover:bg-hovered text-white-text space-y-1"
+    class="grow min-w-0 text-left rounded px-1 -mx-1 py-1 hover:bg-hovered text-white-text space-y-1"
+    use:draggable={{ payload: { kind: "history", entry }, onDrop }}
     on:click={onClick}
   >
     <div class="w-full flex gap-2 items-center">
@@ -121,7 +122,7 @@
           Retain
         </div>
       {/if}
-      <div class="truncate grow min-w-0 pr-5">{entry.topic}</div>
+      <div class="truncate grow min-w-0 pr-6">{entry.topic}</div>
     </div>
     <div class="font-mono truncate text-secondary-text">
       {@html syntaxHighlightedPayload}
@@ -143,8 +144,10 @@
       </div>
       <svelte:fragment slot="extra-items">
         <div class="border-t border-divider my-1"></div>
-        <DropdownMenuItem class="hover:text-error" onClick={deleteEntry}
-          >Delete</DropdownMenuItem
+        <DropdownMenuItem
+          iconType="delete"
+          class="text-error"
+          onClick={deleteEntry}>Delete</DropdownMenuItem
         >
       </svelte:fragment>
     </AddToCollectionMenu>

@@ -6,7 +6,7 @@
 
   const componentName = "AddToCollectionMenu";
   const storyId = "Views/Connection/DataView/Sidebar/AddToCollectionMenu";
-  const props: string[] = ["collectionsStore","currentCollectionId","placeholder","onSelect","onCreate"];
+  const props: string[] = ["collectionsStore","open","currentCollectionId","placeholder","onSelect","onCreate"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

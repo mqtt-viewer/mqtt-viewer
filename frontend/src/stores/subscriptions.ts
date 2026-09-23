@@ -8,6 +8,7 @@ import { get, writable } from "svelte/store";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import type { DeepOmit } from "@/util/types";
 import { debounce } from "lodash";
+import { markSaved } from "./last-saved";
 
 type SubscriptionWithOptionalQos = DeepOmit<
   models.Subscription,
@@ -52,6 +53,7 @@ const addSubscription = async (
 ) => {
   try {
     const newSub = (await AddSubscription(connId)) as Subscription;
+    markSaved(connId);
     const existingSubs =
       get({ subscribe }).subscriptionsByConnectionId[connId] ?? [];
     const newSubs = [...existingSubs, newSub];
@@ -71,6 +73,7 @@ const addSubscription = async (
 const deleteSubscription = async (connId: number, subId: number) => {
   try {
     await DeleteSubscription(connId, subId);
+    markSaved(connId);
     const existingSubs = get({ subscribe }).subscriptionsByConnectionId[connId];
     const newSubs = existingSubs.filter((sub) => sub.id !== subId);
     update((store) => {
@@ -93,7 +96,19 @@ const removeConnection = async (connId: number) => {
   }
 };
 
-const debouncedUpdateSubscription = debounce(UpdateSubscription, 400);
+// Mark the save once the debounced call actually fires and succeeds, not
+// when it is scheduled.
+const debouncedUpdateSubscription = debounce(
+  async (connId: number, subscription: models.Subscription) => {
+    try {
+      await UpdateSubscription(connId, subscription);
+      markSaved(connId);
+    } catch (e) {
+      console.error(e);
+    }
+  },
+  400
+);
 
 const updateSubscription = async (
   connId: number,

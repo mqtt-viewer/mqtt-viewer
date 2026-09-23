@@ -6,7 +6,7 @@
 
   const componentName = "FilePathPicker";
   const storyId = "Primitives/InputFields/FilePathPicker";
-  const props: string[] = ["disabled","defaultValue","variant","actionLabel","valueLabel","value","onFileChosen","onFileRemoved"];
+  const props: string[] = ["disabled","defaultValue","variant","actionLabel","valueLabel","value","onFileChosen","onFileRemoved","serverPlaceholder"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

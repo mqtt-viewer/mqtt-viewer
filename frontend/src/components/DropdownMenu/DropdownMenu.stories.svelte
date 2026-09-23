@@ -6,7 +6,7 @@
 
   const componentName = "DropdownMenu";
   const storyId = "Primitives/DropdownMenu";
-  const props: string[] = ["disabled","triggerText","triggerClass","triggerIconSize","triggerVariant","placement"];
+  const props: string[] = ["disabled","open","triggerText","triggerClass","triggerIconSize","triggerVariant","placement"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

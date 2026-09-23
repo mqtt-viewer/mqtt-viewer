@@ -47,6 +47,48 @@ export async function ClearConnectionHistory(
   _connectionId: number
 ): Promise<void> {}
 
+// Client-logs mocks. LogEntry is a flat {timestampMs, level, message} shape;
+// plain objects satisfy it structurally in stories.
+export async function GetConnectionLogs(_connId: number): Promise<any[]> {
+  const base = 1_710_000_000_000;
+  return [
+    {
+      timestampMs: base,
+      level: "info",
+      message: "connection state changed from disconnected to connecting",
+    },
+    {
+      timestampMs: base + 500,
+      level: "info",
+      message: "connection state changed from connecting to connected",
+    },
+    { timestampMs: base + 1200, level: "debug", message: "PINGREQ sent" },
+    { timestampMs: base + 1400, level: "debug", message: "PINGRESP received" },
+    {
+      timestampMs: base + 2600,
+      level: "warn",
+      message: "reconnecting to broker",
+    },
+    {
+      timestampMs: base + 3000,
+      level: "error",
+      message: "connect failed: connection refused",
+    },
+  ];
+}
+
+export async function ClearConnectionLogs(_connId: number): Promise<void> {}
+
+export async function SetConnectionDebugLogging(
+  _connId: number,
+  _enabled: boolean
+): Promise<void> {}
+
+export async function SetLogsStreaming(
+  _connId: number,
+  _streaming: boolean
+): Promise<void> {}
+
 // App settings / message retention mocks.
 let mockAppSettings = new models.AppSettings({
   id: 1,
@@ -57,6 +99,9 @@ let mockAppSettings = new models.AppSettings({
   lastSeenChangelogVersion: "",
   launchCount: 0,
   hasSeenStarPrompt: false,
+  topicPanelDockMode: "right",
+  topicPanelLastDockedSide: "right",
+  ignoredUpdateVersion: "",
 });
 let mockDatabaseSizeBytes = 250 * 1024 * 1024;
 
@@ -92,6 +137,36 @@ export async function AcknowledgeStarPrompt(): Promise<models.AppSettings> {
   return mockAppSettings;
 }
 
+export async function SetTopicPanelDock(
+  mode: string,
+  lastDockedSide: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    topicPanelDockMode: mode,
+    topicPanelLastDockedSide: lastDockedSide,
+  });
+  return mockAppSettings;
+}
+
+export async function SkipUpdateVersion(
+  version: string
+): Promise<models.AppSettings> {
+  mockAppSettings = new models.AppSettings({
+    ...mockAppSettings,
+    ignoredUpdateVersion: version,
+  });
+  return mockAppSettings;
+}
+
+export async function OpenTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
+
+export async function FocusTopicWindow(_params: {
+  connectionId: number;
+}): Promise<void> {}
+
 export async function GetDatabaseSizeBytes(): Promise<number> {
   return mockDatabaseSizeBytes;
 }
@@ -112,6 +187,10 @@ export async function DeleteRetainedMessage(
   _connectionId: number,
   _topic: string
 ): Promise<void> {}
+export async function DeleteRetainedMessages(
+  _connectionId: number,
+  _topics: string[]
+): Promise<void> {}
 export async function DeleteSubscription(
   _connectionId: number,
   _subscriptionId: number
@@ -128,6 +207,24 @@ export async function ExportTopicMessages(
   topic: string
 ): Promise<string> {
   return `/Users/sam/exports/mqtt-messages-${topic.replaceAll("/", "-")}.json`;
+}
+
+export async function ExportAllMessagesData(
+  _connectionId: number
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: "mqtt-messages-all.json",
+    json: "[]",
+  });
+}
+export async function ExportTopicMessagesData(
+  _connectionId: number,
+  topic: string
+): Promise<app.ExportedMessagesPayload> {
+  return new app.ExportedMessagesPayload({
+    filename: `mqtt-messages-${topic.replaceAll("/", "-")}.json`,
+    json: "[]",
+  });
 }
 
 export async function GetAllConnections(): Promise<app.Connections> {
@@ -208,6 +305,17 @@ const findMockCollectionMessage = (id: number) => {
   }
   return null;
 };
+
+export async function GetCollectionCollapsedStates(): Promise<
+  models.CollectionCollapsedState[]
+> {
+  return [];
+}
+
+export async function SetCollectionCollapsed(
+  _collectionId: number,
+  _collapsed: boolean
+): Promise<void> {}
 
 export async function GetCollectionsForConnection(
   _connectionId: number
@@ -301,6 +409,37 @@ export async function DuplicateCollectionMessage(
   return copy;
 }
 
+export async function ReorderCollectionMessages(
+  collectionId: number,
+  orderedIds: number[]
+): Promise<models.CollectionMessage[]> {
+  const target = mockCollectionsState.find((c) => c.id === collectionId);
+  if (!target) return [];
+  const moved: models.CollectionMessage[] = [];
+  for (const id of orderedIds) {
+    const found = findMockCollectionMessage(id);
+    if (!found) continue;
+    found.collection.messages = found.collection.messages.filter(
+      (m) => m.id !== id
+    );
+    found.message.collectionId = collectionId;
+    found.message.position = moved.length;
+    moved.push(found.message);
+  }
+  target.messages = moved;
+  return moved;
+}
+
+export async function ReorderCollections(
+  _connectionId: number | null,
+  orderedIds: number[]
+): Promise<void> {
+  orderedIds.forEach((id, index) => {
+    const collection = mockCollectionsState.find((c) => c.id === id);
+    if (collection) collection.position = index;
+  });
+}
+
 export async function DeleteCollectionMessage(id: number): Promise<void> {
   const found = findMockCollectionMessage(id);
   if (found) {
@@ -371,6 +510,13 @@ export async function PublishSparkplugRebirth(
   _edgeNode: string
 ): Promise<void> {}
 
+export async function GetRetainedTopicsUnderPrefix(
+  _connId: number,
+  _prefix: string
+): Promise<string[]> {
+  return [];
+}
+
 export async function OpenBrokerStatusWindow(
   _connectionId: number
 ): Promise<void> {}
@@ -386,6 +532,7 @@ export async function GetEnvInfo(): Promise<app.EnvInfo> {
     isDev: true,
     serverAddress: "localhost",
     version: "storybook",
+    isServerMode: false,
   });
 }
 
@@ -415,7 +562,8 @@ export async function GetMatchingSubscriptionForTopic(
 
 export async function GetMessageHistory(
   _connectionId: number,
-  _topic: string
+  _topic: string,
+  _limit?: number
 ): Promise<any[]> {
   return mockMqttMessages;
 }
@@ -435,6 +583,94 @@ export async function GetReceivedMessageCount(
   _topic: string
 ): Promise<number> {
   return mockMqttMessages.length;
+}
+
+// Lightweight stubs (id/timeMs/qos/retain, no payload) mirroring the real
+// GetMessageTimeline/GetReceivedTimelineWindow bindings used by the
+// selection timeline. Computed lazily (not a module-level const) to avoid
+// depending on fixtures.ts's own initialization order.
+const mockMqttMessageStubs = () =>
+  mockMqttMessages.map((m) => ({
+    id: m.id,
+    timeMs: m.timeMs,
+    qos: m.qos,
+    retain: m.retain,
+  }));
+
+export async function GetMessageTimeline(
+  _connectionId: number,
+  _topic: string,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetReceivedTimelineWindow(
+  _connectionId: number,
+  _topic: string,
+  _beforeID: number,
+  _afterID: number,
+  _limit: number
+): Promise<any[]> {
+  return mockMqttMessageStubs();
+}
+
+export async function GetMessageById(
+  _connectionId: number,
+  topic: string,
+  id: string,
+  _timeMs: number
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === id);
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetReceivedMessageById(
+  _connectionId: number,
+  topic: string,
+  id: number
+): Promise<[any, boolean]> {
+  const found = mockMqttMessages.find((m) => m.id === String(id));
+  if (!found) return [{}, false];
+  return [{ ...found, topic }, true];
+}
+
+export async function GetMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: string[],
+  _timesMs: number[]
+): Promise<any[]> {
+  return mockMqttMessages
+    .filter((m) => ids.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetReceivedMessagesByIds(
+  _connectionId: number,
+  topic: string,
+  ids: number[]
+): Promise<any[]> {
+  const wanted = ids.map(String);
+  return mockMqttMessages
+    .filter((m) => wanted.includes(m.id))
+    .map((m) => ({ ...m, topic }));
+}
+
+export async function GetMemoryLimitModel(): Promise<app.MemoryLimitModel> {
+  return new app.MemoryLimitModel({
+    baseBytes: 1024 * 1024 * 1024,
+    budgetFactorNumerator: 3,
+    budgetFactorDenominator: 2,
+  });
+}
+
+export async function GetMemoryStats(): Promise<app.MemoryStats> {
+  return new app.MemoryStats({
+    historyBytes: 34 * 1024 * 1024,
+    activeConnections: 1,
+  });
 }
 
 export async function GetMqttStats(): Promise<app.MqttStats> {
@@ -477,6 +713,15 @@ export async function GetSortStates(): Promise<models.SortState[]> {
     }),
   ];
 }
+
+export async function GetChartWindows(): Promise<models.ChartWindow[]> {
+  return [];
+}
+
+export async function UpdateChartWindow(
+  _id: string,
+  _windowSeconds: number
+): Promise<void> {}
 
 export async function LoadOpenTabs(): Promise<models.Tab[]> {
   return [
@@ -556,3 +801,21 @@ export async function UpdateSubscription(
 }
 
 export { mockEventSet, mockHeaders };
+
+export async function GetPinnedTopics(
+  _connectionID: number
+): Promise<models.PinnedTopic[]> {
+  return [];
+}
+
+export async function PinTopic(
+  _connectionID: number,
+  _topic: string
+): Promise<void> {}
+
+export async function UnpinTopic(
+  _connectionID: number,
+  _topic: string
+): Promise<void> {}
+
+export async function UnpinAllTopics(_connectionID: number): Promise<void> {}

@@ -3,7 +3,15 @@
   import Component from "./WhatsNewContent.svelte";
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
-  import { CHANGELOG, releasedEntries } from "@/changelog";
+  import { CHANGELOG, releasedEntries, unreleasedEntry } from "@/changelog";
+
+  // The staging entry groups its sections under Added / Changed / Fixed /
+  // Miscellaneous. Falls back to the newest release right after a promotion,
+  // when there is no staging entry.
+  const groupedEntries = () => {
+    const staging = unreleasedEntry();
+    return staging ? [staging] : releasedEntries().slice(0, 1);
+  };
 
   const componentName = "WhatsNewContent";
   const storyId = "Components/WhatsNewDialog/WhatsNewContent";
@@ -45,5 +53,12 @@
 <Story
   name="Single release"
   args={{ ...storyArgs, entries: releasedEntries().slice(0, 1) }}
+  {template}
+/>
+
+<!-- Grouped sections: headings for Added, Changed, Fixed and Miscellaneous. -->
+<Story
+  name="Grouped sections"
+  args={{ ...storyArgs, entries: groupedEntries() }}
   {template}
 />

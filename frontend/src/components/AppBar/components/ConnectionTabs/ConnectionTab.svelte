@@ -4,6 +4,7 @@
   import ConnectionIdenticon from "@/components/ConnectionIdenticon/ConnectionIdenticon.svelte";
   import type { Connection } from "@/stores/connections";
   import ConnectionStatusCircle from "@/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte";
+  import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   export let isSelected = false;
   export let width: number;
   export let connection: Connection;
@@ -48,10 +49,22 @@
     <div class="truncate flex-grow">{connection.connectionDetails.name}</div>
   {/if}
   {#if (!isHovered || replaceIdenticonOnHover) && showConnectionState}
-    <ConnectionStatusCircle
-      state={connection.connectionState}
-      class="ml-2 mr-1"
-    />
+    {#if connection.connectionState === "error"}
+      <Tooltip
+        placement="top"
+        text={connection.lastConnectionError ?? "Connection failed"}
+      >
+        <ConnectionStatusCircle
+          state={connection.connectionState}
+          class="ml-2 mr-1"
+        />
+      </Tooltip>
+    {:else}
+      <ConnectionStatusCircle
+        state={connection.connectionState}
+        class="ml-2 mr-1"
+      />
+    {/if}
   {:else if isHovered && !replaceIdenticonOnHover}
     <button
       class="p-[1px] rounded hover:bg-hovered"

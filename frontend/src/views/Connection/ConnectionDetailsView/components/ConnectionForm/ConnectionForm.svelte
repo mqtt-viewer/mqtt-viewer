@@ -14,15 +14,12 @@
   import { twMerge } from "tailwind-merge";
   import ConnectionIdenticon from "@/components/ConnectionIdenticon/ConnectionIdenticon.svelte";
   import FilePathPicker from "@/components/InputFields/FilePathPicker.svelte";
+  import envStore from "@/stores/env";
   import { getConnectionIsValidContext } from "@/views/Connection/contexts/connection-is-valid.js";
-  import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
-  import Button from "@/components/Button/Button.svelte";
-  import DropdownCloseOnClick from "@/components/DropdownMenu/DropdownCloseOnClick.svelte";
+  import IconButton from "@/components/Button/IconButton.svelte";
   import ConfirmDeleteConnectionDialog from "../ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte";
   import { writable } from "svelte/store";
   import Icon from "@/components/Icon/Icon.svelte";
-  import IconButton from "@/components/Button/IconButton.svelte";
-  import Tooltip from "@/components/Tooltip/Tooltip.svelte";
   import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
 
   export let connection: Connection;
@@ -101,54 +98,42 @@
 
   $: isSslTls = $data.protocol === "mqtts" || $data.protocol === "wss";
 
-  $: isAllFieldsDisabled = connection.connectionState !== "disconnected";
+  // Editable whenever there isn't a live or in-progress connection to protect
+  // against edits mid-flight. Explicitly not "!== disconnected": an "error"
+  // state means the last attempt failed, which is exactly when the user
+  // needs to fix these fields.
+  $: isAllFieldsDisabled =
+    connection.connectionState === "connected" ||
+    connection.connectionState === "connecting" ||
+    connection.connectionState === "reconnecting";
   let isConfirmDeleteDialogOpen = writable(false);
 </script>
 
 <form use:form class="flex flex-col gap-8 w-full">
-  <div class="flex items-center gap-1">
-    <span class="text-lg">Connection details</span>
-    <DropdownMenu disabled={isAllFieldsDisabled}>
-      <div slot="trigger">
-        <IconButton disabled={isAllFieldsDisabled}>
-          <Icon type="options" size={16} />
-        </IconButton>
-      </div>
-      <div slot="menu-content" class="flex flex-col px-2 py-2 gap-4">
-        <div class="flex">
-          <div class="size-9 mr-2">
-            <ConnectionIdenticon {connection} />
-          </div>
-          <BaseInput
-            class="w-[170px]"
-            name="customIconSeed"
-            placeholder="Custom Icon Seed"
-            bind:value={$data.customIconSeed}
-          />
-        </div>
-        <DropdownCloseOnClick>
-          <Button
-            variant="text"
-            class="mt-2 text-error enabled:hover:text-error-light enabled:group-hover:text-error-light"
-            on:click={onDeleteClick}
-            ><div class="flex mr-[18px] ml-2">
-              <Icon type="delete" size={20} />
-            </div>
-            <span>Delete Connection</span></Button
-          >
-        </DropdownCloseOnClick>
-      </div>
-    </DropdownMenu>
-    {#if isAllFieldsDisabled}
-      <Tooltip>
-        <span slot="tooltip-content"
-          >Disconnect if you want to modify connection details</span
-        >
-        <div class="text-secondary-text flex gap-1 items-center">
-          <Icon type="info" size={14} />Disabled while connected
-        </div>
-      </Tooltip>
-    {/if}
+  <div class="flex items-center gap-3">
+    <div class="size-9 shrink-0">
+      <ConnectionIdenticon {connection} />
+    </div>
+    <div class="w-1/2">
+      <BaseInput
+        disabled={isAllFieldsDisabled}
+        name="customIconSeed"
+        label="Icon seed"
+        placeholder="Leave blank for default"
+        bind:value={$data.customIconSeed}
+      />
+    </div>
+    <div class="grow"></div>
+    <IconButton
+      tooltipText="Delete connection"
+      tooltipPlacement="left"
+      class="-mr-1"
+      onClick={onDeleteClick}
+    >
+      <span class="flex text-error group-hover:text-error-light">
+        <Icon type="delete" size={18} />
+      </span>
+    </IconButton>
   </div>
   <div class="flex w-full gap-3 relative">
     <div class="w-3/4">
@@ -301,6 +286,7 @@
           variant="certificate"
           actionLabel="Add CA Certificate"
           valueLabel="CA"
+          serverPlaceholder="/certs/ca.pem"
           defaultValue={certCa ?? undefined}
           onFileChosen={(filePath) => setFields("certCa", filePath, true)}
           onFileRemoved={() => {
@@ -312,6 +298,7 @@
           variant="certificate"
           actionLabel="Add Client Certificate"
           valueLabel="Client"
+          serverPlaceholder="/certs/client.pem"
           defaultValue={certClient ?? undefined}
           onFileChosen={(filePath) => setFields("certClient", filePath, true)}
           onFileRemoved={() => {
@@ -323,6 +310,7 @@
           variant="certificate"
           actionLabel="Add Client Key"
           valueLabel="Client Key"
+          serverPlaceholder="/certs/client.key"
           defaultValue={certClientKey ?? undefined}
           onFileChosen={(filePath) =>
             setFields("certClientKey", filePath, true)}
@@ -330,6 +318,15 @@
             setFields("certClientKey", "", true);
           }}
         />
+        {#if $envStore.isServerMode}
+          <!-- One hint for the group: in the browser these are typed paths
+               resolved inside the container, not files picked from this
+               machine. -->
+          <span class="block text-sm text-secondary-text">
+            Type paths inside the container. Mount your certificates in first,
+            as described in the Docker guide.
+          </span>
+        {/if}
       </div>
     {/if}
   {/if}

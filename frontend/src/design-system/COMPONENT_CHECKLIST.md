@@ -19,7 +19,7 @@
 | Primitives/Card | [x] | [ ] | [x] | [x] |
 | Primitives/ConnectionIdenticon | [x] | [ ] | [x] | [ ] |
 | Primitives/ConnectionStatusCircle | [x] | [ ] | [x] | [x] |
-| Primitives/ContextMenu | [x] | [ ] | [ ] | [ ] |
+| Primitives/ContextMenu | [x] | [ ] | [x] | [x] |
 | Primitives/CopyToClipboard | [x] | [ ] | [x] | [ ] |
 | Primitives/Dialog | [x] | [ ] | [x] | [x] |
 | Primitives/Dialog/DialogActionBar | [x] | [ ] | [ ] | [ ] |
@@ -62,11 +62,16 @@
 | Components/CodeEditor/CodeEditorConfigBar | [x] | [ ] | [x] | [ ] |
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
+| Components/Connection/DataView/ConfirmClearRetainedDialog | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
+| Components/Connection/DataView/TopicContextMenu | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
 | Components/MaxOpenTabsDialog | [x] | [ ] | [ ] | [ ] |
+| Components/MemoryFormula | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
-| Components/StarPromptDialog | [x] | [ ] | [ ] | [x] |
-| Components/UpdateDialog | [x] | [ ] | [ ] | [ ] |
+| Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
+| Components/UpdateDialog | [x] | [ ] | [ ] | [x] |
+| Components/UpdateDialog/UpdateAvailableContent | [x] | [ ] | [x] | [x] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
 | Components/WhatsNewDialog/WhatsNewContent | [x] | [ ] | [x] | [x] |
 
@@ -76,14 +81,20 @@
 |---|:---:|:---:|:---:|:---:|
 | Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
 | Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/FactsRow | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/HealthChip | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/HealthStrip | [x] | [ ] | [x] | [ ] |
+| Views/BrokerStatusWindow/HeroChart | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/LoudestTopics | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/MetricMappingEditor | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/Sparkline | [x] | [ ] | [x] | [ ] |
 | Views/BrokerStatusWindow/StatTile | [x] | [ ] | [x] | [x] |
+| Views/BrokerStatusWindow/TimeRangeSelector | [x] | [ ] | [x] | [x] |
 | Views/ChartWindow | [x] | [ ] | [ ] | [x] |
 | Views/Connection | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/ConfirmDeleteConnectionDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/ConnectionForm | [x] | [ ] | [x] | [x] |
-| Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [ ] |
+| Views/Connection/ConnectionDetailsView/SubscriptionsForm | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree | [x] | [ ] | [x] | [ ] |
 | Views/Connection/ConnectionDetailsView/SubscriptionsForm/LoadedProtoDetailsDialog/LoadedProtoTree/LoadedProtoTreeItem | [x] | [ ] | [x] | [x] |
@@ -95,6 +106,7 @@
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SparkplugPanel | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SparkplugPanel/SparkplugRow | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/MqttGraphView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
 | Views/Connection/DataView/PublishPanel/PayloadTab | [x] | [ ] | [x] | [x] |
@@ -118,7 +130,8 @@
 | Views/Connection/DataView/Sidebar/CollectionFolder | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/CollectionsSection | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConfirmDeleteDialog | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [ ] |
+| Views/Connection/DataView/Sidebar/ConnectionDetailsDialog | [x] | [ ] | [x] | [x] |
+| Views/Connection/DataView/Sidebar/ConnectionLogsDialog | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/ConnectionRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistoryItem | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/Sidebar/HistorySection | [x] | [ ] | [x] | [x] |
@@ -139,10 +152,11 @@
 | Views/NewTab/RecentConnectionsList | [x] | [ ] | [x] | [x] |
 | Views/NewTab/RecentConnectionsList/RecentConnectionsListItem | [x] | [ ] | [x] | [x] |
 | Views/PleaseUpdate | [x] | [ ] | [ ] | [ ] |
+| Views/TopicWindow | [x] | [ ] | [ ] | [x] |
 
 ## Summary
 
-- Components scanned: 116
-- Story present: 116
+- Components scanned: 130
+- Story present: 130
 - Figma-linked: 0
 - Missing specs: 0

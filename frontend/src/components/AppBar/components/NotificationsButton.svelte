@@ -5,10 +5,9 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import notifications from "@/stores/notifications";
 
-  console.log("notifications", $notifications);
-
-  // Currently the only notification is a new update, so keep it pinging
+  // The list keeps showing dismissed entries, quietly; only unseen ones ping.
   $: hasNotifications = $notifications.notifications.length > 0;
+  $: unseenCount = $notifications.notifications.filter((n) => !n.seen).length;
 </script>
 
 <DropdownMenu>
@@ -16,7 +15,7 @@
     <IconButton class={""} on:click={() => {}}>
       <Icon type="notification" />
     </IconButton>
-    {#if hasNotifications}
+    {#if unseenCount > 0}
       <span class="absolute flex size-2 top-0 right-0">
         <span
           class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"
@@ -36,24 +35,38 @@
     {/if}
     {#if hasNotifications}
       {#each $notifications.notifications as n}
-        <Button
-          on:click={() => n.onClick?.()}
-          class="h-fit w-full text-left py-1"
-        >
-          <div class="flex items-center justify-center py-1">
-            <div class="flex gap-3 w-full h-full">
-              <div class="h-full flex items-center">
-                <Icon type={n.icon ?? "notification"} size={34} />
-              </div>
-              <div class="flex-grow">
-                <p>{n.title}</p>
-                <p class="text-sm text-secondary-text">
-                  {n.message}
-                </p>
+        <div class="relative">
+          <Button
+            on:click={() => n.onClick?.()}
+            class="h-fit w-full text-left py-1 {n.seen ? 'opacity-60' : ''}"
+          >
+            <div class="flex items-center justify-center py-1">
+              <div class="flex gap-3 w-full h-full">
+                <div class="h-full flex items-center">
+                  <Icon type={n.icon ?? "notification"} size={34} />
+                </div>
+                <div class="flex-grow">
+                  <p>{n.title}</p>
+                  <p class="text-sm text-secondary-text">
+                    {n.message}
+                  </p>
+                </div>
               </div>
             </div>
+          </Button>
+          <div class="absolute top-0 right-0">
+            <IconButton
+              tooltipText="Dismiss"
+              onClick={(e) => {
+                e.stopPropagation();
+                n.onDismiss?.();
+                notifications.markNotificationAsSeen(n.id);
+              }}
+            >
+              <Icon type="close" size={14} />
+            </IconButton>
           </div>
-        </Button>
+        </div>
       {/each}
     {/if}
   </div>

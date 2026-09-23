@@ -22,10 +22,23 @@ export interface ChangelogThanks {
   url: string;
 }
 
+// Sections are grouped under these headings in the dialog and the release
+// notes, in this order. A section without a group renders under no heading,
+// which keeps older entries exactly as they were.
+export type ChangelogGroup = "Added" | "Changed" | "Fixed" | "Miscellaneous";
+export const CHANGELOG_GROUPS: ChangelogGroup[] = [
+  "Added",
+  "Changed",
+  "Fixed",
+  "Miscellaneous",
+];
+
 export interface ChangelogSection {
   title: string;
+  // Empty when the title says it all; renderers must not print an empty line.
   body: string;
   thanks?: ChangelogThanks[];
+  group?: ChangelogGroup;
 }
 
 export interface ChangelogEntry {
@@ -47,73 +60,12 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "In development",
     headline: "In the next update",
     intro:
-      "Here's what's landed since 1.0.0. I'll tidy these notes up and give them a version when the update ships.",
+      "Here's what's landed since 1.1. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
-        title: "A status page for your broker",
-        body: "There's a new broker status window showing what your broker is up to: connected clients, message and byte rates, subscriptions, retained messages, uptime and version, each with a little trend line. It reads the $SYS topics mosquitto, EMQX and VerneMQ publish, and I also measure message rates client-side so you still get numbers on brokers that publish nothing. Open it from the pulse icon above the topic tree, or hover the $SYS row.",
-        thanks: [
-          {
-            name: "m1dnight",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12598903",
-          },
-          {
-            name: "adamwoodland2",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12601084",
-          },
-          {
-            name: "viktak",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12790493",
-          },
-        ],
-      },
-      {
-        title: "Make the status page your own",
-        body: "If your broker names its health topics differently, point any tile at your own topic, or add new tiles with the plus at the end of the grid. There's a raw list of every $SYS topic too, and you can pin one as a tile straight from it. Your tiles are saved per connection.",
-        thanks: [
-          {
-            name: "andyg2",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12604380",
-          },
-        ],
-      },
-      {
-        title: "Chart values that arrive as text",
-        body: "Numeric readings often turn up wrapped in quotes, like \"24.6\". You can now chart those too, so a quoted number plots just like a plain one. Values that aren't really numbers stay out of the way.",
-        thanks: [
-          {
-            name: "andyg2",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/77",
-          },
-          {
-            name: "Stefan-Pichler",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/109",
-          },
-        ],
-      },
-      {
-        title: "Adding a value to a chart is clearer",
-        body: "Choosing \"Add value from payload\" now opens the picker straight on the value, so it's obvious what to tick. Plain numeric payloads, where the whole message is the number, work this way too.",
-        thanks: [
-          {
-            name: "Daschi2",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/78",
-          },
-        ],
-      },
-      {
-        title: "Windows on ARM",
-        body: "Releases now include a native Windows ARM64 build, installer and auto-updates included, so Snapdragon laptops no longer need emulation.",
-        thanks: [
-          {
-            name: "cbulock",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/107",
-          },
-        ],
-      },
-      {
+        group: "Added",
         title: "Sparkplug B with the names filled in",
-        body: "MQTT Viewer now remembers Sparkplug birth certificates, so data messages show real metric names instead of bare aliases. A new Sparkplug tab shows a live group, node and metric tree with sequence gap and rebirth storm warnings, and you can request a rebirth right from the viewer. This needs \"Automatically encode/decode Sparkplug messages\" enabled on the connection, which is off by default.",
+        body: "Data messages show real metric names instead of bare aliases, and a Sparkplug view shows your groups, nodes and metrics live, with sequence gaps and rebirth storms flagged. Turn on Sparkplug decoding for the connection to use it.",
         thanks: [
           {
             name: "adamwoodland2",
@@ -125,49 +77,288 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    version: "1.1.0",
+    released: true,
+    date: "September 2026",
+    headline: "What's new in MQTT Viewer 1.1",
+    intro:
+      "A graph view of your topics, a broker status page, retained-message cleanup, and the whole app in a browser. Plus two months of fixes.",
+    sections: [
       {
+        group: "Added",
+        title: "See your topics as a graph",
+        body: "Each node is sized and coloured by its traffic. Switch between list and graph above the tree.",
+      },
+      {
+        group: "Added",
+        title: "Pin the topics you keep coming back to",
+        body: "Pin a topic from its right-click menu and it stays at the top of the tree, per connection.",
+        thanks: [
+          { name: "mrpiggi", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/153" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Sort topics by how busy they are",
+        body: "Busiest first, most messages, newest first or silent first, in the list and the graph.",
+      },
+      {
+        group: "Added",
+        title: "Right-click a topic",
+        body: "Copy the path or payload, export history, or clear the retained message.",
+        thanks: [
+          { name: "Daschi2", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/83" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Clear retained messages in bulk",
+        body: "Right-click a branch to clear every retained message beneath it. The confirmation lists exactly what will go. On MQTT 3 only messages this client has seen can be cleared.",
+        thanks: [
+          { name: "Daschi2", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/83" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Spot retained topics at a glance",
+        body: "Retained topics carry a small marker in the list and the graph.",
+      },
+      {
+        group: "Added",
+        title: "A status page for your broker",
+        body: "Health warnings, a traffic chart and the loudest topics, from $SYS on mosquitto, EMQX and VerneMQ, with client-side rates for brokers that publish nothing.",
+        thanks: [
+          { name: "m1dnight", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12598903" },
+          { name: "adamwoodland2", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12601084" },
+          { name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/1#discussioncomment-12790493" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Run MQTT Viewer in your browser",
+        body: "A Docker image, ghcr.io/mqtt-viewer/mqtt-viewer, and a Home Assistant add-on. Setup is in docs/DOCKER.md.",
+        thanks: [
+          { name: "SiriosDev", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/119" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "See what the MQTT client is doing",
+        body: "View logs in the connection menu shows connects, subscriptions and errors live, with debug logging per connection.",
+      },
+      {
+        group: "Added",
+        title: "Rearrange the panels",
+        body: "The topic panel docks right or bottom, or pops out into its own window.",
+        thanks: [
+          { name: "ElectronicBattle", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/46" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Better collection controls and interactions",
+        body: "New message from any folder, drag to reorder or move between folders, drag history entries in, rename by clicking the name.",
+      },
+      {
+        group: "Added",
+        title: "Peek at messages on the timeline",
+        body: "Hover a marker for the payload, time, QoS and retained flag.",
+        thanks: [
+          { name: "Daschi2", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/84" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Pick your own chart time window",
+        body: "3, 6 and 12 hours, a day, or a custom interval.",
+        thanks: [
+          { name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/106" },
+        ],
+      },
+      {
+        group: "Added",
+        title: "Windows on ARM",
+        body: "A native ARM64 build with installer and auto-updates.",
+        thanks: [
+          { name: "cbulock", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/107" },
+        ],
+      },
+      {
+        group: "Added",
         title: "A Flatpak for Linux",
-        body: "MQTT Viewer now ships as a Flatpak with its own auto-updating repository, alongside the existing AppImage, deb and rpm.",
+        body: "With its own auto-updating repository.",
         thanks: [
-          {
-            name: "maracuya-robotics",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/96",
-          },
+          { name: "maracuya-robotics", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/96" },
         ],
       },
       {
-        title: "WebSocket paths work again",
-        body: "Connections that use a WebSocket path (like /mqtt) failed to connect. The path is now handled properly when building the connection URL.",
+        group: "Added",
+        title: "Install it with Nix",
+        body: "A flake for x86_64 and aarch64 Linux.",
+      },
+      {
+        group: "Changed",
+        title: "Chart values that arrive as text",
+        body: "A number in quotes charts like a plain one.",
         thanks: [
-          {
-            name: "mfried40",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/102",
-          },
+          { name: "andyg2", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/77" },
+          { name: "Stefan-Pichler", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/109" },
         ],
       },
       {
-        title: "Light mode looks right everywhere",
-        body: "Charts, the message timeline and a few icons were keeping their dark colours in light mode. They all follow the theme properly now.",
+        group: "Changed",
+        title: "Adding a value to a chart is clearer",
+        body: "\"Add value from payload\" opens the picker on the value.",
+        thanks: [
+          { name: "Daschi2", url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/78" },
+        ],
       },
       {
+        group: "Changed",
+        title: "Clearer memory settings",
+        body: "Settings show what history is using and what the app can grow to per connection.",
+      },
+      {
+        group: "Changed",
+        title: "The memory budget now covers every topic",
+        body: "The last value kept per topic counts against it.",
+      },
+      {
+        group: "Changed",
+        title: "Icon seed and delete are out in the open",
+        body: "At the top of the connection form instead of behind a cog.",
+      },
+      {
+        group: "Changed",
+        title: "A tidier sidebar and forms",
+        body: "Rows and icons share a grid, and fields no longer crowd their labels.",
+      },
+      {
+        group: "Fixed",
+        title: "Connection failures were reported late and vaguely",
+        body: "On MQTT 3 a bad host, port, credential or certificate now fails immediately with a plain reason.",
+      },
+      {
+        group: "Fixed",
+        title: "Reconnecting when the network drops out",
+        body: "MQTT 5 connections notice a silent broker within about ten seconds and keep retrying.",
+      },
+      {
+        group: "Fixed",
+        title: "Two connections to the same broker no longer fight",
+        body: "Each gets its own client ID.",
+      },
+      {
+        group: "Fixed",
+        title: "WebSocket paths",
+        body: "Connections with a path like /mqtt connect again.",
+        thanks: [
+          { name: "mfried40", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/102" },
+        ],
+      },
+      {
+        group: "Fixed",
+        title: "Deleting a connection",
+        body: "No longer fails if it had history, and clearing a large history no longer freezes the app.",
+      },
+      {
+        group: "Fixed",
+        title: "Crash when disconnecting from a busy broker",
+        body: "",
+      },
+      {
+        group: "Fixed",
+        title: "Message counts under load",
+        body: "The counters no longer drop messages.",
+      },
+      {
+        group: "Fixed",
+        title: "Message order on MQTT 3",
+        body: "Recorded in arrival order, as on MQTT 5.",
+      },
+      {
+        group: "Fixed",
+        title: "The chart's Y-axis rescales with its time window",
+        body: "",
+      },
+      {
+        group: "Fixed",
         title: "Chart and dropdown fixes",
-        body: "Switching a chart back to \"All history\" no longer stays stuck on the previous time window. And on Windows, the dropdowns in the connection form could open as an invisible sliver; they render properly now.",
+        body: "\"All history\" no longer sticks; Windows dropdowns no longer open as a sliver.",
         thanks: [
-          {
-            name: "viktak",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/95",
-          },
-          {
-            name: "Stefan-Pichler",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/108",
-          },
+          { name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/95" },
+          { name: "Stefan-Pichler", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/108" },
         ],
       },
       {
-        title: "Updates that match your install",
-        body: "The updater now detects how the app was installed: in-app updates on macOS, Windows and portable Linux, and the right instructions for Flatpak, AppImage, deb and rpm.",
+        group: "Fixed",
+        title: "Pop-out windows can be moved",
+        body: "",
+      },
+      {
+        group: "Fixed",
+        title: "Dropdowns inside dialogs open on top, not behind",
+        body: "",
+      },
+      {
+        group: "Fixed",
+        title: "The timeline reaches every message in loaded history",
+        body: "",
+      },
+      {
+        group: "Fixed",
+        title: "Light mode",
+        body: "Charts, the timeline and icons follow the theme.",
+      },
+      {
+        group: "Fixed",
+        title: "The interface font loads again",
+        body: "",
+      },
+      {
+        group: "Miscellaneous",
+        title: "Connect and disconnect from the connection dialog's header",
+        body: "",
+      },
+      {
+        group: "Miscellaneous",
+        title: "The connection dialog has a Save button",
+        body: "",
+        thanks: [
+          { name: "jeeftor", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/124" },
+        ],
+      },
+      {
+        group: "Miscellaneous",
+        title: "The pencil on a connection tile opens the details dialog",
+        body: "",
+      },
+      {
+        group: "Miscellaneous",
+        title: "Long topic previews truncate at the panel edge",
+        body: "",
+      },
+      {
+        group: "Miscellaneous",
+        title: "The main window no longer scrolls by a phantom line",
+        body: "",
+      },
+      {
+        group: "Miscellaneous",
+        title: "Buttons with tooltips take one tab stop, not two",
+        body: "",
+      },
+      {
+        group: "Miscellaneous",
+        title: "Dependencies updated to close 19 security issues",
+        body: "",
       },
     ],
+    outro:
+      "Found a bug or a rough edge? Use the Feedback button, I want to know.",
   },
   {
     version: "1.0.0",
@@ -261,7 +452,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ];
 
-const normalise = (version: string): string =>
+export const normalise = (version: string): string =>
   version.trim().replace(/^v/i, "");
 
 /** Released entries only, newest first. */

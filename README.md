@@ -1,38 +1,149 @@
 # MQTT Viewer
 
-[MQTT Viewer](https://mqttviewer.app) is a feature-rich and performant MQTT visualisation and debugging tool for Windows, Mac and Linux.
+[MQTT Viewer](https://mqttviewer.app) is a fast desktop MQTT client for Windows, Mac and Linux. Connect to several brokers at once, watch every topic update in a live tree, scrub back through history on a timeline, chart values, decode payloads and republish messages, all from one window.
 
-[Download MQTT Viewer](https://github.com/mqtt-viewer/mqtt-viewer/releases)
+[Download MQTT Viewer](https://mqttviewer.app/download) or grab a build from the [releases page](https://github.com/mqtt-viewer/mqtt-viewer/releases). Free and open source under GPL-3.0.
 
-![Screenshot of MQTT Viewer](docs/images/screenshot.png)
+![MQTT Viewer connected to two brokers, with the topic tree, a selected topic's payload and the message timeline](docs/images/screenshot.png)
 
 ## Features
 
-First and foremost, MQTT Viewer is fast, responsive and easy to use.
+First and foremost, MQTT Viewer is fast, responsive and easy to use. It stays smooth with two brokers each pushing a couple of thousand messages a second, because that is how I test it.
 
 But wait, there's more:
 
-| Feature                                  | Status | Comments                                                                                                                                                                                                     |
-| ---------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Topic tree data visualisation            | ✅     |                                                                                                                                                                                                              |
-| MQTT v3 + v5 compatibility               | ✅     |                                                                                                                                                                                                              |
-| Run multiple concurrent connections      | ✅     |                                                                                                                                                                                                              |
-| Message publishing (+ v5 headers)        | ✅     |                                                                                                                                                                                                              |
-| Interactive message timeline             | ✅     |                                                                                                                                                                                                              |
-| Message comparison                       | ✅     | Currently only compares to previous message but I'm planning on making this more flexible.                                                                                                                   |
-| Live topic charting                      | ✅     | ⭐ New! Chart numeric payload fields over time, with a pop-out chart window.                                                                                                                                 |
-| Saved message collections                | ✅     | ⭐ New! Save messages per connection or globally and republish them with a click.                                                                                                                            |
-| Bounded memory usage                     | ✅     | ⭐ New! Message history stays within a configurable memory budget, with opt-in recording to disk.                                                                                                            |
-| Image payload previews                   | ✅     | ⭐ New! PNG, JPEG, GIF, WebP and BMP payloads render as images.                                                                                                                                              |
-| Sparkplug + Base64 + Hex codecs          | ✅     |                                                                                                                                                                                                              |
-| Free-text / pattern-based filters        | ✅     |                                                                                                                                                                                                              |
-| Publish history                          | ✅     |                                                                                                                                                                                                              |
-| Client logs                              | 🚧     | In progress                                                                                                                                                                                                  |
-| Broker status page (based on $SYS data)  | ❓     | Potential. Let me know if you might use this [here](https://github.com/mqtt-viewer/mqtt-viewer/discussions/1).                                                                                               |
-| In-app local test broker                 | ❓     | Potential. This would be an alternative to running a local mosquitto instance for debugging/development. Let me know if you might use this [here](https://github.com/mqtt-viewer/mqtt-viewer/discussions/2). |
-| Team workspaces + cloud collections sync | ❓     | Potential. Let me know if you might use this [here](https://github.com/mqtt-viewer/mqtt-viewer/discussions/3).                                                                                               |
+| Feature | Notes |
+| --- | --- |
+| Live topic tree | Every topic on the broker, with counts, last values and a text filter. |
+| Topic Graph | The namespace drawn as a tree where node size is message rate and colour is recency. Collapse branches, follow the hottest, pause. |
+| Topic actions | Right-click any topic to copy its path or payload, export its history, or clear retained messages below it. Retained topics are marked. |
+| Up to 10 connections at once | Each in its own tab. MQTT v3.1.1 and v5, TCP, TLS, mutual TLS and WebSocket. |
+| Interactive message timeline | Scrub through a topic's history. Hover a marker to preview the payload. |
+| Message comparison | Diff a message against the previous one on the same topic. |
+| Live charting | Tick numeric fields in a JSON payload and plot them. Time windows from seconds to days, pop-out chart windows. |
+| Broker status page | Clients, rates, subscriptions, retained count, uptime and health signals from `$SYS`, plus client-side rates and loudest topics for brokers that publish nothing. |
+| Client logs | A terminal-style view of what the MQTT library is doing on each connection, with a debug level and a rotating log file. |
+| Message collections | Save messages into folders, global or per connection, drag them between folders and republish with a click. |
+| Publish history | Everything you have sent, searchable, ready to send again. |
+| Payload decoding | Sparkplug B, Base64 and Hex codecs. PNG, JPEG, GIF, WebP and BMP payloads render as images. |
+| Dockable topic panel | Dock the selected-topic panel right, bottom, or pop it out into its own window. |
+| Bounded memory | History stays inside a memory budget you set, with optional recording to disk. |
+| Web UI | The full app served over HTTP from a Docker image, and a Home Assistant add-on. |
+| Light and dark themes | |
+
+Every one of these has its own page, with screenshots, at [mqttviewer.app/features](https://mqttviewer.app/features). A few of them:
+
+![The broker status window: health strip, traffic chart, loudest topics and metric tiles from $SYS](docs/images/broker-status.png)
+
+![Charting a numeric payload field with the time window menu open](docs/images/chart.png)
+
+![Client logs for a connection in a terminal-style view](docs/images/client-logs.png)
+
+![Collections in the sidebar, global and per connection, with publish history below](docs/images/collections.png)
+
+Still thinking about, and would love to hear whether you'd use them:
+
+- An in-app local test broker, as an alternative to running mosquitto for development. [Discussion](https://github.com/mqtt-viewer/mqtt-viewer/discussions/2)
+- Team workspaces and cloud sync for collections. [Discussion](https://github.com/mqtt-viewer/mqtt-viewer/discussions/3)
 
 Don't see a feature that would make your life easier? [I really, really want to know.](https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=feature_idea.yml)
+
+## Installing
+
+The [download page](https://mqttviewer.app/download) picks the build for your machine and lists every file with its size and sha256 checksum. Every release ships macOS, Windows and Linux builds.
+
+Installed apps on macOS and Windows update themselves. AppImage, deb and rpm installs show a notice when a new version is out and link to it. Flatpak and Nix update through their own tools.
+
+### Docker and Home Assistant
+
+The same app runs headless and serves itself to a browser:
+
+```sh
+docker run -d --name mqtt-viewer \
+  -p 127.0.0.1:8080:8080 \
+  -v mqtt-viewer-data:/data \
+  ghcr.io/mqtt-viewer/mqtt-viewer:latest
+```
+
+Open http://localhost:8080. There is no login screen, so keep it on localhost or a trusted network, or put an authenticating proxy in front. [docs/DOCKER.md](docs/DOCKER.md) has the details, a Caddy example and the security caveats.
+
+For Home Assistant, add [github.com/mqtt-viewer/home-assistant-addon](https://github.com/mqtt-viewer/home-assistant-addon) as an add-on repository and install MQTT Viewer from the store.
+
+### macOS
+
+[mqttviewer.app/download/mac](https://mqttviewer.app/download/mac) has zips for Apple Silicon and Intel. Unzip and drag MQTT Viewer to Applications. The app is signed and notarised. macOS 12 or later.
+
+### Windows
+
+[mqttviewer.app/download/windows](https://mqttviewer.app/download/windows) has signed installers and portable zips for x64 and ARM64, so Snapdragon laptops get a native build rather than emulation. Windows 10 or later.
+
+### Linux
+
+Builds cover x86_64 and ARM64. [mqttviewer.app/download/linux](https://mqttviewer.app/download/linux) has the files, checksums and install steps for each format. Pick whichever fits your distribution:
+
+| Format | Install | Updates |
+| --- | --- | --- |
+| AppImage | `chmod +x MQTT_Viewer_*.AppImage && ./MQTT_Viewer_*.AppImage` | The app tells you; download the next AppImage |
+| deb | `sudo apt install ./MQTT_Viewer_*.deb` | The app tells you; install the next deb |
+| rpm | `sudo dnf install ./MQTT_Viewer_*.rpm` | The app tells you; install the next rpm |
+| Flatpak | See below | `flatpak update` |
+| Nix | See below | `nix profile upgrade --all` |
+
+#### Flatpak
+
+There is a signed Flatpak repository, so installs update through Flatpak like any other app:
+
+```sh
+flatpak remote-add --if-not-exists mqtt-viewer https://dl.mqttviewer.app/mqtt-viewer.flatpakrepo
+flatpak install mqtt-viewer app.mqttviewer.MQTTViewer
+```
+
+Each release also attaches a single-file `.flatpak` bundle per architecture if you would rather not add a remote. Bundles do not auto-update.
+
+#### Nix
+
+This repository is a flake covering `x86_64-linux` and `aarch64-linux`.
+
+Run it without adding it to your profile:
+
+```sh
+nix run github:mqtt-viewer/mqtt-viewer
+```
+
+Install it properly, with the desktop entry and icon:
+
+```sh
+nix profile add github:mqtt-viewer/mqtt-viewer
+```
+
+Or pin it in a NixOS or home-manager configuration:
+
+```nix
+{
+  inputs.mqtt-viewer.url = "github:mqtt-viewer/mqtt-viewer";
+
+  # then, in your package list
+  environment.systemPackages = [ inputs.mqtt-viewer.packages.${pkgs.system}.default ];
+}
+```
+
+MQTT Viewer is not in nixpkgs yet, so nothing is prebuilt. The first build compiles the Go binary and the frontend on your machine.
+
+The package itself is 23 MiB. The catch is everything under it: the app needs GTK 3 and WebKit2GTK, and Nix uses its own copies rather than the ones your distribution already ships. The full closure is about 920 MiB across 186 store paths, and WebKitGTK with its GStreamer stack is nearly all of that. Check for yourself before committing to it:
+
+```sh
+nix path-info -Sh github:mqtt-viewer/mqtt-viewer#default
+```
+
+Most of it comes prebuilt from cache.nixos.org instead of being compiled locally, and it is shared with every other GTK app in your store, so the marginal cost is smaller if you already run one.
+
+Update through Nix, not through the app:
+
+```sh
+nix profile upgrade --all
+```
+
+The app recognises a Nix install and points you at Nix. Store paths are immutable, so it will not try to replace its own binary. The in-app text assumes a profile install; if you pinned MQTT Viewer in a NixOS or home-manager configuration, update the flake input and rebuild instead.
 
 ## Contributing
 
@@ -43,7 +154,7 @@ If MQTT Viewer has been helpful, right now the best ways to contribute are:
 - Giving me honest, constructive feedback about what you like and don't like about MQTT Viewer via [GitHub discussions](https://github.com/mqtt-viewer/mqtt-viewer/discussions).
 - Seriously, nothing is too big or too small. [Let me know](https://github.com/mqtt-viewer/mqtt-viewer/issues) how to make MQTT Viewer better for you.
 - Letting others know about MQTT Viewer on your favourite social media or blogs.
-- Leaving MQTT Viewer [a testimonal!](https://testimonial.to/mqtt-viewer/)
+- Leaving MQTT Viewer [a testimonial.](https://testimonial.to/mqtt-viewer/)
 
 ## Development
 
@@ -57,6 +168,8 @@ MQTT Viewer is built using [Wails](https://wails.io/), a Go-based application fr
 - [pnpm](https://pnpm.io/installation) (install via `npm install -g pnpm`)
 - [Just](https://github.com/casey/just?tab=readme-ov-file#cross-platform) - optional, but recommended for running commands in the project
 - [Atlas](https://github.com/ariga/atlas) - optional, only necessary if you need to create database migrations
+
+If you use Nix, `nix develop` gives you all of the above, including the pinned `wails3` CLI and the GTK/WebKit libraries the Linux build needs.
 
 ### Setup
 

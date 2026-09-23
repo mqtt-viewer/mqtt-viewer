@@ -53,6 +53,18 @@
       "type": "string",
       "required": false,
       "default": "!startEmpty"
+    },
+    {
+      "name": "ariaLabel",
+      "type": "string",
+      "required": false,
+      "default": null
+    },
+    {
+      "name": "openFocus",
+      "type": "string",
+      "required": false,
+      "default": null
     }
   ],
   "tokens": [

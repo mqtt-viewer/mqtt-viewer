@@ -1,9 +1,10 @@
 # Releasing MQTT Viewer
 
 One release = one annotated GitHub release on `main`. Publishing the release
-fires three workflows (mac / windows / linux) that build, sign, upload assets,
-and register the version with the portal. Nothing reaches users until you flip
-the `released` toggle in the portal admin.
+fires five workflows: mac, Windows, Linux, Flatpak publishing and Docker. Desktop artifacts register
+with the portal and stay out of in-app update checks until you flip `released`.
+The Docker workflow publishes its image to GHCR immediately, then repoints the
+Home Assistant add-on at the new tag (full releases only).
 
 The `/release` skill drives this whole runbook. Its first step is always a
 changelog draft presented for approval, so you see and shape what the release
@@ -19,37 +20,77 @@ follows.
 #    ruleset separately blocks force-pushes and deletion on main)
 git checkout main && git merge --ff-only origin/develop && ALLOW_MAIN_PUSH=1 git push
 
-# 2. dry-run with a prerelease (optional but recommended for risky changes)
-gh release create v0.X.Y-beta1 --target main --prerelease --generate-notes \
-  --notes-start-tag <previous-tag> --title "v0.X.Y-beta1"
+# 2. read what the release will actually say
+just release-notes v0.X.Y <previous-tag>
 
-# 3. the real thing
-gh release create v0.X.Y --target main --generate-notes \
-  --notes-start-tag <previous-tag> --title "v0.X.Y"
+# 3. dry-run with a prerelease (optional but recommended for risky changes)
+just release v0.X.Y-beta1 <previous-tag> --prerelease
 
-# 4. watch the three workflows
-gh run list --limit 5
+# 4. the real thing
+just release v0.X.Y <previous-tag>
 
-# 5. flip `released` on the new release_v3 record in the PocketBase admin UI
-#    (https://cloud.mqttviewer.app/_/) once you're happy — this is what makes
+# 5. watch the five workflows, including Publish Docker image
+gh run list --limit 6
+
+# 6. flip `released` on the new release_v3 record in the PocketBase admin UI
+#    (https://cloud.mqttviewer.app/_/) once you're happy. This is what makes
 #    in-app update checks see the version.
+
+# 7. rebuild the website so /download shows the new version (after step 6)
+gh api repos/mqtt-viewer/mqttviewer.app/dispatches \
+  -f event_type=app-release -f "client_payload[version]=v0.X.Y"
 ```
 
-To re-run a failed release after fixing CI: delete + recreate the release —
-workflows run from the tag's commit, so a plain "re-run" would use the old
+To re-run a failed release after fixing CI: delete + recreate the release.
+Workflows run from the tag's commit, so a plain "re-run" would use the old
 workflow definitions.
 
 ```sh
-gh release delete v0.X.Y --cleanup-tag --yes && gh release create v0.X.Y ...
+just release-retry v0.X.Y <previous-tag>
 ```
+
+## Where the release notes come from
+
+The release body is the app's own changelog entry for the version, rendered as
+markdown by `scripts/release-notes.mjs` from `frontend/src/changelog.ts`. It is
+not GitHub's generated list of merged pull requests.
+
+That matters because the notes travel: each workflow POSTs
+`github.event.release.body` to the portal as `release_notes`, and the in-app
+update dialog shows that text under "What's changed". So a user reads the same
+words before updating that they read in "What's new" afterwards.
+
+The practical consequence: **promote the changelog entry, with `released: true`
+and the bare semver, and get it onto `develop` before you create the release.**
+`just release` renders the notes first and stops if the entry is missing, so a
+forgotten promotion fails loudly instead of shipping an empty dialog.
+
+`just release` is a one-liner over `scripts/release.sh`, which runs three
+pre-flight checks before it touches anything. It aborts if the working tree is
+dirty, if `HEAD` is not `origin/develop` after a fetch, and if the changelog has
+no promoted entry for the version. The first two exist because the notes are
+rendered from the tree you are standing on, and that tree is what becomes
+`main` a moment later, so the two have to be the same commit. Every step is its
+own command, so a failed checkout or merge stops there instead of falling
+through to `gh release create`. `scripts/test-release-recipe.sh` covers those
+paths with shimmed `git` and `gh`.
+
+```sh
+just release-notes v0.X.Y <previous-tag>   # preview, exactly what gets posted
+```
+
+A prerelease tag (`v0.X.Y-beta1`) uses the entry for the version it rehearses,
+so a dry run shows the real notes.
 
 ## What each workflow needs (and where it breaks)
 
 | Platform | Signing | Gotchas |
 |---|---|---|
-| mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. |
-| windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions — pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
+| mac (`release-mac.yaml`) | gon codesign + notarytool | Notarization 403 "agreement missing" → sign the latest agreements at developer.apple.com / App Store Connect. Certificate secrets: `APPLE_DEVELOPER_CERTIFICATE_*`, `AC_*`. A Mac-only failure does not need the release recreated: fix it, land the fix on `main`, then `gh workflow run release-mac.yaml --ref main -f tag=vX.Y.Z`. That rebuilds both arches, uploads the zips to the existing release with `--clobber`, and re-registers them with the portal using the release's own notes. |
+| windows (`release-windows.yaml`) | Azure Trusted Signing | Secrets `AZURE_*`. NSIS `VIFileVersion` needs numeric versions, so pre-release suffixes are stripped into `INFO_FILEVERSION` by the taskfile. |
 | linux (`release-linux.yaml`) | none | Runs on `ubuntu-latest` + `ubuntu-24.04-arm`. gtk3/webkit2gtk-4.1 dev packages must install **before** the wails3 CLI (`-tags gtk3`). |
+| Docker (`docker-publish.yaml`) | none | Publishes one `linux/amd64` + `linux/arm64` manifest to GHCR. Release builds fail if any shared app secret is missing; prereleases never move `latest`. |
+| Add-on bump (`docker-publish.yaml`, job `bump-addon`) | none | Runs after `publish` on full releases only. Needs `HA_ADDON_TOKEN`; fails if the tag is not anonymously pullable (see below). A `workflow_dispatch` run skips it unless `bump_addon: true` is passed. |
 
 Shared foundations that have bitten before:
 
@@ -57,9 +98,21 @@ Shared foundations that have bitten before:
   needs `^20.19 || >=22.12`). Keep `NODE_VERSION` at 22.x in all three
   workflows and pin pnpm to the version in `frontend/package.json`'s
   `packageManager` field.
+- **Local `main` must not diverge.** `scripts/release.sh` fast-forwards the
+  local `main` branch from `origin/develop`; a stray local commit on `main`
+  aborts it with "Not possible to fast-forward" before anything is tagged.
+  `git branch -f main origin/main` (from another branch) and re-run.
 - **Secrets** (repo → Settings → Actions): `AZURE_*` (6), `AC_*`/`APPLE_*` (5),
   `MACHINE_ID_SECRET`, `CLOUD_USERNAME`, `CLOUD_PASSWORD`,
-  `CI_RELEASES_USERNAME`, `CI_RELEASES_PASSWORD`.
+  `CI_RELEASES_USERNAME`, `CI_RELEASES_PASSWORD`, `HA_ADDON_TOKEN`.
+- **`HA_ADDON_TOKEN`** is a fine-grained personal access token whose only
+  resource is the `mqtt-viewer/home-assistant-addon` repository, with
+  **Contents: read and write** and nothing else. It lives as an Actions
+  secret on this repo (mqtt-viewer/mqtt-viewer) and is used by the
+  `bump-addon` job to push the version pin. The job fails loudly when it is
+  missing, so a release never leaves the add-on behind quietly. Fine-grained
+  tokens expire: renew it before the expiry date or the next release stops at
+  that job.
 
 ## Portal (mqtt-viewer/cloud, deployed on fly.io as `mqttviewer-cloud`)
 
@@ -72,16 +125,67 @@ Shared foundations that have bitten before:
 - Deploy the portal with `fly deploy -a mqttviewer-cloud` from the cloud repo;
   the same `CI_RELEASES_*` values must exist as fly secrets.
 
+## Website
+
+mqttviewer.app builds its download pages from the GitHub Releases API, using
+the newest non-prerelease release that has every expected asset. It rebuilds
+only on a push to its `main`, so after go-live send it a `repository_dispatch`
+(TL;DR step 7). The site repo's `Rebuild after app release` workflow commits a
+marker file, which triggers the Cloudflare build. `gh workflow run
+rebuild-on-release.yml -R mqtt-viewer/mqttviewer.app` does the same by hand.
+
 ## Expected assets per release
 
 - darwin: `MQTT_Viewer_<tag>_darwin_{arm64,amd64}.zip` (+ `.sha256`)
-- windows: `..._windows_amd64.zip` + `..._installer.exe` (+ `.sha256`)
+- windows: `..._windows_{amd64,arm64}.zip` + `..._installer.exe` (+ `.sha256`)
 - linux: `..._linux_{amd64,arm64}.{zip,AppImage,deb,rpm,flatpak}` (+ `.sha256`)
+- Docker: `ghcr.io/mqtt-viewer/mqtt-viewer:<version>` multi-architecture image
+
+For the first Docker publication, GHCR creates the package as private. Open the
+package settings, connect it to this repository, change visibility to public,
+then verify anonymous access and both architectures. If the visibility control
+reads "Setting is disabled by organization administrators", first allow public
+container packages under the org's Settings → Packages, then come back. This
+was done once for 1.1.0 on 2026-09-05, so later releases inherit it:
+
+```sh
+docker buildx imagetools inspect ghcr.io/mqtt-viewer/mqtt-viewer:<version>
+```
+
+Later releases inherit package visibility. Home Assistant cannot install a
+private image, so this check blocks publishing its app repository.
+
+### The add-on version pin
+
+The add-on lives in `mqtt-viewer/home-assistant-addon`, and its manifest
+(`mqtt-viewer/config.yaml`) names the image tag Home Assistant pulls. The
+`bump-addon` job in `docker-publish.yaml` keeps that pin from drifting: after
+`publish` succeeds it rewrites the manifest's `version:` line, prepends a
+`mqtt-viewer/CHANGELOG.md` entry and pushes `chore: track MQTT Viewer
+<version>` as `github-actions[bot]`. The rewrite itself is
+`scripts/bump-addon-version.sh`, so it can be run and read locally. It is a
+no-op when the pin already matches.
+
+Gating:
+
+- Published releases that are **not** prereleases bump the add-on. A
+  prerelease never does: add-on users get full releases only.
+- A `workflow_dispatch` run skips the bump unless it passes `bump_addon:
+  true`, so manual test pushes cannot repoint the add-on.
+
+Before touching the add-on the job runs `docker buildx imagetools inspect`
+with no registry login, which is exactly what Home Assistant can see. On the
+very first publication that fails, because GHCR made the package private:
+make it public as described above, then re-run just that job.
+
+```sh
+gh run rerun <run-id> --job <job-id>   # gh run view <run-id> lists job ids
+```
 
 Linux distro guidance: deb/rpm use the system WebKit and are the most
-compatible (Fedora needs the rpm — the AppImage bundles Ubuntu-built WebKit
-whose helper paths don't exist elsewhere). AppImage works on Debian/Ubuntu
-family with `libwebkit2gtk-4.1-0` installed.
+compatible (Fedora needs the rpm, because the AppImage bundles Ubuntu-built
+WebKit whose helper paths don't exist elsewhere). AppImage works on the
+Debian/Ubuntu family with `libwebkit2gtk-4.1-0` installed.
 
 ### Flatpak
 
@@ -95,8 +199,9 @@ flatpak install ./MQTT_Viewer_<tag>_linux_amd64.flatpak
 
 The Flatpak build cannot run on macOS. It is verified in CI by
 `.github/workflows/flatpak-check.yaml`, which builds the bundle and launches
-it headlessly on every pull request that touches `build/linux/flatpak/`,
-failing if the GNOME runtime no longer ships `webkit2gtk-4.1`.
+it headlessly. It runs on demand only (`gh workflow run flatpak-check.yaml
+--ref <branch>`), so run it after touching `build/linux/flatpak/`. It fails
+if the GNOME runtime no longer ships `webkit2gtk-4.1`.
 
 The bundled binary links `webkit2gtk-4.1` (the `-tags gtk3` stack), so the
 manifest pins `org.gnome.Platform` to a runtime that still ships it. Keep
@@ -109,7 +214,12 @@ the GTK3 WebKit.
 `.github/workflows/flatpak-publish.yaml` builds both architectures, merges
 them into one GPG-signed OSTree repository and deploys it to GitHub Pages, so
 that installs update through `flatpak update`. It runs on every published
-release, and can be triggered manually:
+release, and can be triggered manually. The deploy job targets the
+`github-pages` environment, whose deployment policy must allow the `v*` tag
+pattern as well as `main` (added 2026-09-05); without it the job is rejected
+with "Tag is not allowed to deploy to github-pages" before it starts, and
+`gh run rerun <run> --failed` after fixing the policy finishes it from the
+artifacts already built. Manual trigger:
 
 ```sh
 gh workflow run flatpak-publish.yaml --ref develop -f version=v0.0.0-test

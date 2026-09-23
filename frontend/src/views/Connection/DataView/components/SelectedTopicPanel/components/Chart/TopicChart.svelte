@@ -11,16 +11,29 @@
   export let paused = false;
   export let style: "line" | "area" = "line";
   export let showPoints = true;
-  // 0 = all history; otherwise show only the last N minutes.
-  export let windowMinutes = 0;
+  // 0 = all history; otherwise show only the last N seconds.
+  export let windowSeconds = 0;
+  // False while the chart is rendered but off screen (an inactive tab slot).
+  // Gates full-payload loading and the 1 Hz ticker.
+  export let visible = true;
 
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
   let resizeObserver: ResizeObserver | null = null;
-  // Drives the sliding time-window: when windowMinutes>0 the x-axis min/max are
+  // Drives the sliding time-window: when windowSeconds>0 the x-axis min/max are
   // anchored to Date.now(), so without fresh data the view would freeze. Tick
   // re-renders ~1s so the window keeps sliding even when no messages arrive.
   let windowTick: ReturnType<typeof setInterval> | null = null;
+
+  // The chart needs every message's payload to plot a series across time,
+  // unlike the rest of the panel which only ever needs one or two messages'
+  // payloads. `history` itself only carries stubs (see selected-topic-store),
+  // so this reads the store's separate full-payload chartHistory cache
+  // instead, populated on demand by ensureChartHistory below. Falls back to
+  // `history` when chartHistory hasn't been requested yet. This also keeps
+  // Storybook fixtures (which set `history` directly with payloads already
+  // present, and never populate chartHistory) working unchanged.
+  $: chartData = $selectedTopicStore.chartHistory ?? $selectedTopicStore.history;
 
   // force bypasses the paused guard: a theme flip must restyle the axis and
   // tooltip chrome immediately, even while the chart is paused.
@@ -28,9 +41,9 @@
     if (!chart || (paused && !force)) return;
     chart.setOption(
       buildChartOption({
-        history: $selectedTopicStore.history,
+        history: chartData,
         series: $chartSeriesStore,
-        windowMinutes,
+        windowSeconds,
         showPoints,
         style,
         now: Date.now(),
@@ -42,27 +55,39 @@
 
   // Re-render on new history, series add/remove/visibility, or option change,
   // unless paused.
-  $: $selectedTopicStore.history,
+  $: chartData,
     $chartSeriesStore,
     style,
     showPoints,
-    windowMinutes,
+    windowSeconds,
     paused,
     render();
 
+  // This component is always mounted, even behind an inactive tab (Tabs.svelte
+  // renders every panel), so it must not fetch every payload just because it
+  // exists. Only once the chart is genuinely visible does the full
+  // window actually get read. ensureChartHistory itself no-ops once loaded
+  // or already loading, so this is cheap to re-evaluate.
+  $: if (visible) {
+    selectedTopicStore.ensureChartHistory();
+  }
+
   $: $theme, render(true);
 
-  // Keep the ticker running only while a finite, unpaused window is shown.
+  // Keep the ticker running only while a finite, unpaused window is actually
+  // on screen. On becoming visible again, render once immediately so the
+  // window is current rather than up to a second stale.
   const syncWindowTick = () => {
-    const wantTick = windowMinutes > 0 && !paused;
+    const wantTick = windowSeconds > 0 && !paused && visible;
     if (wantTick && windowTick === null) {
+      render();
       windowTick = setInterval(render, 1000);
     } else if (!wantTick && windowTick !== null) {
       clearInterval(windowTick);
       windowTick = null;
     }
   };
-  $: windowMinutes, paused, syncWindowTick();
+  $: windowSeconds, paused, visible, syncWindowTick();
 
   onMount(() => {
     chart = echarts.init(container, undefined, { renderer: "canvas" });

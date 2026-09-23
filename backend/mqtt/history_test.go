@@ -51,21 +51,22 @@ func TestHistoryEvictsOldestOverBudget(t *testing.T) {
 	if len(got) == 0 || len(got) > 6 {
 		t.Errorf("expected ~5 retained under budget, got %d", len(got))
 	}
-	if h.totalBytes > h.budgetBytes {
-		t.Errorf("totalBytes %d exceeds budget %d after eviction", h.totalBytes, h.budgetBytes)
+	if h.TotalBytes() > h.budgetBytes {
+		t.Errorf("retained bytes %d exceed budget %d after eviction", h.TotalBytes(), h.budgetBytes)
 	}
 }
 
 func TestHistoryKeepsLatestPerTopicAfterEviction(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
-	// Budget for ~3 messages.
-	h.SetBudgetBytes(int64(perMsg * 3))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic.
+	h.SetBudgetBytes(int64(perMsg * 12))
 
 	// One message on a low-traffic topic, then flood a different topic so the
 	// low-traffic topic's only message ages out of the recent window.
 	h.AddMessage(msg("low/traffic", 1024))
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		h.AddMessage(msg("busy/topic", 1024))
 	}
 
@@ -82,10 +83,10 @@ func TestHistoryKeepsLatestPerTopicAfterEviction(t *testing.T) {
 func TestHistoryGetAllIncludesEvictedTopicLatest(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
-	h.SetBudgetBytes(int64(perMsg * 3))
+	h.SetBudgetBytes(int64(perMsg * 12))
 
 	h.AddMessage(msg("topic/a", 1024))
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		h.AddMessage(msg("topic/b", 1024))
 	}
 
@@ -123,12 +124,12 @@ func TestHistoryGetByTopicPrefixFiltersAndOrders(t *testing.T) {
 func TestHistoryGetByTopicPrefixIncludesEvictedLatest(t *testing.T) {
 	h := newMessageHistory()
 	perMsg := estBytes(msg("x", 1024))
-	h.SetBudgetBytes(int64(perMsg * 3))
+	h.SetBudgetBytes(int64(perMsg * 12))
 
 	// One $SYS message, then flood a different $SYS topic so the first ages out
 	// of the recent window; its latest value must still be returned.
 	h.AddMessage(msg("$SYS/broker/uptime", 1024))
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		h.AddMessage(msg("$SYS/broker/load", 1024))
 	}
 
@@ -161,8 +162,11 @@ func TestHistoryClearPreservesBudget(t *testing.T) {
 		h.AddMessage(msg("a", 100))
 	}
 	h.Clear()
-	if h.totalBytes != 0 || len(h.recent) != 0 || h.head != 0 {
-		t.Errorf("expected empty after clear, got bytes=%d recent=%d head=%d", h.totalBytes, len(h.recent), h.head)
+	if h.TotalBytes() != 0 || len(h.recent) != 0 || h.head != 0 {
+		t.Errorf("expected empty after clear, got bytes=%d recent=%d head=%d", h.TotalBytes(), len(h.recent), h.head)
+	}
+	if h.lruOldest != nil || h.lruNewest != nil {
+		t.Error("expected empty latest LRU list after clear")
 	}
 	if h.budgetBytes != 123456 {
 		t.Errorf("expected budget preserved after clear, got %d", h.budgetBytes)
@@ -170,6 +174,295 @@ func TestHistoryClearPreservesBudget(t *testing.T) {
 	if _, err := h.GetTopicHistory("a"); err == nil {
 		t.Error("expected topic-not-found after clear")
 	}
+}
+
+func TestHistoryTotalBytesCountsPinnedLatest(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("topic/00", 1024))
+	// Budget for ~12 messages, then one message on each of a few distinct
+	// topics so most age out of the recent window but stay pinned in the
+	// latest map. Their bytes must show up in the readout.
+	h.SetBudgetBytes(int64(perMsg * 12))
+	const topics = 20
+	for i := 0; i < topics; i++ {
+		h.AddMessage(msg(fmt.Sprintf("topic/%02d", i), 1024))
+	}
+
+	if h.latestBytes == 0 {
+		t.Error("expected pinned latest messages to be charged to latestBytes")
+	}
+	if h.TotalBytes() != h.recentBytes+h.latestBytes {
+		t.Errorf("TotalBytes %d does not match recent %d + latest %d", h.TotalBytes(), h.recentBytes, h.latestBytes)
+	}
+
+	// Republishing to topics whose latest was pinned must not grow latestBytes
+	// unboundedly: each replacement releases the old pin.
+	for i := 0; i < 500; i++ {
+		h.AddMessage(msg(fmt.Sprintf("topic/%02d", i%topics), 1024))
+	}
+	if max := int64(topics * (perMsg + latestEntryOverhead)); h.latestBytes > max {
+		t.Errorf("latestBytes %d exceeds topic-cardinality bound %d", h.latestBytes, max)
+	}
+	if h.latestBytes < 0 || h.recentBytes < 0 {
+		t.Errorf("byte counters went negative: recent=%d latest=%d", h.recentBytes, h.latestBytes)
+	}
+	assertHistoryAccounting(t, h)
+
+	h.Clear()
+	if h.TotalBytes() != 0 {
+		t.Errorf("expected TotalBytes 0 after clear, got %d", h.TotalBytes())
+	}
+}
+
+// assertHistoryAccounting recomputes both byte counters from scratch and
+// checks the pinned-entry invariants, so a bookkeeping slip in eviction can't
+// pass unnoticed.
+func assertHistoryAccounting(t *testing.T, h *MessageHistory) {
+	t.Helper()
+	var wantRecent, wantLatest int64
+	inWindow := map[*MqttMessage]bool{}
+	for i := h.head; i < len(h.recent); i++ {
+		wantRecent += int64(h.recent[i].estimatedBytes())
+		inWindow[h.recent[i]] = true
+	}
+	pinned, protected := 0, 0
+	for topic, entry := range h.latest {
+		if entry.topic != topic {
+			t.Errorf("latest entry key %q does not match entry topic %q", topic, entry.topic)
+		}
+		if entry.pinned == inWindow[entry.msg] {
+			t.Errorf("topic %q: pinned=%v but inRecentWindow=%v", topic, entry.pinned, inWindow[entry.msg])
+		}
+		if entry.protected && !entry.pinned {
+			t.Errorf("topic %q is protected but not pinned", topic)
+		}
+		if entry.pinned {
+			pinned++
+			wantLatest += pinnedCost(entry.msg)
+		}
+		if entry.protected {
+			protected++
+		}
+	}
+	if protected != h.protectedSysTopics {
+		t.Errorf("protectedSysTopics %d, recomputed %d", h.protectedSysTopics, protected)
+	}
+	if wantRecent != h.recentBytes {
+		t.Errorf("recentBytes %d, recomputed %d", h.recentBytes, wantRecent)
+	}
+	if wantLatest != h.latestBytes {
+		t.Errorf("latestBytes %d, recomputed %d", h.latestBytes, wantLatest)
+	}
+	listed := 0
+	for e := h.lruOldest; e != nil; e = e.next {
+		listed++
+		if !e.pinned {
+			t.Errorf("unpinned topic %q is in the LRU list", e.topic)
+		}
+		if e.next != nil && e.next.prev != e {
+			t.Errorf("LRU list links are inconsistent at topic %q", e.topic)
+		}
+	}
+	if listed != pinned-protected {
+		t.Errorf("LRU list holds %d entries, %d topics are pinned and evictable", listed, pinned-protected)
+	}
+}
+
+func TestHistoryKeepsSysTopicsWhenTrimmingLatest(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("sensors/00000", 200))
+	h.SetBudgetBytes(int64(perMsg * 500))
+
+	// A $SYS value published once at connect, the way a broker announces its
+	// version, then enough traffic across enough topics to force the latest
+	// map to trim. The $SYS value is the oldest of all, so a plain LRU would
+	// drop it first, and the broker status window would lose it for good.
+	h.AddMessage(msg("$SYS/broker/version", 200))
+	for i := 0; i < 50000; i++ {
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d", i), 200))
+	}
+
+	if h.droppedTopics == 0 {
+		t.Fatal("expected the latest map to be trimmed in this scenario")
+	}
+	got, err := h.GetTopicHistory("$SYS/broker/version")
+	if err != nil {
+		t.Fatalf("expected the $SYS value to survive trimming, got %v", err)
+	}
+	if len(got) != 1 || got[0].Topic != "$SYS/broker/version" {
+		t.Errorf("unexpected $SYS history: %+v", got)
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryCapsProtectedSysTopics(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("$SYS/broker/000000", 200))
+	h.SetBudgetBytes(int64(perMsg * 8000))
+
+	// More $SYS topics than the protection cap, then traffic to age them all
+	// out and force trimming. Protection must stop at the cap so a broker with
+	// a huge $SYS tree cannot pin unbounded memory.
+	for i := 0; i < maxProtectedSysTopics*2; i++ {
+		h.AddMessage(msg(fmt.Sprintf("$SYS/broker/%06d", i), 200))
+	}
+	for i := 0; i < 50000; i++ {
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d", i), 200))
+	}
+
+	if h.protectedSysTopics > maxProtectedSysTopics {
+		t.Errorf("protected %d $SYS topics, cap is %d", h.protectedSysTopics, maxProtectedSysTopics)
+	}
+	if h.TotalBytes() > h.budgetBytes+int64(maxProtectedSysTopics)*(int64(perMsg)+latestEntryOverhead) {
+		t.Errorf("retained bytes %d exceed budget %d by more than the protected allowance", h.TotalBytes(), h.budgetBytes)
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryOversizedMessageDoesNotClearLatestMap(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("quiet/000", 200))
+	budget := int64(perMsg * 400)
+	h.SetBudgetBytes(budget)
+
+	// Fill the latest map with quiet topics that have aged out.
+	for i := 0; i < 200; i++ {
+		h.AddMessage(msg(fmt.Sprintf("quiet/%03d", i), 200))
+	}
+	for i := 0; i < 400; i++ {
+		h.AddMessage(msg("busy/topic", 200))
+	}
+	pinnedBefore := 0
+	for _, entry := range h.latest {
+		if entry.pinned {
+			pinnedBefore++
+		}
+	}
+	if pinnedBefore == 0 {
+		t.Fatal("expected quiet topics to be pinned before the oversized message")
+	}
+
+	// One message larger than the whole latest share, then enough traffic to
+	// age it out of the recent window. Pinning it at that point would evict
+	// every other topic to make room for a single value.
+	h.AddMessage(msg("huge/topic", int(budget/latestBudgetDivisor)+1))
+	for i := 0; i < 400; i++ {
+		h.AddMessage(msg("busy/topic", 200))
+	}
+
+	pinnedAfter := 0
+	for _, entry := range h.latest {
+		if entry.pinned {
+			pinnedAfter++
+		}
+	}
+	if pinnedAfter == 0 {
+		t.Error("an oversized message wiped every pinned topic from the latest map")
+	}
+	if _, ok := h.latest["huge/topic"]; ok {
+		t.Error("expected the oversized message to be dropped rather than pinned")
+	}
+	if h.TotalBytes() > h.budgetBytes {
+		t.Errorf("retained bytes %d exceed budget %d", h.TotalBytes(), h.budgetBytes)
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryBoundsLatestMapAtHighCardinality(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("sensors/00000/temperature", 200))
+	// A budget worth ~500 messages against 50k distinct topics: without a
+	// bound the latest map alone would hold 50k messages regardless of it.
+	budget := int64(perMsg * 500)
+	h.SetBudgetBytes(budget)
+	const topics = 50000
+	for i := 0; i < topics; i++ {
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d/temperature", i), 200))
+	}
+
+	if h.TotalBytes() > budget {
+		t.Errorf("retained bytes %d exceed budget %d at %d topics", h.TotalBytes(), budget, topics)
+	}
+	if len(h.latest) >= topics {
+		t.Errorf("latest map kept %d of %d topics; expected it to be trimmed", len(h.latest), topics)
+	}
+	if h.droppedTopics == 0 {
+		t.Error("expected topics to be dropped from the latest map")
+	}
+	if latestBudget := budget / latestBudgetDivisor; h.latestBytes > latestBudget {
+		t.Errorf("latestBytes %d exceeds its %d share of the budget", h.latestBytes, latestBudget)
+	}
+	// The recent window must not have been starved by the latest map.
+	if h.recentBytes == 0 {
+		t.Error("expected the recent window to keep messages alongside the latest map")
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryDropsLeastRecentlyUpdatedTopicFirst(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("t/000", 1024))
+	// Room for ~2 pinned latest entries (a quarter of ~12 messages).
+	h.SetBudgetBytes(int64(perMsg * 12))
+
+	// Three quiet topics in a known order, then enough traffic on a busy topic
+	// to push all three out of the recent window and over the latest share.
+	for _, topic := range []string{"quiet/a", "quiet/b", "quiet/c"} {
+		h.AddMessage(msg(topic, 1024))
+	}
+	for i := 0; i < 50; i++ {
+		h.AddMessage(msg("busy/topic", 1024))
+	}
+
+	if _, ok := h.latest["quiet/a"]; ok {
+		t.Error("expected the least recently updated topic (quiet/a) to be dropped first")
+	}
+	if _, ok := h.latest["quiet/c"]; !ok {
+		t.Error("expected the most recently updated quiet topic (quiet/c) to be kept")
+	}
+	assertHistoryAccounting(t, h)
+}
+
+func TestHistoryKeepsEveryTopicAtNormalCardinality(t *testing.T) {
+	h := newMessageHistory()
+	// A realistic broker: 5,000 topics, 200 B payloads, default budget. Every
+	// topic must still answer with its last value.
+	h.SetBudgetBytes(DefaultMemoryBudgetBytes)
+	const topics = 5000
+	for round := 0; round < 3; round++ {
+		for i := 0; i < topics; i++ {
+			h.AddMessage(msg(fmt.Sprintf("factory/line%02d/sensor%03d", i%50, i/50), 200))
+		}
+	}
+
+	if h.droppedTopics != 0 {
+		t.Errorf("dropped %d topics at normal cardinality; the tree must keep them all", h.droppedTopics)
+	}
+	for i := 0; i < topics; i++ {
+		topic := fmt.Sprintf("factory/line%02d/sensor%03d", i%50, i/50)
+		if _, err := h.GetTopicHistory(topic); err != nil {
+			t.Fatalf("expected history for %s, got %v", topic, err)
+		}
+	}
+}
+
+func TestHistoryLoweringBudgetTrimsLatestMap(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(DefaultMemoryBudgetBytes)
+	const topics = 20000
+	for i := 0; i < topics; i++ {
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d", i), 200))
+	}
+	if h.droppedTopics != 0 {
+		t.Fatalf("expected no drops under the default budget, got %d", h.droppedTopics)
+	}
+
+	tightened := int64(64 * 1024)
+	h.SetBudgetBytes(tightened)
+	if h.TotalBytes() > tightened {
+		t.Errorf("retained bytes %d exceed the tightened budget %d", h.TotalBytes(), tightened)
+	}
+	assertHistoryAccounting(t, h)
 }
 
 func TestHistoryUnknownTopic(t *testing.T) {
@@ -210,5 +503,524 @@ func TestHistoryMultiTopicOrdering(t *testing.T) {
 	all := h.GetAllHistory()
 	if len(all) != 5 {
 		t.Errorf("expected 5 topics, got %d", len(all))
+	}
+}
+
+func TestTopicHistoryWindowReturnsNewestInOrder(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	for i := 0; i < 30; i++ {
+		m := msg("w/t", 10)
+		m.TimeMs = int64(i)
+		h.AddMessage(m)
+		// interleave other-topic traffic so the backward scan must skip
+		h.AddMessage(msg("other", 10))
+	}
+
+	got, err := h.GetTopicHistoryWindow("w/t", 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 10 {
+		t.Fatalf("expected 10 messages, got %d", len(got))
+	}
+	// newest 10 (TimeMs 20..29) in arrival order
+	for i, m := range got {
+		if m.TimeMs != int64(20+i) {
+			t.Errorf("index %d: expected TimeMs %d, got %d", i, 20+i, m.TimeMs)
+		}
+	}
+}
+
+func TestTopicHistoryWindowZeroLimitReturnsAll(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	for i := 0; i < 25; i++ {
+		h.AddMessage(msg("all/t", 10))
+	}
+	got, err := h.GetTopicHistoryWindow("all/t", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 25 {
+		t.Errorf("expected all 25 messages, got %d", len(got))
+	}
+}
+
+func TestTopicTimelineWindowReturnsStubsNewestInOrder(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	for i := 0; i < 30; i++ {
+		m := msg("w/t", 10)
+		m.TimeMs = int64(i)
+		h.AddMessage(m)
+		// interleave other-topic traffic so the backward scan must skip
+		h.AddMessage(msg("other", 10))
+	}
+
+	got, err := h.GetTopicTimelineWindow("w/t", 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 10 {
+		t.Fatalf("expected 10 stubs, got %d", len(got))
+	}
+	// newest 10 (TimeMs 20..29) in arrival order
+	for i, m := range got {
+		if m.TimeMs != int64(20+i) {
+			t.Errorf("index %d: expected TimeMs %d, got %d", i, 20+i, m.TimeMs)
+		}
+	}
+}
+
+func TestTopicTimelineWindowFallsBackToLatestWhenAgedOut(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
+	h.SetBudgetBytes(int64(perMsg * 12))
+
+	h.AddMessage(msg("low/traffic", 1024))
+	for i := 0; i < 20; i++ {
+		h.AddMessage(msg("busy/topic", 1024))
+	}
+
+	got, err := h.GetTopicTimelineWindow("low/traffic", 10)
+	if err != nil {
+		t.Fatalf("expected latest-per-topic fallback, got error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("expected 1 latest stub for low/traffic, got %+v", got)
+	}
+}
+
+func TestTopicTimelineWindowUnknownTopic(t *testing.T) {
+	h := newMessageHistory()
+	if _, err := h.GetTopicTimelineWindow("nope", 10); err == nil {
+		t.Error("expected error for unknown topic")
+	}
+}
+
+func TestGetMessageByIdFindsMessageInWindow(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	m := msg("find/me", 10)
+	m.Id = "target-id"
+	h.AddMessage(m)
+	for i := 0; i < 5; i++ {
+		h.AddMessage(msg("other", 10))
+	}
+
+	// Hint 0 exercises the compatibility full-scan path.
+	got, found := h.GetMessageById("find/me", "target-id", 0)
+	if !found {
+		t.Fatal("expected message to be found")
+	}
+	if got.Id != "target-id" || got.Topic != "find/me" {
+		t.Errorf("unexpected message returned: %+v", got)
+	}
+}
+
+func TestGetMessageByIdFindsAgedOutMessageViaLatestFallback(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
+	h.SetBudgetBytes(int64(perMsg * 12))
+
+	m := msg("low/traffic", 1024)
+	m.Id = "aged-out-id"
+	h.AddMessage(m)
+	for i := 0; i < 20; i++ {
+		h.AddMessage(msg("busy/topic", 1024))
+	}
+
+	// The message's content aged out of the recent ring, but it's still the
+	// latest value recorded for its topic, so it must still be found.
+	got, found := h.GetMessageById("low/traffic", "aged-out-id", 0)
+	if !found {
+		t.Fatal("expected aged-out message to be found via latest fallback")
+	}
+	if got.Id != "aged-out-id" {
+		t.Errorf("unexpected message returned: %+v", got)
+	}
+}
+
+func TestGetMessageByIdReportsNotFoundWhenSupersededAndAgedOut(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
+	h.SetBudgetBytes(int64(perMsg * 12))
+
+	m := msg("low/traffic", 1024)
+	m.Id = "superseded-id"
+	h.AddMessage(m)
+	// A newer message on the same topic replaces the latest pointer, and
+	// enough other traffic follows to push both out of the recent ring.
+	newer := msg("low/traffic", 1024)
+	newer.Id = "current-id"
+	h.AddMessage(newer)
+	for i := 0; i < 20; i++ {
+		h.AddMessage(msg("busy/topic", 1024))
+	}
+
+	_, found := h.GetMessageById("low/traffic", "superseded-id", 0)
+	if found {
+		t.Error("expected superseded, aged-out message to not be found")
+	}
+}
+
+func TestGetMessageByIdUnknownTopicOrId(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.AddMessage(msg("a/b", 10))
+
+	if _, found := h.GetMessageById("a/b", "no-such-id", 0); found {
+		t.Error("expected not found for unknown id")
+	}
+	if _, found := h.GetMessageById("nope", "no-such-id", 0); found {
+		t.Error("expected not found for unknown topic")
+	}
+}
+
+func TestGetMessageByIdWithHintFindsExactMatch(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	base := int64(1_000_000)
+	for i := 0; i < 200; i++ {
+		m := msg("hint/t", 10)
+		m.Id = fmt.Sprintf("id-%d", i)
+		m.TimeMs = base + int64(i*10)
+		h.AddMessage(m)
+	}
+
+	got, found := h.GetMessageById("hint/t", "id-77", base+770)
+	if !found {
+		t.Fatal("expected hinted lookup to find the message")
+	}
+	if got.Id != "id-77" {
+		t.Errorf("unexpected message returned: %+v", got)
+	}
+}
+
+func TestGetMessageByIdWithHintToleratesOutOfOrderInsertion(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	base := int64(1_000_000)
+	// Simulate the per-message-goroutine reordering: the target's TimeMs
+	// says it belongs earlier/later than where it actually sits in the
+	// slice, off by up to a second either way.
+	for i := 0; i < 50; i++ {
+		m := msg("ooo/t", 10)
+		m.Id = fmt.Sprintf("pre-%d", i)
+		m.TimeMs = base + int64(i*100)
+		h.AddMessage(m)
+	}
+	early := msg("ooo/t", 10)
+	early.Id = "target-early"
+	early.TimeMs = base + 5000 - 1000 // inserted now, timestamped 1s earlier
+	h.AddMessage(early)
+	late := msg("ooo/t", 10)
+	late.Id = "target-late"
+	late.TimeMs = base + 5000 + 1000 // inserted now, timestamped 1s later
+	h.AddMessage(late)
+	for i := 0; i < 50; i++ {
+		m := msg("ooo/t", 10)
+		m.Id = fmt.Sprintf("post-%d", i)
+		m.TimeMs = base + 5200 + int64(i*100)
+		h.AddMessage(m)
+	}
+
+	if _, found := h.GetMessageById("ooo/t", "target-early", early.TimeMs); !found {
+		t.Error("expected hinted lookup to find message inserted 1s later than its TimeMs")
+	}
+	if _, found := h.GetMessageById("ooo/t", "target-late", late.TimeMs); !found {
+		t.Error("expected hinted lookup to find message inserted 1s earlier than its TimeMs")
+	}
+}
+
+func TestGetMessageByIdWithHintFastAgedOutCheck(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	base := int64(1_000_000)
+	for i := 0; i < 100; i++ {
+		m := msg("fast/t", 10)
+		m.Id = fmt.Sprintf("id-%d", i)
+		m.TimeMs = base + int64(i)
+		h.AddMessage(m)
+	}
+
+	// Hint far older than the window's oldest entry: evicted, and the topic's
+	// latest is a different id, so this must be not-found (O(1) path).
+	if _, found := h.GetMessageById("fast/t", "long-gone", base-SLACK_MS-10_000); found {
+		t.Error("expected fast aged-out check to report not found")
+	}
+}
+
+func TestGetMessageByIdWithHintFallsBackToLatest(t *testing.T) {
+	h := newMessageHistory()
+	perMsg := estBytes(msg("x", 1024))
+	// Budget for ~12 messages, so the latest map's quarter share comfortably
+	// holds the one quiet topic (see latestBudgetDivisor).
+	h.SetBudgetBytes(int64(perMsg * 12))
+
+	old := msg("low/traffic", 1024)
+	old.Id = "aged-out-id"
+	old.TimeMs = 1 // far older than anything retained after the flood below
+	h.AddMessage(old)
+	for i := 0; i < 20; i++ {
+		m := msg("busy/topic", 1024)
+		m.TimeMs = 1_000_000 + int64(i)
+		h.AddMessage(m)
+	}
+
+	// The hint is far older than the window, but the message is still the
+	// topic's latest value, so the fallback must find it.
+	got, found := h.GetMessageById("low/traffic", "aged-out-id", 1)
+	if !found {
+		t.Fatal("expected latest fallback to find the aged-out message")
+	}
+	if got.Id != "aged-out-id" {
+		t.Errorf("unexpected message returned: %+v", got)
+	}
+}
+
+func TestGetMessagesByIdsReturnsFoundSubset(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	base := int64(1_000_000)
+	for i := 0; i < 30; i++ {
+		m := msg("batch/t", 10)
+		m.Id = fmt.Sprintf("id-%d", i)
+		m.TimeMs = base + int64(i*10)
+		h.AddMessage(m)
+	}
+
+	ids := []string{"id-3", "no-such-id", "id-17", "id-29"}
+	timesMs := []int64{base + 30, base + 999, base + 170, base + 290}
+	got := h.GetMessagesByIds("batch/t", ids, timesMs)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 found messages, got %d", len(got))
+	}
+	found := map[string]bool{}
+	for _, m := range got {
+		found[m.Id] = true
+	}
+	for _, want := range []string{"id-3", "id-17", "id-29"} {
+		if !found[want] {
+			t.Errorf("expected %s in result set, got %v", want, found)
+		}
+	}
+}
+
+func TestGetMessagesByIdsRejectsMismatchedSlices(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.AddMessage(msg("a/b", 10))
+
+	if got := h.GetMessagesByIds("a/b", []string{"x", "y"}, []int64{1}); got != nil {
+		t.Errorf("expected nil for mismatched slice lengths, got %v", got)
+	}
+}
+
+// retainedMsg builds a message carrying the broker's Retain flag. A zero
+// payloadLen is the MQTT tombstone that clears a retained value.
+func retainedMsg(topic string, payloadLen int) MqttMessage {
+	m := msg(topic, payloadLen)
+	m.Retain = true
+	return m
+}
+
+func TestRetainedIndexMarksTopicWithRetainedPayload(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	if !h.IsRetained("a/b") {
+		t.Errorf("expected a/b to be marked retained")
+	}
+}
+
+func TestRetainedIndexTombstoneUnmarksTopic(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b", 0)) // zero-length retained = clear
+	if h.IsRetained("a/b") {
+		t.Errorf("expected a/b to be unmarked after a zero-length retained message")
+	}
+}
+
+func TestRetainedIndexIgnoresNonRetainedMessages(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(msg("a/b", 10))
+	if h.IsRetained("a/b") {
+		t.Errorf("a non-retained message must not mark a topic retained")
+	}
+
+	// A non-retained message must also not clear an existing retained mark:
+	// live traffic on a topic says nothing about its retained value.
+	h.AddMessage(retainedMsg("c/d", 10))
+	h.AddMessage(msg("c/d", 0))
+	if !h.IsRetained("c/d") {
+		t.Errorf("a non-retained message must not unmark a retained topic")
+	}
+}
+
+func TestRetainedUnderPrefixFindsDescendantsAtAnyDepth(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b/c", 10))
+	h.AddMessage(retainedMsg("a/b/c/d/e", 10))
+	h.AddMessage(retainedMsg("a/z", 10))
+
+	got := h.RetainedUnderPrefix("a/b")
+	want := []string{"a/b", "a/b/c", "a/b/c/d/e"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("expected sorted %v, got %v", want, got)
+			break
+		}
+	}
+}
+
+func TestRetainedUnderPrefixRespectsTopicLevelBoundary(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/bc", 10))
+	h.AddMessage(retainedMsg("a/bc/d", 10))
+
+	got := h.RetainedUnderPrefix("a/b")
+	if len(got) != 1 || got[0] != "a/b" {
+		t.Errorf("prefix a/b must match a/b only, never the sibling a/bc; got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixExcludesTombstonedTopics(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b/one", 10))
+	h.AddMessage(retainedMsg("a/b/two", 10))
+	h.AddMessage(retainedMsg("a/b/one", 0)) // cleared again
+
+	got := h.RetainedUnderPrefix("a/b")
+	if len(got) != 1 || got[0] != "a/b/two" {
+		t.Errorf("expected only a/b/two to remain retained, got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixEmptyPrefixMatchesAll(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("z", 10))
+	if got := h.RetainedUnderPrefix(""); len(got) != 2 {
+		t.Errorf("empty prefix must match every retained topic, got %v", got)
+	}
+}
+
+func TestRetainedIndexSurvivesEviction(t *testing.T) {
+	h := newMessageHistory()
+	// Budget that holds only a couple of messages, so the retained one is
+	// evicted from `recent` by later traffic. The index is bounded by topic
+	// cardinality, not the byte budget, so it must not be dropped with it.
+	perMsg := estBytes(msg("t", 1024))
+	h.SetBudgetBytes(int64(perMsg * 2))
+	h.AddMessage(retainedMsg("a/b", 1024))
+	for i := 0; i < 10; i++ {
+		h.AddMessage(msg("noise", 1024))
+	}
+	if !h.IsRetained("a/b") {
+		t.Errorf("eviction under byte pressure must not drop the retained index")
+	}
+}
+
+func TestRetainedIndexClearedByClear(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.Clear()
+	if h.IsRetained("a/b") {
+		t.Errorf("Clear must reset the retained index")
+	}
+	if got := h.RetainedUnderPrefix(""); len(got) != 0 {
+		t.Errorf("expected no retained topics after Clear, got %v", got)
+	}
+}
+
+func TestRetainedUnderPrefixExcludesBrokerReservedTopics(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("factory/line1/s1", 10))
+	h.AddMessage(retainedMsg("$SYS/broker/uptime", 10))
+	h.AddMessage(retainedMsg("$SYS/broker/clients/connected", 10))
+
+	// Empty prefix matches everything else, but $SYS/... must never come back.
+	got := h.RetainedUnderPrefix("")
+	if len(got) != 1 || got[0] != "factory/line1/s1" {
+		t.Errorf("expected only the non-$ topic, got %v", got)
+	}
+
+	// Even asking for the $SYS branch directly must not surface it: a bulk
+	// clear can never be offered over broker internals.
+	if got := h.RetainedUnderPrefix("$SYS"); len(got) != 0 {
+		t.Errorf("expected no $SYS topics under any prefix, got %v", got)
+	}
+}
+
+func TestUnmarkRetainedRemovesFromIndex(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/c", 10))
+
+	h.UnmarkRetained("a/b")
+
+	if h.IsRetained("a/b") {
+		t.Error("expected a/b to be unmarked")
+	}
+	if !h.IsRetained("a/c") {
+		t.Error("expected a/c to remain marked")
+	}
+	got := h.RetainedUnderPrefix("")
+	if len(got) != 1 || got[0] != "a/c" {
+		t.Errorf("expected only a/c to remain, got %v", got)
+	}
+}
+
+func TestUnmarkRetainedNoopForUnknownTopic(t *testing.T) {
+	h := newMessageHistory()
+	h.AddMessage(retainedMsg("a/b", 10))
+
+	// Must not panic or otherwise disturb the index for a topic it never knew
+	// about.
+	h.UnmarkRetained("never/seen")
+
+	if !h.IsRetained("a/b") {
+		t.Error("expected a/b to be unaffected by unmarking an unrelated topic")
+	}
+}
+
+func TestClearRetainedIndexEmptiesIndexButKeepsHistory(t *testing.T) {
+	h := newMessageHistory()
+	h.SetBudgetBytes(10 * 1024 * 1024)
+	h.AddMessage(retainedMsg("a/b", 10))
+
+	h.ClearRetainedIndex()
+
+	if h.IsRetained("a/b") {
+		t.Error("expected the retained index to be empty after ClearRetainedIndex")
+	}
+	if got := h.RetainedUnderPrefix(""); len(got) != 0 {
+		t.Errorf("expected no retained topics after ClearRetainedIndex, got %v", got)
+	}
+
+	// Message history itself must be untouched.
+	got, err := h.GetTopicHistory("a/b")
+	if err != nil {
+		t.Fatalf("expected message history to survive ClearRetainedIndex, got error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("expected 1 message still in history, got %d", len(got))
+	}
+	all := h.GetAllHistory()
+	if _, ok := all["a/b"]; !ok {
+		t.Error("expected a/b still present in GetAllHistory after ClearRetainedIndex")
 	}
 }

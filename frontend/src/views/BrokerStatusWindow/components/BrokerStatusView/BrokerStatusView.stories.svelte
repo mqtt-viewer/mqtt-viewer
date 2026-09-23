@@ -19,7 +19,7 @@
 </script>
 
 {#snippet template(args: any)}
-  <div class="w-[760px] max-w-full bg-elevation-0 p-4">
+  <div class="w-[900px] max-w-full bg-elevation-0 p-4">
     <Component {...args} />
   </div>
 {/snippet}

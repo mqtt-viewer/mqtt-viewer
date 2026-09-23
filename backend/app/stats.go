@@ -14,7 +14,7 @@ func (a *App) GetMqttStats() (MqttStats, error) {
 	stats := MqttStats{
 		StatsByConnection: make(map[uint]mqtt.ConnectionStats),
 	}
-	for _, c := range a.AppConnections {
+	for _, c := range a.appConnectionsSnapshot() {
 		connStats := c.MqttManager.GetStats()
 		stats.StatsByConnection[c.ConnectionId] = connStats
 		stats.TotalMessagesReceived += connStats.MessagesReceived

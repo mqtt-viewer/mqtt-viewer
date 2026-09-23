@@ -1,0 +1,52 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "ViewToggle",
+  "tier": "component",
+  "description": "Segmented List/Graph/Sparkplug switch shown at the left of the data panel header in every view. The Sparkplug option appears once the connection has seen Sparkplug traffic.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "view",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "onChange",
+      "type": "function",
+      "required": true
+    },
+    {
+      "name": "showSparkplug",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Adds the Sparkplug option."
+    },
+    {
+      "name": "sparkplugWarningCount",
+      "type": "number",
+      "required": false,
+      "default": 0,
+      "description": "Open Sparkplug warnings, shown as a count on the Sparkplug option."
+    }
+  ],
+  "tokens": [
+    "outline",
+    "secondary-text",
+    "elevation-2",
+    "white-text",
+    "emphasis",
+    "warning"
+  ],
+  "dependencies": [
+    "Tooltip"
+  ],
+  "notes": "Figma is not linked yet; segmented-control pattern shared by the List and Graph data views."
+}

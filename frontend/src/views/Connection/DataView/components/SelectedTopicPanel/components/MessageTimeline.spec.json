@@ -44,7 +44,9 @@
     "primary-light",
     "secondary",
     "secondary-text",
-    "outline"
+    "outline",
+    "elevation-2",
+    "emphasis"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

@@ -35,9 +35,14 @@
   const NONE_VALUE = "";
   const NONE_LABEL = "None (custom tile)";
 
-  // Overridable builtins only — the computed observed_* tiles have no topic to
-  // redirect, so they are not offered as override targets.
-  const overrideTargets = BUILTIN_METRICS.filter((m) => !m.computed);
+  // Overridable builtins only, via an explicit allowlist: a metric is offered
+  // when it is an override target (overrideTarget !== false) and not a computed
+  // tile (computed tiles have no topic to redirect). This drops the v2 internal
+  // diagnostic / derived-input metrics (msgs_dropped, heap, store, ...) that
+  // carry overrideTarget: false and would only confuse a manual remap.
+  const overrideTargets = BUILTIN_METRICS.filter(
+    (m) => m.overrideTarget !== false && !m.computed
+  );
   const overrideOptions: string[] = [
     NONE_VALUE,
     ...overrideTargets.map((m) => m.key),
@@ -180,15 +185,16 @@
   $: editing = draft.id !== null;
 </script>
 
-<Dialog
-  {isOpen}
-  title="Metric tiles"
-  description="Redirect a builtin tile to your broker's topics, or add your own custom tiles. Changes apply to this connection."
->
-  <div class="flex w-[520px] max-w-[86vw] flex-col gap-5">
+<Dialog {isOpen} title="Metric tiles">
+  <!-- pt-3 clears the first field's floating label. It sits ~16px above its
+       input's box, and overflow-y-auto makes this element a clip box, so
+       without the padding that label renders with its top cut off. -->
+  <div
+    class="flex max-h-[70vh] w-[520px] max-w-[86vw] flex-col gap-5 overflow-y-auto pt-3"
+  >
     <!-- Draft form: add mode, or edit when a row was picked. -->
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-col gap-3 sm:flex-row">
+    <div class="flex flex-col gap-8 pt-2">
+      <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
           name="mapping-label"
           label="Label"
@@ -212,7 +218,7 @@
         errorMessage={topicError}
         onChange={() => (topicError = undefined)}
       />
-      <div class="flex flex-col gap-3 sm:flex-row">
+      <div class="flex flex-col gap-8 sm:flex-row sm:gap-3">
         <BaseInput
           name="mapping-path"
           label="JSON path (optional)"

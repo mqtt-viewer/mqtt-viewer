@@ -46,6 +46,7 @@
     openDelay={clicked ? 0 : tooltipOpenDelay}
     forceOpen={clicked}
     placement={tooltipPlacement}
+    focusable
   >
     <span slot="tooltip-content"
       >{clicked ? (feedbackText ?? tooltipText) : tooltipText}</span

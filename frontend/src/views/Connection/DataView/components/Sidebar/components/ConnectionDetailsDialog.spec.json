@@ -23,7 +23,10 @@
       "required": true
     }
   ],
-  "tokens": [],
+  "tokens": [
+    "secondary-text",
+    "divider"
+  ],
   "dependencies": [],
   "notes": "Figma is not linked yet."
 }

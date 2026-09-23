@@ -45,8 +45,47 @@ So the only consumers of full per-topic history are the selected-topic
 Replace the unbounded per-connection map with a **bounded store** governed by
 the memory budget:
 
-- **Latest-per-topic** map kept always (tiny, bounded by topic count) — feeds
-  the live tree (already how the frontend works).
+- **Latest-per-topic** map kept always — feeds the tree's last-value display
+  for topics whose messages have aged out of the recent ring.
+
+  Correction (measured, 2026-08): this map was not counted against the budget
+  and retains each topic's newest message in full, payload included, after it
+  ages out of the recent window, so very high topic cardinality grew memory
+  beyond the cap regardless of the setting. Measured at roughly 430 B of heap
+  per distinct topic with ~200 B payloads; at 200k topics that is ~86 MB
+  outside the budget.
+
+  Bounded (2026-08): every retained message is now charged exactly once —
+  to the recent ring while it is in the window, then to the latest map once
+  the map is its only holder. The budget bounds the sum, and the latest map
+  may take at most a **quarter** of the budget. Over that share, the least
+  recently updated topics are dropped from it, oldest first.
+
+  The quarter share exists because the two stores serve different things and a
+  plain oldest-first policy would starve one of them: a pinned latest entry is
+  always older than every message still in the ring (its newest message is
+  what aged out), so oldest-first would drop the whole latest map before
+  touching the ring, and clicking a quiet topic would go blank the moment a
+  connection went over budget. Reserving a share keeps breadth (a last value
+  per topic) alongside depth (back-scroll on the selected topic). A normal
+  broker never reaches the share: at 5,000 topics the map costs ~2 MB against
+  a 512 MB default.
+
+  Two carve-outs, both found by reviewing the eviction policy adversarially:
+
+  - **`$SYS/` topics are protected** (up to 1,024 of them) and never picked
+    for eviction. Some are published once as retained and never again (a
+    broker's version), which makes them the oldest entries in the map and so
+    the first a plain LRU would drop, taking the broker status window's
+    backfill with them. The cap keeps the exemption bounded.
+  - **A message too big for the whole latest share is never pinned.** It
+    would evict every other topic to make room for one value. The topic
+    loses the value that did not fit instead.
+
+  Consequence: at extreme cardinality a topic can appear in the tree (the
+  frontend keeps its own latest-per-topic) with no history left in the
+  backend, so `GetMessageHistory` rejects. The frontend treats that as an
+  empty timeline rather than a failed selection.
 - **Recent ring** of full `MqttMessage`s, evicting **oldest globally** when the
   estimated retained bytes exceed the memory budget. Byte estimate =
   Σ(payload len + topic len + fixed per-message overhead). Maintain a running

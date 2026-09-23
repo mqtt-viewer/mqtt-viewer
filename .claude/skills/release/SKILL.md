@@ -1,6 +1,6 @@
 ---
 name: release
-description: Publish a MQTT Viewer release end to end. Use when the user says "release", "cut a release", "publish vX.Y.Z", "ship it", or "do a release". First drafts the changelog for user approval, then promotes it, creates the GitHub release that triggers the mac/windows/linux build+sign+portal workflows, watches them, and hands off the final go-live step.
+description: Publish a MQTT Viewer release end to end. Use when the user says "release", "cut a release", "publish vX.Y.Z", "ship it", or "do a release". First drafts the changelog for user approval, then promotes it, creates the GitHub release that triggers the mac/windows/linux build+sign+portal workflows, watches them, hands off the final go-live step, and triggers the website rebuild.
 ---
 
 # Release MQTT Viewer
@@ -18,8 +18,10 @@ version with the user and get an explicit go-ahead before step 5.**
 - `VERSION`: the tag, `vX.Y.Z` (or `vX.Y.Z-beta1` for a dry run). If the user
   didn't give one, ask. Decide the bump (patch vs minor vs major) now, from what
   actually landed since the last release. Do not pre-empt it earlier.
-- `PREV`: the previous release tag, for release notes. Get it with
-  `gh release list --limit 5` or `git tag --sort=-v:refname | head`.
+- `PREV`: the previous release tag. It is only the compare base for the "Full
+  changelog" link at the bottom of the notes; the notes themselves come from the
+  changelog entry. Get it with `gh release list --limit 5` or
+  `git tag --sort=-v:refname | head`.
 
 ## 1. Draft the changelog and get it approved (always first)
 
@@ -50,12 +52,20 @@ the gate that lets them see, and shape, what's going into the upcoming release.
   (`git merge-base --is-ancestor origin/main origin/develop`). If it can't, stop
   and tell the user: `main` has diverged and `just release` will fail its
   `--ff-only` merge.
-- Working tree clean, `gh auth status` OK.
+- Working tree clean, and `HEAD` on the commit that is about to become `main`
+  (`just release` aborts on either count). `gh auth status` OK.
 
-## 3. Promote the changelog (this is what makes updates show notes)
+## 3. Promote the changelog (this is what the release notes ARE)
 
-The shipped binary carries its own changelog, matched to its version at runtime.
-If you skip this, users who update see no "What's new". So:
+Two things depend on this entry. The shipped binary carries its own changelog
+and matches it to its version at runtime, so it becomes "What's new" after the
+update. And `just release` renders the same entry into the GitHub release body,
+which the workflows post to the portal and the update dialog shows under
+"What's changed" before the update.
+
+So the entry must be promoted and pushed before step 5. If it isn't,
+`just release` fails at the first command with "No released changelog entry for
+X.Y.Z" and nothing is tagged. So:
 
 - In `frontend/src/changelog.ts`, take the approved staging entry from step 1
   and promote it: set `released: true`, `version` to the bare semver
@@ -75,6 +85,12 @@ git push origin develop
 The commit must be on `develop` and pushed before step 5, because `just release`
 fast-forwards `main` from `origin/develop`.
 
+Then read back exactly what the release will say:
+
+```sh
+just release-notes VERSION PREV
+```
+
 ## 4. Dry run (recommended for risky releases)
 
 ```sh
@@ -85,14 +101,21 @@ just release-status   # watch the three workflows
 Fix any CI issues and use `just release-retry` (delete + recreate the tag, so
 workflows run from the fixed commit) rather than a plain re-run.
 
+A `-beta1` tag uses the changelog entry for the version it rehearses, so the dry
+run shows the real notes.
+
 ## 5. The real release (confirm first)
 
 ```sh
 just release VERSION PREV
 ```
 
-This merges `develop` into `main`, pushes, and runs `gh release create` with
-generated notes from `PREV`. Then watch:
+This runs `scripts/release.sh`, which checks the working tree is clean and that
+`HEAD` is `origin/develop` (the notes have to render from the tree that becomes
+`main`), renders the notes from the changelog entry, merges `develop` into
+`main`, pushes, and runs `gh release create --notes-file` with them. Any of
+those steps failing stops the release before the tag exists. `PREV` is only the
+compare base for the "Full changelog" link at the bottom. Then watch:
 
 ```sh
 just release-status
@@ -100,8 +123,8 @@ gh run list --limit 6
 ```
 
 Expected assets (see `docs/RELEASING.md` for the full list): darwin arm64/amd64
-zips, windows zip + installer.exe, linux zip/AppImage/deb/rpm, each with a
-`.sha256`.
+zips, windows arm64/amd64 zips + installer.exe, linux zip/AppImage/deb/rpm,
+each with a `.sha256`.
 
 ## 6. Go live (manual, human gate)
 
@@ -113,6 +136,22 @@ with `released=false`. It reaches users only when someone flips `released=true`.
   it, and flip `released` when happy. The in-app updater
   (`POST /api/cv1/updates/v3/check`) only serves `released=true`.
 - This step is the user's to do. Do not attempt to flip it yourself.
+
+## 7. Rebuild the website
+
+The download pages on mqttviewer.app read the latest complete GitHub release at
+build time, but the site only rebuilds on a push. Once the user has flipped
+`released`, fire the site's rebuild workflow so the new version shows up:
+
+```sh
+gh api repos/mqtt-viewer/mqttviewer.app/dispatches \
+  -f event_type=app-release -f "client_payload[version]=VERSION"
+```
+
+It commits a marker file to the site's `main`, which Cloudflare builds and
+deploys. Check https://mqttviewer.app/download shows VERSION a few minutes
+later. Run it after step 6, not before: the site would otherwise advertise
+a version the in-app updater does not serve yet.
 
 ## Notes
 

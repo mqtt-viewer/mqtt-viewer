@@ -12,6 +12,7 @@ import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import { Events } from "@wailsio/runtime";
 import tabsStore from "@/stores/tabs";
 import subscriptionsStore, { type Subscription } from "./subscriptions";
+import { markSaved } from "./last-saved";
 import type { DeepOmit } from "@/util/types";
 //@ts-ignore - unsure why this is throwing type errors
 import { addToast } from "@/components/Toast/Toast.svelte";
@@ -22,7 +23,8 @@ export type ConnectionState =
   | "connected"
   | "disconnected"
   | "connecting"
-  | "reconnecting";
+  | "reconnecting"
+  | "error";
 
 export type Connection = DeepOmit<
   DeepOmit<app.Connection, "subscriptions" | "isConnected">,
@@ -34,9 +36,17 @@ export type Connection = DeepOmit<
   showDataPageWhileDisconnected: boolean;
   firstConnectedThisSessionAtMs?: number;
   latencyMs?: number;
+  // Set when connectionState is "error", cleared on the next connect
+  // attempt. Lets the UI show why the last attempt failed after the toast
+  // that reported it has gone.
+  lastConnectionError?: string;
   // True only for a connection just created this session, until its details
   // dialog has been shown once (see acknowledgeConnectionCreated).
   justCreated?: boolean;
+  // Set when something outside the connection's tab asks for its details
+  // dialog, such as the edit button on a Home or new-tab tile. Cleared once
+  // the row has opened the dialog (see acknowledgeEditRequest).
+  editRequested?: boolean;
 };
 
 interface ConnectionStore {
@@ -223,6 +233,9 @@ const updateConnectionState = (
       store.connections[connectionId].connectionDetails.lastConnectedAt = now;
       store.connections[connectionId].showDataPageWhileDisconnected = true;
     }
+    if (connectionState === "connecting" || connectionState === "connected") {
+      store.connections[connectionId].lastConnectionError = undefined;
+    }
     if (
       connectionState === "connected" &&
       !store.connections[connectionId].firstConnectedThisSessionAtMs
@@ -252,6 +265,7 @@ const updateConnectionDetails = async (
       };
       return store;
     });
+    markSaved(connectionDetails.id);
   } catch (e) {
     console.error(e);
     throw e;
@@ -303,8 +317,48 @@ const connect = async (connectionId: number) => {
   try {
     await ConnectMqtt(connectionId);
   } catch (e) {
+    setConnectionError(connectionId, toErrorMessage(e));
     throw e;
   }
+};
+
+// toErrorMessage normalises whatever a rejected binding call throws (a plain
+// string from the Wails runtime today, but callers already treat this as
+// untyped) into a displayable string, so a non-string rejection can't render
+// as "[object Object]" in the connection's stored error state.
+const toErrorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+};
+
+// setConnectionError records why the last connect attempt failed, so the UI
+// still shows it after the toast that reported it disappears. Cleared on the
+// next connect attempt (updateConnectionState, on "connecting"/"connected").
+const setConnectionError = (connectionId: number, message: string) => {
+  update((store) => {
+    const existingConnection = store.connections[connectionId];
+    if (!existingConnection) return store;
+    // A newer attempt may have already connected (or started connecting)
+    // between this rejection firing and reaching here. Don't clobber that
+    // with a stale failure.
+    if (
+      existingConnection.connectionState === "connected" ||
+      existingConnection.connectionState === "connecting"
+    ) {
+      return store;
+    }
+    store.connections[connectionId] = {
+      ...existingConnection,
+      connectionState: "error",
+      lastConnectionError: message,
+    };
+    return store;
+  });
 };
 
 const disconnect = async (connectionId: number) => {
@@ -315,17 +369,36 @@ const disconnect = async (connectionId: number) => {
   }
 };
 
-// Clears the just-created flag once the details dialog has auto-opened, so it
+// The two flags that ask a connection's row to open its details dialog once
+// the row is mounted. Each is cleared as soon as the dialog opens, so it
 // doesn't reopen on every remount.
-const acknowledgeConnectionCreated = (connectionId: number) => {
+type OpenDetailsFlag = "justCreated" | "editRequested";
+
+const setOpenDetailsFlag = (
+  connectionId: number,
+  flag: OpenDetailsFlag,
+  value: boolean
+) => {
   update((store) => {
     const connection = store.connections[connectionId];
-    if (connection?.justCreated) {
-      store.connections[connectionId] = { ...connection, justCreated: false };
-    }
+    if (!connection || !!connection[flag] === value) return store;
+    store.connections[connectionId] = { ...connection, [flag]: value };
     return store;
   });
 };
+
+// Clears the just-created flag once the details dialog has auto-opened.
+const acknowledgeConnectionCreated = (connectionId: number) =>
+  setOpenDetailsFlag(connectionId, "justCreated", false);
+
+// Asks the connection's row to open its details dialog. Used by the tiles on
+// Home and the new-tab page, which select the tab but don't own the dialog.
+const requestEdit = (connectionId: number) =>
+  setOpenDetailsFlag(connectionId, "editRequested", true);
+
+// Clears that request once the dialog has opened.
+const acknowledgeEditRequest = (connectionId: number) =>
+  setOpenDetailsFlag(connectionId, "editRequested", false);
 
 const toggleShowDataPageWhileDisconnected = (
   connectionId: number,
@@ -349,6 +422,8 @@ export default {
   deleteConnection,
   toggleShowDataPageWhileDisconnected,
   acknowledgeConnectionCreated,
+  requestEdit,
+  acknowledgeEditRequest,
   connect,
   disconnect,
 };

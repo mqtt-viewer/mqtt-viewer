@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { Browser } from "@wailsio/runtime";
+  import { openExternal } from "@/util/external";
   import Button from "@/components/Button/Button.svelte";
   import type { ChangelogEntry } from "@/changelog";
+  import { groupSections } from "@/changelog-groups";
 
   // Newest first: entries[0] is shown leftmost, older versions to the right.
   export let entries: ChangelogEntry[] = [];
@@ -9,8 +10,7 @@
   export let initialVersion: string | null = null;
   export let onClose: () => void = () => {};
 
-  const STARGAZERS_URL =
-    "https://github.com/mqtt-viewer/mqtt-viewer/stargazers";
+  const STARGAZERS_URL = "https://github.com/mqtt-viewer/mqtt-viewer";
 
   const startIndex = (() => {
     const i = entries.findIndex((e) => e.version === initialVersion);
@@ -21,6 +21,9 @@
   $: selectedIndex = Math.min(selectedIndex, Math.max(entries.length - 1, 0));
   $: entry = entries[selectedIndex];
   $: showTabs = entries.length > 1;
+  // Sections under their group heading. An entry with no groups comes back as
+  // a single unheaded bucket, so older releases look exactly as they did.
+  $: groups = entry ? groupSections(entry.sections) : [];
   const tabLabel = (e: ChangelogEntry) =>
     e.released ? e.version : "Unreleased";
 </script>
@@ -58,22 +61,36 @@
       <span class="text-lg font-medium text-white-text">{entry.headline}</span>
       <p class="text-secondary-text">{entry.intro}</p>
 
-      <div class="flex flex-col gap-3">
-        {#each entry.sections as section}
-          <div class="flex flex-col gap-[2px] border-l-2 border-outline pl-3">
-            <span class="text-emphasis">{section.title}</span>
-            <span class="text-secondary-text text-base"
-              >{section.body}{#if section.thanks?.length}
-                {" Thanks "}{#each section.thanks as t, i}{#if i > 0}{i ===
-                    (section.thanks?.length ?? 0) - 1
-                      ? " and "
-                      : ", "}{/if}<a
-                    href={t.url}
-                    class="text-primary hover:underline"
-                    on:click|preventDefault={() => Browser.OpenURL(t.url)}
-                    >@{t.name}</a
-                  >{/each}.{/if}</span
-            >
+      <div class="flex flex-col gap-4">
+        {#each groups as bucket (bucket.group ?? "")}
+          <div class="flex flex-col gap-3">
+            {#if bucket.group}
+              <span class="text-base font-medium text-emphasis"
+                >{bucket.group}</span
+              >
+            {/if}
+            {#each bucket.sections as section}
+              <div
+                class="flex flex-col gap-[2px] border-l-2 border-outline pl-3"
+              >
+                <span class="text-emphasis">{section.title}</span>
+                {#if section.body || section.thanks?.length}
+                  <span class="text-secondary-text text-base"
+                    >{section.body}{#if section.thanks?.length}{section.body
+                        ? " Thanks "
+                        : "Thanks "}{#each section.thanks as t, i}{#if i > 0}{i ===
+                          (section.thanks?.length ?? 0) - 1
+                            ? " and "
+                            : ", "}{/if}<a
+                          href={t.url}
+                          class="text-primary hover:underline"
+                          on:click|preventDefault={() => openExternal(t.url)}
+                          >@{t.name}</a
+                        >{/each}.{/if}</span
+                  >
+                {/if}
+              </div>
+            {/each}
           </div>
         {/each}
       </div>
@@ -87,7 +104,7 @@
       <span class="text-sm text-secondary-text grow">{entry.date}</span>
       <Button
         variant="secondary"
-        on:click={() => Browser.OpenURL(STARGAZERS_URL)}
+        on:click={() => openExternal(STARGAZERS_URL)}
       >
         Star on GitHub
       </Button>

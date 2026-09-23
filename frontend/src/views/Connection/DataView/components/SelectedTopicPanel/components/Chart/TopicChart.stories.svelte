@@ -6,7 +6,7 @@
 
   const componentName = "TopicChart";
   const storyId = "Views/Connection/DataView/SelectedTopicPanel/Chart/TopicChart";
-  const props: string[] = ["selectedTopicStore","chartSeriesStore","paused","style","showPoints","windowMinutes"];
+  const props: string[] = ["selectedTopicStore","chartSeriesStore","paused","style","showPoints","windowSeconds"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

@@ -3,18 +3,26 @@
   import Button from "@/components/Button/Button.svelte";
   import BaseNumberInput from "@/components/InputFields/BaseNumberInput.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
+  import MemoryFormula from "@/components/MemoryFormula/MemoryFormula.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
   import {
     GetAppSettings,
     UpdateAppSettings,
+    GetMemoryLimitModel,
   } from "bindings/mqtt-viewer/backend/app/app";
   import { firstRunGateCleared } from "@/components/WhatsNewDialog/WhatsNewDialog.svelte";
-
-  const MB = 1024 * 1024;
-  const GB = 1024 * 1024 * 1024;
-  const MIN_MEMORY_MB = 64;
+  import {
+    estimateRetentionSeconds,
+    formatRetentionDuration,
+  } from "./retention-estimates";
+  import {
+    MB,
+    GB,
+    MIN_MEMORY_MB,
+    type MemoryLimitModel,
+  } from "@/util/memory-budget";
 
   const isOpen = writable(false);
 
@@ -22,10 +30,24 @@
   let recordingEnabled = false;
   let diskBudgetGb = 1;
   let isSaving = false;
+  let wasShown = false;
+  let limitModel: MemoryLimitModel | undefined;
 
   const recordingChecked = writable(false);
 
+  // A cleared Svelte number input binds null, which is also invalid.
+  $: memoryBelowMin = memoryBudgetMb == null || memoryBudgetMb < MIN_MEMORY_MB;
+
   onMount(async () => {
+    // Deliberately not awaited: this only feeds an estimate, so a slow or
+    // hanging call must never hold up the prompt or the first-run gate behind
+    // it. The copy shows a placeholder until it lands, and nothing if it fails.
+    GetMemoryLimitModel()
+      .then((model) => {
+        limitModel = model;
+      })
+      .catch((e) => console.error("Failed to read the memory limit model", e));
+
     try {
       const settings = await GetAppSettings();
       if (!settings.hasSeenHistoryPrompt) {
@@ -36,6 +58,7 @@
         recordingChecked.set(settings.recordingEnabled);
         diskBudgetGb =
           Math.round((settings.diskBudgetBytes / GB) * 100) / 100 || 1;
+        wasShown = true;
         isOpen.set(true);
       } else {
         // No prompt needed — the What's New dialog may show straight away.
@@ -49,6 +72,26 @@
 
   const onRecordingChange = (checked: boolean) => {
     recordingEnabled = checked;
+  };
+
+  // Mirror the byte conversion onSave uses so the estimates match what will
+  // actually be saved.
+  $: estimateBudgetBytes = Math.max(0, diskBudgetGb ?? 0) * GB;
+
+  const usageProfiles = [
+    { label: "Heavy", detail: "about 1,000 msg/s", messagesPerSecond: 1000 },
+    { label: "Medium", detail: "about 100 msg/s", messagesPerSecond: 100 },
+    { label: "Light", detail: "about 10 msg/s", messagesPerSecond: 10 },
+  ];
+
+  // Runs on every close path (Escape, overlay click, or after apply) via the
+  // Dialog's onClose. The Dialog invokes onClose once during init because the
+  // store starts false, so no-op until the prompt has actually been shown.
+  // Deliberately does not persist hasSeenHistoryPrompt: dismissing without
+  // choosing should re-prompt on the next launch.
+  const handleClosed = () => {
+    if (!wasShown) return;
+    firstRunGateCleared.set(true);
   };
 
   // Persist the chosen (or default) values and mark the prompt as seen so it
@@ -95,35 +138,41 @@
     });
 </script>
 
-<Dialog title="Message history retention" {isOpen} showCloseButton={false}>
+<Dialog
+  title="Message history retention"
+  {isOpen}
+  onClose={handleClosed}
+  showCloseButton={false}
+>
   <div class="flex flex-col gap-5 mt-3 w-[440px]">
     <p class="text-secondary-text">
-      MQTT Viewer now bounds how much message history it keeps in memory so long
-      subscriptions don't grow RAM. You can also record history to disk so it
-      survives restarts.
+      You can decide how much memory MQTT Viewer uses.
     </p>
 
-    <div class="flex flex-col gap-4">
-      <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="prompt-memory-budget"
-          label="Memory budget (MB)"
+          label="Memory budget per connection (MB)"
           min={MIN_MEMORY_MB}
+          hasError={memoryBelowMin}
           bind:value={memoryBudgetMb}
         />
+        {#if memoryBelowMin}
+          <p class="text-sm text-error">{MIN_MEMORY_MB} MB is the minimum</p>
+        {/if}
+        <MemoryFormula budgetMb={memoryBudgetMb} {limitModel} />
       </div>
 
-      <div class="flex flex-col gap-2">
-        <Switch
-          name="prompt-recording-enabled"
-          label="Record history to disk"
-          checked={recordingChecked}
-          checkedBool={recordingEnabled}
-          onChange={onRecordingChange}
-        />
-      </div>
+      <Switch
+        name="prompt-recording-enabled"
+        label="Record history to disk"
+        checked={recordingChecked}
+        checkedBool={recordingEnabled}
+        onChange={onRecordingChange}
+      />
 
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1.5 pt-4">
         <BaseNumberInput
           name="prompt-disk-budget"
           label="Disk budget (GB)"
@@ -131,6 +180,33 @@
           disabled={!recordingEnabled}
           bind:value={diskBudgetGb}
         />
+        {#if recordingEnabled}
+          <div
+            class="flex flex-col gap-1.5 mt-2 p-3 rounded bg-elevation-1 text-sm text-secondary-text"
+          >
+            <p class="text-emphasis">History kept for one connection</p>
+            {#each usageProfiles as profile}
+              <div class="flex items-baseline justify-between gap-3">
+                <span
+                  >{profile.label}
+                  <span class="text-xs">({profile.detail})</span></span
+                >
+                <span class="whitespace-nowrap text-emphasis"
+                  >{formatRetentionDuration(
+                    estimateRetentionSeconds(
+                      estimateBudgetBytes,
+                      profile.messagesPerSecond
+                    )
+                  )}</span
+                >
+              </div>
+            {/each}
+            <p class="mt-1 text-xs">
+              Estimates assume small messages of a few hundred bytes. You can
+              change this any time in settings.
+            </p>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -138,7 +214,11 @@
       <Button variant="text" disabled={isSaving} on:click={onNotNow}
         >Not now</Button
       >
-      <Button variant="primary" disabled={isSaving} on:click={onSave}>
+      <Button
+        variant="primary"
+        disabled={isSaving || memoryBelowMin}
+        on:click={onSave}
+      >
         {isSaving ? "Saving…" : "Save"}
       </Button>
     </div>

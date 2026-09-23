@@ -23,6 +23,8 @@ func (mm *MqttManager) Disconnect(err *error) {
 	}
 
 	if mm.connection.mqttVersion == "3" && mm.connection.v3Connection != nil {
+		// Stop this connection receiving global v3 debug broadcasts.
+		v3Registry.unregister(mm.LogStore.connId)
 		(*mm.connection.v3Connection).Disconnect(500)
 		mm.connection.v3Connection = nil
 	} else if mm.connection.mqttVersion == "5" && mm.connection.v5Connection != nil {

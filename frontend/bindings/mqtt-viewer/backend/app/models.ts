@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import {Create as $Create} from "@wailsio/runtime";
+import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -17,6 +17,44 @@ import * as paths$0 from "../paths/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as events$0 from "../../events/models.js";
+
+/**
+ * ClearRetainedResult reports what a bulk clear actually did. The UI states a
+ * number to the user, so it must come from attempted publishes rather than
+ * from the size of the list we were handed.
+ */
+export class ClearRetainedResult {
+    "cleared": number;
+    "failed": number;
+
+    /**
+     * FirstError names one failure so the user has something to act on.
+     */
+    "firstError": string;
+
+    /** Creates a new ClearRetainedResult instance. */
+    constructor($$source: Partial<ClearRetainedResult> = {}) {
+        if (!("cleared" in $$source)) {
+            this["cleared"] = 0;
+        }
+        if (!("failed" in $$source)) {
+            this["failed"] = 0;
+        }
+        if (!("firstError" in $$source)) {
+            this["firstError"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ClearRetainedResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ClearRetainedResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ClearRetainedResult($$parsedSource as Partial<ClearRetainedResult>);
+    }
+}
 
 /**
  * Used to represent a connection in the frontend
@@ -59,7 +97,7 @@ export class Connection {
 }
 
 export class Connections {
-    "connections": { [_: `${number}`]: Connection };
+    "connections": { [_ in `${number}`]?: Connection };
 
     /** Creates a new Connections instance. */
     constructor($$source: Partial<Connections> = {}) {
@@ -116,6 +154,7 @@ export class EnvInfo {
     "isDev": boolean;
     "serverAddress": string;
     "version": string;
+    "isServerMode": boolean;
 
     /** Creates a new EnvInfo instance. */
     constructor($$source: Partial<EnvInfo> = {}) {
@@ -127,6 +166,9 @@ export class EnvInfo {
         }
         if (!("version" in $$source)) {
             this["version"] = "";
+        }
+        if (!("isServerMode" in $$source)) {
+            this["isServerMode"] = false;
         }
 
         Object.assign(this, $$source);
@@ -141,12 +183,109 @@ export class EnvInfo {
     }
 }
 
+/**
+ * ExportedMessagesPayload carries an export's JSON and its default filename to
+ * the frontend, so a browser build can trigger a download instead of using the
+ * native save dialog (which is a no-op headless in server mode).
+ */
+export class ExportedMessagesPayload {
+    "filename": string;
+    "json": string;
+
+    /** Creates a new ExportedMessagesPayload instance. */
+    constructor($$source: Partial<ExportedMessagesPayload> = {}) {
+        if (!("filename" in $$source)) {
+            this["filename"] = "";
+        }
+        if (!("json" in $$source)) {
+            this["json"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ExportedMessagesPayload instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ExportedMessagesPayload {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ExportedMessagesPayload($$parsedSource as Partial<ExportedMessagesPayload>);
+    }
+}
+
+/**
+ * MemoryLimitModel is the shape of the soft memory limit, exposed to the
+ * frontend so the estimate the settings dialog shows is derived from the same
+ * numbers the runtime is given (see frontend/src/util/memory-budget.ts).
+ */
+export class MemoryLimitModel {
+    /**
+     * BaseBytes covers heap usage outside the per-connection history budgets.
+     */
+    "baseBytes": number;
+
+    /**
+     * Each connected connection adds budget * BudgetFactorNumerator /
+     * BudgetFactorDenominator: headroom over the budget for churn.
+     */
+    "budgetFactorNumerator": number;
+    "budgetFactorDenominator": number;
+
+    /** Creates a new MemoryLimitModel instance. */
+    constructor($$source: Partial<MemoryLimitModel> = {}) {
+        if (!("baseBytes" in $$source)) {
+            this["baseBytes"] = 0;
+        }
+        if (!("budgetFactorNumerator" in $$source)) {
+            this["budgetFactorNumerator"] = 0;
+        }
+        if (!("budgetFactorDenominator" in $$source)) {
+            this["budgetFactorDenominator"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryLimitModel instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryLimitModel {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryLimitModel($$parsedSource as Partial<MemoryLimitModel>);
+    }
+}
+
+export class MemoryStats {
+    "historyBytes": number;
+    "activeConnections": number;
+
+    /** Creates a new MemoryStats instance. */
+    constructor($$source: Partial<MemoryStats> = {}) {
+        if (!("historyBytes" in $$source)) {
+            this["historyBytes"] = 0;
+        }
+        if (!("activeConnections" in $$source)) {
+            this["activeConnections"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MemoryStats instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MemoryStats {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MemoryStats($$parsedSource as Partial<MemoryStats>);
+    }
+}
+
 export class MqttStats {
     "totalMessagesReceived": number;
     "totalMessagesSent": number;
     "totalBytesReceived": number;
     "totalBytesSent": number;
-    "statsByConnection": { [_: `${number}`]: mqtt$0.ConnectionStats };
+    "statsByConnection": { [_ in `${number}`]?: mqtt$0.ConnectionStats };
 
     /** Creates a new MqttStats instance. */
     constructor($$source: Partial<MqttStats> = {}) {
@@ -219,6 +358,39 @@ export class OpenChartWindowParams {
     }
 }
 
+/**
+ * OpenTopicWindowParams carries the state needed to pop the selected-topic
+ * panel out into its own window: which connection it follows, and the topic
+ * selected at the moment of opening. The topic rides along in the URL so a
+ * freshly created window can seed itself: a TopicWindowSelect event emitted
+ * right after creation would be dropped by a webview whose JS runtime has
+ * not mounted yet.
+ */
+export class OpenTopicWindowParams {
+    "connectionId": number;
+    "topic": string;
+
+    /** Creates a new OpenTopicWindowParams instance. */
+    constructor($$source: Partial<OpenTopicWindowParams> = {}) {
+        if (!("connectionId" in $$source)) {
+            this["connectionId"] = 0;
+        }
+        if (!("topic" in $$source)) {
+            this["topic"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new OpenTopicWindowParams instance from a string or object.
+     */
+    static createFrom($$source: any = {}): OpenTopicWindowParams {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new OpenTopicWindowParams($$parsedSource as Partial<OpenTopicWindowParams>);
+    }
+}
+
 export class PublishParams {
     "topic": string;
     "qos": number;
@@ -268,7 +440,7 @@ export class PublishProperties {
     "responseTopic"?: string;
     "correlationData"?: string;
     "subscriptionIdentifier"?: number;
-    "userProperties"?: { [_: string]: string };
+    "userProperties"?: { [_ in string]?: string };
 
     /** Creates a new PublishProperties instance. */
     constructor($$source: Partial<PublishProperties> = {}) {
