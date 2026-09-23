@@ -51,7 +51,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     inherit (finalAttrs) pname version src;
     pnpm = pnpm_10;
     fetcherVersion = 4;
-    hash = "sha256-oK5C/xVedG3MqnpP8G4Z/V8rf1RDnoFjQtMkFXCkNuw=";
+    hash = "sha256-sV37PiovrqWgVYF2q8fOB6n9MloDUB/l0Z4KEzzPB1g=";
   };
 
   # build/Taskfile.yml sets PRODUCTION=true for the frontend build. Nothing in
