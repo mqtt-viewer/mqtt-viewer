@@ -179,6 +179,15 @@ own work in your own context; you will confirm what you already believe.
 Use the session's top model for the reviewer. Review is judgment, and
 judgment is the one thing not worth delegating downward.
 
+Stop after two rounds and check in with the user. Later rounds mostly
+review the previous round's fixes, and findings drift from what users
+will hit to what a fuzzer can construct. Sort each round's findings into
+user-visible, hardening, and regressions from the last fix: fix the
+first, ask about the second, and treat a run of the third as a design
+problem, not a reason for another round. Only go past two rounds without
+asking when the last one found a high-severity, user-visible bug in code
+it hadn't seen before, and scope any further round to the new diff.
+
 ## Releases and the portal
 
 `docs/RELEASING.md` is the runbook; the `/release` skill drives it.
