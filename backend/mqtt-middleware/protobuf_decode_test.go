@@ -2,6 +2,7 @@ package mqttmiddleware
 
 import (
 	"encoding/json"
+	"fmt"
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/backend/protobuf"
 	"mqtt-viewer/backend/sparkplug"
@@ -38,11 +39,21 @@ func encodeSparkplugB(t *testing.T, registry *protobuf.ProtoRegistry, jsonPayloa
 	return protoBytes
 }
 
+var testMessageCounter int
+
 func runMiddleware(t *testing.T, mw *ProtoDecodeMiddleware, topic string, payload []byte) *mqtt.MqttMessage {
 	t.Helper()
 	// MiddlewareProperties deliberately nil: v3 messages historically arrived
 	// without one, and the middleware must tolerate it.
-	msg := &mqtt.MqttMessage{Topic: topic, Payload: payload, Time: time.Now()}
+	now := time.Now()
+	testMessageCounter++
+	msg := &mqtt.MqttMessage{
+		Id:      fmt.Sprintf("test-%d", testMessageCounter),
+		Topic:   topic,
+		Payload: payload,
+		Time:    now,
+		TimeMs:  now.UnixMilli(),
+	}
 	if err := mw.Func(msg); err != nil {
 		t.Fatalf("middleware error: %v", err)
 	}
@@ -197,26 +208,28 @@ func wireNBirthInvalidUTF8Name() []byte {
 	return payload
 }
 
-func TestInvalidUTF8NameKeepsMetaAndLaterAliasResolves(t *testing.T) {
+func TestInvalidUTF8NameIsRepairedAndLaterAliasResolves(t *testing.T) {
 	registry := loadTestRegistry(t)
 	store := sparkplug.NewSessionStore()
 	mw := NewProtoDecodeMiddleware(registry, store)
 
-	birthPayload := wireNBirthInvalidUTF8Name()
-	msg := runMiddleware(t, mw, "spBv1.0/G/NBIRTH/N", birthPayload)
+	// The birth itself must decode: a raw payload here would leave the
+	// frontend building the node from a birth it can't parse, with no metrics.
+	msg := runMiddleware(t, mw, "spBv1.0/G/NBIRTH/N", wireNBirthInvalidUTF8Name())
 	meta := sparkplugMeta(t, msg)
 	if meta["msgType"] != "NBIRTH" {
-		t.Errorf("expected NBIRTH meta despite marshal failure, got %v", meta)
+		t.Errorf("expected NBIRTH meta, got %v", meta)
 	}
-	if _, ok := (*msg.MiddlewareProperties)["IsDecodedProto"]; ok {
-		t.Error("expected no IsDecodedProto when marshal fails")
+	if (*msg.MiddlewareProperties)["IsDecodedProto"] != true {
+		t.Fatal("expected the birth to decode with its bad name repaired")
 	}
-	if string(msg.Payload) != string(birthPayload) {
-		t.Errorf("expected raw payload left untouched when marshal fails, got %v", msg.Payload)
+	want := strings.ToValidUTF8("\xff\xfe\x00", "\uFFFD")
+	if names := decodedMetricNames(t, msg.Payload); len(names) != 1 || names[0] != want {
+		t.Errorf("expected repaired birth name %q, got %q", want, names)
 	}
 
-	// The poisoned alias must still resolve on a later well-formed message,
-	// with the injected name sanitised to valid UTF-8.
+	// The alias still resolves on a later well-formed message, to the same
+	// repaired name.
 	data := encodeSparkplugB(t, registry,
 		`{"seq":"1","metrics":[{"alias":"3","datatype":10,"doubleValue":239.9}]}`)
 	dataMsg := runMiddleware(t, mw, "spBv1.0/G/NDATA/N", data)
@@ -224,22 +237,65 @@ func TestInvalidUTF8NameKeepsMetaAndLaterAliasResolves(t *testing.T) {
 	if dataMeta["resolution"] != sparkplug.ResolutionResolved {
 		t.Errorf("expected resolved, got %v", dataMeta["resolution"])
 	}
-	if (*dataMsg.MiddlewareProperties)["IsDecodedProto"] != true {
-		t.Error("expected the resolved NDATA payload to marshal to JSON")
+	if names := decodedMetricNames(t, dataMsg.Payload); len(names) != 1 || names[0] != want {
+		t.Errorf("expected sanitised name %q, got %q", want, names)
 	}
+}
 
+// wireNDataInvalidUTF8String hand-builds an NDATA (seq=1) whose one metric
+// carries an invalid UTF-8 string_value, the same proto2 hole as the bad name
+// but in a value.
+func wireNDataInvalidUTF8String() []byte {
+	metric := protowire.AppendTag(nil, 1, protowire.BytesType) // name
+	metric = protowire.AppendBytes(metric, []byte("Label"))
+	metric = protowire.AppendTag(metric, 4, protowire.VarintType) // datatype
+	metric = protowire.AppendVarint(metric, 12)
+	metric = protowire.AppendTag(metric, 15, protowire.BytesType) // string_value
+	metric = protowire.AppendBytes(metric, []byte{'o', 'k', 0xc3})
+
+	payload := protowire.AppendTag(nil, 2, protowire.BytesType)
+	payload = protowire.AppendBytes(payload, metric)
+	payload = protowire.AppendTag(payload, 3, protowire.VarintType)
+	payload = protowire.AppendVarint(payload, 1)
+	return payload
+}
+
+func TestInvalidUTF8StringValueIsRepaired(t *testing.T) {
+	registry := loadTestRegistry(t)
+	mw := NewProtoDecodeMiddleware(registry, sparkplug.NewSessionStore())
+
+	msg := runMiddleware(t, mw, "spBv1.0/G/NDATA/N", wireNDataInvalidUTF8String())
+	if (*msg.MiddlewareProperties)["IsDecodedProto"] != true {
+		t.Fatal("expected the payload to decode with its bad string repaired")
+	}
+	var decoded struct {
+		Metrics []struct {
+			StringValue string `json:"stringValue"`
+		} `json:"metrics"`
+	}
+	if err := json.Unmarshal(msg.Payload, &decoded); err != nil {
+		t.Fatalf("payload is not valid JSON: %v", err)
+	}
+	if len(decoded.Metrics) != 1 || decoded.Metrics[0].StringValue != "ok\uFFFD" {
+		t.Errorf("expected repaired string value, got %+v", decoded.Metrics)
+	}
+}
+
+func decodedMetricNames(t *testing.T, payload []byte) []string {
+	t.Helper()
 	var decoded struct {
 		Metrics []struct {
 			Name string `json:"name"`
 		} `json:"metrics"`
 	}
-	if err := json.Unmarshal(dataMsg.Payload, &decoded); err != nil {
-		t.Fatalf("resolved payload did not marshal to valid JSON: %v", err)
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("payload did not marshal to valid JSON: %v", err)
 	}
-	want := strings.ToValidUTF8("\xff\xfe\x00", "�")
-	if len(decoded.Metrics) != 1 || decoded.Metrics[0].Name != want {
-		t.Errorf("expected sanitised name %q, got %+v", want, decoded.Metrics)
+	names := []string{}
+	for _, m := range decoded.Metrics {
+		names = append(names, m.Name)
 	}
+	return names
 }
 
 func TestNilRegistryLeavesMessageUntouched(t *testing.T) {

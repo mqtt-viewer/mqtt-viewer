@@ -44,7 +44,7 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 	if info.Type == sparkplug.MessageTypeState {
 		// STATE payloads are JSON (3.0) or plain text (legacy 2.2), never
 		// protobuf — attach meta and leave the payload untouched.
-		setSparkplugMeta(params, store.HandleMessage(info, nil, params.Time))
+		setSparkplugMeta(params, store.HandleMessage(info, nil, messageRef(params)))
 		return nil
 	}
 
@@ -63,13 +63,13 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 		slog.Debug(fmt.Sprintf("sparkplug decode middleware error: %s", err.Error()))
 		return nil
 	}
-	meta := store.HandleMessage(info, msg, params.Time)
+	meta := store.HandleMessage(info, msg, messageRef(params))
 	decodedPayload, err := protobuf.MarshalDynamicToJSON(msg)
 	if err != nil {
 		// Alias/seq state is already committed above. Keep the sparkplug
 		// meta so tree tracking doesn't go dark even though this payload
-		// can't be shown decoded — e.g. a metric name with invalid UTF-8,
-		// which proto2 lets through Unmarshal but protojson.Marshal rejects.
+		// can't be shown decoded. MarshalDynamicToJSON already repairs
+		// invalid UTF-8, so this is a genuinely unrenderable payload.
 		slog.Debug(fmt.Sprintf("sparkplug decode middleware error: %s", err.Error()))
 		setSparkplugMeta(params, meta)
 		return nil
@@ -78,6 +78,10 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 	setMiddlewareProperty(params, "IsDecodedProto", true)
 	setSparkplugMeta(params, meta)
 	return nil
+}
+
+func messageRef(params *mqtt.MqttMessage) sparkplug.MessageRef {
+	return sparkplug.MessageRef{Topic: params.Topic, ID: params.Id, TimeMs: params.TimeMs}
 }
 
 // setSparkplugMeta attaches the session store's meta, skipping it entirely when

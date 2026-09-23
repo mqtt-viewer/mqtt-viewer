@@ -24,60 +24,128 @@ const (
 const (
 	maxTrackedNodes   = 4096
 	maxTrackedDevices = 1024 // per node
+	// maxMetricRefsPerScope bounds the latest-message-per-metric index for one
+	// node or device. A birth can declare any number of metrics and an
+	// unbirthed publisher can cycle aliases, so both need a ceiling.
+	maxMetricRefsPerScope = 4096
+	// maxMetricRefsTotal bounds the index across the whole connection, so the
+	// per-scope cap times the node and device caps can't add up to gigabytes.
+	maxMetricRefsTotal = 1 << 18
+	// maxBirthRefsPerNode keeps enough recent NBIRTHs for the frontend to
+	// recount a rebirth storm after a replay.
+	maxBirthRefsPerNode = 8
+	// maxSeqGapRefs keeps the messages behind the most recent seq-gap
+	// warnings, matching the frontend's warning strip cap.
+	maxSeqGapRefs = 50
+	// maxTrackedHosts caps STATE host tracking for the same reason as nodes.
+	maxTrackedHosts = 256
 )
+
+// MessageRef identifies a message in the connection's history: enough for
+// GetMessagesByIds to find it again with a time-hinted lookup.
+type MessageRef struct {
+	Topic  string
+	ID     string
+	TimeMs int64
+}
 
 type nodeKey struct {
 	group    string
 	edgeNode string
 }
 
-type deviceState struct {
-	Aliases  map[uint64]string // DEVICE alias space, separate from the node's
+// scopeState is what a node and a device have in common: an alias space, the
+// birth that established it, and the index of which message last carried
+// each metric (used to replay the tree without replaying every message).
+type scopeState struct {
+	Aliases  map[uint64]string
 	BirthAt  time.Time
 	hasBirth bool
+	// verified is false when the aliases were carried over a connection drop:
+	// the edge node may have rebirthed with new aliases while this client was
+	// away, so names resolved from them are shown as unverified until the
+	// next birth.
+	verified   bool
+	birthRef   *MessageRef
+	deathRef   *MessageRef
+	metricRefs map[string]MessageRef
+}
+
+type deviceState struct {
+	scopeState
 }
 
 type nodeState struct {
-	BdSeq    *uint64           // nil until an NBIRTH carried one
-	LastSeq  int16             // -1 until a seq has been observed
-	Aliases  map[uint64]string // NODE alias space only
-	Devices  map[string]*deviceState
-	BirthAt  time.Time
-	hasBirth bool
+	scopeState
+	BdSeq     *uint64 // nil until an NBIRTH in this session carried one
+	LastSeq   int16   // -1 until a seq has been observed
+	Devices   map[string]*deviceState
+	birthRefs []MessageRef // recent NBIRTHs, oldest first
 }
 
 // SessionStore tracks Sparkplug B birth/alias state for one connection.
-// Aliases are only valid for the life of the MQTT session, so the store is
-// Reset on disconnect and when history is cleared. Safe for concurrent use:
-// HandleMessage runs on the receive goroutine while resets come from others.
+// Aliases belong to the edge node's session, not to this client's MQTT
+// session, so a connection drop only Suspends the store: names keep resolving
+// but are flagged as unverified until the node births again. Reset (history
+// cleared) drops everything. Safe for concurrent use: HandleMessage runs on
+// the receive goroutine while suspends and resets come from others.
 type SessionStore struct {
-	mu    sync.Mutex
-	nodes map[nodeKey]*nodeState
+	mu            sync.Mutex
+	nodes         map[nodeKey]*nodeState
+	hosts         map[string]MessageRef
+	seqGapRefs    []MessageRef
+	metricRefsLen int
 }
 
 func NewSessionStore() *SessionStore {
-	return &SessionStore{nodes: map[nodeKey]*nodeState{}}
+	return &SessionStore{nodes: map[nodeKey]*nodeState{}, hosts: map[string]MessageRef{}}
 }
 
-// Reset drops all session state (births, aliases, seq counters).
+// Reset drops all session state (births, aliases, seq, replay index).
 func (s *SessionStore) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nodes = map[nodeKey]*nodeState{}
+	s.hosts = map[string]MessageRef{}
+	s.seqGapRefs = nil
+	s.metricRefsLen = 0
+}
+
+// Suspend marks every alias table as carried over a connection drop. Messages
+// the client missed while away can include a rebirth, so from here on names
+// resolved from these aliases are flagged unverified, and the seq counter and
+// bdSeq are forgotten (the next seq can't be judged against one from before
+// the gap, and a death's bdSeq may belong to a birth this client never saw).
+// Everything else survives so the tree and replay stay intact.
+func (s *SessionStore) Suspend() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, node := range s.nodes {
+		node.verified = false
+		node.LastSeq = -1
+		node.BdSeq = nil
+		for _, device := range node.Devices {
+			device.verified = false
+		}
+	}
 }
 
 // HandleMessage updates session state for a parsed Sparkplug message and
 // returns the meta map to attach to middleware properties. msg is the
 // already-unmarshalled payload for protobuf types (nil for STATE, and
 // tolerated nil for empty NDEATH payloads); for data messages it is mutated
-// in place to inject birth-established metric names. Returns nil when the
-// message belongs to a node the store refused to track (see maxTrackedNodes),
-// so the frontend never builds tree state for a node we can't follow.
-func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arrival time.Time) map[string]any {
+// in place to inject birth-established metric names. ref identifies the
+// message in history for replay. Returns nil when the message belongs to a
+// node or device the store refused to track (see maxTrackedNodes), so the
+// frontend never builds tree state for something we can't follow.
+func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref MessageRef) map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if info.Type == MessageTypeState {
+		if _, ok := s.hosts[info.HostID]; ok || len(s.hosts) < maxTrackedHosts {
+			s.hosts[info.HostID] = ref
+		}
 		return map[string]any{"msgType": string(info.Type), "hostId": info.HostID}
 	}
 
@@ -95,6 +163,18 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arr
 		}
 	}
 
+	var device *deviceState
+	switch info.Type {
+	case MessageTypeDBirth, MessageTypeDData, MessageTypeDDeath:
+		device = node.ensureDevice(info.Device)
+		if device == nil {
+			// All messages from an edge node share one seq counter, so a
+			// device past the cap still advances it. It just gets no meta.
+			trackSeq(node, msg, map[string]any{})
+			return nil
+		}
+	}
+
 	meta := map[string]any{
 		"msgType":  string(info.Type),
 		"group":    info.Group,
@@ -106,11 +186,19 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arr
 
 	switch info.Type {
 	case MessageTypeNBirth:
-		node.BirthAt = arrival
-		node.hasBirth = true
 		// Flush + rebuild, never merge: stale mappings resolve silently to
 		// wrong names.
-		node.Aliases = buildAliasMap(msg)
+		s.birthScope(&node.scopeState, msg, ref)
+		// Every device's session ends with its node's: Sparkplug requires a
+		// fresh DBIRTH for each device after an NBIRTH, and until one arrives
+		// the old device aliases may already be reassigned.
+		for _, d := range node.Devices {
+			s.clearScope(&d.scopeState)
+		}
+		node.birthRefs = append(node.birthRefs, ref)
+		if len(node.birthRefs) > maxBirthRefsPerNode {
+			node.birthRefs = node.birthRefs[1:]
+		}
 		// An NBIRTH restarts the sequence at 0. Anything else is a publisher
 		// bug worth reporting, but adopt it anyway so every following message
 		// isn't flagged against a counter the publisher isn't using.
@@ -123,32 +211,26 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arr
 		} else {
 			node.LastSeq = -1
 		}
+		// A birth without a bdSeq must not inherit the previous session's,
+		// or that session's number would be used to reject the next death.
+		node.BdSeq = nil
 		if bdSeq, ok := findBdSeq(msg); ok {
 			node.BdSeq = &bdSeq
 			meta["bdSeq"] = bdSeq
 		}
 
 	case MessageTypeDBirth:
-		if device := node.ensureDevice(info.Device); device != nil {
-			device.BirthAt = arrival
-			device.hasBirth = true
-			device.Aliases = buildAliasMap(msg)
-		}
-		// All messages from an edge node share one seq counter, so a DBIRTH
-		// advances the node's seq too, independent of the device cap above.
+		s.birthScope(&device.scopeState, msg, ref)
 		trackSeq(node, msg, meta)
 
 	case MessageTypeNData, MessageTypeDData:
 		trackSeq(node, msg, meta)
 
-		aliases, birthAt, hasBirth := node.Aliases, node.BirthAt, node.hasBirth
-		if info.Type == MessageTypeDData {
-			aliases, birthAt, hasBirth = nil, time.Time{}, false
-			if device, ok := node.Devices[info.Device]; ok {
-				aliases, birthAt, hasBirth = device.Aliases, device.BirthAt, device.hasBirth
-			}
+		scope := &node.scopeState
+		if device != nil {
+			scope = &device.scopeState
 		}
-		needed, resolved := resolveMetricNames(msg, aliases)
+		needed, resolved := resolveMetricNames(msg, scope.Aliases)
 		switch {
 		case needed == 0:
 			meta["resolution"] = ResolutionNames
@@ -159,9 +241,13 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arr
 		default:
 			meta["resolution"] = ResolutionUnresolved
 		}
-		if resolved > 0 && hasBirth {
-			meta["birthAtMs"] = birthAt.UnixMilli()
+		if resolved > 0 && scope.hasBirth {
+			meta["birthAtMs"] = scope.BirthAt.UnixMilli()
+			if !scope.verified {
+				meta["carriedOver"] = true
+			}
 		}
+		s.indexMetrics(scope, msg, ref)
 
 	case MessageTypeNDeath:
 		// The broker delivers NDEATH as the will, often with a nil payload.
@@ -178,23 +264,157 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, arr
 			meta["staleDeath"] = true
 			break
 		}
-		// LastSeq survives: the next NBIRTH is what resets it.
+		// LastSeq survives: the next NBIRTH is what resets it. Metric refs
+		// survive too: the tree keeps showing a dead node's last values.
+		deathRef := ref
+		node.deathRef = &deathRef
 		node.hasBirth = false
+		node.verified = false
 		node.Aliases = map[uint64]string{}
 		node.BirthAt = time.Time{}
-		for _, device := range node.Devices {
-			device.hasBirth = false
-			device.Aliases = map[uint64]string{}
-			device.BirthAt = time.Time{}
+		for _, d := range node.Devices {
+			d.hasBirth = false
+			d.verified = false
+			d.Aliases = map[uint64]string{}
+			d.BirthAt = time.Time{}
 		}
 
 	case MessageTypeDDeath:
 		trackSeq(node, msg, meta)
+		deathRef := ref
+		device.deathRef = &deathRef
 
 	case MessageTypeNCmd, MessageTypeDCmd:
 		// Passthrough: commands don't alter session state.
 	}
+
+	if _, ok := meta["seqGap"]; ok {
+		s.seqGapRefs = append(s.seqGapRefs, ref)
+		if len(s.seqGapRefs) > maxSeqGapRefs {
+			s.seqGapRefs = s.seqGapRefs[1:]
+		}
+	}
 	return meta
+}
+
+// birthScope replaces a scope's aliases and replay index with the birth's.
+func (s *SessionStore) birthScope(scope *scopeState, msg *dynamicpb.Message, ref MessageRef) {
+	s.clearScope(scope)
+	scope.BirthAt = time.UnixMilli(ref.TimeMs)
+	scope.hasBirth = true
+	scope.verified = true
+	scope.Aliases = buildAliasMap(msg)
+	birthRef := ref
+	scope.birthRef = &birthRef
+	scope.deathRef = nil
+}
+
+// clearScope forgets a scope's session: aliases, birth, and the metric values
+// that belonged to it.
+func (s *SessionStore) clearScope(scope *scopeState) {
+	s.metricRefsLen -= len(scope.metricRefs)
+	scope.metricRefs = nil
+	scope.Aliases = map[uint64]string{}
+	scope.BirthAt = time.Time{}
+	scope.hasBirth = false
+	scope.verified = false
+	scope.birthRef = nil
+}
+
+// indexMetrics records ref as the latest message carrying each of msg's
+// metrics. Called after name injection, so a resolved metric is keyed by its
+// name (matching the birth's key) and an unresolved one by its alias.
+func (s *SessionStore) indexMetrics(scope *scopeState, msg *dynamicpb.Message, ref MessageRef) {
+	list, ok := metricsList(msg)
+	if !ok {
+		return
+	}
+	for i := 0; i < list.Len(); i++ {
+		metric := list.Get(i).Message()
+		key := metricName(metric)
+		if key == "" {
+			alias, hasAlias := metricAlias(metric)
+			if !hasAlias {
+				continue
+			}
+			key = aliasKey(alias)
+		}
+		if _, exists := scope.metricRefs[key]; !exists {
+			if len(scope.metricRefs) >= maxMetricRefsPerScope || s.metricRefsLen >= maxMetricRefsTotal {
+				continue
+			}
+			if scope.metricRefs == nil {
+				scope.metricRefs = map[string]MessageRef{}
+			}
+			s.metricRefsLen++
+		}
+		scope.metricRefs[key] = ref
+	}
+}
+
+// aliasKey keys an unresolved metric in the replay index. The leading '#'
+// cannot collide with a birth-named metric in practice, and even if a name
+// did start with it the worst case is replaying one extra message.
+func aliasKey(alias uint64) string {
+	var buf [21]byte
+	i := len(buf)
+	for {
+		i--
+		buf[i] = byte('0' + alias%10)
+		alias /= 10
+		if alias == 0 {
+			break
+		}
+	}
+	i--
+	buf[i] = '#'
+	return string(buf[i:])
+}
+
+// ReplayRefs returns the messages a Sparkplug view needs to rebuild the
+// current tree: for every node and device its latest birth and death and the
+// latest message carrying each metric, the recent NBIRTHs behind rebirth-storm
+// detection, the messages behind recent seq-gap warnings, and each host's
+// latest STATE. Deduplicated by id, in no particular order.
+func (s *SessionStore) ReplayRefs() []MessageRef {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	seen := map[string]bool{}
+	refs := []MessageRef{}
+	add := func(ref MessageRef) {
+		if seen[ref.ID] {
+			return
+		}
+		seen[ref.ID] = true
+		refs = append(refs, ref)
+	}
+	addScope := func(scope *scopeState) {
+		if scope.birthRef != nil {
+			add(*scope.birthRef)
+		}
+		if scope.deathRef != nil {
+			add(*scope.deathRef)
+		}
+		for _, ref := range scope.metricRefs {
+			add(ref)
+		}
+	}
+	for _, node := range s.nodes {
+		addScope(&node.scopeState)
+		for _, ref := range node.birthRefs {
+			add(ref)
+		}
+		for _, device := range node.Devices {
+			addScope(&device.scopeState)
+		}
+	}
+	for _, ref := range s.seqGapRefs {
+		add(ref)
+	}
+	for _, ref := range s.hosts {
+		add(ref)
+	}
+	return refs
 }
 
 // trackSeq advances the node's seq counter and records a gap in meta when the
@@ -226,9 +446,9 @@ func (s *SessionStore) ensureNode(info TopicInfo) *nodeState {
 		return nil
 	}
 	node := &nodeState{
-		LastSeq: -1,
-		Aliases: map[uint64]string{},
-		Devices: map[string]*deviceState{},
+		scopeState: scopeState{Aliases: map[uint64]string{}},
+		LastSeq:    -1,
+		Devices:    map[string]*deviceState{},
 	}
 	s.nodes[key] = node
 	return node
@@ -243,7 +463,7 @@ func (n *nodeState) ensureDevice(name string) *deviceState {
 	if len(n.Devices) >= maxTrackedDevices {
 		return nil
 	}
-	device := &deviceState{Aliases: map[uint64]string{}}
+	device := &deviceState{scopeState: scopeState{Aliases: map[uint64]string{}}}
 	n.Devices[name] = device
 	return device
 }
