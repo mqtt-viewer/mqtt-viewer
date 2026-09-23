@@ -63,7 +63,6 @@
 | Components/CodeEditor/CodeEditorConfigBarOption | [x] | [ ] | [x] | [x] |
 | Components/CodeEditor/DiffCodeEditor | [x] | [ ] | [x] | [ ] |
 | Components/Connection/DataView/ConfirmClearRetainedDialog | [x] | [ ] | [x] | [x] |
-| Components/Connection/DataView/ConfirmRebirthDialog | [x] | [ ] | [x] | [x] |
 | Components/Connection/DataView/MqttDataPanel/ViewToggle | [x] | [ ] | [x] | [x] |
 | Components/Connection/DataView/TopicContextMenu | [x] | [ ] | [x] | [x] |
 | Components/HistoryRetentionPrompt | [x] | [ ] | [ ] | [x] |
@@ -71,6 +70,7 @@
 | Components/MemoryFormula | [x] | [ ] | [x] | [x] |
 | Components/SettingsDialog | [x] | [ ] | [x] | [x] |
 | Components/StarPromptDialog | [x] | [ ] | [ ] | [ ] |
+| Components/StartupError | [x] | [ ] | [x] | [ ] |
 | Components/UpdateDialog | [x] | [ ] | [ ] | [x] |
 | Components/UpdateDialog/UpdateAvailableContent | [x] | [ ] | [x] | [x] |
 | Components/WhatsNewDialog | [x] | [ ] | [ ] | [x] |
@@ -105,8 +105,6 @@
 | Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttDataPanel/SearchActionBar/SearchAndHistory | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/MqttDataPanel/SparkplugPanel | [x] | [ ] | [x] | [x] |
-| Views/Connection/DataView/MqttDataPanel/SparkplugPanel/SparkplugRow | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/MqttGraphView | [x] | [ ] | [x] | [x] |
 | Views/Connection/DataView/PublishPanel/HeadersTab | [x] | [ ] | [x] | [ ] |
 | Views/Connection/DataView/PublishPanel/HeadersTab/HeaderRow | [x] | [ ] | [ ] | [x] |
@@ -157,7 +155,7 @@
 
 ## Summary
 
-- Components scanned: 131
-- Story present: 131
+- Components scanned: 129
+- Story present: 129
 - Figma-linked: 0
 - Missing specs: 0

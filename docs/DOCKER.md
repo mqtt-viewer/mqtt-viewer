@@ -58,22 +58,21 @@ WebSocket is served by the Wails server layer directly, outside any hook the
 app can gate today, so a password check inside the app would still leave the
 message stream open.
 
-### One residual risk the proxy has to close
+### Cross-origin WebSocket upgrades
 
 Calls that run backend code go to `/wails/runtime`, and the app rejects those
 when the browser says they came from another site. The live event WebSocket
-at `/wails/events` is different: it is served by the Wails layer before the
-app sees the request, and it accepts cross-origin upgrades.
+at `/wails/events` is served by the Wails layer before the app sees the
+request. On the Wails version this app now pins, that layer rejects
+cross-origin upgrades itself: the handshake is only accepted when the
+`Origin` matches the request `Host`, and MQTT Viewer does not widen that. So
+another page open in the same browser cannot attach to your message stream,
+and the app is covered without a proxy.
 
-The consequence is that while you have MQTT Viewer open, another page you
-visit in the same browser can open that WebSocket and read your live message
-stream. Browsers do not apply the same-origin policy to WebSockets, and they
-attach any cached basic-auth credentials to the handshake, so proxy auth does
-not close this on its own. It applies even when the port is bound to
-`127.0.0.1`, because the attacking page runs in your browser.
-
-If you put a proxy in front, reject cross-origin upgrades there. The Caddy
-example below does.
+The Caddy rule below still rejects cross-origin upgrades at the edge. Keep it
+as defence in depth, and in particular if you terminate on a different
+`Host` than the one the container sees, since that is the check the Wails
+layer relies on.
 
 ### Worked example: Caddy with basic auth
 

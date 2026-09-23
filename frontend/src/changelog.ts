@@ -60,7 +60,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "In development",
     headline: "In the next update",
     intro:
-      "Here's what's landed since 1.1. I'll tidy these notes up and give them a version when the update ships.",
+      "Here's what's landed since 1.1.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
         group: "Added",
@@ -79,8 +79,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
+        title: "Startup failures show an error instead of a blank window",
+        body: "If the app or a pop-out window cannot initialise it now tells you what went wrong and where to report it.",
+      },
+      {
+        group: "Fixed",
         title: "Busy topics show their payload again",
         body: "A topic publishing about once a second or faster no longer sits on \"Loading message...\" while you follow it.",
+      },
+      {
+        group: "Miscellaneous",
+        title: "Updated the Wails desktop shell to the current beta",
+        body: "The app runtime and the native shell now come from the same Wails release.",
       },
     ],
   },
