@@ -356,8 +356,23 @@
     if (highlightTimer !== null) clearTimeout(highlightTimer);
   });
 
-  const requestRebirthForCandidates = () =>
+  // The rebirth banner goes away once the births it asked for arrive, and a
+  // keyboard user's focus, back on its button after the dialog, would drop
+  // to the page. When the last candidate resolves soon after a request, the
+  // tree takes focus instead, if nothing else has it.
+  let bulkRequestedAt = -Infinity;
+  $: if (rebirthCandidates.length === 0 && performance.now() - bulkRequestedAt < 60_000) {
+    bulkRequestedAt = -Infinity;
+    queueMicrotask(() => {
+      const active = document.activeElement;
+      if (active === null || active === document.body) treeElement?.focus();
+    });
+  }
+
+  const requestRebirthForCandidates = () => {
+    bulkRequestedAt = performance.now();
     onRequestRebirth(rebirthCandidates.map((n) => ({ group: n.group, node: n.name })));
+  };
 
   const requestRebirthForNode = (node: SparkplugNode) =>
     onRequestRebirth([{ group: node.group, node: node.name, offline: node.status === "offline" }]);
