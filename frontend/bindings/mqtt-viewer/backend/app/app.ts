@@ -482,14 +482,23 @@ export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
 }
 
 /**
- * GetSparkplugMessageHistory returns the retained Sparkplug messages a view
- * needs to rebuild its tree (the spBv1.0 namespace plus legacy root-level STATE
- * topics), sorted by arrival time, so a Sparkplug view opened mid-session can
- * replay births received earlier.
+ * GetSparkplugMessageHistory returns the messages a Sparkplug view needs to
+ * rebuild the current tree, in arrival order, so a view opened mid-session
+ * starts from the state it would have reached watching live.
+ * 
+ * It is not a window of recent traffic. Sparkplug reports by exception, so
+ * the latest NDATA for a node usually carries only the metrics that just
+ * changed, and replaying a tail of the history would leave every quieter
+ * metric on its birth value. Births, deaths, recent NBIRTHs, seq-gap messages
+ * and host STATE are fetched from history by id (the latest message per topic
+ * is always kept there, so the current birth and death are too). Metric
+ * values come from the session store's own latest-value index and are rebuilt
+ * into one data message per original message, because the message a quiet
+ * metric last changed in may be long gone from history.
  */
-export function GetSparkplugMessageHistory(connectionId: number): $CancellablePromise<mqtt$0.MqttMessage[]> {
+export function GetSparkplugMessageHistory(connectionId: number): $CancellablePromise<$models.SparkplugHistory> {
     return $Call.ByID(80987752, connectionId).then(($result: any) => {
-        return $$createType27($result);
+        return $$createType40($result);
     });
 }
 
@@ -506,13 +515,13 @@ export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType40($result);
+        return $$createType41($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType42($result);
+        return $$createType43($result);
     });
 }
 
@@ -528,7 +537,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType44($result);
+        return $$createType45($result);
     });
 }
 
@@ -607,7 +616,7 @@ export function RenameCollectionMessage(id: number, name: string): $CancellableP
  */
 export function ReorderCollectionMessages(collectionID: number, orderedIDs: number[]): $CancellablePromise<models$0.CollectionMessage[]> {
     return $Call.ByID(1139884023, collectionID, orderedIDs).then(($result: any) => {
-        return $$createType45($result);
+        return $$createType46($result);
     });
 }
 
@@ -792,9 +801,10 @@ const $$createType36 = $Create.Array($$createType35);
 const $$createType37 = $Create.Array($Create.Any);
 const $$createType38 = models$0.SortState.createFrom;
 const $$createType39 = $Create.Array($$createType38);
-const $$createType40 = $Create.Array($$createType3);
-const $$createType41 = models$0.Tab.createFrom;
-const $$createType42 = $Create.Array($$createType41);
-const $$createType43 = $models.Connection.createFrom;
-const $$createType44 = $Create.Nullable($$createType43);
-const $$createType45 = $Create.Array($$createType9);
+const $$createType40 = $models.SparkplugHistory.createFrom;
+const $$createType41 = $Create.Array($$createType3);
+const $$createType42 = models$0.Tab.createFrom;
+const $$createType43 = $Create.Array($$createType42);
+const $$createType44 = $models.Connection.createFrom;
+const $$createType45 = $Create.Nullable($$createType44);
+const $$createType46 = $Create.Array($$createType9);

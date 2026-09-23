@@ -259,9 +259,9 @@
   // traffic, so a saved Sparkplug preference shows the list until then.
   $: view =
     preferredView === "sparkplug" && !showSparkplug ? "list" : preferredView;
-  // The store defers its history backfill; opening the view is one of the
-  // triggers for it. activate() is idempotent.
-  $: if (view === "sparkplug") sparkplugStore.activate();
+  // The tree is only decoded and built while its view is showing; opening it
+  // replays the backend's snapshot.
+  $: sparkplugStore.setActive(view === "sparkplug");
 
   const expandedTopicsStore = createExpandedTopicsStore();
   const searchStore = createSearchStore();

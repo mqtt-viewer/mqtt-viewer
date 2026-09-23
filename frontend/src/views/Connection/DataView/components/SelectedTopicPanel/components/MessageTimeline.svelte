@@ -742,6 +742,38 @@
       }
     })();
 
+  // Selects a specific message on request (focusMessage in the store) instead
+  // of the newest: the Sparkplug view opens the message a metric's value came
+  // from, which under report-by-exception is rarely the newest on its topic.
+  // The message may have been sampled out of the drawn items, so it is added
+  // if missing. A message no longer in history leaves the selection alone.
+  const applyFocus = (id: string) => {
+    const message = $selectedTopicStore.history.find((m) => m.id.toString() === id);
+    selectedTopicStore.consumeFocus();
+    if (!message) return;
+    if (!timelineDataSet.get(message.id)) {
+      timelineDataSet.update(getTimelineData([message]));
+    }
+    isAutoSelectingMostRecent = false;
+    selectedMessageId = message.id;
+    timeline.setSelection([message.id]);
+    onMessageSelect(message.id.toString());
+    const item = timelineDataSet.get(message.id);
+    if (item) animatedMoveTo(item.start, false);
+  };
+
+  $: focusId = $selectedTopicStore.focusMessageId;
+  $: if (
+    timeline &&
+    timelineDataSet &&
+    focusId !== null &&
+    !$selectedTopicStore.isLoadingHistory &&
+    innerSelectedTopic === $selectedTopicStore.selectedTopic &&
+    innerHistoryRevision === $selectedTopicStore.historyRevision
+  ) {
+    applyFocus(focusId);
+  }
+
   let innerSelectedTopic = $selectedTopicStore.selectedTopic;
   // Tracks historyRevision so a wholesale replacement (new topic, jump to
   // latest, clear-history) rebuilds the dataset. Incremental changes

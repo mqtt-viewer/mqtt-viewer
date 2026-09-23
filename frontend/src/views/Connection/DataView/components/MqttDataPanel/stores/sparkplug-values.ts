@@ -137,6 +137,7 @@ const signed32 = (v: number, bits: 8 | 16 | 32): number => {
  */
 export const formatFloat32 = (n: number): string => {
   if (!Number.isFinite(n)) return String(n);
+  if (Object.is(n, -0)) return "-0";
   const target = Math.fround(n);
   for (let p = 1; p <= 9; p++) {
     const candidate = Number(n.toPrecision(p));
@@ -147,14 +148,32 @@ export const formatFloat32 = (n: number): string => {
 
 const pad = (n: number, width = 2) => String(n).padStart(width, "0");
 
-/** Local wall-clock time with milliseconds: 2026-09-23 14:05:09.120. */
+const utcOffset = (d: Date): string => {
+  const minutes = -d.getTimezoneOffset();
+  const sign = minutes >= 0 ? "+" : "-";
+  const abs = Math.abs(minutes);
+  return `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+};
+
+/**
+ * Local wall-clock time with milliseconds and the UTC offset, so a reading
+ * taken on the other side of the world isn't mistaken for local:
+ * 2026-09-23 14:05:09.120 +10:00.
+ */
 export const formatDateTime = (ms: number): string => {
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return String(ms);
   return (
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}` +
+    ` ${utcOffset(d)}`
   );
+};
+
+/** ISO 8601 in UTC, for copying a DateTime somewhere that parses it. */
+const isoDateTime = (ms: number): string => {
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? String(ms) : d.toISOString();
 };
 
 const base64ToBytes = (b64: string): Uint8Array => {
@@ -252,9 +271,13 @@ const formatArray = (datatype: number, b64: string): FormattedValue => {
   }
   const shown = items.slice(0, ARRAY_PREVIEW).map((v) => String(v));
   const more = items.length - shown.length;
+  // Copy as JSON numbers where they survive the trip (not 64-bit integers,
+  // which lose precision past 2^53, nor DateTimes).
+  const numeric = datatype !== 25 && datatype !== 29 && datatype !== 32 && datatype !== 33 && datatype !== 34;
+  const rawItems = numeric ? items.map((v) => Number(v)) : items;
   return {
     value: `[${shown.join(", ")}${more > 0 ? `, and ${more} more` : ""}]`,
-    raw: JSON.stringify(items),
+    raw: JSON.stringify(rawItems),
   };
 };
 
@@ -294,7 +317,7 @@ export const formatMetricValue = (
     if (big === null) return { value: String(m.longValue), raw: String(m.longValue) };
     if (dt === 13) {
       const ms = Number(big);
-      return { value: formatDateTime(ms), raw: String(ms) };
+      return { value: formatDateTime(ms), raw: isoDateTime(ms) };
     }
     // Int64 and the smaller signed types all ride in long_value as two's
     // complement when a publisher puts them there.
@@ -318,7 +341,10 @@ export const formatMetricValue = (
   }
 
   if (m.stringValue !== undefined) {
-    return { value: m.stringValue, raw: m.stringValue };
+    // A row is one line: show line breaks rather than silently joining
+    // lines, and show an empty string rather than nothing.
+    const shown = m.stringValue === "" ? '""' : m.stringValue.replace(/\r?\n/g, " \u21b5 ");
+    return { value: shown, raw: m.stringValue };
   }
 
   if (m.bytesValue !== undefined) {

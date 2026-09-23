@@ -5,38 +5,47 @@
 // health diagnostics: seq-gap flags, rebirth-storm warnings and host STATE
 // tracking. See docs/specs/research/stateful-sparkplug-decode.md.
 //
-// Order independence. Live batches and the history replay can interleave in
-// any order, so nothing here depends on arrival order. Every scope keeps the
-// newest time of each kind of signal (birth, data, death, seq gap) and the
-// visible state is derived from those: a node is online when its newest sign
-// of life is newer than its newest death, a birth only replaces metrics that
-// are older than it, a seq gap only counts when it is newer than the birth,
-// and data older than the scope's birth belongs to a finished session and is
-// ignored. Replaying the same messages in any order lands on the same tree.
+// Order independence. Live batches and the history replay interleave in any
+// order, so nothing here depends on the order messages are folded in. The
+// backend stamps every Sparkplug message with its arrival order ("n" in the
+// meta, a counter that never ties, unlike millisecond times), and every scope
+// keeps the newest order of each kind of signal: birth, data, death, seq gap.
+// Visible state is derived from those: a node is online when its newest sign
+// of life is newer than its newest death, a birth only replaces metrics older
+// than it, a seq gap only counts when newer than the birth, and data older
+// than the scope's birth belongs to a finished session. Folding the same
+// messages in any order lands on the same tree.
 //
 // Connection drops. Nothing the client missed while disconnected can be
 // known: a node may have died, or rebirthed with new aliases. So on a drop the
 // tree keeps its last values, but status only counts signals received after
 // the drop (unknown until a node is heard from again) and names from births
 // before it are flagged unverified until the node births again. The backend
-// flags the same messages with carriedOver.
+// flags the same data with carriedOver, and reports its own last drop in the
+// replay so a view opened later knows too.
+//
+// Hidden view. The store runs whenever the connection's data panel is open,
+// but the tree only matters while the Sparkplug view is showing. While it is
+// hidden the store folds only what is cheap and feeds the view toggle
+// (whether Sparkplug traffic exists, warnings, liveness): no payload is
+// decoded and no tree is built. Opening the view replays the backend's
+// snapshot (every scope's birth and death and the latest value of every
+// metric) and folds live from then on.
 //
 // Performance contract (mirrors broker-status-store):
 //   - The all-messages feed does a cheap early exit per message: anything
 //     without sparkplug middleware meta costs one property read, no allocs.
 //   - Svelte store writes are coalesced: at most one `set` per incoming batch
 //     event and one per 1 s ticker tick, never per message.
-//   - Snapshots are incremental: only nodes touched since the last snapshot
-//     are rebuilt; everything else reuses the previous objects.
+//   - Snapshots are incremental: only nodes and metrics touched since the
+//     last snapshot are rebuilt; everything else reuses the previous objects.
 //   - State is bounded by hard caps, not by traffic: MAX_TRACKED_NODES nodes,
 //     MAX_TRACKED_DEVICES devices per node, MAX_METRICS_PER_SCOPE metrics and
-//     MAX_PLACEHOLDER_METRICS alias placeholders per scope (these mirror the
-//     backend session caps), MAX_TRACKED_HOSTS hosts, warnings at WARNING_CAP
-//     and the per-node birth ring at BIRTH_RING_CAP. Over-cap keys are
-//     dropped, with one console.warn per store per cap kind.
-//   - The history backfill is deferred and single-shot: it runs on the first
-//     live Sparkplug message, on activate() (the user opening the view), or on
-//     an idle fallback timer, never unconditionally on every panel mount.
+//     MAX_PLACEHOLDER_METRICS alias placeholders per scope, MAX_METRICS_TOTAL
+//     metrics in all (these mirror the backend session caps),
+//     MAX_TRACKED_HOSTS hosts, warnings at WARNING_CAP and the per-node birth
+//     ring at BIRTH_RING_CAP. Over-cap keys are dropped, with one console.warn
+//     per store per cap kind.
 
 import { get, writable } from "svelte/store";
 import { Events } from "@wailsio/runtime";
@@ -85,7 +94,7 @@ export const BIRTH_RING_CAP = 16;
 /** A storm is >= this many births within REBIRTH_STORM_WINDOW_MS. */
 export const REBIRTH_STORM_COUNT = 4;
 export const REBIRTH_STORM_WINDOW_MS = 90_000;
-/** Consecutive identical seq-gap warnings within this window are deduped. */
+/** Identical seq-gap warnings from one node in the same window are deduped. */
 export const SEQ_GAP_DEDUPE_MS = 5_000;
 /** Ticker cadence for relative last-seen labels. */
 export const TICKER_MS = 1000;
@@ -93,8 +102,10 @@ export const TICKER_MS = 1000;
 export const MAX_TRACKED_NODES = 4096;
 /** Devices tracked per edge node (mirrors the backend cap). */
 export const MAX_TRACKED_DEVICES = 1024;
-/** Metrics kept per node or device (mirrors the backend replay index cap). */
-export const MAX_METRICS_PER_SCOPE = 4096;
+/** Metrics kept per node or device (mirrors the backend cap). */
+export const MAX_METRICS_PER_SCOPE = 16384;
+/** Metrics kept across the whole connection (mirrors the backend cap). */
+export const MAX_METRICS_TOTAL = 1 << 18;
 /**
  * `alias_<n>` placeholder metrics kept per scope. Placeholders are minted by
  * an unbirthed publisher cycling aliases, so they get a tighter cap of their
@@ -143,8 +154,9 @@ export interface SparkplugMetric {
   lastSeenMs: number;
   /** Device-reported timestamp (metric or payload level); clocks lie. */
   payloadTsMs?: number;
-  /** Topic of the message that last updated this metric. */
+  /** Topic and id of the message that last updated this metric. */
   topic: string;
+  messageId?: string;
   isNull?: boolean;
   isHistorical?: boolean;
   isTransient?: boolean;
@@ -209,6 +221,8 @@ export interface SparkplugTreeState {
   connected: boolean;
   /** When the connection last dropped, if it has since this store started. */
   droppedAtMs?: number;
+  /** The history replay for an opened view is in flight. */
+  replaying: boolean;
   hosts: SparkplugHost[];
   groups: SparkplugGroup[];
   /** Capped at WARNING_CAP, newest last. */
@@ -225,17 +239,25 @@ export type SparkplugTreeStore = ReturnType<typeof createSparkplugTreeStore>;
 interface MetricRt {
   name: string;
   placeholder: boolean;
-  /** The payload metric the value came from, kept to re-format it if the
-   *  datatype is only learned later (an older birth replayed after data). */
+  /**
+   * The payload metric the value came from, kept to re-format it when a
+   * newer declaration of the datatype arrives (a birth replayed after data).
+   */
   source: PayloadMetric;
   datatype?: number;
+  /** Order of the message that declared the datatype in use. */
+  datatypeOrd: number;
   value: string;
   valueRaw: string;
   unit?: string;
+  unitOrd: number;
   qualityCode?: number;
+  /** Order and time of the message that last updated the value. */
+  lastSeenOrd: number;
   lastSeenMs: number;
   payloadTsMs?: number;
   topic: string;
+  messageId?: string;
   isNull?: boolean;
   isHistorical?: boolean;
   isTransient?: boolean;
@@ -250,17 +272,20 @@ interface ScopeRt {
   sortedKeys: string[] | null;
   /** Placeholder (`alias_<n>`) metrics currently in `metrics`. */
   placeholderCount: number;
-  /** Arrival time of the newest birth folded into this scope. */
+  /** Order and time of the newest birth folded in. */
+  birthOrd?: number;
   birthAtMs?: number;
-  /** Newest birth or data arrival. */
+  /** Order and time of the newest sign of life (birth or data). */
+  lastAliveOrd: number;
   lastAliveMs: number;
-  /** Newest death arrival. */
+  /** Order and time of the newest death. */
+  deathOrd?: number;
   deathAtMs?: number;
   /**
    * Newest data the backend flagged carriedOver: names resolved from a birth
    * that predates a connection drop, possibly before this store existed.
    */
-  carriedOverAtMs?: number;
+  carriedOverOrd?: number;
 }
 
 type DeviceRt = ScopeRt;
@@ -268,15 +293,16 @@ type DeviceRt = ScopeRt;
 interface NodeRt extends ScopeRt {
   group: string;
   bdSeq?: number;
-  /** bdSeq came from the newest birth or death folded in so far. */
-  bdSeqAtMs?: number;
+  /** Order of the birth or death the bdSeq came from. */
+  bdSeqOrd?: number;
   lastSeqGap?: { expected: number; got: number };
-  lastSeqGapMs?: number;
-  /** NBIRTH arrivals (capped), sorted ascending, for storm detection. */
+  lastSeqGapOrd?: number;
+  /** NBIRTH arrivals (capped), sorted by time, for storm detection. */
   birthRing: { id?: string; timeMs: number }[];
   /** The storm warning currently attached to this node, if a storm is live. */
   stormWarning: SparkplugWarning | null;
-  lastSeqGapWarning: { expected: number; got: number; timeMs: number } | null;
+  /** Recent seq-gap warnings as "expected-got-window", for the dedupe. */
+  seqGapKeys: Set<string>;
   devices: Map<string, DeviceRt>;
   /** Snapshot cache: rebuilt only when dirty. */
   dirty: boolean;
@@ -295,12 +321,20 @@ interface SparkplugMeta {
   carriedOver?: boolean;
   seqGap?: { expected: number; got: number };
   bdSeq?: number;
+  /** The backend's arrival order for this message. */
+  n?: number;
   /**
    * Set by the backend when an NDEATH's bdSeq does not match the live
    * session's birth: a late death from a superseded session, which must not
    * take the current session offline.
    */
   staleDeath?: boolean;
+}
+
+/** Replay payload from GetSparkplugMessageHistory. */
+interface SparkplugHistory {
+  messages: mqtt.MqttMessage[] | null;
+  suspendedOrd: number;
 }
 
 const metricKey = (m: PayloadMetric): string => {
@@ -318,6 +352,10 @@ const parseTsMs = (
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+/** Newest of two optional numbers. */
+const newest = (a: number | undefined, b: number | undefined) =>
+  a === undefined ? b : b === undefined ? a : Math.max(a, b);
+
 export const createSparkplugTreeStore = (
   connectionId: number,
   eventSet: events.ConnectionEventsSet,
@@ -325,31 +363,41 @@ export const createSparkplugTreeStore = (
 ) => {
   // group name -> (edge node name -> node runtime)
   const groups = new Map<string, Map<string, NodeRt>>();
-  const hosts = new Map<string, { online: boolean; sinceMs: number; atMs: number }>();
+  const hosts = new Map<string, { online: boolean; sinceMs: number; atOrd: number }>();
   let warnings: SparkplugWarning[] = [];
   let hasSparkplug = false;
 
   let connected = opts.connected ?? true;
-  // The last time the connection went down. Status and name verification
-  // only trust signals newer than this. A store created while disconnected
-  // starts from "down since now": anything it replays is from before.
+  // Order of the last connection drop: signals at or below it predate the
+  // drop. Wall-clock time of the drop is kept only for display.
+  let droppedAtOrd: number | undefined = undefined;
   let droppedAtMs: number | undefined = connected ? undefined : Date.now();
+  // Highest order seen, so a drop can be placed after everything received.
+  let maxOrdSeen = 0;
+  // Newest arrival time seen (the backend's clock), to age storms without
+  // comparing the backend's clock with this machine's.
+  let maxTimeSeen = 0;
+  // Nodes whose storm badge is showing and may need to expire.
+  const stormNodes = new Set<NodeRt>();
 
-  // Bumped on clear-history so an in-flight backfill can't resurrect state.
+  // Whether the Sparkplug view is showing (see "Hidden view" above).
+  let active = false;
+  let replaying = false;
+
+  // Bumped on clear-history so an in-flight replay can't resurrect state.
   let dataEpoch = 0;
 
-  // Set by destroy(); guards against init()'s backfill continuation running
-  // (and leaking a ticker) after the store has been torn down.
+  // Set by destroy(); guards against a replay continuation running (and
+  // leaking a ticker) after the store has been torn down.
   let destroyed = false;
 
-  // Single-shot guard for the deferred backfill, plus its idle fallback timer.
-  let backfillStarted = false;
-  let backfillPromise: Promise<void> | null = null;
   let idleBackfillTimer: ReturnType<typeof setTimeout> | null = null;
+  let idleBackfillDone = false;
 
-  // Total nodes across all groups, kept as a counter so the cap check never
-  // walks the group maps on the hot path.
+  // Totals kept as counters so cap checks never walk the maps on the hot
+  // path.
   let nodeCount = 0;
+  let metricCount = 0;
   // Snapshot cache for the group list: rebuilt only when the set of groups or
   // nodes changes.
   let structureChanged = true;
@@ -378,6 +426,8 @@ export const createSparkplugTreeStore = (
     }
   };
 
+  const findNode = (group: string, name: string) => groups.get(group)?.get(name);
+
   /** Returns null when the node is new and the tracking cap is reached. */
   const ensureNode = (group: string, name: string): NodeRt | null => {
     let nodes = groups.get(group);
@@ -400,10 +450,11 @@ export const createSparkplugTreeStore = (
       metrics: new Map(),
       sortedKeys: null,
       placeholderCount: 0,
+      lastAliveOrd: 0,
       lastAliveMs: 0,
       birthRing: [],
       stormWarning: null,
-      lastSeqGapWarning: null,
+      seqGapKeys: new Set(),
       devices: new Map(),
       dirty: true,
       built: null,
@@ -430,6 +481,7 @@ export const createSparkplugTreeStore = (
         metrics: new Map(),
         sortedKeys: null,
         placeholderCount: 0,
+        lastAliveOrd: 0,
         lastAliveMs: 0,
       };
       node.devices.set(name, device);
@@ -439,13 +491,19 @@ export const createSparkplugTreeStore = (
 
   const pushWarning = (w: SparkplugWarning) => {
     warnings.push(w);
-    if (warnings.length > WARNING_CAP) warnings.shift();
+    if (warnings.length > WARNING_CAP) {
+      const evicted = warnings.shift()!;
+      // A node's storm badge reads its warning's presence in this list.
+      if (evicted.kind === "rebirth-storm") {
+        const node = findNode(evicted.group, evicted.node);
+        if (node) node.dirty = true;
+      }
+    }
   };
 
-  // Message ids already counted towards a warning. Warning counting is
-  // frontend-side, so a duplicate delivery (a replay overlapping live
-  // traffic) would otherwise double count. Insertion-ordered Set used as a
-  // bounded FIFO.
+  // Message ids already counted towards a warning. A duplicate delivery (a
+  // replay overlapping live traffic) would otherwise double count.
+  // Insertion-ordered Set used as a bounded FIFO.
   const warnedIds = new Set<string>();
   const rememberWarnedId = (id: string) => {
     warnedIds.add(id);
@@ -457,17 +515,17 @@ export const createSparkplugTreeStore = (
 
   // --- Derived state ----------------------------------------------------------
 
-  /** Newest time >= the last drop, or undefined when older or missing. */
-  const sinceDrop = (t: number | undefined): number | undefined => {
-    if (t === undefined || t <= 0) return undefined;
-    if (droppedAtMs !== undefined && t < droppedAtMs) return undefined;
-    return t;
+  /** An order after the last drop, or undefined when before it or missing. */
+  const sinceDrop = (ord: number | undefined): number | undefined => {
+    if (ord === undefined || ord <= 0) return undefined;
+    if (droppedAtOrd !== undefined && ord <= droppedAtOrd) return undefined;
+    return ord;
   };
 
-  const statusOf = (aliveMs: number, deathMs: number | undefined): SparkplugStatus => {
+  const statusOf = (aliveOrd: number, deathOrd: number | undefined): SparkplugStatus => {
     if (!connected) return "unknown";
-    const alive = sinceDrop(aliveMs);
-    const dead = sinceDrop(deathMs);
+    const alive = sinceDrop(aliveOrd);
+    const dead = sinceDrop(deathOrd);
     if (alive === undefined && dead === undefined) return "unknown";
     if (dead === undefined) return "online";
     if (alive === undefined) return "offline";
@@ -475,13 +533,9 @@ export const createSparkplugTreeStore = (
   };
 
   const isVerified = (scope: ScopeRt) =>
-    scope.birthAtMs !== undefined &&
-    (droppedAtMs === undefined || scope.birthAtMs >= droppedAtMs) &&
-    (scope.carriedOverAtMs === undefined || scope.birthAtMs > scope.carriedOverAtMs);
-
-  /** Newest of two optional times. */
-  const newest = (a: number | undefined, b: number | undefined) =>
-    a === undefined ? b : b === undefined ? a : Math.max(a, b);
+    scope.birthOrd !== undefined &&
+    (droppedAtOrd === undefined || scope.birthOrd > droppedAtOrd) &&
+    (scope.carriedOverOrd === undefined || scope.birthOrd > scope.carriedOverOrd);
 
   // --- Snapshot ---------------------------------------------------------------
 
@@ -498,6 +552,7 @@ export const createSparkplugTreeStore = (
     lastSeenMs: rt.lastSeenMs,
     payloadTsMs: rt.payloadTsMs,
     topic: rt.topic,
+    messageId: rt.messageId,
     isNull: rt.isNull,
     isHistorical: rt.isHistorical,
     isTransient: rt.isTransient,
@@ -519,45 +574,53 @@ export const createSparkplugTreeStore = (
     return out;
   };
 
-  /** A node's birth is current (not ended by a newer death). */
-  const hasLiveBirth = (scope: ScopeRt) =>
-    scope.birthAtMs !== undefined &&
-    (scope.deathAtMs === undefined || scope.birthAtMs > scope.deathAtMs);
+  /**
+   * A storm is live while its warning is still listed and births kept
+   * coming within the storm window of the newest message seen: once a node
+   * settles, the badge goes (the warning stays in the list).
+   */
+  const stormActive = (n: NodeRt) => {
+    if (n.stormWarning === null || !warnings.includes(n.stormWarning)) return false;
+    const lastBirth = n.birthRing[n.birthRing.length - 1]?.timeMs ?? 0;
+    return maxTimeSeen - lastBirth <= REBIRTH_STORM_WINDOW_MS;
+  };
+
+  /** A birth that no newer death has ended. */
+  const hasLiveBirth = (birthOrd: number | undefined, deathOrd: number | undefined) =>
+    birthOrd !== undefined && (deathOrd === undefined || birthOrd > deathOrd);
 
   const buildNode = (n: NodeRt): SparkplugNode => {
     const devices: SparkplugDevice[] = [];
     for (const dName of Array.from(n.devices.keys()).sort()) {
       const d = n.devices.get(dName)!;
-      // A node's death takes its devices with it.
-      const deviceDeath = newest(d.deathAtMs, n.deathAtMs);
-      const awaitingBirth =
-        n.birthAtMs !== undefined &&
-        (d.birthAtMs === undefined || d.birthAtMs < n.birthAtMs) &&
-        d.metrics.size === 0;
-      const deviceHasBirth =
-        d.birthAtMs !== undefined &&
-        (deviceDeath === undefined || d.birthAtMs > deviceDeath) &&
-        (n.birthAtMs === undefined || d.birthAtMs >= n.birthAtMs);
-      const status = statusOf(d.lastAliveMs, deviceDeath);
+      // A node's death takes its devices with it, and its birth ends their
+      // sessions: a device birth older than the node's is not current.
+      const deviceDeathOrd = newest(d.deathOrd, n.deathOrd);
+      const deviceDeathMs = d.deathOrd === deviceDeathOrd ? d.deathAtMs : n.deathAtMs;
+      const currentBirth =
+        d.birthOrd !== undefined && (n.birthOrd === undefined || d.birthOrd > n.birthOrd);
+      const deviceHasBirth = currentBirth && hasLiveBirth(d.birthOrd, deviceDeathOrd);
+      const awaitingBirth = n.birthOrd !== undefined && !currentBirth && d.metrics.size === 0;
+      const status = statusOf(d.lastAliveOrd, deviceDeathOrd);
       devices.push({
         name: d.name,
         status,
         online: status === "online",
         hasBirth: deviceHasBirth,
-        birthAtMs: d.birthAtMs,
+        birthAtMs: currentBirth ? d.birthAtMs : undefined,
         verified: deviceHasBirth && isVerified(d),
         metrics: buildMetrics(d),
         lastSeenMs: d.lastAliveMs,
-        deathAtMs: deviceDeath,
+        deathAtMs: deviceDeathMs,
         placeholderCount: d.placeholderCount,
         awaitingBirth,
       });
     }
-    const status = statusOf(n.lastAliveMs, n.deathAtMs);
-    const nodeHasBirth = hasLiveBirth(n);
+    const status = statusOf(n.lastAliveOrd, n.deathOrd);
+    const nodeHasBirth = hasLiveBirth(n.birthOrd, n.deathOrd);
     const seqOk =
-      n.lastSeqGapMs === undefined ||
-      (n.birthAtMs !== undefined && n.birthAtMs > n.lastSeqGapMs);
+      n.lastSeqGapOrd === undefined ||
+      (n.birthOrd !== undefined && n.birthOrd > n.lastSeqGapOrd);
     return {
       group: n.group,
       name: n.name,
@@ -575,12 +638,16 @@ export const createSparkplugTreeStore = (
       verified: nodeHasBirth && isVerified(n),
       deathAtMs: n.deathAtMs,
       placeholderCount: n.placeholderCount,
-      storm: n.stormWarning !== null && warnings.includes(n.stormWarning),
+      storm: stormActive(n),
     };
   };
 
-  const buildState = (): SparkplugTreeState => {
-    const nowMs = connected || droppedAtMs === undefined ? Date.now() : droppedAtMs;
+  const buildGroups = (): SparkplugGroup[] => {
+    // A storm badge can expire with no message for its node.
+    for (const node of stormNodes) {
+      node.dirty = true;
+      if (!stormActive(node)) stormNodes.delete(node);
+    }
     if (structureChanged) {
       sortedGroupKeys = Array.from(groups.keys()).sort();
       sortedNodeKeys.clear();
@@ -615,7 +682,11 @@ export const createSparkplugTreeStore = (
     }
     structureChanged = false;
     if (groupsChanged) lastGroups = outGroups;
+    return lastGroups;
+  };
 
+  const buildState = (): SparkplugTreeState => {
+    const nowMs = connected || droppedAtMs === undefined ? Date.now() : droppedAtMs;
     const outHosts: SparkplugHost[] = [];
     for (const hostId of Array.from(hosts.keys()).sort()) {
       const h = hosts.get(hostId)!;
@@ -625,8 +696,10 @@ export const createSparkplugTreeStore = (
       hasSparkplug,
       connected,
       droppedAtMs,
+      replaying,
       hosts: outHosts,
-      groups: lastGroups,
+      // Nobody renders the tree while the view is hidden, so don't build it.
+      groups: active ? buildGroups() : lastGroups,
       warnings,
       warningCount: warnings.length,
       nowMs,
@@ -648,63 +721,72 @@ export const createSparkplugTreeStore = (
     }
   };
 
-  const applyMetric = (
+  const applyValue = (
     rt: MetricRt,
     pm: PayloadMetric,
-    arrivalMs: number,
-    payloadTs: string | number | undefined,
-    topic: string
+    ord: number,
+    m: mqtt.MqttMessage,
+    payloadTs: string | number | undefined
   ) => {
-    if (pm.datatype !== undefined) rt.datatype = pm.datatype;
     rt.built = null;
     rt.source = pm;
     const { value, raw } = formatMetricValue(pm, rt.datatype);
     rt.value = value;
     rt.valueRaw = raw;
-    // Properties usually ride on the birth only; a data message without them
-    // keeps what the birth declared.
-    const props = readMetricProperties(pm);
-    if (props.unit !== undefined) rt.unit = props.unit;
-    if (props.quality !== undefined) rt.qualityCode = props.quality;
-    rt.lastSeenMs = arrivalMs;
+    // Quality describes this value: a value published without one is not
+    // still bad because an earlier one was.
+    rt.qualityCode = readMetricProperties(pm).quality;
+    rt.lastSeenOrd = ord;
+    rt.lastSeenMs = m.timeMs;
     rt.payloadTsMs = parseTsMs(pm.timestamp, payloadTs);
-    rt.topic = topic;
+    rt.topic = m.topic;
+    rt.messageId = m.id as string | undefined;
     rt.isNull = pm.isNull;
     rt.isHistorical = pm.isHistorical;
     rt.isTransient = pm.isTransient;
   };
 
-  /** Inserts or updates one metric. Never walks a metric backwards in time. */
+  /**
+   * Takes the datatype and unit from the newest message that declares them,
+   * whatever its value's age: a birth replayed after data still declares
+   * what the data left out, and a newer birth corrects an older one.
+   */
+  const applyDeclarations = (rt: MetricRt, pm: PayloadMetric, ord: number) => {
+    if (pm.datatype !== undefined && ord >= rt.datatypeOrd && pm.datatype !== rt.datatype) {
+      rt.datatype = pm.datatype;
+      rt.datatypeOrd = ord;
+      const { value, raw } = formatMetricValue(rt.source, rt.datatype);
+      rt.value = value;
+      rt.valueRaw = raw;
+      rt.built = null;
+    } else if (pm.datatype !== undefined && ord >= rt.datatypeOrd) {
+      rt.datatypeOrd = ord;
+    }
+    const unit = readMetricProperties(pm).unit;
+    if (unit !== undefined && ord >= rt.unitOrd) {
+      if (unit !== rt.unit) rt.built = null;
+      rt.unit = unit;
+      rt.unitOrd = ord;
+    }
+  };
+
+  /** Inserts or updates one metric. Never walks a value backwards. */
   const upsertMetric = (
     scope: ScopeRt,
     pm: PayloadMetric,
-    arrivalMs: number,
-    payloadTs: string | number | undefined,
-    topic: string
+    ord: number,
+    m: mqtt.MqttMessage,
+    payloadTs: string | number | undefined
   ) => {
     const name = metricKey(pm);
     const existing = scope.metrics.get(name);
     if (existing) {
-      if (arrivalMs < existing.lastSeenMs) {
-        // An older message never changes the value, but a birth replayed
-        // after newer data still declares what the data left out.
-        if (existing.datatype === undefined && pm.datatype !== undefined) {
-          existing.built = null;
-          existing.datatype = pm.datatype;
-          const { value, raw } = formatMetricValue(existing.source, pm.datatype);
-          existing.value = value;
-          existing.valueRaw = raw;
-        }
-        if (existing.unit === undefined) {
-          const unit = readMetricProperties(pm).unit;
-          if (unit !== undefined) {
-            existing.built = null;
-            existing.unit = unit;
-          }
-        }
-        return;
+      if (ord > existing.lastSeenOrd) {
+        applyDeclarations(existing, pm, ord);
+        applyValue(existing, pm, ord, m, payloadTs);
+      } else {
+        applyDeclarations(existing, pm, ord);
       }
-      applyMetric(existing, pm, arrivalMs, payloadTs, topic);
       return;
     }
     const placeholder = pm.name === undefined || pm.name === "";
@@ -715,10 +797,10 @@ export const createSparkplugTreeStore = (
       );
       return;
     }
-    if (scope.metrics.size >= MAX_METRICS_PER_SCOPE) {
+    if (scope.metrics.size >= MAX_METRICS_PER_SCOPE || metricCount >= MAX_METRICS_TOTAL) {
       warnCapOnce(
         "metric",
-        `sparkplug-tree: metric cap reached (${MAX_METRICS_PER_SCOPE}) on a node or device, ignoring new metrics`
+        `sparkplug-tree: metric cap reached, ignoring new metrics`
       );
       return;
     }
@@ -726,31 +808,85 @@ export const createSparkplugTreeStore = (
       name,
       placeholder,
       source: pm,
+      datatypeOrd: -1,
       value: "",
       valueRaw: "",
-      lastSeenMs: arrivalMs,
-      topic,
+      unitOrd: -1,
+      lastSeenOrd: ord,
+      lastSeenMs: m.timeMs,
+      topic: m.topic,
       built: null,
     };
-    applyMetric(rt, pm, arrivalMs, payloadTs, topic);
+    applyDeclarations(rt, pm, ord);
+    applyValue(rt, pm, ord, m, payloadTs);
     scope.metrics.set(name, rt);
     scope.sortedKeys = null;
+    metricCount++;
     if (placeholder) scope.placeholderCount++;
   };
 
   /**
-   * Drops metrics older than a birth at `birthMs`: they belong to the session
-   * the birth ended. Newer ones (folded in before an older replayed birth)
-   * stay.
+   * Drops metrics older than a session boundary (a birth, or a death
+   * followed by unbirthed data): they belong to the session it ended.
    */
-  const dropMetricsOlderThan = (scope: ScopeRt, birthMs: number) => {
+  const dropMetricsOlderThan = (scope: ScopeRt, ord: number) => {
     for (const [key, m] of scope.metrics) {
-      if (m.lastSeenMs < birthMs) {
+      if (m.lastSeenOrd < ord) {
         scope.metrics.delete(key);
         scope.sortedKeys = null;
+        metricCount--;
         if (m.placeholder) scope.placeholderCount--;
       }
     }
+  };
+
+  /**
+   * Data newer than a death with no birth between them is a new session
+   * whose aliases nobody has told us; the dead session's metrics would sit
+   * beside its alias placeholders and read as current. Retire them. Checked
+   * from both sides, so it doesn't matter whether the death or the data is
+   * folded first.
+   */
+  const retireAfterUnbirthedRestart = (scope: ScopeRt, deathOrd: number | undefined, sessionStart: number | undefined) => {
+    if (deathOrd === undefined) return;
+    if (sessionStart !== undefined && sessionStart > deathOrd) return;
+    if (scope.lastAliveOrd <= deathOrd) return;
+    dropMetricsOlderThan(scope, deathOrd);
+  };
+
+  const recordSeqGap = (node: NodeRt, meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
+    const gap = meta.seqGap;
+    if (!gap) return;
+    if (node.lastSeqGapOrd === undefined || ord > node.lastSeqGapOrd) {
+      node.lastSeqGapOrd = ord;
+      node.lastSeqGap = { expected: gap.expected, got: gap.got };
+    }
+    // Two dedupes: by message id (the same message delivered twice, e.g. a
+    // replay overlapping live traffic) and by content within a short window
+    // either side (a publisher repeating the same gap), whatever the order.
+    const id = m.id as string | undefined;
+    if (id !== undefined) {
+      if (warnedIds.has(id)) return;
+      rememberWarnedId(id);
+    }
+    // Same gap in the same fixed window: one warning. Fixed windows rather
+    // than "within 5s of the last one" so the count doesn't depend on the
+    // order the repeats are folded in.
+    const key = `${gap.expected}-${gap.got}-${Math.floor(m.timeMs / SEQ_GAP_DEDUPE_MS)}`;
+    const repeat = node.seqGapKeys.has(key);
+    node.seqGapKeys.add(key);
+    if (node.seqGapKeys.size > 64) {
+      const oldest = node.seqGapKeys.values().next().value;
+      if (oldest !== undefined) node.seqGapKeys.delete(oldest);
+    }
+    if (repeat) return;
+    pushWarning({
+      group: node.group,
+      node: node.name,
+      text: `seq gap (expected ${gap.expected}, got ${gap.got})`,
+      timeMs: m.timeMs,
+      kind: "seq-gap",
+    });
   };
 
   const recordStorm = (node: NodeRt, m: mqtt.MqttMessage) => {
@@ -791,13 +927,21 @@ export const createSparkplugTreeStore = (
         node.stormWarning = w;
         pushWarning(w);
       }
+      stormNodes.add(node);
     } else if (m.timeMs === latest) {
       // Storm over: the next one gets a fresh warning.
       node.stormWarning = null;
     }
   };
 
-  const handleBirth = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
+  const noteAlive = (scope: ScopeRt, ord: number, timeMs: number) => {
+    if (ord > scope.lastAliveOrd) {
+      scope.lastAliveOrd = ord;
+      scope.lastAliveMs = timeMs;
+    }
+  };
+
+  const handleBirth = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
     if (!node) return;
     node.dirty = true;
@@ -806,41 +950,57 @@ export const createSparkplugTreeStore = (
     if (!scope) return;
 
     if (!isDevice) recordStorm(node, m);
-    if (m.timeMs > scope.lastAliveMs) scope.lastAliveMs = m.timeMs;
+    noteAlive(scope, ord, m.timeMs);
+    recordSeqGap(node, meta, m, ord);
+
+    if (!isDevice && (node.bdSeqOrd === undefined || ord > node.bdSeqOrd)) {
+      // A birth without a bdSeq clears the previous session's.
+      node.bdSeq = meta.bdSeq;
+      node.bdSeqOrd = ord;
+    }
+
+    // While the view is hidden, births only count for liveness and storms;
+    // the replay folds them properly when the view opens.
+    if (!active) return;
 
     // An older birth than the one already recorded belongs to a finished
     // session. So does a DBIRTH older than its node's latest NBIRTH.
-    if (scope.birthAtMs !== undefined && m.timeMs < scope.birthAtMs) return;
-    if (isDevice && node.birthAtMs !== undefined && m.timeMs < node.birthAtMs) return;
+    if (scope.birthOrd !== undefined && ord <= scope.birthOrd) {
+      if (ord === scope.birthOrd) return; // the same birth again
+      // Still declares datatypes and units for metrics it shares.
+      for (const pm of (parsePayload(m)?.metrics ?? []) as PayloadMetric[]) {
+        const existing = scope.metrics.get(metricKey(pm));
+        if (existing) applyDeclarations(existing, pm, ord);
+      }
+      return;
+    }
+    if (isDevice && node.birthOrd !== undefined && ord < node.birthOrd) return;
 
     const payload = parsePayload(m);
     const payloadMetrics: PayloadMetric[] = payload?.metrics ?? [];
 
     // Replace, never merge: the birth defines the metric set. Anything newer
     // than it (live data folded in before this replayed birth) stays.
-    dropMetricsOlderThan(scope, m.timeMs);
+    dropMetricsOlderThan(scope, ord);
     for (const pm of payloadMetrics) {
       // bdSeq is session plumbing; it is surfaced on the node row instead of
       // polluting the metric list.
       if (pm.name === "bdSeq") continue;
-      upsertMetric(scope, pm, m.timeMs, payload?.timestamp, m.topic);
+      upsertMetric(scope, pm, ord, m, payload?.timestamp);
     }
+    scope.birthOrd = ord;
     scope.birthAtMs = m.timeMs;
 
     if (!isDevice) {
-      if (meta.bdSeq !== undefined && (node.bdSeqAtMs ?? 0) <= m.timeMs) {
-        node.bdSeq = meta.bdSeq;
-        node.bdSeqAtMs = m.timeMs;
-      }
       // Every device's session ends with its node's: until a fresh DBIRTH,
       // its old metrics are from a finished session.
       for (const device of node.devices.values()) {
-        dropMetricsOlderThan(device, m.timeMs);
+        dropMetricsOlderThan(device, ord);
       }
     }
   };
 
-  const handleData = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
+  const handleData = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
     if (!node) return;
     node.dirty = true;
@@ -848,96 +1008,77 @@ export const createSparkplugTreeStore = (
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
     if (!scope) return;
 
-    if (m.timeMs > scope.lastAliveMs) scope.lastAliveMs = m.timeMs;
-    if (isDevice && m.timeMs > node.lastAliveMs) node.lastAliveMs = m.timeMs;
+    noteAlive(scope, ord, m.timeMs);
+    if (isDevice) noteAlive(node, ord, m.timeMs);
+    recordSeqGap(node, meta, m, ord);
+    if (meta.carriedOver) scope.carriedOverOrd = newest(scope.carriedOverOrd, ord);
+
+    // While the view is hidden, values are left to the replay.
+    if (!active) return;
 
     // Data from before the scope's current session started is superseded by
     // the birth that started it.
-    const sessionStart = isDevice
-      ? newest(node.birthAtMs, scope.birthAtMs)
-      : scope.birthAtMs;
-    if (meta.carriedOver) {
-      scope.carriedOverAtMs = newest(scope.carriedOverAtMs, m.timeMs);
-    }
-    if (sessionStart === undefined || m.timeMs >= sessionStart) {
-      // Data after a death with no birth since is a new session whose
-      // aliases nobody has told us: the dead session's named metrics would
-      // sit beside its alias placeholders and read as current. Retire them.
-      const scopeDeath = isDevice ? newest(scope.deathAtMs, node.deathAtMs) : scope.deathAtMs;
-      if (
-        scopeDeath !== undefined &&
-        m.timeMs > scopeDeath &&
-        (sessionStart === undefined || scopeDeath > sessionStart)
-      ) {
-        dropMetricsOlderThan(scope, scopeDeath);
-      }
-      const payload = parsePayload(m);
-      const payloadMetrics: PayloadMetric[] = payload?.metrics ?? [];
-      for (const pm of payloadMetrics) {
-        upsertMetric(scope, pm, m.timeMs, payload?.timestamp, m.topic);
-      }
-    }
+    const sessionStart = isDevice ? newest(node.birthOrd, scope.birthOrd) : scope.birthOrd;
+    if (sessionStart !== undefined && ord < sessionStart) return;
+    const scopeDeath = isDevice ? newest(scope.deathOrd, node.deathOrd) : scope.deathOrd;
+    retireAfterUnbirthedRestart(scope, scopeDeath, sessionStart);
 
-    const gap = meta.seqGap;
-    if (gap) {
-      if (node.lastSeqGapMs === undefined || m.timeMs >= node.lastSeqGapMs) {
-        node.lastSeqGapMs = m.timeMs;
-        node.lastSeqGap = { expected: gap.expected, got: gap.got };
-      }
-      const prev = node.lastSeqGapWarning;
-      // Two dedupes: by message id (the same message delivered twice, e.g. a
-      // replay overlapping live traffic) and by content within a short window
-      // (a publisher repeating the same gap).
-      const id = m.id as string | undefined;
-      const isDuplicate =
-        (id !== undefined && warnedIds.has(id)) ||
-        (prev !== null &&
-          prev.expected === gap.expected &&
-          prev.got === gap.got &&
-          Math.abs(m.timeMs - prev.timeMs) <= SEQ_GAP_DEDUPE_MS);
-      if (id !== undefined) rememberWarnedId(id);
-      if (!isDuplicate) {
-        pushWarning({
-          group: node.group,
-          node: node.name,
-          text: `seq gap (expected ${gap.expected}, got ${gap.got})`,
-          timeMs: m.timeMs,
-          kind: "seq-gap",
-        });
-      }
-      node.lastSeqGapWarning = {
-        expected: gap.expected,
-        got: gap.got,
-        timeMs: m.timeMs,
-      };
+    const payload = parsePayload(m);
+    const payloadMetrics: PayloadMetric[] = payload?.metrics ?? [];
+    for (const pm of payloadMetrics) {
+      upsertMetric(scope, pm, ord, m, payload?.timestamp);
     }
   };
 
-  const handleDeath = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
+  const handleDeath = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
     // A death whose bdSeq does not match the live birth belongs to a
     // superseded session: it says nothing about the session on screen.
     if (meta.staleDeath) return;
     const node = ensureNode(meta.group ?? "", meta.edgeNode ?? "");
     if (!node) return;
     node.dirty = true;
+    recordSeqGap(node, meta, m, ord);
     if (meta.device !== undefined) {
       const device = ensureDevice(node, meta.device);
       if (!device) return;
-      device.deathAtMs = newest(device.deathAtMs, m.timeMs);
+      if (device.deathOrd === undefined || ord > device.deathOrd) {
+        device.deathOrd = ord;
+        device.deathAtMs = m.timeMs;
+      }
+      if (active) {
+        retireAfterUnbirthedRestart(
+          device,
+          newest(device.deathOrd, node.deathOrd),
+          newest(node.birthOrd, device.birthOrd)
+        );
+      }
       return;
     }
-    node.deathAtMs = newest(node.deathAtMs, m.timeMs);
-    if (meta.bdSeq !== undefined && (node.bdSeqAtMs ?? 0) <= m.timeMs) {
+    if (node.deathOrd === undefined || ord > node.deathOrd) {
+      node.deathOrd = ord;
+      node.deathAtMs = m.timeMs;
+    }
+    if (meta.bdSeq !== undefined && (node.bdSeqOrd === undefined || ord > node.bdSeqOrd)) {
       node.bdSeq = meta.bdSeq;
-      node.bdSeqAtMs = m.timeMs;
+      node.bdSeqOrd = ord;
+    }
+    if (active) {
+      retireAfterUnbirthedRestart(node, node.deathOrd, node.birthOrd);
+      for (const device of node.devices.values()) {
+        retireAfterUnbirthedRestart(
+          device,
+          newest(device.deathOrd, node.deathOrd),
+          newest(node.birthOrd, device.birthOrd)
+        );
+      }
     }
   };
 
-  const handleState = (meta: SparkplugMeta, m: mqtt.MqttMessage) => {
+  const handleState = (meta: SparkplugMeta, m: mqtt.MqttMessage, ord: number) => {
     const hostId = meta.hostId ?? "";
     if (hostId === "") return;
     const existing = hosts.get(hostId);
-    if (existing && existing.atMs > m.timeMs) return; // older replay
+    if (existing && existing.atOrd >= ord) return; // older or the same
     if (!existing && hosts.size >= MAX_TRACKED_HOSTS) {
       warnCapOnce(
         "host",
@@ -959,7 +1100,7 @@ export const createSparkplugTreeStore = (
         hosts.set(hostId, {
           online: !!parsed.online,
           sinceMs: Number.isFinite(ts) && ts > 0 ? ts : m.timeMs,
-          atMs: m.timeMs,
+          atOrd: ord,
         });
         return;
       }
@@ -969,11 +1110,7 @@ export const createSparkplugTreeStore = (
     // Legacy 2.2 form: plain ONLINE / OFFLINE.
     const trimmed = text.trim().toUpperCase();
     if (trimmed === "ONLINE" || trimmed === "OFFLINE") {
-      hosts.set(hostId, {
-        online: trimmed === "ONLINE",
-        sinceMs: m.timeMs,
-        atMs: m.timeMs,
-      });
+      hosts.set(hostId, { online: trimmed === "ONLINE", sinceMs: m.timeMs, atOrd: ord });
     }
     // Anything else is junk on the STATE topic: ignore silently.
   };
@@ -984,26 +1121,36 @@ export const createSparkplugTreeStore = (
       | SparkplugMeta
       | undefined;
     if (!meta) return false; // cheap early exit for non-Sparkplug traffic
-    hasSparkplug = true;
+    const ord = typeof meta.n === "number" ? meta.n : m.timeMs;
+    if (ord > maxOrdSeen) maxOrdSeen = ord;
+    if (m.timeMs > maxTimeSeen) maxTimeSeen = m.timeMs;
     switch (meta.msgType) {
       case "NBIRTH":
       case "DBIRTH":
-        handleBirth(meta, m);
+        hasSparkplug = true;
+        handleBirth(meta, m, ord);
         break;
       case "NDATA":
       case "DDATA":
-        handleData(meta, m);
+        hasSparkplug = true;
+        handleData(meta, m, ord);
         break;
       case "NDEATH":
       case "DDEATH":
-        handleDeath(meta, m);
+        hasSparkplug = true;
+        handleDeath(meta, m, ord);
         break;
       case "STATE":
-        handleState(meta, m);
+        // The legacy STATE/<host> form matches any two-level topic under a
+        // root called STATE, so on its own it doesn't prove this connection
+        // carries Sparkplug; the 3.0 form lives in the namespace and does.
+        if (m.topic.startsWith("spBv1.0/")) hasSparkplug = true;
+        handleState(meta, m, ord);
         break;
       default:
         // NCMD/DCMD (and unknown types): traffic exists but carries no tree
         // state we track.
+        hasSparkplug = true;
         break;
     }
     return true;
@@ -1021,8 +1168,8 @@ export const createSparkplugTreeStore = (
 
   let tickerId: ReturnType<typeof setInterval> | null = null;
   const tick = () => {
-    // Only recompute when there is something to recompute.
-    if (groups.size > 0 || hosts.size > 0) flush();
+    // Ages only show in the open view.
+    if (active && (groups.size > 0 || hosts.size > 0)) flush();
   };
   const startTicker = () => {
     if (destroyed) return;
@@ -1043,14 +1190,22 @@ export const createSparkplugTreeStore = (
     warnings = [];
     warnedIds.clear();
     nodeCount = 0;
+    metricCount = 0;
     hasSparkplug = false;
     structureChanged = true;
     lastGroupByName.clear();
+    lastGroups = [];
+    stormNodes.clear();
+    metricCount = 0;
     dataEpoch++;
   };
 
   const onConnectionDown = () => {
-    if (connected) droppedAtMs = Date.now();
+    if (connected) {
+      // After everything received so far, before anything that follows.
+      droppedAtOrd = maxOrdSeen + 0.5;
+      droppedAtMs = Date.now();
+    }
     connected = false;
     stopTicker();
     markAllDirty();
@@ -1067,14 +1222,12 @@ export const createSparkplugTreeStore = (
     offMessages = Events.On(eventSet.mqttMessages, (e: any) => {
       const messages: mqtt.MqttMessage[] = e.data ?? [];
       // One coalesced store write per batch, and none at all for batches with
-      // no Sparkplug traffic. Live traffic is never held back for the
-      // backfill: folding is order-independent and warning counters dedupe
-      // by message id, so the replay can land before or after this batch.
+      // no Sparkplug traffic. Live traffic is never held back for a replay:
+      // folding is order-independent and warning counters dedupe by message
+      // id, so the replay can land before or after this batch.
       if (!ingest(messages)) return;
+      clearIdleBackfillTimer();
       flush();
-      // Sparkplug traffic on this connection is the signal that the retained
-      // history is worth fetching. Single-shot.
-      if (!backfillStarted) void startBackfill();
     });
     offClear = Events.On(eventSet.mqttClearHistory, () => {
       resetData();
@@ -1093,21 +1246,41 @@ export const createSparkplugTreeStore = (
     offReconnecting = Events.On(eventSet.mqttReconnecting, onConnectionDown);
   };
 
-  // Replays the connection's Sparkplug history (already enriched by the
-  // backend middleware): the latest birth, death and value-carrying message
-  // per metric, so a view opened mid-session starts from the same tree it
-  // would have reached watching live. Live traffic keeps flowing while it is
-  // in flight; folding is order-independent. Guarded by dataEpoch against a
-  // clear racing the fetch.
-  const backfill = async () => {
+  // Folds the backend's snapshot of the session: every scope's latest birth
+  // and death, the latest value of every metric, recent warnings and host
+  // STATE. Live traffic keeps flowing while it is in flight; folding is
+  // order-independent. Guarded by dataEpoch against a clear racing the fetch.
+  let replayPromise: Promise<void> | null = null;
+  const replay = (): Promise<void> => {
+    if (replayPromise) return replayPromise;
     const epoch = dataEpoch;
-    try {
-      const history = (await GetSparkplugMessageHistory(connectionId)) ?? [];
-      if (destroyed || epoch !== dataEpoch) return; // torn down / cleared
-      if (ingest(history)) flush();
-    } catch (e) {
-      console.error("sparkplug-tree: history backfill failed", e);
-    }
+    // Only an open view shows the loading state; the idle replay for a
+    // hidden one stays silent unless it finds something.
+    const showsProgress = active;
+    let changed = false;
+    replaying = true;
+    if (showsProgress) flush();
+    replayPromise = (async () => {
+      try {
+        const history = (await GetSparkplugMessageHistory(connectionId)) as unknown as
+          | SparkplugHistory
+          | null;
+        if (destroyed || epoch !== dataEpoch) return;
+        if (history?.suspendedOrd) {
+          // The backend saw a drop, possibly before this store existed.
+          droppedAtOrd = newest(droppedAtOrd, history.suspendedOrd + 0.5);
+        }
+        changed = ingest(history?.messages ?? []);
+        markAllDirty();
+      } catch (e) {
+        console.error("sparkplug-tree: history replay failed", e);
+      } finally {
+        replaying = false;
+        replayPromise = null;
+        if (!destroyed && (showsProgress || changed || active)) flush();
+      }
+    })();
+    return replayPromise;
   };
 
   const clearIdleBackfillTimer = () => {
@@ -1117,31 +1290,55 @@ export const createSparkplugTreeStore = (
     }
   };
 
-  /** Runs the backfill at most once per store, whatever triggered it. */
-  const startBackfill = (): Promise<void> => {
-    if (backfillStarted) return backfillPromise ?? Promise.resolve();
-    backfillStarted = true;
-    clearIdleBackfillTimer();
-    backfillPromise = backfill();
-    return backfillPromise;
+  /**
+   * Shows or hides the tree. Showing it replays the backend's snapshot, so
+   * the tree is complete however long the view was hidden; hiding it stops
+   * decoding payloads and building the tree.
+   */
+  const setActive = (next: boolean): Promise<void> => {
+    if (next === active) return replayPromise ?? Promise.resolve();
+    active = next;
+    if (!active) {
+      flush();
+      return Promise.resolve();
+    }
+    markAllDirty();
+    structureChanged = true;
+    return replay();
   };
 
   /**
-   * Called when the user opens the Sparkplug view. Idempotent: it only forces
-   * the one-shot history backfill if no live message has triggered it yet.
+   * Acknowledges the warnings: empties the list and the toggle's count.
+   * Node state (a seq gap until the next birth) is not a warning and stays.
    */
-  const activate = (): Promise<void> => startBackfill();
+  const clearWarnings = () => {
+    for (const node of stormNodes) {
+      node.stormWarning = null;
+      node.dirty = true;
+    }
+    stormNodes.clear();
+    for (const nodes of groups.values()) {
+      for (const node of nodes.values()) node.stormWarning = null;
+    }
+    warnings = [];
+    flush();
+  };
 
-  // Opens the store: binds the live listeners only. The history fetch is
-  // deferred (see startBackfill) so mounting a connection panel costs nothing
-  // on the backend; the idle timer is the fallback for a dormant connection
-  // whose Sparkplug traffic stopped before this mount.
+  /** Opens the view (kept for callers that only ever show it). */
+  const activate = (): Promise<void> => setActive(true);
+
+  // Binds the live listeners only. The idle timer covers a dormant
+  // connection whose Sparkplug traffic stopped before this mount: with no
+  // live message to say Sparkplug is here, the replay does.
   const init = () => {
     bindListeners();
     if (connected) startTicker();
     idleBackfillTimer = setTimeout(() => {
       idleBackfillTimer = null;
-      void startBackfill();
+      if (!hasSparkplug && !idleBackfillDone) {
+        idleBackfillDone = true;
+        void replay();
+      }
     }, BACKFILL_IDLE_MS);
     flush();
   };
@@ -1163,6 +1360,8 @@ export const createSparkplugTreeStore = (
     subscribe,
     init,
     activate,
+    setActive,
+    clearWarnings,
     destroy,
     /** Test/inspection helper: current state snapshot. */
     snapshot: () => get({ subscribe }),

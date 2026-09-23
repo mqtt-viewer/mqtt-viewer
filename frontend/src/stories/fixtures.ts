@@ -273,6 +273,7 @@ const mockSubstation7 = spNode({
 export const mockSparkplugTreeState: SpState = {
   hasSparkplug: true,
   connected: true,
+  replaying: false,
   hosts: [
     { hostId: "scada-primary", online: true, sinceMs: now - 45 * 60_000 },
   ],
@@ -334,6 +335,7 @@ export const mockSparkplugTreeState: SpState = {
 export const mockSparkplugTreeStateEmpty: SpState = {
   hasSparkplug: true,
   connected: true,
+  replaying: false,
   hosts: [],
   groups: [],
   warnings: [],
@@ -898,6 +900,7 @@ export const createMockSelectedTopicStore = () => {
       format: "json",
     },
     onHistoryDelta: null,
+    focusMessageId: null,
   });
   return store;
 };
@@ -979,6 +982,7 @@ export const createBusyMockSelectedTopicStore = (
       format: "json",
     },
     onHistoryDelta: null,
+    focusMessageId: null,
   });
 
   let liveTimer: ReturnType<typeof setInterval> | null = null;

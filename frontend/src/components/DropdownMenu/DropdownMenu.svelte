@@ -12,6 +12,8 @@
   // the menu is open).
   export let open = writable(false);
   export let triggerText = "";
+  /** What a screen reader announces for the trigger. */
+  export let triggerLabel = "Open Popover";
   export let triggerClass = "";
   // Classes for the outer melt trigger <button> itself. The button is
   // shrink-to-fit by default, which makes a max-w-full child truncate against
@@ -96,7 +98,7 @@
     </Button>
   {/if}
   <slot />
-  <span class="sr-only">Open Popover</span>
+  <span class="sr-only">{triggerLabel}</span>
 </button>
 
 {#if $open}

@@ -39,6 +39,12 @@
       "required": false,
       "default": true,
       "description": "Shows the topic tree's expand/collapse and sort controls. Off in the Sparkplug view."
+    },
+    {
+      "name": "searchPlaceholder",
+      "type": "string",
+      "required": false,
+      "description": "Search box placeholder override."
     }
   ],
   "tokens": [

@@ -57,22 +57,30 @@ const emit = (name: string, data?: any) => {
 
 const b64 = (s: string) => Buffer.from(s, "utf-8").toString("base64");
 
+/** Wraps messages as GetSparkplugMessageHistory returns them. */
+const history = (messages: any[], suspendedOrd = 0) => ({ messages, suspendedOrd });
+
 let nextId = 1;
 const msg = (
   topic: string,
   payload: string,
   timeMs: number,
   sparkplug?: Record<string, any>
-) =>
-  ({
-    id: String(nextId++),
-    topic,
-    payload: b64(payload),
-    qos: 0,
-    retain: false,
-    timeMs,
-    middlewareProperties: sparkplug ? { sparkplug } : null,
-  }) as any;
+) => {
+    const id = nextId++;
+    return {
+      id: String(id),
+      topic,
+      payload: b64(payload),
+      qos: 0,
+      retain: false,
+      timeMs,
+      // The backend's arrival order: time order, ties broken by creation.
+      middlewareProperties: sparkplug
+        ? { sparkplug: { n: timeMs * 1000 + (id % 1000), ...sparkplug } }
+        : null,
+    } as any;
+  };
 
 // Sparkplug message builders. The payload is the backend's protojson form
 // (names already injected for resolved data messages).
@@ -216,7 +224,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(BASE_MS));
   mocks.handlers.clear();
-  mocks.getSparkplugHistory.mockReset().mockResolvedValue([]);
+  mocks.getSparkplugHistory.mockReset().mockResolvedValue(history([]));
   nextId = 1;
 });
 
@@ -668,7 +676,7 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
   });
 
   it("replays Sparkplug history once the backfill is triggered", async () => {
-    mocks.getSparkplugHistory.mockResolvedValue([
+    mocks.getSparkplugHistory.mockResolvedValue(history([
       nbirth(BASE_MS - 10_000, { bdSeq: 1 }),
       ndata(BASE_MS - 5000),
       msg(
@@ -677,7 +685,7 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
         BASE_MS - 20_000,
         { msgType: "STATE", hostId: "scada-primary" }
       ),
-    ]);
+    ]));
     const store = await makeStore();
     const state = get(store);
     expect(state.hasSparkplug).toBe(true);
@@ -701,36 +709,42 @@ describe("createSparkplugTreeStore — gating, backfill, reset", () => {
     errSpy.mockRestore();
   });
 
-  it("does not fetch history on init alone, and fetches once per store", async () => {
+  it("replays when the view opens, not on init or live traffic", async () => {
     const store = createSparkplugTreeStore(CONN, eventSet);
     store.init();
+    emit("msgs", [nbirth(BASE_MS)]);
+    await vi.advanceTimersByTimeAsync(BACKFILL_IDLE_MS * 2);
     expect(mocks.getSparkplugHistory).not.toHaveBeenCalled();
 
-    await store.activate();
+    await store.setActive(true);
     expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
     expect(mocks.getSparkplugHistory).toHaveBeenCalledWith(CONN);
 
-    // Idempotent: a second activate and later live traffic never refetch.
-    await store.activate();
-    emit("msgs", [nbirth(BASE_MS)]);
-    await vi.advanceTimersByTimeAsync(BACKFILL_IDLE_MS * 2);
-    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
+    // Opening it again replays again: whatever arrived while it was hidden
+    // was never decoded.
+    await store.setActive(false);
+    await store.setActive(true);
+    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(2);
     store.destroy();
   });
 
-  it("triggers the backfill on the first live Sparkplug message", async () => {
+  it("while hidden, tracks warnings and liveness but builds no tree", async () => {
     const store = createSparkplugTreeStore(CONN, eventSet);
     store.init();
+    emit("msgs", [nbirth(BASE_MS), ndata(BASE_MS + 100, { seqGap: { expected: 1, got: 3 } })]);
+    let state = get(store);
+    expect(state.hasSparkplug).toBe(true);
+    expect(state.warningCount).toBe(1);
+    expect(state.groups).toHaveLength(0);
 
-    emit("msgs", [msg("factory/line0/temp", "21.4", BASE_MS)]);
-    expect(mocks.getSparkplugHistory).not.toHaveBeenCalled();
-
-    emit("msgs", [nbirth(BASE_MS)]);
-    expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
-
-    await store.activate(); // settle the in-flight fetch
-    // The triggering batch was queued, not dropped.
-    expect(findNode(get(store), "EnergyCo", "substation-7").hasBirth).toBe(true);
+    // Opening the view replays the backend's snapshot to fill the tree.
+    mocks.getSparkplugHistory.mockResolvedValue(history([nbirth(BASE_MS), ndata(BASE_MS + 100)]));
+    await store.setActive(true);
+    state = get(store);
+    const node = findNode(state, "EnergyCo", "substation-7");
+    expect(node.metrics.find((m) => m.name === "Volts/L1")!.value).toBe("240.1");
+    // The replayed gap message is the same one: not counted twice.
+    expect(state.warningCount).toBe(1);
     store.destroy();
   });
 
@@ -956,10 +970,15 @@ describe("createSparkplugTreeStore — connection drops", () => {
   });
 
   it("starts unknown when created while disconnected", async () => {
+    // The backend reports its last drop, after the birth it replays.
+    const birth = nbirth(BASE_MS - 10_000);
+    mocks.getSparkplugHistory.mockResolvedValue({
+      messages: [birth],
+      suspendedOrd: (birth.middlewareProperties as any).sparkplug.n,
+    });
     const store = createSparkplugTreeStore(CONN, eventSet, { connected: false });
     store.init();
     await store.activate();
-    emit("msgs", [nbirth(BASE_MS - 10_000)]);
     const node = findNode(get(store), "EnergyCo", "substation-7");
     expect(node.status).toBe("unknown");
     expect(node.verified).toBe(false);

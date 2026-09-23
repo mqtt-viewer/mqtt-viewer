@@ -629,6 +629,40 @@ export class SavePublishHistoryEntryParams {
     }
 }
 
+/**
+ * SparkplugHistory is what a Sparkplug view replays to rebuild its tree.
+ * SuspendedOrd is the arrival order (the meta "n") of the connection's last
+ * drop: births with a lower order predate it and their names are unverified.
+ */
+export class SparkplugHistory {
+    "messages": mqtt$0.MqttMessage[];
+    "suspendedOrd": number;
+
+    /** Creates a new SparkplugHistory instance. */
+    constructor($$source: Partial<SparkplugHistory> = {}) {
+        if (!("messages" in $$source)) {
+            this["messages"] = [];
+        }
+        if (!("suspendedOrd" in $$source)) {
+            this["suspendedOrd"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SparkplugHistory instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SparkplugHistory {
+        const $$createField0_0 = $$createType10;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("messages" in $$parsedSource) {
+            $$parsedSource["messages"] = $$createField0_0($$parsedSource["messages"]);
+        }
+        return new SparkplugHistory($$parsedSource as Partial<SparkplugHistory>);
+    }
+}
+
 export class StartupOptions {
     "PathsOverride": paths$0.Paths | null;
     "DbNameOverride": string | null;
@@ -649,7 +683,7 @@ export class StartupOptions {
      * Creates a new StartupOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): StartupOptions {
-        const $$createField0_0 = $$createType10;
+        const $$createField0_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("PathsOverride" in $$parsedSource) {
             $$parsedSource["PathsOverride"] = $$createField0_0($$parsedSource["PathsOverride"]);
@@ -701,5 +735,7 @@ const $$createType5 = $Create.Map($Create.Any, $$createType4);
 const $$createType6 = $Create.Array($Create.Any);
 const $$createType7 = PublishProperties.createFrom;
 const $$createType8 = $Create.Map($Create.Any, $Create.Any);
-const $$createType9 = paths$0.Paths.createFrom;
-const $$createType10 = $Create.Nullable($$createType9);
+const $$createType9 = mqtt$0.MqttMessage.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = paths$0.Paths.createFrom;
+const $$createType12 = $Create.Nullable($$createType11);

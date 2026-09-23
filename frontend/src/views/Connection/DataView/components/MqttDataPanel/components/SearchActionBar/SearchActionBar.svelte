@@ -36,6 +36,8 @@
    * tree (Sparkplug) hide them rather than show controls that do nothing.
    */
   export let showTopicControls = true;
+  /** Placeholder for the search box, for views that filter something else. */
+  export let searchPlaceholder: string | undefined = undefined;
 
   let searchText = $searchStore.text;
   const debouncedSetSearchText = _.debounce(searchStore.setSearchText, 200);
@@ -134,7 +136,7 @@
     class="flex flex-row items-center h-full gap-2 px-2 text-emphasis overflow-hidden"
   >
     <slot name="leading" />
-    <SearchAndHistory bind:searchText />
+    <SearchAndHistory bind:searchText placeholder={searchPlaceholder} />
     {#if showTopicControls}
     <Tooltip placement="bottom" focusable>
       <Button on:click={onExpandClick}

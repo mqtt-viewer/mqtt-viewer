@@ -237,7 +237,7 @@
       <div
         class="grow flex items-center justify-center text-secondary-text"
       >
-        Waiting for Sparkplug traffic
+        {treeState.replaying ? "Loading the Sparkplug session" : "Waiting for Sparkplug traffic"}
       </div>
     {:else if rows.length === 0}
       <div class="grow flex items-center justify-center text-secondary-text">

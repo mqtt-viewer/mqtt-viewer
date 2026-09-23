@@ -39,11 +39,19 @@ describe("formatMetricValue", () => {
     expect(formatMetricValue({ floatValue: "NaN" }, 9).value).toBe("NaN");
   });
 
-  it("formats DateTime as local time with the epoch in the raw value", () => {
+  it("formats DateTime as local time with its offset, copying ISO 8601", () => {
     const ms = new Date(2026, 8, 23, 14, 5, 9, 120).getTime();
     const formatted = formatMetricValue({ longValue: String(ms) }, 13);
-    expect(formatted.value).toBe("2026-09-23 14:05:09.120");
-    expect(formatted.raw).toBe(String(ms));
+    expect(formatted.value).toMatch(/^2026-09-23 14:05:09\.120 [+-]\d\d:\d\d$/);
+    expect(formatted.raw).toBe(new Date(ms).toISOString());
+  });
+
+  it("shows empty and multi-line strings for what they are", () => {
+    expect(formatMetricValue({ stringValue: "" }, 12).value).toBe('""');
+    const multi = formatMetricValue({ stringValue: "a\nb" }, 12);
+    expect(multi.value).toBe("a \u21b5 b");
+    expect(multi.raw).toBe("a\nb");
+    expect(formatMetricValue({ floatValue: -0 }, 9).value).toBe("-0");
   });
 
   it("summarises bytes, files, datasets and templates", () => {
@@ -73,6 +81,8 @@ describe("formatMetricValue", () => {
     const long = formatMetricValue({ bytesValue: b64(bytes) }, 26);
     expect(long.value).toBe("[0, 1, 2, 3, 4, 5, 6, 7, and 2 more]");
     expect(JSON.parse(long.raw)).toHaveLength(10);
+    // Numeric arrays copy as numbers.
+    expect(JSON.parse(long.raw)[3]).toBe(3);
     // A byte count that doesn't fit the element size falls back to a size.
     expect(formatMetricValue({ bytesValue: b64([1, 2, 3]) }, 24).value).toBe("3 bytes");
   });

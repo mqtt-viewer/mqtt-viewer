@@ -64,6 +64,13 @@
         "left"
       ],
       "default": null
+    },
+    {
+      "name": "triggerLabel",
+      "type": "string",
+      "required": false,
+      "default": "Open Popover",
+      "description": "Screen-reader name for the trigger button."
     }
   ],
   "tokens": [
