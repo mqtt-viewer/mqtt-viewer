@@ -127,8 +127,14 @@
   // history[] only carries stubs until fetched. Ensure the selected
   // message's payload as soon as it's picked (timeline click or
   // auto-select-latest). Cheap/no-op if already loaded or in flight.
+  // Run after this flush, not inside it: a live entry decodes synchronously,
+  // and a store write made from within the reactive statement that reads it
+  // is not re-rendered until the next unrelated change. On a topic busier
+  // than the 300ms batch that next change is always a newer message, so the
+  // panel sat on "Loading message..." for good.
   $: if (selectedMessageId !== null) {
-    selectedTopicStore.ensurePayload(selectedMessageId);
+    const id = selectedMessageId;
+    queueMicrotask(() => selectedTopicStore.ensurePayload(id));
   }
 
   // Retained state for the selected topic and everything below it. One call

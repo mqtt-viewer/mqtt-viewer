@@ -77,6 +77,11 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
         ],
       },
+      {
+        group: "Fixed",
+        title: "Busy topics show their payload again",
+        body: "A topic publishing about once a second or faster no longer sits on \"Loading message...\" while you follow it.",
+      },
     ],
   },
   {
