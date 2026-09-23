@@ -19,8 +19,10 @@ Ctrl-C to stop. Each topic publishes on its own cadence; rates are msgs/sec.
 --sparkplug adds a simulated Sparkplug B world (group "EnergyCo") alongside
 the plain-JSON topics above rather than replacing them, so a broker can be
 used to exercise both decode paths at once: births, aliased data, a periodic
-seq gap, and a device DDEATH followed by its node's NDEATH and rebirth. See
---help for the sub-flags.
+seq gap, a device DDEATH followed by its node's NDEATH and rebirth, units and
+OPC quality in metric properties, and a PLC node with signed ints, a DateTime,
+a float array and a string. --sparkplug-rbe makes data report by exception.
+See --help for the sub-flags.
 """
 import argparse
 import json
@@ -131,7 +133,10 @@ class Pub:
 #        is_historical=5 varint(bool), is_transient=6 varint(bool),
 #        is_null=7 varint(bool), value oneof: int_value=10 varint,
 #        long_value=11 varint, float_value=12 fixed32, double_value=13
-#        fixed64, boolean_value=14 varint(bool), string_value=15 LEN}
+#        fixed64, boolean_value=14 varint(bool), string_value=15 LEN,
+#        bytes_value=16 LEN, properties=9 LEN}
+# PropertySet{keys=1 repeated LEN, values=2 repeated LEN}
+# PropertyValue{type=1 varint, int_value=3 varint, string_value=8 LEN}
 # Field numbers confirmed against backend/protobuf/spBv1.proto.
 # ---------------------------------------------------------------------------
 
@@ -143,10 +148,20 @@ WIRE_LEN = 2
 WIRE_FIXED32 = 5
 
 # subset of the DataType enum in spBv1.proto
+DT_INT8 = 1
+DT_INT32 = 3
 DT_INT64 = 4
 DT_FLOAT = 9
 DT_DOUBLE = 10
 DT_BOOLEAN = 11
+DT_STRING = 12
+DT_DATETIME = 13
+DT_FLOAT_ARRAY = 30
+
+# Report by exception: set by --sparkplug-rbe. Data messages then carry only
+# the metrics that changed, the way real edge nodes publish, so most metrics
+# go quiet for long stretches.
+RBE = False
 
 
 def _varint(n):
@@ -191,13 +206,31 @@ def _f_double(field_num, value):
     return _tag(field_num, WIRE_FIXED64) + struct.pack("<d", value)
 
 
+def encode_property_set(props):
+    """props is a list of (key, type, value) where value is an int or str.
+    Ints go in int_value (3), strings in string_value (8)."""
+    out = bytearray()
+    for key, _type, _value in props:
+        out += _f_string(1, key)
+    for _key, ptype, value in props:
+        pv = bytearray(_f_varint(1, ptype))
+        if isinstance(value, str):
+            pv += _f_string(8, value)
+        else:
+            pv += _f_varint(3, value & 0xFFFFFFFF)
+        out += _f_len(2, bytes(pv))
+    return bytes(out)
+
+
 def encode_metric(name=None, alias=None, timestamp=None, datatype=None,
                    is_historical=None, is_transient=None, is_null=None,
-                   value=None, value_type=None):
+                   value=None, value_type=None, properties=None):
     """Build one Metric submessage. value_type selects the value oneof
     field: "int"=10, "long"=11, "float"=12, "double"=13, "bool"=14,
-    "string"=15. Omit value/value_type (or pass is_null=True) for a metric
-    with no value."""
+    "string"=15, "bytes"=16. Signed ints are written as their two's
+    complement, as the spec requires. Omit value/value_type (or pass
+    is_null=True) for a metric with no value. properties is a list for
+    encode_property_set."""
     out = bytearray()
     if name is not None:
         out += _f_string(1, name)
@@ -213,11 +246,13 @@ def encode_metric(name=None, alias=None, timestamp=None, datatype=None,
         out += _f_bool(6, is_transient)
     if is_null is not None:
         out += _f_bool(7, is_null)
+    if properties:
+        out += _f_len(9, encode_property_set(properties))
     if value_type is not None and not is_null:
         if value_type == "int":
-            out += _f_varint(10, value)
+            out += _f_varint(10, value & 0xFFFFFFFF)
         elif value_type == "long":
-            out += _f_varint(11, value)
+            out += _f_varint(11, value & 0xFFFFFFFFFFFFFFFF)
         elif value_type == "float":
             out += _f_float(12, value)
         elif value_type == "double":
@@ -226,6 +261,8 @@ def encode_metric(name=None, alias=None, timestamp=None, datatype=None,
             out += _f_bool(14, value)
         elif value_type == "string":
             out += _f_string(15, value)
+        elif value_type == "bytes":
+            out += _f_len(16, value)
         else:
             raise ValueError(f"unknown value_type {value_type!r}")
     return bytes(out)
@@ -284,22 +321,72 @@ def self_test():
     expected_n = b"\x10\x05" + b"\x38\x01"
     assert n == expected_n, f"null metric: {n.hex()} != {expected_n.hex()}"
 
+    neg = encode_metric(alias=7, datatype=DT_INT32, value=-5, value_type="int")
+    expected_neg = b"\x10\x07" + b"\x20\x03" + b"\x50" + bytes([0xFB, 0xFF, 0xFF, 0xFF, 0x0F])
+    assert neg == expected_neg, f"negative int metric: {neg.hex()} != {expected_neg.hex()}"
+
+    arr = encode_metric(alias=8, datatype=DT_FLOAT_ARRAY, value=struct.pack("<2f", 1.0, 2.0),
+                        value_type="bytes")
+    expected_arr = b"\x10\x08" + b"\x20\x1e" + b"\x82\x01\x08" + struct.pack("<2f", 1.0, 2.0)
+    assert arr == expected_arr, f"array metric: {arr.hex()} != {expected_arr.hex()}"
+
+    prop = encode_metric(alias=9, properties=[("engUnit", DT_STRING, "V")])
+    expected_prop = (
+        b"\x10\x09"
+        + b"\x4a\x10"  # field 9 (properties), LEN 16
+        + b"\x0a\x07engUnit"  # keys
+        + b"\x12\x05" + b"\x08\x0c" + b"\x42\x01V"  # values: type 12, string_value "V"
+    )
+    assert prop == expected_prop, f"property metric: {prop.hex()} != {expected_prop.hex()}"
+
     print("self-test OK")
     return True
 
 
 def _metric(name, alias, datatype, value, value_type, spread=0.0, lo=None, hi=None,
-            monotonic=False):
-    if lo is None:
-        lo = value - spread * 4
-    if hi is None:
-        hi = value + spread * 4
+            monotonic=False, unit=None, flaky_quality=False):
+    if value_type in ("float", "double", "int", "long"):
+        if lo is None:
+            lo = value - spread * 4
+        if hi is None:
+            hi = value + spread * 4
     return {"name": name, "alias": alias, "datatype": datatype, "value": value,
             "value_type": value_type, "spread": spread, "lo": lo, "hi": hi,
-            "monotonic": monotonic}
+            "monotonic": monotonic, "unit": unit, "flaky_quality": flaky_quality}
+
+
+def _birth_metric(m):
+    props = [("engUnit", DT_STRING, m["unit"])] if m.get("unit") else None
+    return encode_metric(name=m["name"], alias=m["alias"], datatype=m["datatype"],
+                         value=m["value"], value_type=m["value_type"], properties=props)
+
+
+def _data_metrics(metrics):
+    """The metrics a data message carries: all of them, or under --sparkplug-rbe
+    only the ones that changed this tick (at least one)."""
+    if not RBE:
+        return list(enumerate(metrics))
+    changed = [(i, m) for i, m in enumerate(metrics) if random.random() < 0.25]
+    return changed or [random.choice(list(enumerate(metrics)))]
+
+
+def _data_metric(m, **extra):
+    props = None
+    if m.get("flaky_quality"):
+        # OPC-style quality: 192 good, 0 bad. Bad now and then, so the
+        # quality badge has something to show.
+        props = [("Quality", DT_INT32, 0 if random.random() < 0.2 else 192)]
+    return encode_metric(alias=m["alias"], datatype=m["datatype"], value=m["value"],
+                         value_type=m["value_type"], properties=props, **extra)
 
 
 def _drift(m):
+    if m["value_type"] in ("string", "bytes"):
+        return m["value"]
+    if m["value_type"] in ("int", "long"):
+        if m["monotonic"]:
+            return m["value"] + (1 if random.random() < 0.3 else 0)
+        return m["value"]
     if m["value_type"] == "bool":
         return (not m["value"]) if random.random() < 0.02 else m["value"]
     if m["monotonic"]:
@@ -351,8 +438,7 @@ class NodeSim:
         self.data_count = 0
         metrics = [self._bd_seq_metric()]
         for m in self.metrics:
-            metrics.append(encode_metric(name=m["name"], alias=m["alias"], datatype=m["datatype"],
-                                          value=m["value"], value_type=m["value_type"]))
+            metrics.append(_birth_metric(m))
         payload = encode_payload(timestamp=now_ms(), metrics=metrics, seq=self._next_seq())
         self.client.publish(self.topic("NBIRTH"), payload, qos=0, retain=False)
         self.alive = True
@@ -367,33 +453,27 @@ class NodeSim:
         flagged = self.data_count > 0 and self.data_count % 20 == 0
         self.data_count += 1
         metrics = []
-        for i, m in enumerate(self.metrics):
+        for i, m in _data_metrics(self.metrics):
             m["value"] = _drift(m)
             if flagged and i == 0:
                 metrics.append(encode_metric(alias=m["alias"], is_null=True))
             elif flagged and i == 1 and len(self.metrics) > 1:
-                metrics.append(encode_metric(alias=m["alias"], datatype=m["datatype"],
-                                              is_historical=True, value=m["value"],
-                                              value_type=m["value_type"]))
+                metrics.append(_data_metric(m, is_historical=True))
             else:
-                metrics.append(encode_metric(alias=m["alias"], datatype=m["datatype"],
-                                              value=m["value"], value_type=m["value_type"]))
+                metrics.append(_data_metric(m))
         payload = encode_payload(timestamp=now_ms(), metrics=metrics, seq=self._next_seq())
         self.client.publish(self.topic("NDATA"), payload, qos=0, retain=False)
 
     def publish_dbirth(self, device):
-        metrics = [encode_metric(name=m["name"], alias=m["alias"], datatype=m["datatype"],
-                                  value=m["value"], value_type=m["value_type"])
-                   for m in device.metrics]
+        metrics = [_birth_metric(m) for m in device.metrics]
         payload = encode_payload(timestamp=now_ms(), metrics=metrics, seq=self._next_seq())
         self.client.publish(self.topic("DBIRTH", device.device_id), payload, qos=0, retain=False)
 
     def publish_ddata(self, device):
         metrics = []
-        for m in device.metrics:
+        for _i, m in _data_metrics(device.metrics):
             m["value"] = _drift(m)
-            metrics.append(encode_metric(alias=m["alias"], datatype=m["datatype"],
-                                          value=m["value"], value_type=m["value_type"]))
+            metrics.append(_data_metric(m))
         payload = encode_payload(timestamp=now_ms(), metrics=metrics, seq=self._next_seq())
         self.client.publish(self.topic("DDATA", device.device_id), payload, qos=0, retain=False)
 
@@ -410,16 +490,18 @@ def build_sparkplug_world(client):
     (+ device relay-09) cycles offline/rebirth, taking the device down with a
     DDEATH first; substation-2 only exists for --sparkplug-storm."""
     substation7 = NodeSim(client, "substation-7", [
-        _metric("Volts/L1", 3, DT_FLOAT, 11000.0, "float", spread=8.0, lo=10800, hi=11200),
-        _metric("Volts/L2", 4, DT_FLOAT, 10995.0, "float", spread=8.0, lo=10800, hi=11200),
-        _metric("Amps/L1", 5, DT_FLOAT, 120.0, "float", spread=6.0, lo=60, hi=200),
+        _metric("Volts/L1", 3, DT_FLOAT, 11000.0, "float", spread=8.0, lo=10800, hi=11200, unit="V"),
+        _metric("Volts/L2", 4, DT_FLOAT, 10995.0, "float", spread=8.0, lo=10800, hi=11200, unit="V"),
+        _metric("Amps/L1", 5, DT_FLOAT, 120.0, "float", spread=6.0, lo=60, hi=200, unit="A"),
         _metric("Breaker/State", 6, DT_BOOLEAN, True, "bool"),
     ])
     meter01 = DeviceSim("meter-01", [
         # deliberately alias 3 — same alias number as substation-7's
         # Volts/L1, to exercise separate per-entity alias spaces.
-        _metric("Energy/kWh", 3, DT_DOUBLE, 152340.5, "double", spread=0.4, monotonic=True),
-        _metric("Energy/Demand", 4, DT_FLOAT, 450.0, "float", spread=25.0, lo=300, hi=650),
+        _metric("Energy/kWh", 3, DT_DOUBLE, 152340.5, "double", spread=0.4, monotonic=True,
+                unit="kWh"),
+        _metric("Energy/Demand", 4, DT_FLOAT, 450.0, "float", spread=25.0, lo=300, hi=650,
+                unit="kW"),
     ])
     substation7.devices.append(meter01)
 
@@ -441,11 +523,27 @@ def build_sparkplug_world(client):
         _metric("Status", 3, DT_BOOLEAN, True, "bool"),
     ])
 
+    # A PLC-style node carrying the awkward datatypes: signed ints (two's
+    # complement on the wire), a DateTime, a float array, a string, and a
+    # flow reading whose OPC quality turns bad now and then.
+    plc12 = NodeSim(client, "plc-12", [
+        _metric("Setpoint/Offset", 3, DT_INT32, -5, "int"),
+        _metric("Trim", 4, DT_INT8, -3, "int"),
+        _metric("Cycles/Total", 5, DT_INT64, 9007199254740993, "long", monotonic=True),
+        _metric("Service/Last", 6, DT_DATETIME, now_ms() - 3 * 86_400_000, "long"),
+        _metric("Zones/Temp", 7, DT_FLOAT_ARRAY, struct.pack("<4f", 71.5, 72.25, 70.0, 69.75),
+                "bytes", unit="degC"),
+        _metric("Mode", 8, DT_STRING, "AUTO", "string"),
+        _metric("Flow", 9, DT_DOUBLE, 12.4, "double", spread=0.3, lo=10, hi=15,
+                unit="m3/h", flaky_quality=True),
+    ])
+
     return {
         "substation-7": substation7,
         "substation-4": substation4,
         "substation-9": substation9,
         "substation-2": substation2,
+        "plc-12": plc12,
     }
 
 
@@ -456,6 +554,7 @@ def start_sparkplug(client, args, start):
     nodes = build_sparkplug_world(client)
     n7, n4, n9, n2 = (nodes["substation-7"], nodes["substation-4"],
                        nodes["substation-9"], nodes["substation-2"])
+    plc = nodes["plc-12"]
     device7 = n7.devices[0]
     device9 = n9.devices[0]
 
@@ -504,8 +603,14 @@ def start_sparkplug(client, args, start):
     n9.publish_nbirth()
     n9.publish_dbirth(device9)
     n4.publish_nbirth()
+    plc.publish_nbirth()
+    state["plc_next_data"] = start + 1.5
 
     def tick(t):
+        if t >= state["plc_next_data"]:
+            plc.publish_ndata()
+            state["plc_next_data"] = t + 2.0
+
         if not state["n7_birthed"] and t >= state["n7_next_birth"]:
             birth_n7()
             state["n7_birthed"] = True
@@ -577,10 +682,15 @@ def main():
                     help="with --sparkplug, delay substation-7's NBIRTH so its first "
                          "NDATA is published first, to exercise the app's unresolved "
                          "(data-before-birth) alias state")
+    ap.add_argument("--sparkplug-rbe", action="store_true", default=False,
+                    help="with --sparkplug, report by exception: data messages carry only "
+                         "the metrics that changed, like real edge nodes")
     ap.add_argument("--self-test", action="store_true", default=False,
                     help="run the Sparkplug protobuf encoder self-test and exit "
                          "(no broker connection made)")
     args = ap.parse_args()
+    global RBE
+    RBE = args.sparkplug_rbe
 
     if args.self_test:
         sys.exit(0 if self_test() else 1)
