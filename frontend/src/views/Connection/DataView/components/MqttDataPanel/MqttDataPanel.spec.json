@@ -54,11 +54,26 @@
       "type": "store",
       "required": true,
       "description": "This connection's pinned topics, shared with the selected-topic panel."
+    },
+    {
+      "name": "onRequestRebirth",
+      "type": "function",
+      "required": false,
+      "description": "Opens the rebirth confirmation for the Sparkplug view's node and bulk actions."
     }
   ],
   "tokens": [
-    "elevation-0"
+    "elevation-0",
+    "white-text",
+    "secondary-text",
+    "warning"
   ],
-  "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "dependencies": [
+    "Button",
+    "MqttTopicTree",
+    "SearchActionBar",
+    "SparkplugPanel",
+    "ViewToggle"
+  ],
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic."
 }

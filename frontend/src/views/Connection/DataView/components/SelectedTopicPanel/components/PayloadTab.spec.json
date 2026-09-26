@@ -54,13 +54,45 @@
         "json-prettier",
         "xml"
       ]
+    },
+    {
+      "name": "sparkplugMeta",
+      "type": "object",
+      "required": false,
+      "default": null,
+      "description": "The message's middlewareProperties[\"sparkplug\"] meta; renders a one-line banner saying where the names came from (published, filled in from a birth, carried over a connection drop, or unresolved)."
+    },
+    {
+      "name": "onRequestRebirth",
+      "type": "function",
+      "required": false,
+      "default": null,
+      "description": "([{group, node}]) asks for a rebirth from the banner when names are unresolved or unverified. The caller confirms first."
+    },
+    {
+      "name": "sparkplugUndecoded",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "options": [
+        "off",
+        "earlier",
+        "failed"
+      ],
+      "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, earlier says it arrived before decoding was on, failed says the payload isn't Sparkplug B."
     }
   ],
   "tokens": [
     "secondary",
     "secondary-text",
-    "outline"
+    "outline",
+    "divider",
+    "warning"
   ],
-  "dependencies": [],
+  "dependencies": [
+    "Button",
+    "SparkplugLogo",
+    "Tooltip"
+  ],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
 }

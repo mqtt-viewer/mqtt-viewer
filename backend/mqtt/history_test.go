@@ -22,7 +22,7 @@ func TestHistoryKeepsAllUnderBudget(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024) // 10MB, plenty
 	for i := 0; i < 100; i++ {
-		h.addMessageToHistory(msg("a/b", 100))
+		h.AddMessage(msg("a/b", 100))
 	}
 	got, err := h.GetTopicHistory("a/b")
 	if err != nil {
@@ -40,7 +40,7 @@ func TestHistoryEvictsOldestOverBudget(t *testing.T) {
 	h.SetBudgetBytes(int64(perMsg * 5))
 
 	for i := 0; i < 50; i++ {
-		h.addMessageToHistory(msg("t", 1024))
+		h.AddMessage(msg("t", 1024))
 	}
 
 	got, err := h.GetTopicHistory("t")
@@ -65,9 +65,9 @@ func TestHistoryKeepsLatestPerTopicAfterEviction(t *testing.T) {
 
 	// One message on a low-traffic topic, then flood a different topic so the
 	// low-traffic topic's only message ages out of the recent window.
-	h.addMessageToHistory(msg("low/traffic", 1024))
+	h.AddMessage(msg("low/traffic", 1024))
 	for i := 0; i < 50; i++ {
-		h.addMessageToHistory(msg("busy/topic", 1024))
+		h.AddMessage(msg("busy/topic", 1024))
 	}
 
 	// Selecting the low-traffic topic must still return its latest value.
@@ -85,9 +85,9 @@ func TestHistoryGetAllIncludesEvictedTopicLatest(t *testing.T) {
 	perMsg := estBytes(msg("x", 1024))
 	h.SetBudgetBytes(int64(perMsg * 12))
 
-	h.addMessageToHistory(msg("topic/a", 1024))
+	h.AddMessage(msg("topic/a", 1024))
 	for i := 0; i < 50; i++ {
-		h.addMessageToHistory(msg("topic/b", 1024))
+		h.AddMessage(msg("topic/b", 1024))
 	}
 
 	all := h.GetAllHistory()
@@ -104,11 +104,11 @@ func TestHistoryGetByTopicPrefixFiltersAndOrders(t *testing.T) {
 	h.SetBudgetBytes(10 * 1024 * 1024)
 
 	// Interleave $SYS and non-$SYS topics; arrival order is insertion order.
-	h.addMessageToHistory(msg("$SYS/broker/uptime", 10))
-	h.addMessageToHistory(msg("factory/line1/s1", 10))
-	h.addMessageToHistory(msg("$SYS/broker/clients/connected", 10))
+	h.AddMessage(msg("$SYS/broker/uptime", 10))
+	h.AddMessage(msg("factory/line1/s1", 10))
+	h.AddMessage(msg("$SYS/broker/clients/connected", 10))
 	// "$SYS" alone (no trailing slash) must not match the "$SYS/" prefix.
-	h.addMessageToHistory(msg("$SYS", 10))
+	h.AddMessage(msg("$SYS", 10))
 
 	got := h.GetHistoryByTopicPrefix("$SYS/")
 	if len(got) != 2 {
@@ -128,9 +128,9 @@ func TestHistoryGetByTopicPrefixIncludesEvictedLatest(t *testing.T) {
 
 	// One $SYS message, then flood a different $SYS topic so the first ages out
 	// of the recent window; its latest value must still be returned.
-	h.addMessageToHistory(msg("$SYS/broker/uptime", 1024))
+	h.AddMessage(msg("$SYS/broker/uptime", 1024))
 	for i := 0; i < 50; i++ {
-		h.addMessageToHistory(msg("$SYS/broker/load", 1024))
+		h.AddMessage(msg("$SYS/broker/load", 1024))
 	}
 
 	got := h.GetHistoryByTopicPrefix("$SYS/")
@@ -149,7 +149,7 @@ func TestHistoryGetByTopicPrefixIncludesEvictedLatest(t *testing.T) {
 func TestHistoryGetByTopicPrefixEmpty(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
-	h.addMessageToHistory(msg("factory/line1/s1", 10))
+	h.AddMessage(msg("factory/line1/s1", 10))
 	if got := h.GetHistoryByTopicPrefix("$SYS/"); len(got) != 0 {
 		t.Errorf("expected no matches, got %d", len(got))
 	}
@@ -159,7 +159,7 @@ func TestHistoryClearPreservesBudget(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(123456)
 	for i := 0; i < 10; i++ {
-		h.addMessageToHistory(msg("a", 100))
+		h.AddMessage(msg("a", 100))
 	}
 	h.Clear()
 	if h.TotalBytes() != 0 || len(h.recent) != 0 || h.head != 0 {
@@ -185,7 +185,7 @@ func TestHistoryTotalBytesCountsPinnedLatest(t *testing.T) {
 	h.SetBudgetBytes(int64(perMsg * 12))
 	const topics = 20
 	for i := 0; i < topics; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("topic/%02d", i), 1024))
+		h.AddMessage(msg(fmt.Sprintf("topic/%02d", i), 1024))
 	}
 
 	if h.latestBytes == 0 {
@@ -198,7 +198,7 @@ func TestHistoryTotalBytesCountsPinnedLatest(t *testing.T) {
 	// Republishing to topics whose latest was pinned must not grow latestBytes
 	// unboundedly: each replacement releases the old pin.
 	for i := 0; i < 500; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("topic/%02d", i%topics), 1024))
+		h.AddMessage(msg(fmt.Sprintf("topic/%02d", i%topics), 1024))
 	}
 	if max := int64(topics * (perMsg + latestEntryOverhead)); h.latestBytes > max {
 		t.Errorf("latestBytes %d exceeds topic-cardinality bound %d", h.latestBytes, max)
@@ -277,9 +277,9 @@ func TestHistoryKeepsSysTopicsWhenTrimmingLatest(t *testing.T) {
 	// version, then enough traffic across enough topics to force the latest
 	// map to trim. The $SYS value is the oldest of all, so a plain LRU would
 	// drop it first, and the broker status window would lose it for good.
-	h.addMessageToHistory(msg("$SYS/broker/version", 200))
+	h.AddMessage(msg("$SYS/broker/version", 200))
 	for i := 0; i < 50000; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("sensors/%05d", i), 200))
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d", i), 200))
 	}
 
 	if h.droppedTopics == 0 {
@@ -304,10 +304,10 @@ func TestHistoryCapsProtectedSysTopics(t *testing.T) {
 	// out and force trimming. Protection must stop at the cap so a broker with
 	// a huge $SYS tree cannot pin unbounded memory.
 	for i := 0; i < maxProtectedSysTopics*2; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("$SYS/broker/%06d", i), 200))
+		h.AddMessage(msg(fmt.Sprintf("$SYS/broker/%06d", i), 200))
 	}
 	for i := 0; i < 50000; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("sensors/%05d", i), 200))
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d", i), 200))
 	}
 
 	if h.protectedSysTopics > maxProtectedSysTopics {
@@ -327,10 +327,10 @@ func TestHistoryOversizedMessageDoesNotClearLatestMap(t *testing.T) {
 
 	// Fill the latest map with quiet topics that have aged out.
 	for i := 0; i < 200; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("quiet/%03d", i), 200))
+		h.AddMessage(msg(fmt.Sprintf("quiet/%03d", i), 200))
 	}
 	for i := 0; i < 400; i++ {
-		h.addMessageToHistory(msg("busy/topic", 200))
+		h.AddMessage(msg("busy/topic", 200))
 	}
 	pinnedBefore := 0
 	for _, entry := range h.latest {
@@ -345,9 +345,9 @@ func TestHistoryOversizedMessageDoesNotClearLatestMap(t *testing.T) {
 	// One message larger than the whole latest share, then enough traffic to
 	// age it out of the recent window. Pinning it at that point would evict
 	// every other topic to make room for a single value.
-	h.addMessageToHistory(msg("huge/topic", int(budget/latestBudgetDivisor)+1))
+	h.AddMessage(msg("huge/topic", int(budget/latestBudgetDivisor)+1))
 	for i := 0; i < 400; i++ {
-		h.addMessageToHistory(msg("busy/topic", 200))
+		h.AddMessage(msg("busy/topic", 200))
 	}
 
 	pinnedAfter := 0
@@ -377,7 +377,7 @@ func TestHistoryBoundsLatestMapAtHighCardinality(t *testing.T) {
 	h.SetBudgetBytes(budget)
 	const topics = 50000
 	for i := 0; i < topics; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("sensors/%05d/temperature", i), 200))
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d/temperature", i), 200))
 	}
 
 	if h.TotalBytes() > budget {
@@ -408,10 +408,10 @@ func TestHistoryDropsLeastRecentlyUpdatedTopicFirst(t *testing.T) {
 	// Three quiet topics in a known order, then enough traffic on a busy topic
 	// to push all three out of the recent window and over the latest share.
 	for _, topic := range []string{"quiet/a", "quiet/b", "quiet/c"} {
-		h.addMessageToHistory(msg(topic, 1024))
+		h.AddMessage(msg(topic, 1024))
 	}
 	for i := 0; i < 50; i++ {
-		h.addMessageToHistory(msg("busy/topic", 1024))
+		h.AddMessage(msg("busy/topic", 1024))
 	}
 
 	if _, ok := h.latest["quiet/a"]; ok {
@@ -431,7 +431,7 @@ func TestHistoryKeepsEveryTopicAtNormalCardinality(t *testing.T) {
 	const topics = 5000
 	for round := 0; round < 3; round++ {
 		for i := 0; i < topics; i++ {
-			h.addMessageToHistory(msg(fmt.Sprintf("factory/line%02d/sensor%03d", i%50, i/50), 200))
+			h.AddMessage(msg(fmt.Sprintf("factory/line%02d/sensor%03d", i%50, i/50), 200))
 		}
 	}
 
@@ -451,7 +451,7 @@ func TestHistoryLoweringBudgetTrimsLatestMap(t *testing.T) {
 	h.SetBudgetBytes(DefaultMemoryBudgetBytes)
 	const topics = 20000
 	for i := 0; i < topics; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("sensors/%05d", i), 200))
+		h.AddMessage(msg(fmt.Sprintf("sensors/%05d", i), 200))
 	}
 	if h.droppedTopics != 0 {
 		t.Fatalf("expected no drops under the default budget, got %d", h.droppedTopics)
@@ -478,7 +478,7 @@ func TestHistoryCompactionKeepsCorrectness(t *testing.T) {
 	h.SetBudgetBytes(int64(perMsg * 4))
 	// Drive many evictions to exercise compaction repeatedly.
 	for i := 0; i < 1000; i++ {
-		h.addMessageToHistory(msg("t", 64))
+		h.AddMessage(msg("t", 64))
 	}
 	got, err := h.GetTopicHistory("t")
 	if err != nil {
@@ -498,7 +498,7 @@ func TestHistoryMultiTopicOrdering(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
 	for i := 0; i < 5; i++ {
-		h.addMessageToHistory(msg(fmt.Sprintf("topic/%d", i), 10))
+		h.AddMessage(msg(fmt.Sprintf("topic/%d", i), 10))
 	}
 	all := h.GetAllHistory()
 	if len(all) != 5 {
@@ -512,9 +512,9 @@ func TestTopicHistoryWindowReturnsNewestInOrder(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		m := msg("w/t", 10)
 		m.TimeMs = int64(i)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 		// interleave other-topic traffic so the backward scan must skip
-		h.addMessageToHistory(msg("other", 10))
+		h.AddMessage(msg("other", 10))
 	}
 
 	got, err := h.GetTopicHistoryWindow("w/t", 10)
@@ -536,7 +536,7 @@ func TestTopicHistoryWindowZeroLimitReturnsAll(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
 	for i := 0; i < 25; i++ {
-		h.addMessageToHistory(msg("all/t", 10))
+		h.AddMessage(msg("all/t", 10))
 	}
 	got, err := h.GetTopicHistoryWindow("all/t", 0)
 	if err != nil {
@@ -553,9 +553,9 @@ func TestTopicTimelineWindowReturnsStubsNewestInOrder(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		m := msg("w/t", 10)
 		m.TimeMs = int64(i)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 		// interleave other-topic traffic so the backward scan must skip
-		h.addMessageToHistory(msg("other", 10))
+		h.AddMessage(msg("other", 10))
 	}
 
 	got, err := h.GetTopicTimelineWindow("w/t", 10)
@@ -580,9 +580,9 @@ func TestTopicTimelineWindowFallsBackToLatestWhenAgedOut(t *testing.T) {
 	// holds the one quiet topic (see latestBudgetDivisor).
 	h.SetBudgetBytes(int64(perMsg * 12))
 
-	h.addMessageToHistory(msg("low/traffic", 1024))
+	h.AddMessage(msg("low/traffic", 1024))
 	for i := 0; i < 20; i++ {
-		h.addMessageToHistory(msg("busy/topic", 1024))
+		h.AddMessage(msg("busy/topic", 1024))
 	}
 
 	got, err := h.GetTopicTimelineWindow("low/traffic", 10)
@@ -606,9 +606,9 @@ func TestGetMessageByIdFindsMessageInWindow(t *testing.T) {
 	h.SetBudgetBytes(10 * 1024 * 1024)
 	m := msg("find/me", 10)
 	m.Id = "target-id"
-	h.addMessageToHistory(m)
+	h.AddMessage(m)
 	for i := 0; i < 5; i++ {
-		h.addMessageToHistory(msg("other", 10))
+		h.AddMessage(msg("other", 10))
 	}
 
 	// Hint 0 exercises the compatibility full-scan path.
@@ -630,9 +630,9 @@ func TestGetMessageByIdFindsAgedOutMessageViaLatestFallback(t *testing.T) {
 
 	m := msg("low/traffic", 1024)
 	m.Id = "aged-out-id"
-	h.addMessageToHistory(m)
+	h.AddMessage(m)
 	for i := 0; i < 20; i++ {
-		h.addMessageToHistory(msg("busy/topic", 1024))
+		h.AddMessage(msg("busy/topic", 1024))
 	}
 
 	// The message's content aged out of the recent ring, but it's still the
@@ -655,14 +655,14 @@ func TestGetMessageByIdReportsNotFoundWhenSupersededAndAgedOut(t *testing.T) {
 
 	m := msg("low/traffic", 1024)
 	m.Id = "superseded-id"
-	h.addMessageToHistory(m)
+	h.AddMessage(m)
 	// A newer message on the same topic replaces the latest pointer, and
 	// enough other traffic follows to push both out of the recent ring.
 	newer := msg("low/traffic", 1024)
 	newer.Id = "current-id"
-	h.addMessageToHistory(newer)
+	h.AddMessage(newer)
 	for i := 0; i < 20; i++ {
-		h.addMessageToHistory(msg("busy/topic", 1024))
+		h.AddMessage(msg("busy/topic", 1024))
 	}
 
 	_, found := h.GetMessageById("low/traffic", "superseded-id", 0)
@@ -674,7 +674,7 @@ func TestGetMessageByIdReportsNotFoundWhenSupersededAndAgedOut(t *testing.T) {
 func TestGetMessageByIdUnknownTopicOrId(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
-	h.addMessageToHistory(msg("a/b", 10))
+	h.AddMessage(msg("a/b", 10))
 
 	if _, found := h.GetMessageById("a/b", "no-such-id", 0); found {
 		t.Error("expected not found for unknown id")
@@ -692,7 +692,7 @@ func TestGetMessageByIdWithHintFindsExactMatch(t *testing.T) {
 		m := msg("hint/t", 10)
 		m.Id = fmt.Sprintf("id-%d", i)
 		m.TimeMs = base + int64(i*10)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 	}
 
 	got, found := h.GetMessageById("hint/t", "id-77", base+770)
@@ -715,21 +715,21 @@ func TestGetMessageByIdWithHintToleratesOutOfOrderInsertion(t *testing.T) {
 		m := msg("ooo/t", 10)
 		m.Id = fmt.Sprintf("pre-%d", i)
 		m.TimeMs = base + int64(i*100)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 	}
 	early := msg("ooo/t", 10)
 	early.Id = "target-early"
 	early.TimeMs = base + 5000 - 1000 // inserted now, timestamped 1s earlier
-	h.addMessageToHistory(early)
+	h.AddMessage(early)
 	late := msg("ooo/t", 10)
 	late.Id = "target-late"
 	late.TimeMs = base + 5000 + 1000 // inserted now, timestamped 1s later
-	h.addMessageToHistory(late)
+	h.AddMessage(late)
 	for i := 0; i < 50; i++ {
 		m := msg("ooo/t", 10)
 		m.Id = fmt.Sprintf("post-%d", i)
 		m.TimeMs = base + 5200 + int64(i*100)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 	}
 
 	if _, found := h.GetMessageById("ooo/t", "target-early", early.TimeMs); !found {
@@ -748,7 +748,7 @@ func TestGetMessageByIdWithHintFastAgedOutCheck(t *testing.T) {
 		m := msg("fast/t", 10)
 		m.Id = fmt.Sprintf("id-%d", i)
 		m.TimeMs = base + int64(i)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 	}
 
 	// Hint far older than the window's oldest entry: evicted, and the topic's
@@ -768,11 +768,11 @@ func TestGetMessageByIdWithHintFallsBackToLatest(t *testing.T) {
 	old := msg("low/traffic", 1024)
 	old.Id = "aged-out-id"
 	old.TimeMs = 1 // far older than anything retained after the flood below
-	h.addMessageToHistory(old)
+	h.AddMessage(old)
 	for i := 0; i < 20; i++ {
 		m := msg("busy/topic", 1024)
 		m.TimeMs = 1_000_000 + int64(i)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 	}
 
 	// The hint is far older than the window, but the message is still the
@@ -794,7 +794,7 @@ func TestGetMessagesByIdsReturnsFoundSubset(t *testing.T) {
 		m := msg("batch/t", 10)
 		m.Id = fmt.Sprintf("id-%d", i)
 		m.TimeMs = base + int64(i*10)
-		h.addMessageToHistory(m)
+		h.AddMessage(m)
 	}
 
 	ids := []string{"id-3", "no-such-id", "id-17", "id-29"}
@@ -817,7 +817,7 @@ func TestGetMessagesByIdsReturnsFoundSubset(t *testing.T) {
 func TestGetMessagesByIdsRejectsMismatchedSlices(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
-	h.addMessageToHistory(msg("a/b", 10))
+	h.AddMessage(msg("a/b", 10))
 
 	if got := h.GetMessagesByIds("a/b", []string{"x", "y"}, []int64{1}); got != nil {
 		t.Errorf("expected nil for mismatched slice lengths, got %v", got)
@@ -834,7 +834,7 @@ func retainedMsg(topic string, payloadLen int) MqttMessage {
 
 func TestRetainedIndexMarksTopicWithRetainedPayload(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
 	if !h.IsRetained("a/b") {
 		t.Errorf("expected a/b to be marked retained")
 	}
@@ -842,8 +842,8 @@ func TestRetainedIndexMarksTopicWithRetainedPayload(t *testing.T) {
 
 func TestRetainedIndexTombstoneUnmarksTopic(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
-	h.addMessageToHistory(retainedMsg("a/b", 0)) // zero-length retained = clear
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b", 0)) // zero-length retained = clear
 	if h.IsRetained("a/b") {
 		t.Errorf("expected a/b to be unmarked after a zero-length retained message")
 	}
@@ -851,15 +851,15 @@ func TestRetainedIndexTombstoneUnmarksTopic(t *testing.T) {
 
 func TestRetainedIndexIgnoresNonRetainedMessages(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(msg("a/b", 10))
+	h.AddMessage(msg("a/b", 10))
 	if h.IsRetained("a/b") {
 		t.Errorf("a non-retained message must not mark a topic retained")
 	}
 
 	// A non-retained message must also not clear an existing retained mark:
 	// live traffic on a topic says nothing about its retained value.
-	h.addMessageToHistory(retainedMsg("c/d", 10))
-	h.addMessageToHistory(msg("c/d", 0))
+	h.AddMessage(retainedMsg("c/d", 10))
+	h.AddMessage(msg("c/d", 0))
 	if !h.IsRetained("c/d") {
 		t.Errorf("a non-retained message must not unmark a retained topic")
 	}
@@ -867,10 +867,10 @@ func TestRetainedIndexIgnoresNonRetainedMessages(t *testing.T) {
 
 func TestRetainedUnderPrefixFindsDescendantsAtAnyDepth(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
-	h.addMessageToHistory(retainedMsg("a/b/c", 10))
-	h.addMessageToHistory(retainedMsg("a/b/c/d/e", 10))
-	h.addMessageToHistory(retainedMsg("a/z", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b/c", 10))
+	h.AddMessage(retainedMsg("a/b/c/d/e", 10))
+	h.AddMessage(retainedMsg("a/z", 10))
 
 	got := h.RetainedUnderPrefix("a/b")
 	want := []string{"a/b", "a/b/c", "a/b/c/d/e"}
@@ -887,9 +887,9 @@ func TestRetainedUnderPrefixFindsDescendantsAtAnyDepth(t *testing.T) {
 
 func TestRetainedUnderPrefixRespectsTopicLevelBoundary(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
-	h.addMessageToHistory(retainedMsg("a/bc", 10))
-	h.addMessageToHistory(retainedMsg("a/bc/d", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/bc", 10))
+	h.AddMessage(retainedMsg("a/bc/d", 10))
 
 	got := h.RetainedUnderPrefix("a/b")
 	if len(got) != 1 || got[0] != "a/b" {
@@ -899,9 +899,9 @@ func TestRetainedUnderPrefixRespectsTopicLevelBoundary(t *testing.T) {
 
 func TestRetainedUnderPrefixExcludesTombstonedTopics(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b/one", 10))
-	h.addMessageToHistory(retainedMsg("a/b/two", 10))
-	h.addMessageToHistory(retainedMsg("a/b/one", 0)) // cleared again
+	h.AddMessage(retainedMsg("a/b/one", 10))
+	h.AddMessage(retainedMsg("a/b/two", 10))
+	h.AddMessage(retainedMsg("a/b/one", 0)) // cleared again
 
 	got := h.RetainedUnderPrefix("a/b")
 	if len(got) != 1 || got[0] != "a/b/two" {
@@ -911,8 +911,8 @@ func TestRetainedUnderPrefixExcludesTombstonedTopics(t *testing.T) {
 
 func TestRetainedUnderPrefixEmptyPrefixMatchesAll(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
-	h.addMessageToHistory(retainedMsg("z", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("z", 10))
 	if got := h.RetainedUnderPrefix(""); len(got) != 2 {
 		t.Errorf("empty prefix must match every retained topic, got %v", got)
 	}
@@ -925,9 +925,9 @@ func TestRetainedIndexSurvivesEviction(t *testing.T) {
 	// cardinality, not the byte budget, so it must not be dropped with it.
 	perMsg := estBytes(msg("t", 1024))
 	h.SetBudgetBytes(int64(perMsg * 2))
-	h.addMessageToHistory(retainedMsg("a/b", 1024))
+	h.AddMessage(retainedMsg("a/b", 1024))
 	for i := 0; i < 10; i++ {
-		h.addMessageToHistory(msg("noise", 1024))
+		h.AddMessage(msg("noise", 1024))
 	}
 	if !h.IsRetained("a/b") {
 		t.Errorf("eviction under byte pressure must not drop the retained index")
@@ -936,7 +936,7 @@ func TestRetainedIndexSurvivesEviction(t *testing.T) {
 
 func TestRetainedIndexClearedByClear(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
 	h.Clear()
 	if h.IsRetained("a/b") {
 		t.Errorf("Clear must reset the retained index")
@@ -948,9 +948,9 @@ func TestRetainedIndexClearedByClear(t *testing.T) {
 
 func TestRetainedUnderPrefixExcludesBrokerReservedTopics(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("factory/line1/s1", 10))
-	h.addMessageToHistory(retainedMsg("$SYS/broker/uptime", 10))
-	h.addMessageToHistory(retainedMsg("$SYS/broker/clients/connected", 10))
+	h.AddMessage(retainedMsg("factory/line1/s1", 10))
+	h.AddMessage(retainedMsg("$SYS/broker/uptime", 10))
+	h.AddMessage(retainedMsg("$SYS/broker/clients/connected", 10))
 
 	// Empty prefix matches everything else, but $SYS/... must never come back.
 	got := h.RetainedUnderPrefix("")
@@ -967,8 +967,8 @@ func TestRetainedUnderPrefixExcludesBrokerReservedTopics(t *testing.T) {
 
 func TestUnmarkRetainedRemovesFromIndex(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
-	h.addMessageToHistory(retainedMsg("a/c", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/c", 10))
 
 	h.UnmarkRetained("a/b")
 
@@ -986,7 +986,7 @@ func TestUnmarkRetainedRemovesFromIndex(t *testing.T) {
 
 func TestUnmarkRetainedNoopForUnknownTopic(t *testing.T) {
 	h := newMessageHistory()
-	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
 
 	// Must not panic or otherwise disturb the index for a topic it never knew
 	// about.
@@ -1000,7 +1000,7 @@ func TestUnmarkRetainedNoopForUnknownTopic(t *testing.T) {
 func TestClearRetainedIndexEmptiesIndexButKeepsHistory(t *testing.T) {
 	h := newMessageHistory()
 	h.SetBudgetBytes(10 * 1024 * 1024)
-	h.addMessageToHistory(retainedMsg("a/b", 10))
+	h.AddMessage(retainedMsg("a/b", 10))
 
 	h.ClearRetainedIndex()
 

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// The retained index adds work to addMessageToHistory, which is the ingest path
+// The retained index adds work to AddMessage, which is the ingest path
 // for every message from every broker (the perf bar is two brokers at ~2000
 // msg/s each). These measure that the added work is a non-event.
 
@@ -28,7 +28,7 @@ func BenchmarkAddMessageNonRetained(b *testing.B) {
 	h := newMessageHistory()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		h.addMessageToHistory(msgs[i%len(msgs)])
+		h.AddMessage(msgs[i%len(msgs)])
 	}
 }
 
@@ -39,6 +39,6 @@ func BenchmarkAddMessageRetained(b *testing.B) {
 	h := newMessageHistory()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		h.addMessageToHistory(msgs[i%len(msgs)])
+		h.AddMessage(msgs[i%len(msgs)])
 	}
 }

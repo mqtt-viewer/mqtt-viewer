@@ -7,6 +7,7 @@ import (
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/backend/paths"
 	"mqtt-viewer/backend/protobuf"
+	"mqtt-viewer/backend/sparkplug"
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
@@ -65,6 +66,8 @@ type AppConnection struct {
 	SubscriptionMatcher *topicmatching.SubscriptionMatcher
 	MqttMessageBuffer   *mqtt.MessageBuffer
 	EventSet            *events.ConnectionEventsSet
+	// Per-connection Sparkplug B session state (births, aliases, seq).
+	SparkplugStore *sparkplug.SessionStore
 	// connUp guards connectedConnCount against double-counting: the
 	// underlying manager's OnConnectionUp/OnConnectionDown callbacks are not
 	// guaranteed to alternate (e.g. Disconnect() on an already-down

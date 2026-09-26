@@ -103,6 +103,28 @@ die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
 mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
 trailing-slash self-heal (see the file's header for the rest).
 
+### Field-tested walkthrough (Sparkplug e2e, 2026-07)
+
+A full e2e drive of the app (create connection, connect to a local broker,
+watch live traffic, click UI actions, verify a publish round trip) works in
+server mode from an agent-driven browser. Lessons that save time:
+
+- **Prefer accessibility refs over screenshot coordinates** for clicks; several
+  panels (dialogs, tab strip) swallow coordinate clicks that land fine via refs.
+- **Bindings can be called directly from page JS** when the UI path is fiddly:
+  `POST /wails/runtime` with header `x-wails-client-id` and body
+  `{object:0,method:0,args:{"call-id":"x",methodID:<id>,args:[...]}}`. Method
+  ids live in `frontend/bindings/**` (`$Call.ByID(<id>)`). `GetAllConnections`
+  returns `{connections:{"<id>":{connectionDetails:{...}}}}` — the model is the
+  nested `connectionDetails`. After `UpdateConnection` (e.g. flipping
+  `isProtoEnabled`), disconnect + reconnect so per-connection middleware
+  reinstalls.
+- **Pass real ids**: methods like `DisconnectMqtt` panic the whole app on an
+  unknown connection id (no not-found guard yet).
+- Drive traffic with `scripts/mqtt-sim.py` (`--sparkplug` for births/aliases/
+  seq faults; it answers NCMD rebirth requests) against a local mosquitto on
+  1883, or `scripts/mqtt-flood.py` for load.
+
 ### Fallback for human/visual verification
 
 For pixel-level UI checks, prefer **Storybook** on its own dev port (see

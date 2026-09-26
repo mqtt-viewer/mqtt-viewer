@@ -27,7 +27,7 @@ func (mm *MqttManager) receiveMessage(m *MqttMessage) error {
 	// (20s keepalive plus a 10s ping timeout), so it stalls reading briefly and
 	// recovers. Keep it that way: work that could block for seconds does not
 	// belong on this path.
-	mm.MessageHistory.addMessageToHistory(*m)
+	mm.MessageHistory.AddMessage(*m)
 	mm.MessageBuffer.addMessageToBuffer(*m)
 
 	mm.stats.receiveMessageToStats(*m)

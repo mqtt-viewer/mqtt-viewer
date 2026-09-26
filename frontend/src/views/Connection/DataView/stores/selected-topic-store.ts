@@ -131,6 +131,11 @@ interface SelectedTopicData {
     format: SupportedCodeEditorFormat;
   };
   onHistoryDelta: null | ((delta: HistoryDelta) => void);
+  // A message the timeline should select once it is in the loaded history,
+  // instead of following the newest. Set by focusMessage (the Sparkplug view
+  // opening the message a metric's value came from) and cleared by the
+  // timeline when it acts on it.
+  focusMessageId: string | null;
 }
 
 export type SelectedTopicStore = ReturnType<typeof createSelectedTopicStore>;
@@ -427,6 +432,7 @@ export const createSelectedTopicStore = (
       recordingEnabled: false,
       recordedCount: null,
       onHistoryDelta: null,
+      focusMessageId: null,
       options: {
         autoSelect: true,
         compare: false,
@@ -717,6 +723,7 @@ export const createSelectedTopicStore = (
       chartHistory: null,
       isLoadingChartHistory: false,
       recordedCount: null,
+      focusMessageId: null,
       options: { ...store.options, autoSelect: true },
       onHistoryDelta: onHistoryDelta ?? null,
     }));
@@ -1378,6 +1385,32 @@ export const createSelectedTopicStore = (
     }));
   };
 
+  // Asks the timeline to select a specific message of the selected topic
+  // rather than follow the newest. Call after selectTopic when switching.
+  const focusMessage = (id: string) => {
+    update((store) => ({
+      ...store,
+      focusMessageId: id,
+      options: { ...store.options, autoSelect: false },
+    }));
+  };
+
+  /**
+   * Marks the focus request handled. When the message wasn't in the loaded
+   * history, the timeline goes back to following the newest.
+   */
+  const consumeFocus = (found = true) => {
+    update((store) =>
+      store.focusMessageId === null
+        ? store
+        : {
+            ...store,
+            focusMessageId: null,
+            options: found ? store.options : { ...store.options, autoSelect: true },
+          }
+    );
+  };
+
   // Fetches the full-payload window for the CURRENT selection (via the
   // pre-existing full-message bindings) so the Chart tab can draw a numeric
   // series across the whole loaded window. This is the one place a busy
@@ -1431,6 +1464,8 @@ export const createSelectedTopicStore = (
     setOnHistoryDelta,
     setComparing,
     setAutoSelect,
+    focusMessage,
+    consumeFocus,
     destroy,
     loadOlderWindow,
     loadNewerWindow,

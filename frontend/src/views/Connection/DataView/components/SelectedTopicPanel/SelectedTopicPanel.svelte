@@ -21,6 +21,8 @@
   import ChartView from "./components/Chart/ChartView.svelte";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
   import { GetRetainedTopicsUnderPrefix } from "bindings/mqtt-viewer/backend/app/app";
+  import { isSparkplugProtobufTopic } from "../MqttDataPanel/components/SparkplugPanel/build-sparkplug-tree";
+  import connectionsStore from "@/stores/connections";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { copyToClipboard } from "@/util/copy";
   import { decodePayload } from "@/components/CodeEditor/codec";
@@ -39,6 +41,10 @@
   export let copyTopicPath: (topic: string) => void;
   export let onClearRetained: (topic: string) => void;
   export let onClearRetainedBelow: (prefix: string) => void;
+  /** Sparkplug rebirth requests from the payload banner (confirmed upstream). */
+  export let onRequestRebirth:
+    | ((targets: { group: string; node: string }[]) => void)
+    | null = null;
   /** Whether the selected topic is pinned to the top of the topic tree. */
   export let isPinned = false;
   export let onTogglePin: (topic: string) => void = () => {};
@@ -116,6 +122,27 @@
   $: selectedMessagePayload = selectedMessage?.payload ?? null;
   $: selectedMessagePayloadB64 = selectedMessage?.payloadB64 ?? null;
   $: selectedMessageRetained = selectedMessage?.retain ?? false;
+  // Sparkplug middleware meta drives PayloadTab's decode banner.
+  $: selectedMessageSparkplugMeta =
+    (selectedMessage?.middlewareProperties as any)?.sparkplug ?? null;
+  // A Sparkplug B topic whose payload has no Sparkplug decode. The decoder
+  // flags a payload it couldn't read ("failed"); one it never saw arrived
+  // while decoding was off ("off", or "earlier" if it is on now). A payload
+  // decoded some other way (a topic outside the strict grammar, a device
+  // past the tracking cap) needs no hint. STATE messages are JSON.
+  $: isProtoEnabled =
+    $connectionsStore.connections[connectionId]?.connectionDetails.isProtoEnabled ?? false;
+  $: selectedMessageProps = (selectedMessage?.middlewareProperties ?? {}) as Record<string, unknown>;
+  $: selectedMessageSparkplugUndecoded =
+    selectedMessageSparkplugMeta !== null ||
+    selectedMessageProps.IsDecodedProto === true ||
+    !isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "")
+      ? null
+      : selectedMessageProps.SparkplugDecodeFailed === true
+        ? ("failed" as const)
+        : isProtoEnabled
+          ? ("earlier" as const)
+          : ("off" as const);
 
   // Runs ensurePayload outside the current reactive flush. A live message
   // decodes synchronously, and a store write made from inside a `$:` block
@@ -498,6 +525,9 @@
                 selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
+              {onRequestRebirth}
+              sparkplugMeta={selectedMessageSparkplugMeta}
+              sparkplugUndecoded={selectedMessageSparkplugUndecoded}
             />
           {:else}
             <div class="mt-12 flex justify-center text-secondary-text">
@@ -571,6 +601,9 @@
                 selectedTopicStore.loadRecordedHistory()}
               {chartSeriesStore}
               onViewChart={viewChart}
+              {onRequestRebirth}
+              sparkplugMeta={selectedMessageSparkplugMeta}
+              sparkplugUndecoded={selectedMessageSparkplugUndecoded}
             />
           {:else}
             <div class="mt-12 flex justify-center text-secondary-text">

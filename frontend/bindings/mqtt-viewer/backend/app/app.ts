@@ -482,6 +482,37 @@ export function GetSortStates(): $CancellablePromise<models$0.SortState[]> {
 }
 
 /**
+ * GetSparkplugMessageHistory returns the messages a Sparkplug view needs to
+ * rebuild the current tree, in arrival order, so a view opened mid-session
+ * starts from the state it would have reached watching live.
+ * 
+ * It is not a window of recent traffic. Sparkplug reports by exception, so
+ * the latest NDATA for a node usually carries only the metrics that just
+ * changed, and replaying a tail of the history would leave every quieter
+ * metric on its birth value. The current births and deaths come from the
+ * session store, which keeps them, and metric values from its latest-value
+ * index, rebuilt into one data message per original message: the message a
+ * quiet metric last changed in, or a quiet node's birth, may be long gone
+ * from history. Older NBIRTHs, seq-gap messages and host STATE are fetched
+ * from history by id, best effort.
+ */
+export function GetSparkplugMessageHistory(connectionId: number): $CancellablePromise<$models.SparkplugHistory> {
+    return $Call.ByID(80987752, connectionId).then(($result: any) => {
+        return $$createType40($result);
+    });
+}
+
+/**
+ * GetSparkplugSuspendedOrd returns the arrival order (the meta "n") at the
+ * connection's last drop. A view asks for it on reconnect: messages received
+ * just before a drop can still be delivered after it, and must not count as
+ * signs of life since.
+ */
+export function GetSparkplugSuspendedOrd(connectionId: number): $CancellablePromise<number> {
+    return $Call.ByID(2797090677, connectionId);
+}
+
+/**
  * GetSysMessageHistory returns every retained $SYS/* message for a
  * connection, flattened across topics and sorted by arrival time, so a
  * broker-status window opened mid-session starts populated.
@@ -494,13 +525,13 @@ export function GetSysMessageHistory(connId: number): $CancellablePromise<mqtt$0
 
 export function GetSysMetricMappingsByConnectionId(connId: number): $CancellablePromise<models$0.SysMetricMapping[]> {
     return $Call.ByID(1443899974, connId).then(($result: any) => {
-        return $$createType40($result);
+        return $$createType41($result);
     });
 }
 
 export function LoadOpenTabs(): $CancellablePromise<models$0.Tab[]> {
     return $Call.ByID(2526018972).then(($result: any) => {
-        return $$createType42($result);
+        return $$createType43($result);
     });
 }
 
@@ -516,7 +547,7 @@ export function MoveCollectionMessage(id: number, targetCollectionID: number): $
 
 export function NewConnection(): $CancellablePromise<$models.Connection | null> {
     return $Call.ByID(3098702478).then(($result: any) => {
-        return $$createType44($result);
+        return $$createType45($result);
     });
 }
 
@@ -559,6 +590,16 @@ export function PublishMqtt(connId: number, message: $models.PublishParams): $Ca
     return $Call.ByID(3575117605, connId, message);
 }
 
+/**
+ * PublishSparkplugRebirth publishes the standard NCMD Node Control/Rebirth
+ * request for an edge node. It routes through PublishMqtt so the proto-encode
+ * publish middleware turns the JSON body into a Sparkplug B protobuf payload,
+ * which is why the connection must have protobuf decoding enabled.
+ */
+export function PublishSparkplugRebirth(connectionId: number, group: string, edgeNode: string): $CancellablePromise<void> {
+    return $Call.ByID(1032928642, connectionId, group, edgeNode);
+}
+
 export function RenameCollection(id: number, name: string): $CancellablePromise<models$0.Collection> {
     return $Call.ByID(1111441190, id, name).then(($result: any) => {
         return $$createType7($result);
@@ -585,7 +626,7 @@ export function RenameCollectionMessage(id: number, name: string): $CancellableP
  */
 export function ReorderCollectionMessages(collectionID: number, orderedIDs: number[]): $CancellablePromise<models$0.CollectionMessage[]> {
     return $Call.ByID(1139884023, collectionID, orderedIDs).then(($result: any) => {
-        return $$createType45($result);
+        return $$createType46($result);
     });
 }
 
@@ -770,9 +811,10 @@ const $$createType36 = $Create.Array($$createType35);
 const $$createType37 = $Create.Array($Create.Any);
 const $$createType38 = models$0.SortState.createFrom;
 const $$createType39 = $Create.Array($$createType38);
-const $$createType40 = $Create.Array($$createType3);
-const $$createType41 = models$0.Tab.createFrom;
-const $$createType42 = $Create.Array($$createType41);
-const $$createType43 = $models.Connection.createFrom;
-const $$createType44 = $Create.Nullable($$createType43);
-const $$createType45 = $Create.Array($$createType9);
+const $$createType40 = $models.SparkplugHistory.createFrom;
+const $$createType41 = $Create.Array($$createType3);
+const $$createType42 = models$0.Tab.createFrom;
+const $$createType43 = $Create.Array($$createType42);
+const $$createType44 = $models.Connection.createFrom;
+const $$createType45 = $Create.Nullable($$createType44);
+const $$createType46 = $Create.Array($$createType9);

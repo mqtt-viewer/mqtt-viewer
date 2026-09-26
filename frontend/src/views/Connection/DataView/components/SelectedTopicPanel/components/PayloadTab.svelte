@@ -22,6 +22,36 @@
     base64ByteSize,
     formatByteSize,
   } from "./image-payload";
+  import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
+  import { formatClockTime } from "../../MqttDataPanel/components/SparkplugPanel/build-sparkplug-tree";
+
+  /** The message's middlewareProperties["sparkplug"] meta, when present. */
+  export let sparkplugMeta: {
+    msgType: string;
+    group?: string;
+    edgeNode?: string;
+    device?: string;
+    hostId?: string;
+    resolution?: string;
+    birthAtMs?: number;
+    carriedOver?: boolean;
+    seqGap?: { expected: number; got: number };
+    bdSeq?: number;
+  } | null = null;
+  /**
+   * Asks for a rebirth of the message's edge node. The caller confirms
+   * before anything is published. Absent where no rebirth can be offered.
+   */
+  export let onRequestRebirth:
+    | ((targets: { group: string; node: string }[]) => void)
+    | null = null;
+  /**
+   * The message is on a Sparkplug B topic but carries no Sparkplug decode:
+   * "off" when decoding is off for the connection, "earlier" when it
+   * arrived before decoding was turned on, "failed" when the decoder read
+   * it and it isn't Sparkplug B.
+   */
+  export let sparkplugUndecoded: "off" | "earlier" | "failed" | null = null;
 
   export let isComparing: boolean;
   export let payload: string;
@@ -96,6 +126,69 @@
     ($chartSeriesStore ?? []).map((s) => [s.path, s.color])
   );
   $: selectedCount = ($chartSeriesStore ?? []).length;
+
+  // --- Sparkplug banner --------------------------------------------------------
+  // One line above the payload that says where the names in it came from, so
+  // an injected name is never mistaken for one that was on the wire.
+  $: spIsData =
+    sparkplugMeta?.msgType === "NDATA" || sparkplugMeta?.msgType === "DDATA";
+  $: spResolution = spIsData ? sparkplugMeta?.resolution : undefined;
+  $: spBirthTime =
+    sparkplugMeta?.birthAtMs !== undefined
+      ? formatClockTime(sparkplugMeta.birthAtMs)
+      : null;
+  $: spTone =
+    spResolution === "unresolved" ||
+    spResolution === "partial" ||
+    sparkplugMeta?.carriedOver
+      ? "warning"
+      : "normal";
+  $: spLabel = (() => {
+    const m = sparkplugMeta;
+    if (!m) return "";
+    const type = `Sparkplug B ${m.msgType}`;
+    if (m.msgType === "STATE") return `Sparkplug host state for ${m.hostId}`;
+    if (!spIsData) {
+      return m.bdSeq !== undefined ? `${type}, bdSeq ${m.bdSeq}` : type;
+    }
+    switch (spResolution) {
+      case "names":
+        return `${type}, names as published`;
+      case "unresolved":
+        return `${type}: aliases only, no birth seen since connecting`;
+      case "partial":
+        return `${type}: some aliases unresolved, others named from the birth at ${spBirthTime}`;
+      default:
+        return m.carriedOver
+          ? `${type}: names from the birth at ${spBirthTime}, before the connection dropped`
+          : `${type}: names from the birth at ${spBirthTime}`;
+    }
+  })();
+  $: spOffersRebirth =
+    onRequestRebirth !== null &&
+    spIsData &&
+    (spResolution === "unresolved" ||
+      spResolution === "partial" ||
+      !!sparkplugMeta?.carriedOver);
+  $: spTooltip = (() => {
+    if (spResolution === "unresolved" || spResolution === "partial") {
+      return "Sparkplug data messages carry aliases, and the names are only sent in the node's birth. A rebirth sends them again.";
+    }
+    if (sparkplugMeta?.carriedOver) {
+      return "The connection dropped after this birth. If the node rebirthed while disconnected, its aliases may have changed.";
+    }
+    if (spIsData && spResolution !== "names") {
+      return "Names were filled in from the birth, not sent in this message.";
+    }
+    return spLabel;
+  })();
+
+  const requestRebirth = () => {
+    if (!sparkplugMeta || !onRequestRebirth) return;
+    onRequestRebirth([
+      { group: sparkplugMeta.group ?? "", node: sparkplugMeta.edgeNode ?? "" },
+    ]);
+  };
 </script>
 
 <div
@@ -138,6 +231,54 @@
       </Tooltip>
     {/if}
   </div>
+
+  {#if sparkplugMeta}
+    <!-- Wraps rather than truncates: the part that matters ("aliases only,
+         no birth seen") is at the end, and the panel is often narrow. -->
+    <div
+      class="text-sm border-b border-divider py-1 px-2 flex items-start gap-2 text-secondary-text"
+    >
+      <SparkplugLogo class="size-4 shrink-0 mt-px" isActive />
+      <Tooltip
+        class={spTone === "warning" ? "text-warning min-w-0 grow" : "min-w-0 grow"}
+        text={spTooltip}>{spLabel}</Tooltip
+      >
+      {#if sparkplugMeta.seqGap}
+        <span
+          class="text-warning shrink-0"
+          title={`Expected seq ${sparkplugMeta.seqGap.expected}, got ${sparkplugMeta.seqGap.got}`}
+          >seq gap</span
+        >
+      {/if}
+      {#if spOffersRebirth}
+        <Button variant="text" class="text-sm shrink-0" on:click={requestRebirth}
+          >Request rebirth</Button
+        >
+      {/if}
+    </div>
+  {:else if sparkplugUndecoded}
+    <div
+      class="text-sm border-b border-divider py-1 px-2 flex items-start gap-2 text-secondary-text"
+    >
+      <SparkplugLogo class="size-4 shrink-0 mt-px" />
+      {#if sparkplugUndecoded === "off"}
+        <span class="min-w-0"
+          >Sparkplug B, shown as raw protobuf. The Sparkplug view can turn on
+          decoding.</span
+        >
+      {:else if sparkplugUndecoded === "earlier"}
+        <span class="min-w-0"
+          >Sparkplug B, shown as raw protobuf: it arrived before decoding was
+          on.</span
+        >
+      {:else}
+        <span class="min-w-0 text-warning"
+          >Sparkplug B topic, but this payload didn't decode as Sparkplug B.
+          The publisher may be sending something else here.</span
+        >
+      {/if}
+    </div>
+  {/if}
 
   {#if showImagePreview && detectedImage && payloadB64}
     <div class="grow w-full min-h-0 flex flex-col">
