@@ -134,6 +134,11 @@ only on a push to its `main`, so after go-live send it a `repository_dispatch`
 marker file, which triggers the Cloudflare build. `gh workflow run
 rebuild-on-release.yml -R mqtt-viewer/mqttviewer.app` does the same by hand.
 
+The same workflow copies the released entries of `frontend/src/changelog.ts`
+from `main` into the site, so mqttviewer.app/changelog shows the new notes.
+The site evaluates the `CHANGELOG` array literal, so keep it plain data (no
+function calls or imported values inside it).
+
 ## Expected assets per release
 
 - darwin: `MQTT_Viewer_<tag>_darwin_{arm64,amd64}.zip` (+ `.sha256`)

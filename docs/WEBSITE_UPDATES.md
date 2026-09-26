@@ -14,6 +14,12 @@ docs/WRITING_STYLE.md.
 
 ## Done
 
+- 2026-09-26. Stateful Sparkplug B view (#180), published ahead of the
+  release: /features/sparkplug with five screenshots, /learn/sparkplug-b,
+  a homepage teaser, a new payload-decoding hero, and the Sparkplug copy
+  across the FAQ, llms.txt and the alternative pages. /changelog added in
+  the same pass; it carries a 1.2.0 preview entry until the release syncs.
+  #180's Pending entry for this can be dropped when it merges.
 - 2026-09-04. Feature pages for everything on develop after 1.0.0, plus
   broker status v2 (#125), written and screenshotted in the website PR
   "Feature pages and style pass". README feature table refreshed in the
