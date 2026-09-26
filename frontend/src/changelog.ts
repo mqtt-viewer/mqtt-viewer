@@ -68,6 +68,18 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "If the app or a pop-out window cannot initialise it now tells you what went wrong and where to report it.",
       },
       {
+        group: "Fixed",
+        title: "New messages no longer stick at \"Loading message...\"",
+        body: "When a new message arrives on the topic you're viewing, or you step onto one with the arrow keys, the panel shows it instead of sticking at \"Loading message...\".",
+        thanks: [
+          { name: "ejannink", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177" },
+          {
+            name: "Noschvie",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177#issuecomment-5760500007",
+          },
+        ],
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",
