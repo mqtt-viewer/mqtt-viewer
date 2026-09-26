@@ -144,17 +144,21 @@
           ? ("earlier" as const)
           : ("off" as const);
 
+  // Runs ensurePayload outside the current reactive flush. A live message
+  // decodes synchronously, and a store write made from inside a `$:` block
+  // does not re-run the `$:` blocks that already read the store in that
+  // flush, so selectedMessage kept its null payload and the panel sat on
+  // "Loading message..." (issue #177). With auto-select on, every new
+  // message got stuck the same way, and re-selecting the same id never
+  // re-ran this block. Deferring lets the write land as its own update.
+  const ensurePayloadDeferred = (id: string) =>
+    queueMicrotask(() => selectedTopicStore.ensurePayload(id));
+
   // history[] only carries stubs until fetched. Ensure the selected
   // message's payload as soon as it's picked (timeline click or
   // auto-select-latest). Cheap/no-op if already loaded or in flight.
-  // Run after this flush, not inside it: a live entry decodes synchronously,
-  // and a store write made from within the reactive statement that reads it
-  // is not re-rendered until the next unrelated change. On a topic busier
-  // than the 300ms batch that next change is always a newer message, so the
-  // panel sat on "Loading message..." for good.
   $: if (selectedMessageId !== null) {
-    const id = selectedMessageId;
-    queueMicrotask(() => selectedTopicStore.ensurePayload(id));
+    ensurePayloadDeferred(selectedMessageId);
   }
 
   // Retained state for the selected topic and everything below it. One call
@@ -253,7 +257,7 @@
   // Compare mode needs the previous message's payload too, still only ever
   // 1-2 messages fetched, never the whole history.
   $: if (isComparing && previousMessage !== null) {
-    selectedTopicStore.ensurePayload(previousMessage.id);
+    ensurePayloadDeferred(previousMessage.id);
   }
 
   // Windowed durable history (recording on): older/newer/latest navigation.

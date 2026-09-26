@@ -84,8 +84,15 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
-        title: "Busy topics show their payload again",
-        body: "A topic publishing about once a second or faster no longer sits on \"Loading message...\" while you follow it.",
+        title: "New messages no longer stick at \"Loading message...\"",
+        body: "When a new message arrives on the topic you're viewing, or you step onto one with the arrow keys, the panel shows it instead of sticking at \"Loading message...\".",
+        thanks: [
+          { name: "ejannink", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177" },
+          {
+            name: "Noschvie",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177#issuecomment-5760500007",
+          },
+        ],
       },
       {
         group: "Miscellaneous",
