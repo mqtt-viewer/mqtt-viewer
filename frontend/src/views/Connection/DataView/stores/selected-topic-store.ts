@@ -848,8 +848,8 @@ export const createSelectedTopicStore = (
   // messages doesn't pay one bridge round-trip each. Live-appended messages
   // resolve locally from their retained payloadB64 without touching the
   // backend; only true stubs (window fetches) go across the bridge. No-ops
-  // (returns immediately) if the stub isn't found, already loaded, or
-  // already loading — the "loading" state doubles as the single-flight
+  // (returns immediately, no store write) if the stub isn't found, already
+  // loaded, aged out, or already loading — the "loading" state doubles as the single-flight
   // guard, so an overlapping ensurePayload never double-fetches an id. Does
   // NOT fire a history delta: the timeline only cares about id/time/flags,
   // which don't change here. Token-guarded so a stale fetch (user selected
@@ -868,7 +868,15 @@ export const createSelectedTopicStore = (
     const index = store.history.findIndex((m) => m.id === id);
     if (index === -1) return;
     const target = store.history[index];
-    if (target.payloadState === "loaded" || target.payloadState === "loading") {
+    // "aged-out" is definitive (the backend already said not found), so
+    // there is nothing to fetch. Returning before any store write matters:
+    // the panel's compare block re-runs on every new history array, so a
+    // no-op update here would loop forever.
+    if (
+      target.payloadState === "loaded" ||
+      target.payloadState === "loading" ||
+      target.payloadState === "aged-out"
+    ) {
       return;
     }
 
@@ -906,6 +914,9 @@ export const createSelectedTopicStore = (
         batch.push({ id: m.id, timeMs: m.timeMs });
       }
     }
+    // Defensive: the early-outs above mean the target always qualifies, but
+    // an empty batch must never write the store or cross the bridge.
+    if (batch.length === 0) return;
     const batchIds = new Set(batch.map((b) => b.id));
 
     // Mark the whole batch loading in one store update; from here on other

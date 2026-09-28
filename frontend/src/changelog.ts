@@ -69,6 +69,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
+        title: "Compare mode no longer freezes on an aged-out message",
+        body: "Comparing against a previous message whose payload has aged out now shows why, instead of freezing the app.",
+      },
+      {
+        group: "Fixed",
         title: "New messages no longer stick at \"Loading message...\"",
         body: "When a new message arrives on the topic you're viewing, or you step onto one with the arrow keys, the panel shows it instead of sticking at \"Loading message...\".",
         thanks: [

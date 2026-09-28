@@ -768,6 +768,53 @@ describe("ensurePayload", () => {
     unsub();
   });
 
+  it("returns early for an aged-out stub: no store write, no bridge call", async () => {
+    GetAppSettings.mockResolvedValue({ recordingEnabled: false });
+    const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    GetMessageTimeline.mockResolvedValue(makeStubs(1, 3));
+    await store.selectTopic("a/b");
+    await flushMicrotasks();
+
+    // "1" is the aged-out previous message compare mode asks for; its
+    // neighbours are already loaded, so the prefetch batch would be empty.
+    const seeded = get(store);
+    store.set({
+      ...seeded,
+      history: seeded.history.map((m) =>
+        m.id === "1"
+          ? { ...m, payload: null, payloadB64: null, payloadState: "aged-out" }
+          : {
+              ...m,
+              payload: "x",
+              payloadB64: btoa("x"),
+              payloadState: "loaded",
+            }
+      ),
+    });
+    vi.clearAllMocks();
+
+    // Any store write here hands the panel a new history array, which re-runs
+    // its compare block and calls ensurePayload again, forever.
+    const historyBefore = get(store).history;
+    let writes = 0;
+    const unsubWrites = store.subscribe(() => writes++);
+    writes = 0;
+
+    await store.ensurePayload("1");
+    await flushMicrotasks();
+
+    expect(writes).toBe(0);
+    expect(get(store).history).toBe(historyBefore);
+    expect(GetMessagesByIds).not.toHaveBeenCalled();
+    expect(GetMessageById).not.toHaveBeenCalled();
+    expect(get(store).history[0].payloadState).toBe("aged-out");
+
+    unsubWrites();
+    unsub();
+  });
+
   it("discards a stale ensurePayload result after selecting a different topic (race)", async () => {
     const store = createSelectedTopicStore(CONNECTION_ID, connectionEventSet);
     const unsub = store.subscribe(() => {});
