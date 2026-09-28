@@ -80,6 +80,17 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        group: "Fixed",
+        title: "Windows updates work when the app runs from another drive",
+        body: "The portable exe could not update itself from a drive other than the one holding Windows' temp folder. The app closed and stayed on the old version. If you're on 1.1.0 or earlier and hit this, download this version by hand once; later updates work as normal.",
+        thanks: [{ name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181" }],
+      },
+      {
+        group: "Fixed",
+        title: "Program Files installs no longer try to update themselves",
+        body: "Without admin rights the app can't replace itself under Program Files, so the update closed the app and changed nothing. It now points you to the installer on the releases page instead.",
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",

@@ -49,6 +49,9 @@ const (
 	installLinuxPortable = "linux-portable"
 	installMacOS         = "macos"
 	installWindows       = "windows"
+	// Windows installs the updater cannot write to, in practice the NSIS
+	// installer's machine-wide install under Program Files.
+	installWindowsInstaller = "windows-installer"
 	// Server (headless) builds. These never self-update; a container is
 	// replaced by pulling a new image, so the frontend only shows how to do
 	// that. installDocker is the default; installHomeAssistant is used when
@@ -298,7 +301,10 @@ func resolveInstallType() string {
 	case "darwin":
 		return installMacOS
 	case "windows":
-		return installWindows
+		if canSelfUpdate() {
+			return installWindows
+		}
+		return installWindowsInstaller
 	default:
 		if canSelfUpdate() {
 			return installLinuxPortable
@@ -324,6 +330,10 @@ func updateGuidance(installType string) (command, instructions, releasesURL stri
 	case installLinuxPackage:
 		return "",
 			"Download the .deb or .rpm for your distribution from the releases page and install it over your current version.",
+			releasesPageURL
+	case installWindowsInstaller:
+		return "",
+			"Download the Windows installer from the releases page and run it. It installs over your current version.",
 			releasesPageURL
 	case installNix:
 		return "nix profile upgrade --all",
