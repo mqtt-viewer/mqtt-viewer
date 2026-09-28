@@ -87,8 +87,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
-        title: "Program Files installs no longer try to update themselves",
-        body: "Without admin rights the app can't replace itself under Program Files, so the update closed the app and changed nothing. It now points you to the installer on the releases page instead.",
+        title: "Windows installs in protected folders no longer try to update themselves",
+        body: "Without admin rights the app can't replace itself in a folder like Program Files, so the update closed the app and changed nothing. It now points you to the releases page instead.",
       },
       {
         group: "Miscellaneous",

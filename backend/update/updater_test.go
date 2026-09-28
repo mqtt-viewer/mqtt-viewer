@@ -245,7 +245,7 @@ func TestUpdateGuidance_Flatpak(t *testing.T) {
 }
 
 func TestUpdateGuidance_ManagedDownloads(t *testing.T) {
-	for _, it := range []string{installAppImage, installLinuxPackage, installWindowsInstaller} {
+	for _, it := range []string{installAppImage, installLinuxPackage, installWindowsManual} {
 		cmd, instructions, url := updateGuidance(it)
 		if cmd != "" {
 			t.Fatalf("%s should have no command, got %q", it, cmd)

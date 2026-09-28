@@ -49,9 +49,10 @@ const (
 	installLinuxPortable = "linux-portable"
 	installMacOS         = "macos"
 	installWindows       = "windows"
-	// Windows installs the updater cannot write to, in practice the NSIS
-	// installer's machine-wide install under Program Files.
-	installWindowsInstaller = "windows-installer"
+	// Windows installs whose folder the updater cannot write to: the NSIS
+	// installer's machine-wide install under Program Files, or a portable exe
+	// on read-only or protected storage.
+	installWindowsManual = "windows-manual"
 	// Server (headless) builds. These never self-update; a container is
 	// replaced by pulling a new image, so the frontend only shows how to do
 	// that. installDocker is the default; installHomeAssistant is used when
@@ -304,7 +305,7 @@ func resolveInstallType() string {
 		if canSelfUpdate() {
 			return installWindows
 		}
-		return installWindowsInstaller
+		return installWindowsManual
 	default:
 		if canSelfUpdate() {
 			return installLinuxPortable
@@ -331,9 +332,9 @@ func updateGuidance(installType string) (command, instructions, releasesURL stri
 		return "",
 			"Download the .deb or .rpm for your distribution from the releases page and install it over your current version.",
 			releasesPageURL
-	case installWindowsInstaller:
+	case installWindowsManual:
 		return "",
-			"Download the Windows installer from the releases page and run it. It installs over your current version.",
+			"MQTT Viewer can't update itself in its current folder. Download the new version from the releases page. If you used the installer, run the new installer.",
 			releasesPageURL
 	case installNix:
 		return "nix profile upgrade --all",

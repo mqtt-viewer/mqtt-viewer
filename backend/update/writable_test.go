@@ -40,3 +40,19 @@ func TestDirIsWritable_ReadOnlyDir(t *testing.T) {
 		t.Fatal("a read-only dir should not be writable")
 	}
 }
+
+func TestExeDirWritable_ChecksUnresolvedExeFolder(t *testing.T) {
+	dir := t.TempDir()
+	orig := osExecutable
+	t.Cleanup(func() { osExecutable = orig })
+
+	osExecutable = func() (string, error) { return filepath.Join(dir, "mqtt-viewer.exe"), nil }
+	if !exeDirWritable() {
+		t.Fatal("exe in a writable folder should be self-updatable")
+	}
+
+	osExecutable = func() (string, error) { return filepath.Join(dir, "missing", "mqtt-viewer.exe"), nil }
+	if exeDirWritable() {
+		t.Fatal("exe in an unwritable folder should not be self-updatable")
+	}
+}
