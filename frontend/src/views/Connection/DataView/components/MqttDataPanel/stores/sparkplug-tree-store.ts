@@ -306,9 +306,19 @@ interface ScopeRt {
   /** Order and time of the newest birth folded in. */
   birthOrd?: number;
   birthAtMs?: number;
-  /** Order and time of the newest sign of life (birth or data). */
+  /**
+   * Order and time of the newest birth or data: the session evidence a
+   * restart is judged by, retained messages included.
+   */
   lastAliveOrd: number;
   lastAliveMs: number;
+  /**
+   * The same for messages that weren't retained, the only ones that say the
+   * scope is up now: the broker hands a retained one to every new
+   * subscriber, however long ago its publisher died.
+   */
+  lastLiveOrd: number;
+  lastLiveMs: number;
   /** Order and time of the newest death. */
   deathOrd?: number;
   /**
@@ -565,6 +575,8 @@ export const createSparkplugTreeStore = (
       placeholderCount: 0,
       lastAliveOrd: 0,
       lastAliveMs: 0,
+      lastLiveOrd: 0,
+      lastLiveMs: 0,
       deathOrds: [],
       lastOrd: 0,
       birthRing: [],
@@ -598,6 +610,8 @@ export const createSparkplugTreeStore = (
         placeholderCount: 0,
         lastAliveOrd: 0,
         lastAliveMs: 0,
+        lastLiveOrd: 0,
+        lastLiveMs: 0,
         deathOrds: [],
       };
       node.devices.set(name, device);
@@ -731,7 +745,7 @@ export const createSparkplugTreeStore = (
         d.birthOrd !== undefined && (n.birthOrd === undefined || d.birthOrd > n.birthOrd);
       const deviceHasBirth = currentBirth && hasLiveBirth(d.birthOrd, deviceDeathOrd);
       const awaitingBirth = n.birthOrd !== undefined && !currentBirth && d.metrics.size === 0;
-      const status = statusOf(d.lastAliveOrd, deviceDeathOrd);
+      const status = statusOf(d.lastLiveOrd, deviceDeathOrd);
       devices.push({
         name: d.name,
         status,
@@ -740,13 +754,13 @@ export const createSparkplugTreeStore = (
         birthAtMs: currentBirth ? d.birthAtMs : undefined,
         verified: deviceHasBirth && isVerified(d),
         metrics: buildMetrics(d),
-        lastSeenMs: d.lastAliveMs,
+        lastSeenMs: d.lastLiveMs,
         deathAtMs: deviceDeathMs,
         placeholderCount: d.placeholderCount,
         awaitingBirth,
       });
     }
-    const status = statusOf(n.lastAliveOrd, n.deathOrd);
+    const status = statusOf(n.lastLiveOrd, n.deathOrd);
     const nodeHasBirth = hasLiveBirth(n.birthOrd, n.deathOrd);
     const seqOk =
       n.lastSeqGapOrd === undefined ||
@@ -761,7 +775,7 @@ export const createSparkplugTreeStore = (
       lastSeqGap: seqOk ? undefined : n.lastSeqGap,
       metricCount: n.metrics.size,
       birthAtMs: n.birthAtMs,
-      lastSeenMs: n.lastAliveMs,
+      lastSeenMs: n.lastLiveMs,
       metrics: buildMetrics(n),
       devices,
       hasBirth: nodeHasBirth,
@@ -1189,10 +1203,14 @@ export const createSparkplugTreeStore = (
     }
   };
 
-  const noteAlive = (scope: ScopeRt, ord: number, timeMs: number) => {
+  const noteAlive = (scope: ScopeRt, ord: number, timeMs: number, live: boolean) => {
     if (ord > scope.lastAliveOrd) {
       scope.lastAliveOrd = ord;
       scope.lastAliveMs = timeMs;
+    }
+    if (live && ord > scope.lastLiveOrd) {
+      scope.lastLiveOrd = ord;
+      scope.lastLiveMs = timeMs;
     }
   };
 
@@ -1206,10 +1224,15 @@ export const createSparkplugTreeStore = (
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
     if (!scope) return;
 
-    if (!isDevice) recordStorm(node, m);
-    noteAlive(scope, ord, m.timeMs);
+    // A retained birth may be years old: the broker hands it to every new
+    // subscriber, whether or not the node is still up. It names metrics but
+    // doesn't say the node is up, and is no storm. (The spec forbids
+    // retaining births and data, so a live publisher's don't carry the flag.)
+    const live = !meta.retained;
+    if (!isDevice && live) recordStorm(node, m);
+    noteAlive(scope, ord, m.timeMs, live);
     // A device can only birth through a live node.
-    if (isDevice) noteAlive(node, ord, m.timeMs);
+    if (isDevice) noteAlive(node, ord, m.timeMs, live);
     recordSeqGap(node, meta, m, ord);
 
     if (!isDevice && (node.bdSeqOrd === undefined || ord > node.bdSeqOrd)) {
@@ -1282,8 +1305,9 @@ export const createSparkplugTreeStore = (
     const scope = isDevice ? ensureDevice(node, meta.device!) : node;
     if (!scope) return;
 
-    noteAlive(scope, ord, m.timeMs);
-    if (isDevice) noteAlive(node, ord, m.timeMs);
+    // Retained data is as old as a retained birth.
+    noteAlive(scope, ord, m.timeMs, !meta.retained);
+    if (isDevice) noteAlive(node, ord, m.timeMs, !meta.retained);
     recordSeqGap(node, meta, m, ord);
     if (meta.carriedOver) scope.carriedOverOrd = newest(scope.carriedOverOrd, ord);
 

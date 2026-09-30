@@ -337,10 +337,13 @@ func (s *SessionStore) HandleMessage(info TopicInfo, msg *dynamicpb.Message, ref
 		}
 		trackSeq(node, msg, meta)
 	}
-	// A retained birth identical to the one already held is the broker
-	// sending it again (a reconnect, another subscription): nothing changed.
+	// A retained birth identical to the one for the live session is the
+	// broker sending it again (a reconnect, another subscription): nothing
+	// changed. Once that session has ended (a death, or a new NBIRTH for a
+	// device), the same bytes start a new one: publishers without payload
+	// timestamps or a changing bdSeq send identical births every time.
 	isRedelivery := func(scope *scopeState) bool {
-		if !ref.Retained || scope.birth == nil || scope.birth.inHistory || msg == nil {
+		if !ref.Retained || !scope.hasBirth || scope.birth == nil || scope.birth.inHistory || msg == nil {
 			return false
 		}
 		raw, err := (proto.MarshalOptions{AllowPartial: true, Deterministic: true}).Marshal(msg)

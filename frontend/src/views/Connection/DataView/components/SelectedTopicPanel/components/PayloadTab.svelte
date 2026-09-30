@@ -47,8 +47,8 @@
     | null = null;
   /**
    * The message is on a Sparkplug B topic but carries no Sparkplug decode:
-   * "off" when decoding is off for the connection, "earlier" when it
-   * arrived before decoding was turned on, "failed" when the decoder read
+   * "off" when decoding is off for the connection, "earlier" when
+   * decoding wasn't running when it arrived, "failed" when the decoder read
    * it and it isn't Sparkplug B.
    */
   export let sparkplugUndecoded: "off" | "earlier" | "failed" | null = null;
@@ -268,8 +268,8 @@
         >
       {:else if sparkplugUndecoded === "earlier"}
         <span class="min-w-0"
-          >Sparkplug B, shown as raw protobuf: it arrived before decoding was
-          on.</span
+          >Sparkplug B, shown as raw protobuf: decoding wasn't running when it
+          arrived. It starts when the connection connects.</span
         >
       {:else}
         <span class="min-w-0 text-warning"

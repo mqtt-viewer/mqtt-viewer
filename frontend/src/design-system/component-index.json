@@ -5243,7 +5243,7 @@
             "earlier",
             "failed"
           ],
-          "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, earlier says it arrived before decoding was on, failed says the payload isn't Sparkplug B."
+          "description": "Set for a Sparkplug B topic whose payload has no Sparkplug decode: off points at turning decoding on, earlier says decoding wasn't running when it arrived, failed says the payload isn't Sparkplug B."
         }
       ],
       "tokens": [

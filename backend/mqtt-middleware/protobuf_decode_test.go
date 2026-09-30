@@ -320,3 +320,16 @@ func TestStatefulDecodeFlagsAPayloadThatIsNotSparkplug(t *testing.T) {
 		t.Errorf("expected the payload left as it was, got %s", msg.Payload)
 	}
 }
+
+// spBv1.0 topics outside the strict grammar take the stateless decode, and a
+// payload it can't read is flagged the same way.
+func TestStatelessDecodeFlagsAPayloadThatIsNotSparkplug(t *testing.T) {
+	registry := loadTestRegistry(t)
+	mw := NewProtoDecodeMiddleware(registry, sparkplug.NewSessionStore())
+	for _, topic := range []string{"spBv1.0/G/NDATA/N/", "spBv1.0/G/NDATA/N/x/y", "spBv1.0/G/NDATA"} {
+		msg := runMiddleware(t, mw, topic, []byte(`{"temp": 21.5}`))
+		if msg.MiddlewareProperties == nil || (*msg.MiddlewareProperties)["SparkplugDecodeFailed"] != true {
+			t.Errorf("%s: expected the failed decode flagged, got %v", topic, msg.MiddlewareProperties)
+		}
+	}
+}

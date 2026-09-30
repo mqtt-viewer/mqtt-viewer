@@ -1225,3 +1225,71 @@ func TestSuspendedOrdMarksTheLastDrop(t *testing.T) {
 		t.Errorf("expected the drop at ord %d, got %d", last.Ord, store.SuspendedOrd())
 	}
 }
+
+// An identical retained birth is only a redelivery while the session it
+// started is live. Once it has ended, the same bytes start a new session:
+// publishers without payload timestamps send identical births every time.
+func TestIdenticalRetainedBirthAfterSessionEndsIsANewBirth(t *testing.T) {
+	d := loadPayloadDescriptor(t)
+	nbirth := func(bdSeq uint64) *dynamicpb.Message {
+		return buildPayload(t, d, 0, testMetric{name: "bdSeq", longValue: u64(bdSeq)}, testMetric{name: "A", alias: u64(1)})
+	}
+	dbirth := func() *dynamicpb.Message {
+		return buildPayload(t, d, 1, testMetric{name: "Temp", alias: u64(7)})
+	}
+	nodeResolves := func(t *testing.T, s *SessionStore) {
+		t.Helper()
+		meta := s.HandleMessage(ndataInfo, buildPayload(t, d, 1, testMetric{alias: u64(1), doubleValue: f64(1)}), at(100))
+		if meta["resolution"] != ResolutionResolved {
+			t.Errorf("want resolved, got %v", meta)
+		}
+	}
+
+	t.Run("after a death", func(t *testing.T) {
+		s := NewSessionStore()
+		s.HandleMessage(nbirthInfo, nbirth(0), retained(at(1)))
+		s.HandleMessage(ndeathInfo, buildPayload(t, d, -1, testMetric{name: "bdSeq", longValue: u64(0)}), at(2))
+		if meta := s.HandleMessage(nbirthInfo, nbirth(0), retained(at(3))); meta["staleBirth"] == true {
+			t.Fatalf("a birth after a death was dropped as a redelivery: %v", meta)
+		}
+		nodeResolves(t, s)
+	})
+
+	t.Run("constant bdSeq across a reconnect", func(t *testing.T) {
+		s := NewSessionStore()
+		s.HandleMessage(nbirthInfo, nbirth(0), retained(at(1)))
+		s.Suspend()
+		s.ResyncSeq()
+		s.HandleMessage(ndeathInfo, buildPayload(t, d, -1, testMetric{name: "bdSeq", longValue: u64(0)}), retained(at(2)))
+		s.HandleMessage(nbirthInfo, nbirth(0), retained(at(3)))
+		nodeResolves(t, s)
+	})
+
+	t.Run("device birth after a new node birth", func(t *testing.T) {
+		s := NewSessionStore()
+		s.HandleMessage(nbirthInfo, nbirth(1), retained(at(1)))
+		s.HandleMessage(dbirthInfo, dbirth(), retained(at(2)))
+		s.HandleMessage(nbirthInfo, nbirth(2), retained(at(3)))
+		if meta := s.HandleMessage(dbirthInfo, dbirth(), retained(at(4))); meta["staleBirth"] == true {
+			t.Fatalf("the DBIRTH the new node session requires was dropped: %v", meta)
+		}
+		meta := s.HandleMessage(ddataInfo, buildPayload(t, d, 2, testMetric{alias: u64(7), doubleValue: f64(1)}), at(5))
+		if meta["resolution"] != ResolutionResolved {
+			t.Errorf("want resolved, got %v", meta)
+		}
+	})
+
+	t.Run("device birth after a retained device death on reconnect", func(t *testing.T) {
+		s := NewSessionStore()
+		s.HandleMessage(nbirthInfo, nbirth(1), at(1))
+		s.HandleMessage(dbirthInfo, dbirth(), retained(at(2)))
+		s.Suspend()
+		s.ResyncSeq()
+		s.HandleMessage(ddeathInfo, buildPayload(t, d, 2), retained(at(3)))
+		s.HandleMessage(dbirthInfo, dbirth(), retained(at(4)))
+		meta := s.HandleMessage(ddataInfo, buildPayload(t, d, 3, testMetric{alias: u64(7), doubleValue: f64(1)}), at(5))
+		if meta["resolution"] != ResolutionResolved {
+			t.Errorf("want resolved, got %v", meta)
+		}
+	})
+}

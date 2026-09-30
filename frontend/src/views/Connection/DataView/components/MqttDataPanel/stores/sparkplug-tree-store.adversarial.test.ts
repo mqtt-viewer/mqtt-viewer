@@ -279,4 +279,14 @@ describe("final review regressions", () => {
     if (failures.length) console.log(failures.join("\n\n"));
     expect(failures).toEqual([]);
   }, 120_000);
+  it("F10 a retained birth and retained data are no sign of life", async () => {
+    const store = await open();
+    emit("conn");
+    emit("msgs", [mk("spBv1.0/G/NBIRTH/N", { metrics: [{ name: "A", alias: "1", datatype: 10, doubleValue: 1 }] }, { msgType: "NBIRTH", group: "G", edgeNode: "N", retained: true })]);
+    emit("msgs", [mk("spBv1.0/G/NDATA/N", { metrics: [{ name: "A", alias: "1", doubleValue: 2 }] }, { msgType: "NDATA", group: "G", edgeNode: "N", retained: true, resolution: "resolved" })]);
+    expect((get(store) as any).groups[0].nodes[0].status).not.toBe("online");
+    emit("msgs", [mk("spBv1.0/G/NDATA/N", { metrics: [{ name: "A", alias: "1", doubleValue: 3 }] }, { msgType: "NDATA", group: "G", edgeNode: "N", resolution: "resolved" })]);
+    expect((get(store) as any).groups[0].nodes[0].status).toBe("online");
+    store.destroy();
+  });
 });

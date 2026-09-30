@@ -127,6 +127,9 @@ func decodeStateless(protoRegistry *protobuf.ProtoRegistry, params *mqtt.MqttMes
 	if err != nil {
 		// Don't error - just use payload as normal
 		slog.Debug(fmt.Sprintf("proto decode middleware error: %s", err.Error()))
+		if topicmatching.MatchesSparkplugBPrefix(params.Topic) {
+			setMiddlewareProperty(params, "SparkplugDecodeFailed", true)
+		}
 		return nil
 	}
 	if decodedPayload == nil {
