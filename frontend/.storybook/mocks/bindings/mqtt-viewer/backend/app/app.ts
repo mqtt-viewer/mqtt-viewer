@@ -498,6 +498,24 @@ export async function GetSysMessageHistory(
   return [];
 }
 
+export async function GetSparkplugMessageHistory(
+  _connectionId: number
+): Promise<{ messages: any[]; suspendedOrd: number }> {
+  return { messages: [], suspendedOrd: 0 };
+}
+
+export async function GetSparkplugSuspendedOrd(
+  _connectionId: number
+): Promise<number> {
+  return 0;
+}
+
+export async function PublishSparkplugRebirth(
+  _connectionId: number,
+  _group: string,
+  _edgeNode: string
+): Promise<void> {}
+
 export async function GetRetainedTopicsUnderPrefix(
   _connId: number,
   _prefix: string

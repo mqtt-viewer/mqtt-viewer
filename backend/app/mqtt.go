@@ -48,7 +48,7 @@ func (a *App) ConnectMqtt(connId uint) error {
 				mqttmiddleware.NewProtoEncodeMiddleware(protoRegistry).Middleware,
 			},
 			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				mqttmiddleware.NewProtoDecodeMiddleware(protoRegistry).Middleware,
+				mqttmiddleware.NewProtoDecodeMiddleware(protoRegistry, appConnection.SparkplugStore).Middleware,
 			},
 		})
 	} else {
@@ -177,6 +177,9 @@ func (a *App) ClearConnectionHistory(connId uint) error {
 		return fmt.Errorf("connection not found (%d)", connId)
 	}
 	appConnection.MqttManager.ClearConnectionHistory()
+	// History is gone, so is everything the Sparkplug replay would rebuild
+	// from it; the edge nodes' aliases are not ours to forget.
+	appConnection.SparkplugStore.ClearHistory()
 	a.EventRuntime.EventsEmit(appConnection.EventSet.MqttClearHistory, nil)
 	return nil
 }

@@ -17,6 +17,13 @@
       "type": "string",
       "required": false,
       "default": ""
+    },
+    {
+      "name": "placeholder",
+      "type": "string",
+      "required": false,
+      "default": "Filter by topic, payload or pattern",
+      "description": "Input placeholder; views that filter something else say what."
     }
   ],
   "tokens": [

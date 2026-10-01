@@ -65,6 +65,12 @@
       "type": "string",
       "required": false,
       "default": null
+    },
+    {
+      "name": "closeFocus",
+      "type": "string",
+      "required": false,
+      "default": null
     }
   ],
   "tokens": [

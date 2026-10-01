@@ -31,9 +31,31 @@
   export let searchStore: SearchStore;
   export let expandedTopicsStore: ExpandedTopicsStore;
   export let sortStore: MqttDataSortStore;
+  /**
+   * Expand/collapse and sort act on the topic tree. Views that bring their own
+   * tree (Sparkplug) hide them rather than show controls that do nothing.
+   */
+  export let showTopicControls = true;
+  /** Placeholder for the search box, for views that filter something else. */
+  export let searchPlaceholder: string | undefined = undefined;
 
   let searchText = $searchStore.text;
-  const debouncedSetSearchText = _.debounce(searchStore.setSearchText, 200);
+  // The last text this bar wrote to the store. A store value that differs
+  // was set from outside (the Sparkplug view clearing its search to reveal
+  // a node), and the box follows it.
+  let lastPushed = searchText;
+  const pushSearchText = (text: string) => {
+    lastPushed = text;
+    searchStore.setSearchText(text);
+  };
+  const debouncedSetSearchText = _.debounce(pushSearchText, 200);
+  const followStore = (text: string) => {
+    if (text === lastPushed) return;
+    lastPushed = text;
+    debouncedSetSearchText.cancel();
+    searchText = text;
+  };
+  $: followStore($searchStore.text);
   // Flush any pending debounced text on unmount so a List -> Graph toggle within
   // 200ms of typing doesn't leave the graph opening unfiltered (the filter would
   // otherwise flash in late once the trailing call fires against a dead view).
@@ -42,7 +64,7 @@
     (() => {
       if (searchText === "") {
         debouncedSetSearchText.cancel();
-        searchStore.setSearchText("");
+        pushSearchText("");
         return;
       }
       debouncedSetSearchText(searchText);
@@ -129,7 +151,8 @@
     class="flex flex-row items-center h-full gap-2 px-2 text-emphasis overflow-hidden"
   >
     <slot name="leading" />
-    <SearchAndHistory bind:searchText />
+    <SearchAndHistory bind:searchText placeholder={searchPlaceholder} />
+    {#if showTopicControls}
     <Tooltip placement="bottom" focusable>
       <Button on:click={onExpandClick}
         ><Icon
@@ -140,6 +163,7 @@
       >
       <span slot="tooltip-content">Expand/Collapse all topics</span>
     </Tooltip>
+    {/if}
 
     <!-- ponytail: browser status needs an in-page route before this control returns. -->
     {#if !$envStore.isServerMode}
@@ -151,6 +175,7 @@
       </Tooltip>
     {/if}
 
+    {#if showTopicControls}
     <Tooltip placement="bottom" focusable>
       <DropdownMenu triggerText={sortButtonText} triggerClass="w-[110px]">
         <div class="flex flex-col" slot="menu-content">
@@ -188,6 +213,7 @@
       </DropdownMenu>
       <span slot="tooltip-content">Sort topics</span>
     </Tooltip>
+    {/if}
     <DropdownMenu>
       <span slot="trigger"
         ><Button variant="secondary" iconType="settings" iconSize={16}

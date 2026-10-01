@@ -63,6 +63,21 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.1.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        group: "Added",
+        title: "Sparkplug B with the names filled in",
+        body: "Data messages show real metric names instead of bare aliases, and a Sparkplug view shows your groups, nodes and metrics live, with sequence gaps and rebirth storms flagged. Turn on Sparkplug decoding for the connection to use it.",
+        thanks: [
+          {
+            name: "adamwoodland2",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14",
+          },
+          {
+            name: "thebaldgeek",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14",
+          },
+        ],
+      },
+      {
         group: "Fixed",
         title: "Startup failures show an error instead of a blank window",
         body: "If the app or a pop-out window cannot initialise it now tells you what went wrong and where to report it.",

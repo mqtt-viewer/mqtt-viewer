@@ -32,3 +32,17 @@ test("errorMessage stringifies other primitives", () => {
   expect(errorMessage(42)).toBe("42");
   expect(errorMessage(false)).toBe("false");
 });
+
+test("errorMessage unwraps the envelope inside an Error too", () => {
+  expect(
+    errorMessage(new Error('{"message":"connect: refused","cause":{},"kind":"RuntimeError"}'))
+  ).toBe("connect: refused");
+});
+
+test("errorMessage unwraps the Wails runtime error envelope", () => {
+  expect(
+    errorMessage('{"message":"specified connection not connected","cause":{},"kind":"RuntimeError"}')
+  ).toBe("specified connection not connected");
+  expect(errorMessage("{not json")).toBe("{not json");
+  expect(errorMessage('{"kind":"RuntimeError"}')).toBe('{"kind":"RuntimeError"}');
+});

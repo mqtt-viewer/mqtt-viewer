@@ -26,7 +26,7 @@ func TestLatestMapCalibration(t *testing.T) {
 
 	now := time.Now()
 	for i := 0; i < topics; i++ {
-		h.addMessageToHistory(MqttMessage{
+		h.AddMessage(MqttMessage{
 			Id:      uuid.NewString(),
 			Topic:   fmt.Sprintf("telemetry/group-%03d/device-%06d/temperature", i%50, i),
 			Payload: []byte(fmt.Sprintf(`{"value": %d.%03d, "unit": "C"}`, i%100, i%1000)),

@@ -31,3 +31,4 @@ scripts/.venv/
 # nix build symlinks
 result
 result-*
+__pycache__/

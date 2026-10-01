@@ -16,6 +16,7 @@ import (
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/backend/paths"
 	"mqtt-viewer/backend/protobuf"
+	"mqtt-viewer/backend/sparkplug"
 	"mqtt-viewer/backend/update"
 	"mqtt-viewer/events"
 
@@ -211,10 +212,11 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 	})
 
 	appConnection := AppConnection{
-		ctx:          &withName,
-		ConnectionId: conn.ID,
-		MqttManager:  mqttManager,
-		EventSet:     &connEvents,
+		ctx:            &withName,
+		ConnectionId:   conn.ID,
+		MqttManager:    mqttManager,
+		EventSet:       &connEvents,
+		SparkplugStore: sparkplug.NewSessionStore(),
 	}
 
 	mqttManager.SetConnectionCallbacks(
@@ -229,6 +231,9 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					a.connectedConnCount.Add(1)
 					a.recomputeMemoryLimit()
 				}
+				// A message from before the drop that paho delivers late must
+				// not become the seq baseline for the new session.
+				appConnection.SparkplugStore.ResyncSeq()
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
 				appConnection.MqttManager.MessageBuffer.StartHandlingBuffer(MQTT_BUFFER_EMIT_INTERVAL, func(messages []mqtt.MqttMessage) {
 					if len(messages) == 0 {
@@ -256,6 +261,10 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 					a.recomputeMemoryLimit()
 				}
 				appConnection.MqttManager.MessageBuffer.StopHandlingBuffer()
+				// Sparkplug aliases belong to the edge node's session, which
+				// carries on without us, so keep them but flag them unverified:
+				// a node may rebirth with new aliases while we are away.
+				appConnection.SparkplugStore.Suspend()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("connection down: %v", (*reason).Error()))
 					if a.Mode != AppModes.Test {
@@ -269,6 +278,12 @@ func (a *App) createAppConnectionFromConnectionModel(conn *models.Connection, ev
 				}
 			},
 			OnReconnecting: func(reason *error) {
+				// Same as a disconnect: names keep resolving but are flagged
+				// unverified until each node births again, and the seq counter
+				// restarts so the gap in our own delivery isn't reported as the
+				// node's. A late message from the dropped session landing after
+				// this is harmless: it resolves with the same aliases.
+				appConnection.SparkplugStore.Suspend()
 				if reason != nil {
 					slog.ErrorContext(*appConnection.ctx, fmt.Sprintf("starting reconnect due to: %v", (*reason).Error()))
 					if a.Mode != AppModes.Test {

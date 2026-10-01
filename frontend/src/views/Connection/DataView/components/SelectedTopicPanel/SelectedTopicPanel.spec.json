@@ -117,6 +117,13 @@
       "type": "function",
       "required": false,
       "default": "> void"
+    },
+    {
+      "name": "onRequestRebirth",
+      "type": "function",
+      "required": false,
+      "default": null,
+      "description": "Passed to PayloadTab for the Sparkplug banner's Request rebirth action."
     }
   ],
   "tokens": [

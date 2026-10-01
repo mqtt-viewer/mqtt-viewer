@@ -22,6 +22,7 @@ export {
     PublishProperties,
     SaveCollectionMessageParams,
     SavePublishHistoryEntryParams,
+    SparkplugHistory,
     StartupOptions,
     UpdateAppSettingsParams
 } from "./models.js";

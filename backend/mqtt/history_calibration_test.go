@@ -34,7 +34,7 @@ func TestHistoryCalibration(t *testing.T) {
 			TimeMs:  now.UnixMilli() + int64(i),
 			Time:    now,
 		}
-		h.addMessageToHistory(msg)
+		h.AddMessage(msg)
 	}
 
 	runtime.GC()

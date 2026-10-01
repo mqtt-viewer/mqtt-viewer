@@ -21,6 +21,10 @@
   // focus when the dialog opens. A selector string is the reliable form here:
   // melt resolves it after the content has mounted.
   export let openFocus: CreateDialogProps["openFocus"] = undefined;
+  // Where focus goes when the dialog closes. Melt's default is the trigger,
+  // so a dialog opened from a store (no trigger) otherwise drops focus on
+  // the page body.
+  export let closeFocus: CreateDialogProps["closeFocus"] = undefined;
 
   $: $isOpen,
     (() => {
@@ -43,6 +47,7 @@
     forceVisible: true,
     open: isOpen,
     openFocus,
+    closeFocus,
   });
 </script>
 

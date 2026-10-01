@@ -14,6 +14,7 @@
   import { type ActionButton } from "@/components/InputFields/interfaces";
 
   export let searchText = "";
+  export let placeholder = "Filter by topic, payload or pattern";
 
   let connectionId = getConnectionIdContext();
   let filterHistoryStore = createFilterHistoryStore(connectionId);
@@ -136,7 +137,7 @@
     id={inputElName}
     icon="search"
     name={inputElName}
-    placeholder="Filter by topic, payload or pattern"
+    {placeholder}
     bgColor={fieldColor}
     bgHoverColor={fieldHoverColor}
     inputClass={hasHistory ? "pr-7" : undefined}

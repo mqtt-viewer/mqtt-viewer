@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../../../../../design-system/component-spec.schema.json",
+  "name": "SparkplugPanel",
+  "tier": "view",
+  "description": "Sparkplug session view: connection and alias banners with a bulk rebirth request, fleet summary with a problems filter, host state strip, virtualised group/node/device/metric tree, and a clickable warnings strip. Explains and offers to turn on decoding when it is off.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "treeState",
+      "type": "object",
+      "required": true,
+      "description": "SparkplugTreeState snapshot from the sparkplug tree store (plain state in, so stories can feed fixtures)."
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "required": true,
+      "description": "Panel width for the virtual-list row max-width math."
+    },
+    {
+      "name": "filter",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Search text. Matches group, node, device and metric names, Group/Node paths, \"alias N\" and pasted Sparkplug topics. Opens everything while set."
+    },
+    {
+      "name": "decodingState",
+      "type": "string",
+      "required": false,
+      "default": "on",
+      "options": [
+        "on",
+        "off",
+        "needs-reconnect"
+      ],
+      "description": "off or needs-reconnect replaces the tree with an explanation and a button."
+    },
+    {
+      "name": "connectionState",
+      "type": "string",
+      "required": false,
+      "default": "connected",
+      "options": [
+        "connected",
+        "disconnected",
+        "connecting",
+        "reconnecting",
+        "error"
+      ],
+      "description": "Decides what turning decoding on does: reconnect, connect, or (while the client retries) save it for the next connect without interrupting the retries."
+    },
+    {
+      "name": "enablingDecoding",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "True while decoding is being turned on; the button disables and says so."
+    },
+    {
+      "name": "onEnableDecoding",
+      "type": "function",
+      "required": false,
+      "description": "Turns decoding on for the connection and connects, or reconnects when already connected."
+    },
+    {
+      "name": "onRequestRebirth",
+      "type": "function",
+      "required": true,
+      "description": "([{group, node, offline?}]) asks for rebirths; the caller confirms before anything is published."
+    },
+    {
+      "name": "onCopyMetricList",
+      "type": "function",
+      "required": true,
+      "description": "(node) callback for the Copy metric list action."
+    },
+    {
+      "name": "onSelectMetric",
+      "type": "function",
+      "required": false,
+      "description": "(metric) opens the message that last set the metric's value."
+    },
+    {
+      "name": "onCopyValue",
+      "type": "function",
+      "required": false,
+      "description": "(metric) copies the metric's full value."
+    },
+    {
+      "name": "onClearWarnings",
+      "type": "function",
+      "required": false,
+      "description": "Clears the warning list."
+    },
+    {
+      "name": "onClearFilter",
+      "type": "function",
+      "required": false,
+      "description": "Clears the search, so a warning click can reveal a node the search hides."
+    }
+  ],
+  "tokens": [
+    "secondary-text",
+    "white-text",
+    "emphasis",
+    "success",
+    "error",
+    "warning",
+    "divider",
+    "hovered",
+    "elevation-2"
+  ],
+  "dependencies": [
+    "SparkplugRow",
+    "Icon",
+    "Button"
+  ],
+  "notes": "Figma is not linked yet; stories use local fixtures. Expansion is panel-local: groups open, nodes open by default only while the tree holds 400 metrics or fewer, and that choice holds from the user's first click, scroll or key so rows never collapse under them, and the user's clicks override per key. The tree is one tab stop with arrow-key navigation (aria-activedescendant). Below 560px wide the rows go compact."
+}
