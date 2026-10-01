@@ -10,7 +10,9 @@ docs/WRITING_STYLE.md.
 
 ## Pending
 
-- Stateful Sparkplug B decode (fill in merge date when the PR lands).
+- 2026-10-01. Stateful Sparkplug B decode merged (#180). The site copy
+  is written and waiting on the website branch
+  `claude/website-sparkplug-seo-txk0ae`; merge it after 1.2.0 goes live.
   Add to features list; dedicated Sparkplug use-case page; screenshot
   or short clip of the Sparkplug view. Copy angle (verified against
   desktop competitors 2026-07-17, re-verify briefly before
