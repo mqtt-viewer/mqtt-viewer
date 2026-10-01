@@ -129,13 +129,18 @@
   // flags a payload it couldn't read ("failed"); one it never saw arrived
   // while decoding was off ("off", or "earlier" if it is on now). A payload
   // decoded some other way (a topic outside the strict grammar, a device
-  // past the tracking cap) needs no hint. STATE messages are JSON.
+  // past the tracking cap) needs no hint. STATE messages are JSON. A stub
+  // whose payload hasn't loaded carries no flags yet, and a message recorded
+  // before the decode state was stored may be either form, so neither gets
+  // one.
   $: isProtoEnabled =
     $connectionsStore.connections[connectionId]?.connectionDetails.isProtoEnabled ?? false;
   $: selectedMessageProps = (selectedMessage?.middlewareProperties ?? {}) as Record<string, unknown>;
   $: selectedMessageSparkplugUndecoded =
     selectedMessageSparkplugMeta !== null ||
+    selectedMessage?.payloadState !== "loaded" ||
     selectedMessageProps.IsDecodedProto === true ||
+    selectedMessageProps.DecodeStateUnknown === true ||
     !isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "")
       ? null
       : selectedMessageProps.SparkplugDecodeFailed === true

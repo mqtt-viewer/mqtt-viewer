@@ -47,6 +47,7 @@ func receivedMessageFromMqtt(connectionID uint, m *mqtt.MqttMessage) models.Rece
 		Retain:       m.Retain,
 		Payload:      m.Payload,
 		ReceivedAt:   m.Time,
+		DecodeState:  decodeStateOf(m),
 	}
 	props := m.Properties
 	if props == nil {
@@ -87,4 +88,21 @@ func receivedMessageFromMqtt(connectionID uint, m *mqtt.MqttMessage) models.Rece
 		row.HeaderSubscriptionIdentifier = &v
 	}
 	return row
+}
+
+// decodeStateOf records what the decode middleware did to a message before it
+// reached the recording worker. The middleware properties themselves are not
+// persisted, and without this a recorded decoded payload reads back looking
+// like one that arrived while decoding was off.
+func decodeStateOf(m *mqtt.MqttMessage) *string {
+	state := models.DecodeStateRaw
+	if m.MiddlewareProperties != nil {
+		props := *m.MiddlewareProperties
+		if decoded, _ := props["IsDecodedProto"].(bool); decoded {
+			state = models.DecodeStateDecoded
+		} else if failed, _ := props["SparkplugDecodeFailed"].(bool); failed {
+			state = models.DecodeStateFailed
+		}
+	}
+	return &state
 }

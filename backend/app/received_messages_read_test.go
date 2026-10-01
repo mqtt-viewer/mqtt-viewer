@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	"strings"
 	"testing"
 )
 
@@ -364,5 +365,85 @@ func TestGetReceivedMessageByIdScopedToTopic(t *testing.T) {
 	}
 	if found {
 		t.Error("expected not found when topic does not match")
+	}
+}
+
+// The recording worker stores what the decode middleware produced, so a
+// Sparkplug payload recorded with decoding on is the decoded JSON. Reading it
+// back must say so, or the payload view calls it raw protobuf that arrived
+// while decoding was off.
+func TestRecordedMessagesKeepTheirDecodeState(t *testing.T) {
+	app := getSeededTestApp(t)
+	enableRecording(t, app)
+	p := newSparkplugPipeline(t, testConn(t, app, 1))
+
+	decoded := p.decode("spBv1.0/G/NBIRTH/N", 1000,
+		`{"seq":"0","metrics":[{"name":"A","alias":"1","datatype":10,"doubleValue":1}]}`)
+	failed := mqtt.MqttMessage{
+		Topic:                "spBv1.0/G/NDATA/N",
+		Payload:              []byte{0xff, 0xff, 0xff},
+		MiddlewareProperties: &map[string]any{},
+	}
+	if err := p.middleware.Func(&failed); err != nil {
+		t.Fatalf("middleware: %v", err)
+	}
+	// Recorded with decoding off: no middleware ran at all.
+	raw := mqtt.MqttMessage{Topic: "spBv1.0/G/NDATA/N", Payload: []byte{0x08, 0x01}}
+	app.insertReceivedMessages(1, []mqtt.MqttMessage{decoded, failed, raw})
+
+	// A row from before decode_state existed.
+	if err := app.Db.Create(&models.ReceivedMessage{
+		ConnectionID: 1, Topic: "spBv1.0/G/NBIRTH/N", Payload: []byte(`{"seq":"0"}`),
+	}).Error; err != nil {
+		t.Fatalf("inserting legacy row: %v", err)
+	}
+
+	read := func(topic string) []mqtt.MqttMessage {
+		t.Helper()
+		msgs, err := app.GetReceivedMessageWindow(1, topic, 0, 0, 10)
+		if err != nil {
+			t.Fatalf("window %s: %v", topic, err)
+		}
+		return msgs
+	}
+	flag := func(m mqtt.MqttMessage, key string) bool {
+		if m.MiddlewareProperties == nil {
+			return false
+		}
+		v, _ := (*m.MiddlewareProperties)[key].(bool)
+		return v
+	}
+
+	births := read("spBv1.0/G/NBIRTH/N")
+	if len(births) != 2 {
+		t.Fatalf("expected 2 births, got %d", len(births))
+	}
+	if !strings.HasPrefix(string(births[0].Payload), "{") {
+		t.Errorf("expected the recorded payload to be the decoded JSON, got %q", births[0].Payload)
+	}
+	if !flag(births[0], "IsDecodedProto") {
+		t.Errorf("expected IsDecodedProto on a recorded decoded message, got %v", births[0].MiddlewareProperties)
+	}
+	if !flag(births[1], "DecodeStateUnknown") || flag(births[1], "IsDecodedProto") {
+		t.Errorf("expected a legacy row to read as unknown, got %v", births[1].MiddlewareProperties)
+	}
+
+	datas := read("spBv1.0/G/NDATA/N")
+	if len(datas) != 2 {
+		t.Fatalf("expected 2 data messages, got %d", len(datas))
+	}
+	if !flag(datas[0], "SparkplugDecodeFailed") {
+		t.Errorf("expected SparkplugDecodeFailed on a recorded failed decode, got %v", datas[0].MiddlewareProperties)
+	}
+	if datas[1].MiddlewareProperties != nil {
+		t.Errorf("expected no flags on a message recorded undecoded, got %v", datas[1].MiddlewareProperties)
+	}
+
+	// The single and batch payload fetches go through the same mapping.
+	var id uint
+	fmt.Sscanf(births[0].Id, "%d", &id)
+	one, found, err := app.GetReceivedMessageById(1, "spBv1.0/G/NBIRTH/N", id)
+	if err != nil || !found || !flag(one, "IsDecodedProto") {
+		t.Errorf("by id: found=%v err=%v props=%v", found, err, one.MiddlewareProperties)
 	}
 }
