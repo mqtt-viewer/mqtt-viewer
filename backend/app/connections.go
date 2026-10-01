@@ -110,20 +110,8 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 		return fmt.Errorf("connection not found")
 	}
 
-	existingConnection := models.Connection{}
-	if res := a.Db.First(&existingConnection, conn.ID); res.Error != nil {
-		return res.Error
-	}
-
-	passwordHasChanged := conn.Password != nil && *conn.Password != "" && (existingConnection.Password == nil || *conn.Password != *existingConnection.Password)
-	if passwordHasChanged {
-		// Encrypt the incoming password from the frontend
-		encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(*conn.Password))
-		if err != nil {
-			return err
-		}
-		encrypted := string(encryptedPassword)
-		conn.Password = &encrypted
+	if err := a.encryptIncomingPassword(conn); err != nil {
+		return err
 	}
 
 	updated := models.Connection{
@@ -138,6 +126,33 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	newCtx := logging.ReplaceCtx(*appConnection.ctx, slog.String("name", getMqttManagerName(conn)))
 	appConnection.ctx = &newCtx
 
+	return nil
+}
+
+// encryptIncomingPassword encrypts the password a connection update carries.
+//
+// The frontend holds the decrypted password (AfterFind decrypts on load), so
+// a non-empty value it sends back is plaintext and must be encrypted, changed
+// or not. Comparing against the decrypted row used to skip this for an
+// unchanged password and write it back in the clear. The one value to leave
+// alone is the raw stored one, which only reaches the frontend when it was
+// encrypted on another machine and cannot be decrypted here.
+func (a *App) encryptIncomingPassword(conn *models.Connection) error {
+	if conn.Password == nil || *conn.Password == "" {
+		return nil
+	}
+	var storedPassword *string
+	if res := a.Db.Raw("SELECT password FROM connections WHERE id = ?", conn.ID).Scan(&storedPassword); res.Error != nil {
+		return res.Error
+	}
+	if storedPassword != nil && *conn.Password == *storedPassword {
+		return nil
+	}
+	encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(*conn.Password))
+	if err != nil {
+		return err
+	}
+	conn.Password = &encryptedPassword
 	return nil
 }
 

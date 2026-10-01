@@ -1,4 +1,4 @@
-test PATH='./...': stub-dist
+test PATH='./...': stub-dist test-broker
   set -o pipefail && go test {{PATH}} fmt -json | tparse -all
 
 # main.go embeds frontend/dist, which is gitignored and so missing on a fresh
@@ -8,6 +8,12 @@ test PATH='./...': stub-dist
 stub-dist:
   mkdir -p frontend/dist
   [ -f frontend/dist/index.html ] || echo "<html></html>" > frontend/dist/index.html
+
+# The mqtt and app tests connect to a local broker on localhost:1883 and fail
+# with "the broker refused the connection" without one. Idempotent and shared
+# across worktrees; see scripts/test-broker.sh.
+test-broker:
+  scripts/test-broker.sh up
 
 new-migration NAME:
   atlas migrate diff --env gorm {{NAME}}

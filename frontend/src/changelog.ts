@@ -81,6 +81,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
+        title: "Saved passwords stay encrypted when you edit a connection",
+        body: "Saving a connection without changing its password stored it unencrypted and logged \"error decrypting password\" on every start. I now encrypt any password stored that way the next time the app opens.",
+        thanks: [
+          {
+            name: "viktak",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181#issuecomment-5864069262",
+          },
+        ],
+      },
+      {
+        group: "Fixed",
         title: "Windows updates work when the app runs from another drive",
         body: "The portable exe could not update itself from a drive other than the one holding Windows' temp folder. The app closed and stayed on the old version. If you're on 1.1.0 or earlier and hit this, download this version by hand once; later updates work as normal.",
         thanks: [{ name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181" }],

@@ -3,6 +3,7 @@ package db
 import (
 	"embed"
 	"fmt"
+	"errors"
 	"log/slog"
 	"mqtt-viewer/backend/cryptography"
 	"mqtt-viewer/backend/env"
@@ -77,7 +78,7 @@ func (db *DB) Migrate() error {
 		return err
 	}
 	slog.Info("applied " + fmt.Sprint(migrationsApplied) + " migrations")
-	return nil
+	return db.encryptPlaintextPasswords()
 }
 
 func (db *DB) getAppliedMigrations() (map[string]bool, error) {
@@ -111,7 +112,7 @@ func (db *DB) encryptExistingPasswords() error {
 			if err != nil {
 				return err
 			}
-			slog.Info(fmt.Sprintf("encrypting password from %s to %s", c.Password, string(encryptedPassword)))
+			slog.Info("encrypting password", "conn_id", c.ID)
 			if err := tx.Exec("UPDATE connections SET password = ? WHERE id = ?", string(encryptedPassword), c.ID).Error; err != nil {
 				return err
 			}
@@ -119,4 +120,41 @@ func (db *DB) encryptExistingPasswords() error {
 		return nil
 	})
 	return err
+}
+
+// encryptPlaintextPasswords encrypts any stored password that is not
+// ciphertext. Up to 1.1.0, saving a connection without changing its password
+// wrote the decrypted password back in the clear, so those rows need repairing
+// on every start until they have all been saved again.
+//
+// A value that is valid ciphertext but fails to decrypt was encrypted on
+// another machine. It is left alone: encrypting it again would only bury it
+// deeper.
+func (db *DB) encryptPlaintextPasswords() error {
+	type conn struct {
+		ID       uint
+		Password string
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		var result []conn
+		if err := tx.Raw("SELECT id, password FROM connections WHERE password IS NOT NULL AND password != ''").Scan(&result).Error; err != nil {
+			return err
+		}
+		for _, c := range result {
+			_, err := cryptography.DecryptBytesForMachine(env.MachineId, []byte(c.Password))
+			if !errors.Is(err, cryptography.ErrNotCiphertext) {
+				continue
+			}
+			encryptedPassword, err := cryptography.EncryptBytesForMachine(env.MachineId, []byte(c.Password))
+			if err != nil {
+				return err
+			}
+			slog.Info("encrypting plaintext password", "conn_id", c.ID)
+			if err := tx.Exec("UPDATE connections SET password = ? WHERE id = ?", encryptedPassword, c.ID).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
