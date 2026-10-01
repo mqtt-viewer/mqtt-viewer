@@ -20,6 +20,8 @@ const unwrapRuntimeError = (s: string): string => {
   return s;
 };
 
+const UNKNOWN_ERROR = "Unknown error";
+
 /**
  * Safely turn an unknown catch value into display text.
  *
@@ -33,14 +35,25 @@ export const errorMessage = (e: unknown): string => {
   if (typeof e === "string") return unwrapRuntimeError(e);
   // Bindings reject with an Error whose message is the envelope's JSON.
   if (e instanceof Error) return unwrapRuntimeError(e.message);
-  if (e === null || e === undefined) return "Unknown error";
+  if (e === null || e === undefined) return UNKNOWN_ERROR;
+  // An error from another realm, or anything else shaped like one, fails
+  // instanceof but still carries a message.
+  const message = (e as { message?: unknown }).message;
+  if (typeof message === "string" && message !== "") return unwrapRuntimeError(message);
   try {
     const json = JSON.stringify(e);
     // undefined for a value JSON can't represent, "{}" for an object whose
     // own properties are all non-enumerable: neither tells the user anything.
     if (json !== undefined && json !== "{}") return json;
   } catch (_) {
-    // circular reference; String() below still gives something printable
+    // circular reference; String() below may still give something printable
   }
-  return String(e);
+  try {
+    const text = String(e);
+    // A custom toString says something; the default "[object Object]" doesn't.
+    if (!text.startsWith("[object ")) return text;
+  } catch (_) {
+    // no toString at all (Object.create(null)), or one that throws
+  }
+  return UNKNOWN_ERROR;
 };

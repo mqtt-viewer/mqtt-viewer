@@ -15,7 +15,7 @@ import { get, writable } from "svelte/store";
 import * as app from "bindings/mqtt-viewer/backend/app/models";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import { addToast } from "@/components/Toast/Toast.svelte";
-import { errorMessage } from "@/util/errors";
+import { errorMessage } from "@/util/strings";
 import { reorderIds } from "../dnd/drop-index";
 
 export type CollectionScope = "global" | "connection";

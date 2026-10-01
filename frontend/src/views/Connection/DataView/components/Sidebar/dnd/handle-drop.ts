@@ -1,6 +1,6 @@
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import { addToast } from "@/components/Toast/Toast.svelte";
-import { errorMessage } from "@/util/errors";
+import { errorMessage } from "@/util/strings";
 import { filterByScope, type CollectionsStore } from "../stores/collections";
 import { historyEntryToMessage } from "../util/history-to-message";
 import type { DragPayload, DropTarget } from "./drag-store";

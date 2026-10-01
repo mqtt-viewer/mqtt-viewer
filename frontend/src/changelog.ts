@@ -117,6 +117,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Without admin rights the app can't replace itself in a folder like Program Files, so the update closed the app and changed nothing. It now points you to the releases page instead.",
       },
       {
+        group: "Fixed",
+        title: "Error messages no longer read \"[object Object]\"",
+        body: "An error that arrived as a bare object now shows its message, or \"Unknown error\" when it has none.",
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",
