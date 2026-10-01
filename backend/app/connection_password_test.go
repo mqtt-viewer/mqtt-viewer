@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"mqtt-viewer/backend/cryptography"
 	"mqtt-viewer/backend/env"
 	"testing"
@@ -127,4 +128,55 @@ func TestForeignCiphertextIsLeftAloneOnStartup(t *testing.T) {
 	if stored := storedPassword(t, app2, id); stored != foreign {
 		t.Fatalf("expected foreign ciphertext to be left unchanged on save, got %q", stored)
 	}
+}
+
+// Known limit, kept as documentation rather than a fix. A plaintext password
+// of 38 or more characters drawn only from the base64 alphabet (at a length
+// that decodes as unpadded base64, so not 41, 45, ...), written in
+// the clear before 1.2, decodes as base64 to at least a nonce and a tag, then
+// fails authentication: exactly what ciphertext from another machine does.
+// Without that machine's key the two cannot be told apart, so it is left in
+// the clear on startup and on an unchanged save. It still loads and connects
+// with the right password, and is encrypted once the password is changed.
+func TestBase64LookingPlaintextPasswordStaysInTheClear(t *testing.T) {
+	app := getTestApp(t)
+	created, err := app.NewConnection()
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+	id := created.ConnectionDetails.ID
+	const password = "Abcdefghijklmnopqrstuvwxyz0123456789ABCD" // 40 chars
+	if err := app.Db.Exec("UPDATE connections SET password = ? WHERE id = ?", password, id).Error; err != nil {
+		t.Fatalf("writing plaintext password: %v", err)
+	}
+	if _, err := cryptography.DecryptBytesForMachine(env.MachineId, []byte(password)); err == nil ||
+		errors.Is(err, cryptography.ErrNotCiphertext) {
+		t.Fatalf("expected the password to look like foreign ciphertext, got %v", err)
+	}
+
+	app2 := reopenTestApp(t, app)
+	if stored := storedPassword(t, app2, id); stored != password {
+		t.Fatalf("expected startup to leave it alone, got %q", stored)
+	}
+
+	conn := app2.GetAllConnections().Connections[id].ConnectionDetails
+	if conn.Password == nil || *conn.Password != password {
+		t.Fatalf("expected loaded password %q, got %v", password, conn.Password)
+	}
+	conn.Name = "Renamed"
+	if err := app2.UpdateConnection(&conn); err != nil {
+		t.Fatalf("renaming connection: %v", err)
+	}
+	if stored := storedPassword(t, app2, id); stored != password {
+		t.Fatalf("expected an unchanged save to leave it alone, got %q", stored)
+	}
+
+	// Changing it encrypts it.
+	const changed = password + "EF"
+	pw := changed
+	conn.Password = &pw
+	if err := app2.UpdateConnection(&conn); err != nil {
+		t.Fatalf("changing password: %v", err)
+	}
+	assertStoredPasswordEncrypts(t, app2, id, changed)
 }

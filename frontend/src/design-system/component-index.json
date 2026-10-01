@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-23T12:19:09.939Z",
+  "generatedAt": "2026-10-01T10:40:22.321Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3784,6 +3784,12 @@
           "type": "function",
           "required": false,
           "description": "Opens the rebirth confirmation for the Sparkplug view's node and bulk actions."
+        },
+        {
+          "name": "isTabActive",
+          "type": "boolean",
+          "required": false,
+          "description": "False while the connection's tab is in the background; pauses the Sparkplug tree until the tab shows again."
         }
       ],
       "tokens": [

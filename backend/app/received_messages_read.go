@@ -170,6 +170,26 @@ func stubFromReceived(row *models.ReceivedMessage) mqtt.MqttMessageStub {
 	}
 }
 
+// middlewarePropertiesFromDecodeState restores the decode flags the payload
+// view reads, as the decode middleware set them when the message arrived. A
+// row recorded before decode_state existed may hold either the decoded JSON
+// or the wire bytes, so it says so rather than guess; the payload view then
+// makes no claim about how the payload was decoded.
+func middlewarePropertiesFromDecodeState(state *string) *map[string]any {
+	var props map[string]any
+	switch {
+	case state == nil:
+		props = map[string]any{"DecodeStateUnknown": true}
+	case *state == models.DecodeStateDecoded:
+		props = map[string]any{"IsDecodedProto": true}
+	case *state == models.DecodeStateFailed:
+		props = map[string]any{"SparkplugDecodeFailed": true}
+	default:
+		return nil
+	}
+	return &props
+}
+
 func mqttMessageFromReceived(row *models.ReceivedMessage) mqtt.MqttMessage {
 	msg := mqtt.MqttMessage{
 		Id:      strconv.FormatUint(uint64(row.ID), 10),
@@ -180,6 +200,7 @@ func mqttMessageFromReceived(row *models.ReceivedMessage) mqtt.MqttMessage {
 		TimeMs:  row.ReceivedAt.UnixMilli(),
 		Time:    row.ReceivedAt,
 	}
+	msg.MiddlewareProperties = middlewarePropertiesFromDecodeState(row.DecodeState)
 	hasProps := row.UserProperties != nil || row.HeaderContentType != nil ||
 		row.HeaderResponseTopic != nil || row.HeaderCorrelationData != nil ||
 		row.HeaderPayloadFormatIndicator != nil || row.HeaderMessageExpiryInterval != nil ||

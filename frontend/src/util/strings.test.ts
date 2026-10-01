@@ -46,3 +46,27 @@ test("errorMessage unwraps the Wails runtime error envelope", () => {
   expect(errorMessage("{not json")).toBe("{not json");
   expect(errorMessage('{"kind":"RuntimeError"}')).toBe('{"kind":"RuntimeError"}');
 });
+
+test("errorMessage keeps an envelope without a string message as it is", () => {
+  const numeric = JSON.stringify({ message: 7 });
+  expect(errorMessage(new Error(numeric))).toBe(numeric);
+  expect(errorMessage(new Error("42"))).toBe("42");
+});
+
+test("errorMessage uses the message of an error-shaped object", () => {
+  expect(errorMessage({ message: "not an Error instance" })).toBe("not an Error instance");
+  // Non-enumerable, as on an Error from another realm: JSON would say "{}".
+  const crossRealm = Object.defineProperty({}, "message", { value: "boom", enumerable: false });
+  expect(errorMessage(crossRealm)).toBe("boom");
+});
+
+test("errorMessage falls back to a sentence rather than [object Object]", () => {
+  class Opaque {
+    #reason = "hidden";
+  }
+  expect(errorMessage(new Opaque())).toBe("Unknown error");
+  expect(errorMessage({})).toBe("Unknown error");
+  expect(errorMessage(Object.create(null))).toBe("Unknown error");
+  // A custom toString still says something.
+  expect(errorMessage({ toString: () => "custom failure" })).toBe("custom failure");
+});

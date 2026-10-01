@@ -65,6 +65,14 @@ func newSparkplugPipeline(t *testing.T, conn *AppConnection) *sparkplugPipeline 
 // receive runs one message through decode and into history, returning its id.
 func (p *sparkplugPipeline) receive(topic string, timeMs int64, jsonPayload string) string {
 	p.t.Helper()
+	msg := p.decode(topic, timeMs, jsonPayload)
+	p.conn.MqttManager.MessageHistory.AddMessage(msg)
+	return msg.Id
+}
+
+// decode runs one message through the decode middleware only.
+func (p *sparkplugPipeline) decode(topic string, timeMs int64, jsonPayload string) mqtt.MqttMessage {
+	p.t.Helper()
 	payload := []byte(jsonPayload)
 	if !strings.Contains(topic, "STATE") {
 		descriptor, _ := p.registry.GetMessageDescriptorFromName("SparkplugBPayload")
@@ -86,8 +94,7 @@ func (p *sparkplugPipeline) receive(topic string, timeMs int64, jsonPayload stri
 	if err := p.middleware.Func(&msg); err != nil {
 		p.t.Fatalf("middleware: %v", err)
 	}
-	p.conn.MqttManager.MessageHistory.AddMessage(msg)
-	return msg.Id
+	return msg
 }
 
 func idsOf(messages []mqtt.MqttMessage) []string {

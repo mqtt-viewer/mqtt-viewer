@@ -2,8 +2,8 @@ package db
 
 import (
 	"embed"
-	"fmt"
 	"errors"
+	"fmt"
 	"log/slog"
 	"mqtt-viewer/backend/cryptography"
 	"mqtt-viewer/backend/env"
@@ -127,9 +127,14 @@ func (db *DB) encryptExistingPasswords() error {
 // wrote the decrypted password back in the clear, so those rows need repairing
 // on every start until they have all been saved again.
 //
-// A value that is valid ciphertext but fails to decrypt was encrypted on
-// another machine. It is left alone: encrypting it again would only bury it
-// deeper.
+// A value that is shaped like ciphertext (base64 long enough for a nonce and
+// a tag) but fails to decrypt is taken to be from another machine and left
+// alone: encrypting it again would only bury it deeper. A plaintext password
+// of 38 or more characters drawn only from the base64 alphabet usually has
+// that shape too (any length that decodes as unpadded base64), and nothing
+// short of the other machine's key tells the two apart, so
+// it stays in the clear until the password is changed. It still works; it is
+// just not encrypted at rest.
 func (db *DB) encryptPlaintextPasswords() error {
 	type conn struct {
 		ID       uint
