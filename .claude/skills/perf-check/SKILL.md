@@ -125,8 +125,11 @@ the browser pane, which is usually easier than the native window. Two
 things to know: live message events already flow with no changes to the
 page, because the runtime loads `/wails/custom.js` itself. Do not inject
 that script tag by hand: it opens a second event WebSocket and every
-message count and rate reads double (see `AGENTS.md`). And the process can panic on shutdown with `server
-shutdown error: context deadline exceeded`, seemingly when a client goes
-away with that WebSocket open. It is a dev-only path, but it will end a
-run mid-measurement, so take readings as you go rather than only at the
-end.
+message count and rate reads double (see `AGENTS.md`).
+
+On SIGTERM or Ctrl+C it waits up to 5 seconds for in-flight HTTP
+requests, then exits. Further signals during that wait are ignored, so
+give it the 5 seconds before reaching for `kill -9`. The open event
+WebSocket does not hold it up. Older builds waited 30 seconds and then
+panicked with `server shutdown error: context deadline exceeded`; that
+is the same slow stop, not a crash mid-run.

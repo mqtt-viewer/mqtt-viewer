@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"errors"
 	"log/slog"
 	"mqtt-viewer/backend/app"
 	"mqtt-viewer/backend/env"
@@ -9,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/panicwrap"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -44,8 +47,10 @@ func main() {
 	assetOptions := application.AssetOptions{
 		Handler: application.AssetFileServerFS(assets),
 	}
+	var serverOptions application.ServerOptions
 	if env.IsServerBuild {
 		assetOptions.Middleware = guardRuntimeOrigin
+		serverOptions.ShutdownTimeout = serverShutdownTimeout
 	}
 
 	wailsApp := application.New(application.Options{
@@ -56,6 +61,7 @@ func main() {
 			application.NewService(connectionEvents),
 		},
 		Assets: assetOptions,
+		Server: serverOptions,
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
@@ -78,12 +84,34 @@ func main() {
 			_ = mqttViewer.DisconnectMqtt(id)
 		}
 		slog.Info("shutdown complete")
+
+		// A request still in flight when the signal lands holds the HTTP
+		// drain open until the timeout. The work above has already run, so
+		// that is a slow stop, not a crash worth a panic and a stack dump.
+		if isShutdownTimeout(err) {
+			slog.Warn("http server did not drain before the shutdown timeout", "error", err)
+			err = nil
+		}
 	}
 
 	if err != nil {
 		slog.Error(err.Error())
 		panic(err)
 	}
+}
+
+// serverShutdownTimeout bounds how long server mode waits on SIGTERM/SIGINT for
+// in-flight HTTP requests before giving up. Wails' default is 30 seconds, and
+// its handler swallows any further signal while it waits, so one slow request
+// left the process apparently ignoring Ctrl+C and outlasting `docker stop`'s
+// 10 second grace period, which then SIGKILLs before the broker disconnects
+// below can run. The events WebSocket is hijacked and never waited on.
+const serverShutdownTimeout = 5 * time.Second
+
+// isShutdownTimeout reports whether Run failed only because the HTTP server
+// did not drain within serverShutdownTimeout.
+func isShutdownTimeout(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded)
 }
 
 // guardRuntimeOrigin rejects cross-origin requests to /wails/runtime, the HTTP
