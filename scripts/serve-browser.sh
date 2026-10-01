@@ -14,20 +14,25 @@
 # The production webview build never sees the `server` tag, so this is dev-only.
 #
 # Usage:
-#   scripts/serve-browser.sh [port]        # default port 9500
+#   scripts/serve-browser.sh [port]        # default: derived per checkout
 #   SKIP_FRONTEND=1 scripts/serve-browser.sh   # reuse existing frontend/dist
 #
-# Then open http://localhost:<port> in a browser. Backend bindings work.
+# The default port comes from `scripts/dev-ports.sh server` (9700-9899, stable
+# per checkout) so parallel worktrees don't collide. An explicit [port] wins,
+# then WAILS_SERVER_PORT. The script prints the URL before it starts serving.
+# Then open that URL in a browser. Backend bindings work.
 # NOTE: this is a headless instance running the real Go backend — it is NOT the
 # native window. Backend->frontend live events need one extra script tag; see the
 # AGENTS.md section for details.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd -P)
-port="${1:-${WAILS_SERVER_PORT:-9500}}"
+port="${1:-$("$root/scripts/dev-ports.sh" server)}"
 bin="$root/bin/mqtt-viewer-server"
 
 cd "$root"
+
+echo "Will serve on http://localhost:$port once built" >&2
 
 if [ "${SKIP_FRONTEND:-0}" != "1" ]; then
   echo "Building frontend (set SKIP_FRONTEND=1 to reuse frontend/dist)..." >&2

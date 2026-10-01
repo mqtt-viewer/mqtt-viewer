@@ -7,24 +7,48 @@ shared, and the one setup step each checkout needs.
 ## Setup per checkout
 
 ```sh
-scripts/dev-ports.sh write-launch
+just setup          # or scripts/setup-worktree.sh
 ```
 
-This writes `.claude/launch.json` (gitignored) with dev-server ports derived
-from the checkout's absolute path, so every worktree gets its own stable
-ports and none of them collide:
+A fresh worktree has none of the gitignored or per-clone pieces, so run
+this once in each new checkout. It is idempotent: re-running it skips
+what is already done and prints one line per step (`set`, `skip`, `ok`).
+It exits non-zero with a `fail` line on a real failure. It does five
+things:
+
+- `pnpm install --frozen-lockfile` in `frontend/`.
+- `scripts/.venv` with `paho-mqtt`, for `scripts/mqtt-sim.py` and
+  `scripts/mqtt-flood.py`. If creating one fails (no `python3`, pip
+  offline), it symlinks the main checkout's `scripts/.venv` instead,
+  found via `git worktree list`.
+- `scripts/dev-ports.sh write-launch` (below).
+- The `frontend/dist` stub that `main.go` embeds (`just stub-dist`), so
+  `go build ./...` works before a real frontend build.
+- `git config core.hooksPath .githooks`, the pre-push guard on `main`.
+  This is per clone, so every worktree shares it.
+
+## Dev ports
+
+`scripts/dev-ports.sh write-launch` writes `.claude/launch.json`
+(gitignored) with dev-server ports derived from the checkout's absolute
+path, so every worktree gets its own stable ports and none of them
+collide:
 
 - Vite / `wails3 dev`: 9300-9499
 - Storybook: 6100-6299
+- Server mode (`scripts/serve-browser.sh`): 9700-9899
 
-`just dev` picks the same derived Vite port automatically. Override with
-`WAILS_VITE_PORT` or `STORYBOOK_PORT` if a derived port is taken by
+`scripts/dev-ports.sh` prints all three; `scripts/dev-ports.sh server`
+prints just the server-mode one. `just dev` and `scripts/serve-browser.sh`
+pick the derived ports automatically. Override with `WAILS_VITE_PORT`,
+`STORYBOOK_PORT` or `WAILS_SERVER_PORT` if a derived port is taken by
 something else (`wails3 dev` and Storybook both fail fast on a busy port
-rather than silently moving).
+rather than silently moving). `serve-browser.sh` also takes the port as
+its first argument, and prints the URL it serves on.
 
 Watch out: some older branches still track `.claude/launch.json`, so
 checking one out and switching away deletes the file. If it goes
-missing, just re-run `scripts/dev-ports.sh write-launch`.
+missing, re-run `just setup` or `scripts/dev-ports.sh write-launch`.
 
 ## What is already isolated per worktree
 

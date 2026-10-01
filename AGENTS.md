@@ -50,14 +50,20 @@ behind the `server` build tag. It runs a real `http.Server` that:
 Run it:
 
 ```sh
-scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500, data in _dev_resources/server
-SKIP_FRONTEND=1 scripts/serve-browser.sh 9500   # reuse an existing frontend/dist
+scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves the derived port, data in _dev_resources/server
+SKIP_FRONTEND=1 scripts/serve-browser.sh        # reuse an existing frontend/dist
+scripts/serve-browser.sh 9750     # explicit port (WAILS_SERVER_PORT works too)
 ```
+
+The default port is derived per checkout (9700-9899) so parallel
+worktrees never collide; `scripts/dev-ports.sh server` prints it, and the
+script prints the URL before it starts. `.claude/launch.json` (from
+`just setup`) has a `server` entry on the same port.
 
 Verified round-trip (this is exactly what a browser sends):
 
 ```sh
-curl -s -X POST http://localhost:9500/wails/runtime \
+curl -s -X POST "http://localhost:$(scripts/dev-ports.sh server)/wails/runtime" \
   -H 'Content-Type: application/json' \
   -H 'x-wails-client-id: any-id' \
   -d '{"object":0,"method":0,"args":{"call-id":"x","methodID":3769940222,"args":[]}}'
@@ -94,14 +100,30 @@ everything under `/prefix/` and strips the prefix before forwarding, mirroring
 how ingress mounts an add-on.
 
 ```sh
-go build -o bin/ingress-sim ./scripts && bin/ingress-sim   # then open :9600/prefix/
-bin/ingress-sim -listen :9601 -redirect=false              # no trailing-slash redirect
+go build -o bin/ingress-sim ./scripts
+bin/ingress-sim -upstream "http://127.0.0.1:$(scripts/dev-ports.sh server)"   # then open :9600/prefix/
+bin/ingress-sim -upstream "http://127.0.0.1:$(scripts/dev-ports.sh server)" -listen :9601 -redirect=false   # no trailing-slash redirect
 ```
 
+`-upstream` defaults to a fixed `:9500`, not the derived port, so pass it.
 Build the binary, don't `go run` it: `go run`'s temp binaries have been seen to
 die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
 mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
 trailing-slash self-heal (see the file's header for the rest).
+
+### Measuring performance in the browser pane
+
+The in-app browser pane throttles `requestAnimationFrame`: about 2 fps
+observed, frames 1000 ms apart with zero long tasks. rAF-based frame
+timing there is meaningless, and layout read straight after a resize can
+be stale. Instead:
+
+- Measure main-thread load with an event-loop-lag sampler (post a
+  `MessageChannel` message or a `setTimeout(0)` on a short interval and
+  record how late each one runs) plus a `PerformanceObserver` on
+  `longtask`.
+- Wait about a second after a resize before measuring anything that
+  depends on layout.
 
 ### Field-tested walkthrough (Sparkplug e2e, 2026-07)
 

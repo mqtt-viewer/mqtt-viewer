@@ -1,16 +1,18 @@
 #!/bin/sh
 # Deterministic per-checkout dev ports so multiple agents (each in their own
-# git worktree) can run wails3 dev and Storybook side by side without port
-# collisions. The port is derived from the checkout's absolute path, so it is
-# stable across runs but different between worktrees.
+# git worktree) can run wails3 dev, Storybook and the server-mode app side by
+# side without port collisions. The port is derived from the checkout's
+# absolute path, so it is stable across runs but different between worktrees.
 #
 # Usage:
-#   scripts/dev-ports.sh              # print both as KEY=VALUE lines
+#   scripts/dev-ports.sh              # print all as KEY=VALUE lines
 #   scripts/dev-ports.sh vite         # print the Vite/wails dev port
 #   scripts/dev-ports.sh storybook    # print the Storybook port
+#   scripts/dev-ports.sh server       # print the server-mode port (serve-browser.sh)
 #   scripts/dev-ports.sh write-launch # write .claude/launch.json with these ports
 #
-# Overrides: WAILS_VITE_PORT and STORYBOOK_PORT env vars win when set.
+# Overrides: WAILS_VITE_PORT, STORYBOOK_PORT and WAILS_SERVER_PORT env vars win
+# when set.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd -P)
@@ -19,6 +21,8 @@ slot=$((hash % 200))
 
 vite_port="${WAILS_VITE_PORT:-$((9300 + slot))}"
 storybook_port="${STORYBOOK_PORT:-$((6100 + slot))}"
+# 9700, not 9500: 9500-9699 would overlap ingress-sim's default :9600.
+server_port="${WAILS_SERVER_PORT:-$((9700 + slot))}"
 
 write_launch() {
   mkdir -p "$root/.claude"
@@ -37,23 +41,31 @@ write_launch() {
       "runtimeExecutable": "wails3",
       "runtimeArgs": ["dev", "-config", "./build/config.yml", "-port", "$vite_port"],
       "port": $vite_port
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "scripts/serve-browser.sh",
+      "runtimeArgs": ["$server_port"],
+      "port": $server_port
     }
   ]
 }
 EOF
-  echo "wrote $root/.claude/launch.json (vite=$vite_port storybook=$storybook_port)" >&2
+  echo "wrote $root/.claude/launch.json (vite=$vite_port storybook=$storybook_port server=$server_port)" >&2
 }
 
 case "${1:-}" in
   vite) echo "$vite_port" ;;
   storybook) echo "$storybook_port" ;;
+  server) echo "$server_port" ;;
   write-launch) write_launch ;;
   "")
     echo "WAILS_VITE_PORT=$vite_port"
     echo "STORYBOOK_PORT=$storybook_port"
+    echo "WAILS_SERVER_PORT=$server_port"
     ;;
   *)
-    echo "usage: $0 [vite|storybook|write-launch]" >&2
+    echo "usage: $0 [vite|storybook|server|write-launch]" >&2
     exit 2
     ;;
 esac

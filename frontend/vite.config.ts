@@ -62,7 +62,27 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["src/**/*.{test,spec}.ts"],
-          exclude: ["src/**/*.stories.svelte", "storybook-static/**"],
+          exclude: [
+            "src/**/*.stories.svelte",
+            "src/**/*.perf.test.ts",
+            "storybook-static/**",
+          ],
+        },
+      },
+      // Wall-clock perf budgets. They share no CPU with the rest of the run:
+      // groupOrder 1 starts this project only after the unit project
+      // finishes, and fileParallelism: false runs its files one at a time.
+      // The retry covers contention from outside the run (other agents'
+      // suites on the same machine); a real regression fails every attempt.
+      // Budgets live in the test files and are not loosened here.
+      {
+        extends: true,
+        test: {
+          name: "perf",
+          include: ["src/**/*.perf.test.ts"],
+          fileParallelism: false,
+          retry: 2,
+          sequence: { groupOrder: 1 },
         },
       },
       {

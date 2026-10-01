@@ -19,16 +19,16 @@ like test.mosquitto.org do to the app.
 # local brokers (macOS)
 brew install mosquitto
 
-# python env for the harness
-python3 -m venv scripts/.venv
-scripts/.venv/bin/pip install paho-mqtt
+# python env for the harness (and the rest of the checkout setup)
+just setup
 ```
 
-`scripts/.venv` is gitignored, so it does not exist in an agent
-worktree. Either re-run those two lines there, or use the main
-checkout's copy at `~/git/mqtt-viewer/scripts/.venv/bin/python3`.
-Backgrounding the flood before checking the interpreter exists fails
-silently and looks like a broker with no traffic.
+`scripts/.venv` is gitignored, so it does not exist in a fresh agent
+worktree. `just setup` (`scripts/setup-worktree.sh`) creates it with
+`paho-mqtt`, or symlinks the main checkout's venv if it cannot, and is
+safe to re-run. Check `scripts/.venv/bin/python -c 'import paho.mqtt'`
+before backgrounding a flood: a missing interpreter fails silently and
+looks like a broker with no traffic.
 
 ## Run
 
@@ -121,11 +121,21 @@ than watching the UI. Two traps:
 ## Driving the app headlessly
 
 `scripts/serve-browser.sh` runs the real backend and is drivable from
-the browser pane, which is usually easier than the native window. Two
-things to know: live message events need
-`<script src="/wails/custom.js"></script>` injected into the page (see
-`AGENTS.md`), and the process can panic on shutdown with `server
-shutdown error: context deadline exceeded`, seemingly when a client goes
-away with that WebSocket open. It is a dev-only path, but it will end a
-run mid-measurement, so take readings as you go rather than only at the
-end.
+the browser pane, which is usually easier than the native window. It
+serves on a port derived per checkout (`scripts/dev-ports.sh server`)
+and prints the URL. Things to know:
+
+- Live message events already flow; do not inject
+  `<script src="/wails/custom.js"></script>`, or every event arrives
+  twice and rates read double (see `AGENTS.md`).
+- The process can panic on shutdown with `server shutdown error:
+  context deadline exceeded`, seemingly when a client goes away with the
+  events WebSocket open. It is a dev-only path, but it will end a run
+  mid-measurement, so take readings as you go rather than only at the
+  end.
+- The browser pane throttles `requestAnimationFrame` to about 2 fps
+  (frames 1000 ms apart, zero long tasks), so rAF frame timing there
+  means nothing and layout read straight after a resize can be stale.
+  Measure main-thread load with a `MessageChannel` or `setTimeout`
+  event-loop-lag sampler plus a `longtask` `PerformanceObserver`, and
+  wait about a second after a resize before measuring.
