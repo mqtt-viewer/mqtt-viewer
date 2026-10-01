@@ -378,6 +378,7 @@
             {connection}
             {selectedTopicStore}
             {pinnedTopicsStore}
+            isTabActive={isActiveTab}
             width={dataViewWidth}
             {copyTopicPath}
             {exportTopicMessages}

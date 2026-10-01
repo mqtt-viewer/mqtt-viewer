@@ -57,6 +57,12 @@
   export let onClearRetainedBelow: (prefix: string) => void;
   /** Opens the rebirth confirmation; nothing is published before it. */
   export let onRequestRebirth: (targets: RebirthTarget[]) => void = () => {};
+  /**
+   * Whether this connection's tab is the one showing. Background tabs stay
+   * mounted (hidden with display: none), so without this a Sparkplug view
+   * left open in one would keep decoding every batch nobody can see.
+   */
+  export let isTabActive = true;
 
   const mqttHighlightStore = createHighlightedMqttTopicsStore();
   const mqttDataStore = createMqttDataStore(
@@ -290,9 +296,10 @@
   // traffic, so a saved Sparkplug preference shows the list until then.
   $: view =
     preferredView === "sparkplug" && !showSparkplug ? "list" : preferredView;
-  // The tree is only decoded and built while its view is showing; opening it
-  // replays the backend's snapshot.
-  $: sparkplugStore.setActive(view === "sparkplug");
+  // The tree is only decoded and built while its view is showing, in the tab
+  // you are looking at. Showing it again replays the backend's snapshot,
+  // which covers anything that happened while it was hidden, drops included.
+  $: sparkplugStore.setActive(view === "sparkplug" && isTabActive);
 
   const expandedTopicsStore = createExpandedTopicsStore();
   const searchStore = createSearchStore();
