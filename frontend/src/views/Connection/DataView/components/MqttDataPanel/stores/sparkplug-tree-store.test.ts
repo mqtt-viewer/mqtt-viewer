@@ -1004,6 +1004,45 @@ describe("createSparkplugTreeStore — connection drops", () => {
     expect(mocks.getSparkplugHistory).toHaveBeenCalledTimes(1);
     store.destroy();
   });
+
+  // The data panel deactivates the store while its connection's tab is in
+  // the background. A reconnect and a rebirth while away must not leave the
+  // tree stale once the tab is back.
+  it("catches up on a drop and rebirth that happened while hidden", async () => {
+    const store = await makeStore();
+    emit("msgs", [nbirth(BASE_MS)]);
+    await store.setActive(false);
+
+    dropAndReturn(store);
+    const t = Date.now();
+    const rebirth = nbirth(t, {
+      metrics: [{ name: "Temp", alias: "9", datatype: 9, floatValue: 21.0, timestamp: String(t) }],
+    });
+    const data = ndata(t + 100, {
+      metrics: [{ name: "Temp", alias: "9", floatValue: 22.5, timestamp: String(t + 100) }],
+    });
+    emit("msgs", [rebirth, data]);
+
+    // Hidden: liveness is tracked, but the payloads were not folded in.
+    let node = findNode(get(store), "EnergyCo", "substation-7");
+    expect(node.metrics.some((m) => m.name === "Temp")).toBe(false);
+    expect(node.metrics.some((m) => m.name === "Volts/L1")).toBe(true);
+
+    // The backend's snapshot after the reconnect: the newest birth and the
+    // latest value of each metric.
+    mocks.getSparkplugHistory.mockResolvedValue(history([rebirth, data]));
+    await store.setActive(true);
+    const state = get(store);
+    expect(state.connected).toBe(true);
+    expect(state.replaying).toBe(false);
+    node = findNode(state, "EnergyCo", "substation-7");
+    expect(node.status).toBe("online");
+    expect(node.verified).toBe(true);
+    expect(node.birthAtMs).toBe(t);
+    expect(node.metrics.map((m) => m.name)).toEqual(["Temp"]);
+    expect(node.metrics[0].value).toBe("22.5");
+    store.destroy();
+  });
 });
 
 describe("createSparkplugTreeStore — stale deaths", () => {

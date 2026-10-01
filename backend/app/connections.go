@@ -135,8 +135,16 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 // a non-empty value it sends back is plaintext and must be encrypted, changed
 // or not. Comparing against the decrypted row used to skip this for an
 // unchanged password and write it back in the clear. The one value to leave
-// alone is the raw stored one, which only reaches the frontend when it was
-// encrypted on another machine and cannot be decrypted here.
+// alone is the raw stored one, which reaches the frontend whenever the row
+// does not decrypt here: ciphertext from another machine, which encrypting
+// again would only bury deeper.
+//
+// That also covers a plaintext password the startup repair
+// (encryptPlaintextPasswords) could not tell from foreign ciphertext: one
+// that decodes as unpadded base64 to a nonce and a tag or more (38 or more
+// characters, all from the base64 alphabet). It stays in the clear until the
+// password is changed. Without the other machine's key there is no way to
+// tell the two apart (TestBase64LookingPlaintextPasswordStaysInTheClear).
 func (a *App) encryptIncomingPassword(conn *models.Connection) error {
 	if conn.Password == nil || *conn.Password == "" {
 		return nil

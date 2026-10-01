@@ -27,8 +27,8 @@
 // replay so a view opened later knows too.
 //
 // Hidden view. The store runs whenever the connection's data panel is open,
-// but the tree only matters while the Sparkplug view is showing. While it is
-// hidden the store folds only what is cheap and feeds the view toggle
+// but the tree only matters while the Sparkplug view is showing in the
+// selected tab (background tabs stay mounted). While it is hidden the store folds only what is cheap and feeds the view toggle
 // (whether Sparkplug traffic exists, warnings, liveness): no payload is
 // decoded and no tree is built. Opening the view replays the backend's
 // snapshot (every scope's birth and death and the latest value of every

@@ -54,16 +54,30 @@ type ReceivedMessage struct {
 	Encoding     string `json:"encoding"`
 	Format       string `json:"format"`
 	//JSON key-value properties stored as string
-	UserProperties               *string   `json:"userProperties"`
-	HeaderContentType            *string   `json:"headerContentType"`
-	HeaderResponseTopic          *string   `json:"headerResponseTopic"`
-	HeaderCorrelationData        *string   `json:"headerCorrelationData"`
-	HeaderPayloadFormatIndicator *bool     `json:"headerPayloadFormatIndicator"`
-	HeaderMessageExpiryInterval  *int32    `json:"headerMessageExpiryInterval"`
-	HeaderTopicAlias             *int32    `json:"headerTopicAlias"`
-	HeaderSubscriptionIdentifier *int32    `json:"headerSubscriptionIdentifier"`
-	ReceivedAt                   time.Time `json:"receivedAt"`
+	UserProperties               *string `json:"userProperties"`
+	HeaderContentType            *string `json:"headerContentType"`
+	HeaderResponseTopic          *string `json:"headerResponseTopic"`
+	HeaderCorrelationData        *string `json:"headerCorrelationData"`
+	HeaderPayloadFormatIndicator *bool   `json:"headerPayloadFormatIndicator"`
+	HeaderMessageExpiryInterval  *int32  `json:"headerMessageExpiryInterval"`
+	HeaderTopicAlias             *int32  `json:"headerTopicAlias"`
+	HeaderSubscriptionIdentifier *int32  `json:"headerSubscriptionIdentifier"`
+	// What the decode middleware did to Payload before it was recorded: one
+	// of the DecodeState* values. Nil on rows recorded before the column
+	// existed, whose payload may be either form.
+	DecodeState *string   `json:"decodeState"`
+	ReceivedAt  time.Time `json:"receivedAt"`
 }
+
+// ReceivedMessage.DecodeState values.
+const (
+	// DecodeStateDecoded: Payload is the decoded JSON, not the wire bytes.
+	DecodeStateDecoded = "decoded"
+	// DecodeStateFailed: a Sparkplug B payload that did not decode; raw bytes.
+	DecodeStateFailed = "failed"
+	// DecodeStateRaw: no decode ran, or none applied; raw bytes.
+	DecodeStateRaw = "raw"
+)
 
 type Connection struct {
 	ID                   uint           `json:"id" gorm:"primaryKey"`

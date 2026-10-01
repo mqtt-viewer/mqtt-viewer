@@ -14,25 +14,25 @@
 # The production webview build never sees the `server` tag, so this is dev-only.
 #
 # Usage:
-#   scripts/serve-browser.sh [port]        # default: derived per checkout
+#   scripts/serve-browser.sh [port]        # default port 9500
+#   scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # per-checkout port
 #   SKIP_FRONTEND=1 scripts/serve-browser.sh   # reuse existing frontend/dist
 #
-# The default port comes from `scripts/dev-ports.sh server` (9700-9899, stable
-# per checkout) so parallel worktrees don't collide. An explicit [port] wins,
-# then WAILS_SERVER_PORT. The script prints the URL before it starts serving.
-# Then open that URL in a browser. Backend bindings work.
+# 9500 is shared by every worktree; parallel agents should pass the derived
+# port (or start the `server-mode` entry from .claude/launch.json).
+#
+# Then open http://localhost:<port> in a browser. Backend bindings work.
 # NOTE: this is a headless instance running the real Go backend — it is NOT the
-# native window. Backend->frontend live events need one extra script tag; see the
-# AGENTS.md section for details.
+# native window. Backend->frontend live events already flow: the runtime loads
+# /wails/custom.js itself. Do not add that script tag by hand; it opens a second
+# event WebSocket and doubles every count. See the AGENTS.md section.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd -P)
-port="${1:-$("$root/scripts/dev-ports.sh" server)}"
+port="${1:-${WAILS_SERVER_PORT:-9500}}"
 bin="$root/bin/mqtt-viewer-server"
 
 cd "$root"
-
-echo "Will serve on http://localhost:$port once built" >&2
 
 if [ "${SKIP_FRONTEND:-0}" != "1" ]; then
   echo "Building frontend (set SKIP_FRONTEND=1 to reuse frontend/dist)..." >&2

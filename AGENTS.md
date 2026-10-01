@@ -50,20 +50,21 @@ behind the `server` build tag. It runs a real `http.Server` that:
 Run it:
 
 ```sh
-scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves the derived port, data in _dev_resources/server
-SKIP_FRONTEND=1 scripts/serve-browser.sh        # reuse an existing frontend/dist
-scripts/serve-browser.sh 9750     # explicit port (WAILS_SERVER_PORT works too)
+scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # builds frontend + `go build -tags server`, data in _dev_resources/server
+SKIP_FRONTEND=1 scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # reuse an existing frontend/dist
 ```
 
-The default port is derived per checkout (9700-9899) so parallel
-worktrees never collide; `scripts/dev-ports.sh server` prints it, and the
-script prints the URL before it starts. `.claude/launch.json` (from
-`just setup`) has a `server` entry on the same port.
+The port argument is optional and defaults to 9500, which parallel worktrees
+will fight over. `scripts/dev-ports.sh server` prints this checkout's own port
+(9700-9899), and the `server-mode` entry that `scripts/dev-ports.sh
+write-launch` puts in `.claude/launch.json` uses the same one, so the preview
+tool can start it by name. The examples below use 9500; substitute your port.
+Point `scripts/ingress-sim.go` at it with `-upstream http://127.0.0.1:<port>`.
 
 Verified round-trip (this is exactly what a browser sends):
 
 ```sh
-curl -s -X POST "http://localhost:$(scripts/dev-ports.sh server)/wails/runtime" \
+curl -s -X POST http://localhost:9500/wails/runtime \
   -H 'Content-Type: application/json' \
   -H 'x-wails-client-id: any-id' \
   -d '{"object":0,"method":0,"args":{"call-id":"x","methodID":3769940222,"args":[]}}'
@@ -91,6 +92,13 @@ Caveats:
   opens a second WebSocket, and delivers every event twice: message counts and
   rates then read double, which looks like a backend bug and is not one. Plain
   request/response binding calls need nothing extra either.
+- **Stopping it.** SIGTERM or Ctrl+C makes Wails stop accepting connections
+  and wait for in-flight HTTP requests (not the event WebSocket, which it
+  never waits on), then `main.go` disconnects the brokers and exits. The wait
+  is capped at 5 seconds (`serverShutdownTimeout`; Wails' default is 30).
+  Wails keeps its signal handler registered during the wait, so a second
+  SIGTERM or Ctrl+C does nothing: allow the 5 seconds before using
+  `kill -9`, which also skips the broker disconnect.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
 
@@ -100,12 +108,10 @@ everything under `/prefix/` and strips the prefix before forwarding, mirroring
 how ingress mounts an add-on.
 
 ```sh
-go build -o bin/ingress-sim ./scripts
-bin/ingress-sim -upstream "http://127.0.0.1:$(scripts/dev-ports.sh server)"   # then open :9600/prefix/
-bin/ingress-sim -upstream "http://127.0.0.1:$(scripts/dev-ports.sh server)" -listen :9601 -redirect=false   # no trailing-slash redirect
+go build -o bin/ingress-sim ./scripts && bin/ingress-sim   # then open :9600/prefix/
+bin/ingress-sim -listen :9601 -redirect=false              # no trailing-slash redirect
 ```
 
-`-upstream` defaults to a fixed `:9500`, not the derived port, so pass it.
 Build the binary, don't `go run` it: `go run`'s temp binaries have been seen to
 die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
 mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's

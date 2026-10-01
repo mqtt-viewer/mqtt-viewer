@@ -1,8 +1,8 @@
 #!/bin/sh
 # Deterministic per-checkout dev ports so multiple agents (each in their own
 # git worktree) can run wails3 dev, Storybook and the server-mode app side by
-# side without port collisions. The port is derived from the checkout's
-# absolute path, so it is stable across runs but different between worktrees.
+# side without port collisions. The ports are derived from the checkout's
+# absolute path, so they are stable across runs but different between worktrees.
 #
 # Usage:
 #   scripts/dev-ports.sh              # print all as KEY=VALUE lines
@@ -21,7 +21,8 @@ slot=$((hash % 200))
 
 vite_port="${WAILS_VITE_PORT:-$((9300 + slot))}"
 storybook_port="${STORYBOOK_PORT:-$((6100 + slot))}"
-# 9700, not 9500: 9500-9699 would overlap ingress-sim's default :9600.
+# 9700-9899 stays clear of Vite above, serve-browser.sh's manual default (9500)
+# and ingress-sim's listen port (9600).
 server_port="${WAILS_SERVER_PORT:-$((9700 + slot))}"
 
 write_launch() {
@@ -43,7 +44,7 @@ write_launch() {
       "port": $vite_port
     },
     {
-      "name": "server",
+      "name": "server-mode",
       "runtimeExecutable": "scripts/serve-browser.sh",
       "runtimeArgs": ["$server_port"],
       "port": $server_port

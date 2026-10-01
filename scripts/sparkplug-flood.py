@@ -12,6 +12,10 @@ It answers NCMD rebirth requests like a real node would.
 Usage:
     scripts/.venv/bin/python scripts/sparkplug-flood.py --port 1883 --rate 1000
     scripts/.venv/bin/python scripts/sparkplug-flood.py --nodes 500 --metrics 50 --rate 2000
+    # Two floods on one broker need distinct groups, or they publish as the
+    # same edge nodes and their interleaved seq numbers read as gaps:
+    scripts/.venv/bin/python scripts/sparkplug-flood.py --rate 1000 --group PlantA
+    scripts/.venv/bin/python scripts/sparkplug-flood.py --rate 1000 --group PlantB
 
 Ctrl-C to stop. Prints achieved msg/s once per second. Reuses the protobuf
 encoder in mqtt-sim.py (no protobuf dependency).
@@ -33,7 +37,6 @@ _spec = importlib.util.spec_from_file_location(
 sim = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sim)
 
-GROUP = "Plant"
 UNITS = ["V", "A", "kW", "degC", "bar", "m3/h", "%", "rpm"]
 
 
@@ -71,6 +74,8 @@ def main():
     ap.add_argument("--host", default="localhost")
     ap.add_argument("--port", type=int, default=1883)
     ap.add_argument("--rate", type=int, default=1000, help="target data messages/second")
+    ap.add_argument("--group", default="Plant",
+                    help="Sparkplug group id; give each flood sharing a broker its own")
     ap.add_argument("--nodes", type=int, default=300, help="edge nodes")
     ap.add_argument("--metrics", type=int, default=40, help="metrics per edge node")
     ap.add_argument("--device-metrics", type=int, default=10,
@@ -78,9 +83,12 @@ def main():
     ap.add_argument("--changed", type=int, default=4, help="metrics per data message")
     ap.add_argument("--duration", type=float, default=0, help="seconds to run (0 = forever)")
     args = ap.parse_args()
+    group = args.group
 
+    # The pid keeps ids unique when several floods share a broker (a duplicate
+    # id makes the broker drop the other session).
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
-                         client_id=f"sparkplug-flood-{random.randint(1000, 9999)}")
+                         client_id=f"sparkplug-flood-{group}-{os.getpid()}")
     client.connect(args.host, args.port)
     client.loop_start()
 
@@ -91,8 +99,8 @@ def main():
             "id": node_id,
             "seq": 0,
             "bd_seq": 0,
-            "scope": Scope(f"spBv1.0/{GROUP}/NDATA/{node_id}", args.metrics),
-            "device": (Scope(f"spBv1.0/{GROUP}/DDATA/{node_id}/dev-0", args.device_metrics)
+            "scope": Scope(f"spBv1.0/{group}/NDATA/{node_id}", args.metrics),
+            "device": (Scope(f"spBv1.0/{group}/DDATA/{node_id}/dev-0", args.device_metrics)
                        if args.device_metrics > 0 else None),
         }
         nodes.append(node)
@@ -104,10 +112,10 @@ def main():
 
     def birth(node):
         node["seq"] = 0
-        client.publish(f"spBv1.0/{GROUP}/NBIRTH/{node['id']}",
+        client.publish(f"spBv1.0/{group}/NBIRTH/{node['id']}",
                        birth_payload(node["scope"], next_seq(node), node["bd_seq"]))
         if node["device"] is not None:
-            client.publish(f"spBv1.0/{GROUP}/DBIRTH/{node['id']}/dev-0",
+            client.publish(f"spBv1.0/{group}/DBIRTH/{node['id']}/dev-0",
                            birth_payload(node["device"], next_seq(node)))
 
     by_id = {node["id"]: node for node in nodes}
@@ -118,7 +126,7 @@ def main():
             node["bd_seq"] += 1
             birth(node)
 
-    ncmd = f"spBv1.0/{GROUP}/NCMD/#"
+    ncmd = f"spBv1.0/{group}/NCMD/#"
     client.subscribe(ncmd)
     client.message_callback_add(ncmd, on_ncmd)
 

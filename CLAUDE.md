@@ -32,7 +32,7 @@ contract (`docs/WRITING_STYLE.md`) for anything a user reads.
 
 End-to-end verification IS possible from a browser: run the app in Wails
 server mode via `scripts/serve-browser.sh` (real Go backend, bindings work
-over HTTP; port derived per checkout, `scripts/dev-ports.sh server`). A
+over HTTP; pass it this checkout's port, `scripts/dev-ports.sh server`). A
 plain `wails3 dev` Vite port renders but bindings fail. Full how-to
 and gotchas: AGENTS.md "Driving the app from a browser (agents)".
 

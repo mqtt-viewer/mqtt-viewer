@@ -58,7 +58,12 @@ scripts/.venv/bin/python scripts/mqtt-flood.py --port 1884 --rate 2000
 A single flood process tops out around 1,700 msg/s on this machine
 (paho's python client is the ceiling, not the broker). To hold a true
 2,000, run two floods per broker at `--rate 1000` rather than trusting
-the target.
+the target. Each `mqtt-flood.py` process connects with its own client id
+(`flood-<port>-<pid>`), so two on one broker do not knock each other off.
+For `sparkplug-flood.py`, also give each its own `--group` (for example
+`--group PlantA` and `--group PlantB`; the default is `Plant`): two floods
+in the same group publish as the same edge nodes, and their interleaved
+seq numbers show up as false sequence gaps.
 
 Add `--topics 200000` to one of them when the change touches history,
 the topic tree or memory: high topic cardinality is a separate axis from
@@ -121,21 +126,22 @@ than watching the UI. Two traps:
 ## Driving the app headlessly
 
 `scripts/serve-browser.sh` runs the real backend and is drivable from
-the browser pane, which is usually easier than the native window. It
-serves on a port derived per checkout (`scripts/dev-ports.sh server`)
-and prints the URL. Things to know:
+the browser pane, which is usually easier than the native window. Two
+things to know: live message events already flow with no changes to the
+page, because the runtime loads `/wails/custom.js` itself. Do not inject
+that script tag by hand: it opens a second event WebSocket and every
+message count and rate reads double (see `AGENTS.md`).
 
-- Live message events already flow; do not inject
-  `<script src="/wails/custom.js"></script>`, or every event arrives
-  twice and rates read double (see `AGENTS.md`).
-- The process can panic on shutdown with `server shutdown error:
-  context deadline exceeded`, seemingly when a client goes away with the
-  events WebSocket open. It is a dev-only path, but it will end a run
-  mid-measurement, so take readings as you go rather than only at the
-  end.
-- The browser pane throttles `requestAnimationFrame` to about 2 fps
-  (frames 1000 ms apart, zero long tasks), so rAF frame timing there
-  means nothing and layout read straight after a resize can be stale.
-  Measure main-thread load with a `MessageChannel` or `setTimeout`
-  event-loop-lag sampler plus a `longtask` `PerformanceObserver`, and
-  wait about a second after a resize before measuring.
+On SIGTERM or Ctrl+C it waits up to 5 seconds for in-flight HTTP
+requests, then exits. Further signals during that wait are ignored, so
+give it the 5 seconds before reaching for `kill -9`. The open event
+WebSocket does not hold it up. Older builds waited 30 seconds and then
+panicked with `server shutdown error: context deadline exceeded`; that
+is the same slow stop, not a crash mid-run.
+
+The browser pane throttles `requestAnimationFrame` to about 2 fps (frames
+1000 ms apart, zero long tasks), so rAF frame timing there means nothing
+and layout read straight after a resize can be stale. Measure main-thread
+load with a `MessageChannel` or `setTimeout` event-loop-lag sampler plus
+a `longtask` `PerformanceObserver`, and wait about a second after a
+resize before measuring.
