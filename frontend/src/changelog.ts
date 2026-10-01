@@ -117,6 +117,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Without admin rights the app can't replace itself in a folder like Program Files, so the update closed the app and changed nothing. It now points you to the releases page instead.",
       },
       {
+        group: "Fixed",
+        title: "The Docker image stops promptly",
+        body: "A request still in flight when the container stopped could hold it for 30 seconds, long enough for Docker to kill it before it disconnected from your brokers. It now gives up after 5 seconds and disconnects cleanly.",
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",
