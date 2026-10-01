@@ -58,7 +58,12 @@ scripts/.venv/bin/python scripts/mqtt-flood.py --port 1884 --rate 2000
 A single flood process tops out around 1,700 msg/s on this machine
 (paho's python client is the ceiling, not the broker). To hold a true
 2,000, run two floods per broker at `--rate 1000` rather than trusting
-the target.
+the target. Each `mqtt-flood.py` process connects with its own client id
+(`flood-<port>-<pid>`), so two on one broker do not knock each other off.
+For `sparkplug-flood.py`, also give each its own `--group` (for example
+`--group PlantA` and `--group PlantB`; the default is `Plant`): two floods
+in the same group publish as the same edge nodes, and their interleaved
+seq numbers show up as false sequence gaps.
 
 Add `--topics 200000` to one of them when the change touches history,
 the topic tree or memory: high topic cardinality is a separate axis from
