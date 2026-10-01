@@ -107,7 +107,10 @@
         {:else if isHomeSelected}
           <Home />
         {/if}
-        {#each connectionIds as connectionId}
+        <!-- Keyed: a Connection binds its stores to its id when it mounts,
+             so after a delete each view must stay with its own connection
+             rather than shift onto the next one's id. -->
+        {#each connectionIds as connectionId (connectionId)}
           <Connection {connectionId} />
         {/each}
       </div>

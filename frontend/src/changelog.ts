@@ -58,14 +58,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "unreleased",
     released: false,
     date: "In development",
-    headline: "In the next update",
+    headline: "What's new in MQTT Viewer 1.2",
     intro:
-      "Here's what's landed since 1.1.0. I'll tidy these notes up and give them a version when the update ships.",
+      "Sparkplug B with real metric names and a live view of the whole network. Plus a month of fixes.",
     sections: [
       {
         group: "Added",
         title: "Sparkplug B with the names filled in",
-        body: "Data messages show real metric names instead of bare aliases, and a Sparkplug view shows your groups, nodes and metrics live, with sequence gaps and rebirth storms flagged. Turn on Sparkplug decoding for the connection to use it.",
+        body: "With Sparkplug decoding on, NDATA and DDATA messages show the metric names from the node's birth instead of bare aliases.",
         thanks: [
           {
             name: "adamwoodland2",
@@ -78,26 +78,27 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
-        group: "Fixed",
-        title: "Startup failures show an error instead of a blank window",
-        body: "If the app or a pop-out window cannot initialise it now tells you what went wrong and where to report it.",
+        group: "Added",
+        title: "A live view of your Sparkplug network",
+        body: "Groups, edge nodes, devices and metrics in one tree beside the list and graph views, with sequence gaps, rebirth storms, offline nodes and unnamed metrics flagged.",
+      },
+      {
+        group: "Added",
+        title: "Request a rebirth from the Sparkplug view",
+        body: "Sends Node Control/Rebirth to one edge node, or to every node missing a birth, after a confirmation.",
       },
       {
         group: "Fixed",
-        title: "New messages no longer stick at \"Loading message...\"",
-        body: "When a new message arrives on the topic you're viewing, or you step onto one with the arrow keys, the panel shows it instead of sticking at \"Loading message...\".",
+        title: "Crash when decoding Sparkplug on MQTT 3 connections",
+        body: "The first Sparkplug message on an MQTT 3.1 or 3.1.1 connection closed the app.",
         thanks: [
-          { name: "ejannink", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177" },
-          {
-            name: "Noschvie",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177#issuecomment-5760500007",
-          },
+          { name: "CantDecodeMe", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/184" },
         ],
       },
       {
         group: "Fixed",
         title: "Saved passwords stay encrypted when you edit a connection",
-        body: "Saving a connection without changing its password stored it unencrypted and logged \"error decrypting password\" on every start. I now encrypt any password stored that way the next time the app opens.",
+        body: "Saving a connection without changing its password stored it unencrypted. I now encrypt any password stored that way the next time the app opens.",
         thanks: [
           {
             name: "viktak",
@@ -108,13 +109,41 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Windows updates work when the app runs from another drive",
-        body: "The portable exe could not update itself from a drive other than the one holding Windows' temp folder. The app closed and stayed on the old version. If you're on 1.1.0 or earlier and hit this, download this version by hand once; later updates work as normal.",
+        body: "The portable exe could not update itself from a drive other than the one holding Windows' temp folder. From 1.1.0 or earlier, download this version by hand once.",
         thanks: [{ name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181" }],
       },
       {
         group: "Fixed",
         title: "Windows installs in protected folders no longer try to update themselves",
-        body: "Without admin rights the app can't replace itself in a folder like Program Files, so the update closed the app and changed nothing. It now points you to the releases page instead.",
+        body: "An install under Program Files can't replace itself without admin rights, so the update dialog points to the releases page instead.",
+      },
+      {
+        group: "Fixed",
+        title: "New messages no longer stick at \"Loading message...\"",
+        body: "The topic panel shows a new message as it arrives, or when you step onto it with the arrow keys.",
+        thanks: [
+          { name: "ejannink", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177" },
+          {
+            name: "Noschvie",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177#issuecomment-5760500007",
+          },
+        ],
+      },
+      {
+        group: "Fixed",
+        title: "Deleting a connection no longer mixes up the other tabs",
+        body: "The tabs after a deleted connection showed another connection's topics until the app restarted.",
+      },
+      {
+        group: "Fixed",
+        title: "Startup failures show an error instead of a blank window",
+        body: "If the app or a pop-out window cannot initialise, it says what went wrong and where to report it.",
+      },
+      {
+        group: "Fixed",
+        title: "The Nix flake builds again",
+        body: "",
+        thanks: [{ name: "sikmir", url: "https://github.com/mqtt-viewer/mqtt-viewer/pull/174" }],
       },
       {
         group: "Miscellaneous",
@@ -122,6 +151,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "The app runtime and the native shell now come from the same Wails release.",
       },
     ],
+    outro: "Found a bug or a rough edge? Use the Feedback button, I want to know.",
   },
   {
     version: "1.1.0",
