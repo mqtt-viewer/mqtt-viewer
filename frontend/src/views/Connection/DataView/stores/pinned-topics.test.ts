@@ -265,4 +265,50 @@ describe("pinned-topics store", () => {
     off();
     expect(listeners.has("PinnedTopicsChanged")).toBe(false);
   });
+
+  it("tells listeners why the pins changed", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const changes: Array<[string, string[]]> = [];
+    const stop = store.onChange((change, order) =>
+      changes.push([
+        change.kind === "pin" ? `pin ${change.topic}` : change.kind,
+        order,
+      ])
+    );
+    const { off } = observe(store);
+    await flush();
+
+    store.pin("b/two");
+    store.unpin("a/one");
+    store.unpinAll();
+
+    expect(changes).toEqual([
+      ["loaded", ["a/one"]],
+      ["pin b/two", ["a/one", "b/two"]],
+    ]);
+
+    stop();
+    store.pin("c/three");
+    expect(changes).toHaveLength(2);
+    off();
+  });
+
+  it("never reports the empty value it holds before the first load", async () => {
+    let resolveLoad: (value: unknown) => void = () => {};
+    GetPinnedTopics.mockReturnValue(
+      new Promise((resolve) => (resolveLoad = resolve))
+    );
+    const store = createPinnedTopicsStore(1);
+    const changes: string[] = [];
+    store.onChange((change) => changes.push(change.kind));
+    const { off } = observe(store);
+    await flush();
+    expect(changes).toEqual([]);
+
+    resolveLoad(rows("a/one"));
+    await flush();
+    expect(changes).toEqual(["loaded"]);
+    off();
+  });
 });

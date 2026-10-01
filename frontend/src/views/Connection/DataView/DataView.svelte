@@ -6,6 +6,7 @@
   import MqttDataPanel from "./components/MqttDataPanel/MqttDataPanel.svelte";
   import { createSelectedTopicStore } from "./stores/selected-topic-store";
   import { createPinnedTopicsStore } from "./stores/pinned-topics";
+  import { createPinnedExpansionStore } from "./stores/pinned-expansion";
   import { createTopicPanelViewState } from "./stores/topic-panel-view-state";
   import { topicWindowSyncAction } from "./topic-window-sync";
   import type { Connection } from "@/stores/connections";
@@ -65,6 +66,23 @@
   const pinnedTopicsStore = createPinnedTopicsStore(
     connection.connectionDetails.id
   );
+  // What is open inside the pinned block. Lives here, beside the pins, so it
+  // outlives the tree and the data panel. Anything no longer under a pin is
+  // forgotten so the saved set cannot grow without bound, but only against a
+  // pin list read back from the database. Every unpin, here or in another
+  // window, ends in that read, whereas the local list is empty until the
+  // first load and wrong while a failed write is being undone, and pruning
+  // against either would throw away branches the user still has open.
+  const pinnedExpansionStore = createPinnedExpansionStore(
+    connection.connectionDetails.id
+  );
+  const stopPruningPinnedExpansion = pinnedTopicsStore.onChange(
+    (change, order) => {
+      if (change.kind === "loaded") pinnedExpansionStore.prune(order);
+    }
+  );
+  onDestroy(stopPruningPinnedExpansion);
+
   $: selectedTopicIsPinned =
     $selectedTopicStore.selectedTopic !== null &&
     $pinnedTopicsStore.set.has($selectedTopicStore.selectedTopic);
@@ -378,6 +396,7 @@
             {connection}
             {selectedTopicStore}
             {pinnedTopicsStore}
+            {pinnedExpansionStore}
             width={dataViewWidth}
             {copyTopicPath}
             {exportTopicMessages}

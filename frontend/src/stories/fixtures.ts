@@ -12,7 +12,11 @@ import { createExpandedTopicsStore } from "@/views/Connection/DataView/component
 import { createHighlightedMqttTopicsStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/highlighted-topics";
 import { createSearchStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/search";
 import { createSortStore } from "@/views/Connection/DataView/components/MqttDataPanel/stores/sort";
-import type { PinnedTopics } from "@/views/Connection/DataView/stores/pinned-topics";
+import type {
+  PinnedTopics,
+  PinnedTopicsChangeListener,
+} from "@/views/Connection/DataView/stores/pinned-topics";
+import { createPinnedExpansionStore } from "@/views/Connection/DataView/stores/pinned-expansion";
 
 const now = Date.now();
 
@@ -35,20 +39,36 @@ export const createStaticPinnedTopicsStore = (topics: string[] = []) => {
     set(current);
   };
 
+  const listeners = new Set<PinnedTopicsChangeListener>();
+  const onChange = (listener: PinnedTopicsChangeListener) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+  const notify = (change: Parameters<PinnedTopicsChangeListener>[0]) => {
+    for (const listener of listeners) listener(change, current.order);
+  };
+
   const pin = (topic: string) => {
     if (current.set.has(topic)) return;
     apply([...current.order, topic]);
+    notify({ kind: "pin", topic });
   };
   const unpin = (topic: string) => {
     if (!current.set.has(topic)) return;
     apply(current.order.filter((t) => t !== topic));
+    notify({ kind: "loaded" });
   };
   const toggle = (topic: string) =>
     current.set.has(topic) ? unpin(topic) : pin(topic);
-  const unpinAll = () => apply([]);
+  const unpinAll = () => {
+    apply([]);
+    notify({ kind: "loaded" });
+  };
   const isPinned = (topic: string) => current.set.has(topic);
 
-  return { subscribe, pin, unpin, toggle, unpinAll, isPinned };
+  return { subscribe, pin, unpin, toggle, unpinAll, isPinned, onChange };
 };
 
 export const mockEventSet = {
@@ -1325,6 +1345,9 @@ const propDefaults: Record<string, () => unknown> = {
     "warehouse/dock2/door",
   ],
   pinnedTopicsStore: () => createStaticPinnedTopicsStore(),
+  // In memory only (null connection), so stories never read or write the
+  // real app's saved expansion.
+  pinnedExpansionStore: () => createPinnedExpansionStore(null),
   isPinned: () => false,
   onTogglePin: () => noop,
   onUnpin: () => noop,

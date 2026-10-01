@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-23T12:19:09.939Z",
+  "generatedAt": "2026-10-01T10:51:46.143Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3780,6 +3780,12 @@
           "description": "This connection's pinned topics, shared with the selected-topic panel."
         },
         {
+          "name": "pinnedExpansionStore",
+          "type": "store",
+          "required": true,
+          "description": "Topics open inside the pinned block, owned by DataView so they survive a remount. A branch pinned from this window opens its first level here."
+        },
+        {
           "name": "onRequestRebirth",
           "type": "function",
           "required": false,
@@ -3901,13 +3907,6 @@
           "required": false,
           "default": "undefined",
           "description": "Unpins the topic. The pin marker is a button wherever a pinned row appears, in the tree as well as the pinned block; only pinned rows render it, so unpinned rows pay no listener cost."
-        },
-        {
-          "name": "showChevron",
-          "type": "boolean",
-          "required": false,
-          "default": true,
-          "description": "Hide the expansion chevron column, as the pinned block does."
         }
       ],
       "tokens": [
@@ -3995,7 +3994,7 @@
           "type": "array",
           "required": false,
           "default": [],
-          "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list."
+          "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list; a pinned branch opens in place to show its subtree."
         },
         {
           "name": "onUnpin",
@@ -4008,6 +4007,12 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "pinnedExpansionStore",
+          "type": "store",
+          "required": true,
+          "description": "Topics open inside the pinned block. Separate from expandedTopicsStore so the block and the tree expand independently; owned by DataView and persisted per connection."
         }
       ],
       "tokens": [],

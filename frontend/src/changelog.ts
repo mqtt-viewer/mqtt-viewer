@@ -78,6 +78,17 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        group: "Added",
+        title: "Pinned topics open to show everything beneath them",
+        body: "A pinned branch now expands in place at the top of the tree. Pinning a branch opens its first level for you.",
+        thanks: [
+          {
+            name: "mrpiggi",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/153#issuecomment-5560389408",
+          },
+        ],
+      },
+      {
         group: "Fixed",
         title: "Startup failures show an error instead of a blank window",
         body: "If the app or a pop-out window cannot initialise it now tells you what went wrong and where to report it.",

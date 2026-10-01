@@ -56,6 +56,12 @@
       "description": "This connection's pinned topics, shared with the selected-topic panel."
     },
     {
+      "name": "pinnedExpansionStore",
+      "type": "store",
+      "required": true,
+      "description": "Topics open inside the pinned block, owned by DataView so they survive a remount. A branch pinned from this window opens its first level here."
+    },
+    {
       "name": "onRequestRebirth",
       "type": "function",
       "required": false,

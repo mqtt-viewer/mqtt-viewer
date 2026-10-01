@@ -20,6 +20,21 @@ export interface PinnedTopics {
 export type PinnedTopicsStore = ReturnType<typeof createPinnedTopicsStore>;
 
 /**
+ * Why the pins just changed. "pin" is a pin made in this window, reported as
+ * it is painted and before it is written. "loaded" is an authoritative read
+ * from the database, which is how unpins, and pins from other windows,
+ * arrive; only then is `order` the persisted list.
+ */
+export type PinnedTopicsChange =
+  | { kind: "pin"; topic: string }
+  | { kind: "loaded" };
+
+export type PinnedTopicsChangeListener = (
+  change: PinnedTopicsChange,
+  order: string[]
+) => void;
+
+/**
  * Pins live in SQLite rather than localStorage because the topic pop-out is a
  * separate webview: a localStorage write here would never reach it. Every
  * window instead loads from GetPinnedTopics and converges on the
@@ -62,6 +77,20 @@ export const createPinnedTopicsStore = (connectionId: number) => {
     set(current);
   };
 
+  // Plain callbacks rather than a second store: listeners care about why the
+  // pins changed (a local pin auto-expands in the pinned block, a cross-window
+  // one does not), which a value subscription cannot tell them.
+  const changeListeners = new Set<PinnedTopicsChangeListener>();
+  const notify = (change: PinnedTopicsChange) => {
+    for (const listener of changeListeners) listener(change, current.order);
+  };
+  const onChange = (listener: PinnedTopicsChangeListener) => {
+    changeListeners.add(listener);
+    return () => {
+      changeListeners.delete(listener);
+    };
+  };
+
   // Optimistic paints win over any read that was already in flight: the
   // database row the reload is reading predates the mutation, so its result is
   // stale by definition. The mutation emits PinnedTopicsChanged, which starts a
@@ -84,6 +113,7 @@ export const createPinnedTopicsStore = (connectionId: number) => {
       if (seq !== loadSeq) return;
       apply((pinned ?? []).map((pin) => pin.topic));
       hasLoaded = true;
+      notify({ kind: "loaded" });
     } catch (e) {
       if (seq !== loadSeq) return;
       // Allow the next first-subscription to retry rather than losing the
@@ -105,6 +135,7 @@ export const createPinnedTopicsStore = (connectionId: number) => {
   const pin = (topic: string) => {
     if (current.set.has(topic)) return;
     applyOptimistic([...current.order, topic]);
+    notify({ kind: "pin", topic });
     PinTopic(connectionId, topic).catch((e) => {
       console.error("failed to pin topic", e);
       reload();
@@ -139,5 +170,5 @@ export const createPinnedTopicsStore = (connectionId: number) => {
 
   const isPinned = (topic: string) => current.set.has(topic);
 
-  return { subscribe, pin, unpin, toggle, unpinAll, isPinned };
+  return { subscribe, pin, unpin, toggle, unpinAll, isPinned, onChange };
 };

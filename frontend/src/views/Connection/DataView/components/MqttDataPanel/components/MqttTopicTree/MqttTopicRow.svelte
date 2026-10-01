@@ -33,9 +33,6 @@
   // Only rows that are actually pinned render it, so unpinned rows still pay
   // nothing (same rule as onOpenBrokerStatus).
   export let onUnpin: (() => void) | undefined = undefined;
-  // The pinned block shows no expansion chevron: its rows are a flat list, so
-  // the column would only be dead space.
-  export let showChevron: boolean = true;
 
   $: syntaxHighlightedMessage = !!message ? highlightJson(message) : "";
 
@@ -109,21 +106,19 @@
     "overflow-hidden min-w-0 w-full"
   )}
 >
-  {#if showChevron}
-    <button
-      on:click={() => {
-        toggleExpansion(expandKey);
-      }}
-    >
-      <div class={`w-4 relative`}>
-        {#if subtopicCount > 0}
-          <div class={`${isExpanded ? "rotate-90" : "rotate-0"}`}>
-            <Button variant="text" iconType="right" iconSize={14} />
-          </div>
-        {/if}
-      </div>
-    </button>
-  {/if}
+  <button
+    on:click={() => {
+      toggleExpansion(expandKey);
+    }}
+  >
+    <div class={`w-4 relative`}>
+      {#if subtopicCount > 0}
+        <div class={`${isExpanded ? "rotate-90" : "rotate-0"}`}>
+          <Button variant="text" iconType="right" iconSize={14} />
+        </div>
+      {/if}
+    </div>
+  </button>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     id={`topic-row-${expandKey}`}

@@ -27,6 +27,7 @@
   import type { Connection } from "@/stores/connections";
   import type { SelectedTopicStore } from "../../stores/selected-topic-store";
   import type { PinnedTopicsStore } from "../../stores/pinned-topics";
+  import type { PinnedExpansionStore } from "../../stores/pinned-expansion";
   import { createHighlightedMqttTopicsStore } from "./stores/highlighted-topics";
   import defaultSorts from "@/stores/default-sorts";
   import { get } from "svelte/store";
@@ -36,6 +37,7 @@
   import { copyToClipboard } from "@/util/copy";
   import {
     findTopicIsRetained,
+    findTopicNode,
     findTopicPayload,
     formatPayloadForCopy,
   } from "../../payload-copy";
@@ -44,6 +46,7 @@
   export let connection: Connection;
   export let selectedTopicStore: SelectedTopicStore;
   export let pinnedTopicsStore: PinnedTopicsStore;
+  export let pinnedExpansionStore: PinnedExpansionStore;
   export let width: number;
   // Measured width of the tree's scroll container. The `width` prop is derived
   // arithmetically in DataView (window minus the side panels) and drifts by a
@@ -149,6 +152,20 @@
       });
     return true;
   };
+
+  // A branch pinned here opens its first level in the pinned block, since its
+  // children are usually what you pinned it to watch. Wired here because this
+  // is where the topic data lives. Pins arriving from another window come in
+  // as "loaded", not "pin", so they stay collapsed.
+  onMount(() =>
+    pinnedTopicsStore.onChange((change) => {
+      if (change.kind !== "pin") return;
+      const node = findTopicNode(get(mqttDataStore), change.topic);
+      if (node !== null && node.subtopicCount > 0) {
+        pinnedExpansionStore.expand(change.topic);
+      }
+    })
+  );
 
   const sparkplugStore = createSparkplugTreeStore(
     connection.connectionDetails.id,
@@ -334,6 +351,7 @@
         <MqttTopicTree
           width={treeWidth || width}
           pinnedTopics={$pinnedTopicsStore.order}
+          {pinnedExpansionStore}
           onUnpin={(topic) => pinnedTopicsStore.unpin(topic)}
           onUnpinAll={() => pinnedTopicsStore.unpinAll()}
           selectedTopic={$selectedTopicStore.selectedTopic}
