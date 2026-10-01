@@ -80,6 +80,17 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        group: "Fixed",
+        title: "Saved passwords stay encrypted when you edit a connection",
+        body: "Saving a connection without changing its password stored it unencrypted and logged \"error decrypting password\" on every start. I now encrypt any password stored that way the next time the app opens.",
+        thanks: [
+          {
+            name: "viktak",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181#issuecomment-5864069262",
+          },
+        ],
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",
