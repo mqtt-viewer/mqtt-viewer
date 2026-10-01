@@ -58,7 +58,12 @@ scripts/.venv/bin/python scripts/mqtt-flood.py --port 1884 --rate 2000
 A single flood process tops out around 1,700 msg/s on this machine
 (paho's python client is the ceiling, not the broker). To hold a true
 2,000, run two floods per broker at `--rate 1000` rather than trusting
-the target.
+the target. Each `mqtt-flood.py` process connects with its own client id
+(`flood-<port>-<pid>`), so two on one broker do not knock each other off.
+For `sparkplug-flood.py`, also give each its own `--group` (for example
+`--group PlantA` and `--group PlantB`; the default is `Plant`): two floods
+in the same group publish as the same edge nodes, and their interleaved
+seq numbers show up as false sequence gaps.
 
 Add `--topics 200000` to one of them when the change touches history,
 the topic tree or memory: high topic cardinality is a separate axis from
@@ -122,10 +127,14 @@ than watching the UI. Two traps:
 
 `scripts/serve-browser.sh` runs the real backend and is drivable from
 the browser pane, which is usually easier than the native window. Two
-things to know: live message events need
-`<script src="/wails/custom.js"></script>` injected into the page (see
-`AGENTS.md`), and the process can panic on shutdown with `server
-shutdown error: context deadline exceeded`, seemingly when a client goes
-away with that WebSocket open. It is a dev-only path, but it will end a
-run mid-measurement, so take readings as you go rather than only at the
-end.
+things to know: live message events already flow with no changes to the
+page, because the runtime loads `/wails/custom.js` itself. Do not inject
+that script tag by hand: it opens a second event WebSocket and every
+message count and rate reads double (see `AGENTS.md`).
+
+On SIGTERM or Ctrl+C it waits up to 5 seconds for in-flight HTTP
+requests, then exits. Further signals during that wait are ignored, so
+give it the 5 seconds before reaching for `kill -9`. The open event
+WebSocket does not hold it up. Older builds waited 30 seconds and then
+panicked with `server shutdown error: context deadline exceeded`; that
+is the same slow stop, not a crash mid-run.

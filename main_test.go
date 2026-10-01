@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,5 +53,17 @@ func TestGuardRuntimeOrigin(t *testing.T) {
 				t.Fatalf("next called = %v, want %v", called, tt.wantNext)
 			}
 		})
+	}
+}
+
+func TestIsShutdownTimeout(t *testing.T) {
+	// Wails wraps the http.Server.Shutdown error as "server shutdown error: %w".
+	if !isShutdownTimeout(fmt.Errorf("server shutdown error: %w", context.DeadlineExceeded)) {
+		t.Fatal("wrapped deadline should count as a shutdown timeout")
+	}
+	for _, err := range []error{nil, errors.New("failed to listen on localhost:9500: address already in use")} {
+		if isShutdownTimeout(err) {
+			t.Fatalf("%v should not count as a shutdown timeout", err)
+		}
 	}
 }

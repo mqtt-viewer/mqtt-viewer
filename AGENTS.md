@@ -50,9 +50,16 @@ behind the `server` build tag. It runs a real `http.Server` that:
 Run it:
 
 ```sh
-scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500, data in _dev_resources/server
-SKIP_FRONTEND=1 scripts/serve-browser.sh 9500   # reuse an existing frontend/dist
+scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # builds frontend + `go build -tags server`, data in _dev_resources/server
+SKIP_FRONTEND=1 scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # reuse an existing frontend/dist
 ```
+
+The port argument is optional and defaults to 9500, which parallel worktrees
+will fight over. `scripts/dev-ports.sh server` prints this checkout's own port
+(9700-9899), and the `server-mode` entry that `scripts/dev-ports.sh
+write-launch` puts in `.claude/launch.json` uses the same one, so the preview
+tool can start it by name. The examples below use 9500; substitute your port.
+Point `scripts/ingress-sim.go` at it with `-upstream http://127.0.0.1:<port>`.
 
 Verified round-trip (this is exactly what a browser sends):
 
@@ -85,6 +92,13 @@ Caveats:
   opens a second WebSocket, and delivers every event twice: message counts and
   rates then read double, which looks like a backend bug and is not one. Plain
   request/response binding calls need nothing extra either.
+- **Stopping it.** SIGTERM or Ctrl+C makes Wails stop accepting connections
+  and wait for in-flight HTTP requests (not the event WebSocket, which it
+  never waits on), then `main.go` disconnects the brokers and exits. The wait
+  is capped at 5 seconds (`serverShutdownTimeout`; Wails' default is 30).
+  Wails keeps its signal handler registered during the wait, so a second
+  SIGTERM or Ctrl+C does nothing: allow the 5 seconds before using
+  `kill -9`, which also skips the broker disconnect.
 - Production is unaffected: `wails3 build`/`package` never pass `-tags server`, so
   the shipping app is always the native webview build.
 
