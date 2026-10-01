@@ -23,8 +23,9 @@
 #
 # Then open http://localhost:<port> in a browser. Backend bindings work.
 # NOTE: this is a headless instance running the real Go backend — it is NOT the
-# native window. Backend->frontend live events need one extra script tag; see the
-# AGENTS.md section for details.
+# native window. Backend->frontend live events already flow: the runtime loads
+# /wails/custom.js itself. Do not add that script tag by hand; it opens a second
+# event WebSocket and doubles every count. See the AGENTS.md section.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd -P)

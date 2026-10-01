@@ -122,9 +122,10 @@ than watching the UI. Two traps:
 
 `scripts/serve-browser.sh` runs the real backend and is drivable from
 the browser pane, which is usually easier than the native window. Two
-things to know: live message events need
-`<script src="/wails/custom.js"></script>` injected into the page (see
-`AGENTS.md`), and the process can panic on shutdown with `server
+things to know: live message events already flow with no changes to the
+page, because the runtime loads `/wails/custom.js` itself. Do not inject
+that script tag by hand: it opens a second event WebSocket and every
+message count and rate reads double (see `AGENTS.md`). And the process can panic on shutdown with `server
 shutdown error: context deadline exceeded`, seemingly when a client goes
 away with that WebSocket open. It is a dev-only path, but it will end a
 run mid-measurement, so take readings as you go rather than only at the
