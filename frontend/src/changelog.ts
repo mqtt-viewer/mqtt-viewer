@@ -95,6 +95,28 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        group: "Fixed",
+        title: "Saved passwords stay encrypted when you edit a connection",
+        body: "Saving a connection without changing its password stored it unencrypted and logged \"error decrypting password\" on every start. I now encrypt any password stored that way the next time the app opens.",
+        thanks: [
+          {
+            name: "viktak",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181#issuecomment-5864069262",
+          },
+        ],
+      },
+      {
+        group: "Fixed",
+        title: "Windows updates work when the app runs from another drive",
+        body: "The portable exe could not update itself from a drive other than the one holding Windows' temp folder. The app closed and stayed on the old version. If you're on 1.1.0 or earlier and hit this, download this version by hand once; later updates work as normal.",
+        thanks: [{ name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181" }],
+      },
+      {
+        group: "Fixed",
+        title: "Windows installs in protected folders no longer try to update themselves",
+        body: "Without admin rights the app can't replace itself in a folder like Program Files, so the update closed the app and changed nothing. It now points you to the releases page instead.",
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",
