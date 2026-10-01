@@ -50,9 +50,16 @@ behind the `server` build tag. It runs a real `http.Server` that:
 Run it:
 
 ```sh
-scripts/serve-browser.sh          # builds frontend + `go build -tags server`, serves :9500, data in _dev_resources/server
-SKIP_FRONTEND=1 scripts/serve-browser.sh 9500   # reuse an existing frontend/dist
+scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # builds frontend + `go build -tags server`, data in _dev_resources/server
+SKIP_FRONTEND=1 scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # reuse an existing frontend/dist
 ```
+
+The port argument is optional and defaults to 9500, which parallel worktrees
+will fight over. `scripts/dev-ports.sh server` prints this checkout's own port
+(9700-9899), and the `server-mode` entry that `scripts/dev-ports.sh
+write-launch` puts in `.claude/launch.json` uses the same one, so the preview
+tool can start it by name. The examples below use 9500; substitute your port.
+Point `scripts/ingress-sim.go` at it with `-upstream http://127.0.0.1:<port>`.
 
 Verified round-trip (this is exactly what a browser sends):
 

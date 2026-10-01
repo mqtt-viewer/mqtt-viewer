@@ -15,7 +15,11 @@
 #
 # Usage:
 #   scripts/serve-browser.sh [port]        # default port 9500
+#   scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # per-checkout port
 #   SKIP_FRONTEND=1 scripts/serve-browser.sh   # reuse existing frontend/dist
+#
+# 9500 is shared by every worktree; parallel agents should pass the derived
+# port (or start the `server-mode` entry from .claude/launch.json).
 #
 # Then open http://localhost:<port> in a browser. Backend bindings work.
 # NOTE: this is a headless instance running the real Go backend — it is NOT the

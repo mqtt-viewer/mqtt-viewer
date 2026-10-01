@@ -16,9 +16,14 @@ ports and none of them collide:
 
 - Vite / `wails3 dev`: 9300-9499
 - Storybook: 6100-6299
+- Server mode (`scripts/serve-browser.sh`, the `server-mode` entry): 9700-9899
 
-`just dev` picks the same derived Vite port automatically. Override with
-`WAILS_VITE_PORT` or `STORYBOOK_PORT` if a derived port is taken by
+`just dev` picks the same derived Vite port automatically.
+`scripts/serve-browser.sh` does not: called with no argument it serves on
+9500, which every worktree shares. Pass it the derived port with
+`scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"`, or start the
+`server-mode` launch entry. Override with `WAILS_VITE_PORT`,
+`STORYBOOK_PORT` or `WAILS_SERVER_PORT` if a derived port is taken by
 something else (`wails3 dev` and Storybook both fail fast on a busy port
 rather than silently moving).
 
