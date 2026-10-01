@@ -128,6 +128,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Without admin rights the app can't replace itself in a folder like Program Files, so the update closed the app and changed nothing. It now points you to the releases page instead.",
       },
       {
+        group: "Fixed",
+        title: "Topics named like toString or constructor show up",
+        body: "A topic level called toString or constructor now appears in the tree like any other, and no longer drops the rest of the messages that arrived with it.",
+      },
+      {
         group: "Miscellaneous",
         title: "Updated the Wails desktop shell to the current beta",
         body: "The app runtime and the native shell now come from the same Wails release.",

@@ -1,15 +1,17 @@
 import type { MqttData } from "../../stores/mqtt-data";
+import { emptyMqttData } from "../../stores/mqtt-data-levels";
 import { topicMatchesQuery } from "@/util/topic-filter";
 
 // Builds a pruned copy without deep-cloning the input: new node objects are
 // created only for kept entries, unmatched subtrees are never copied, and the
-// input tree is left untouched.
+// input tree is left untouched. Kept levels go into null-prototype maps like
+// the store's, so a level named "__proto__" stays an ordinary key.
 export const filterData = (data: MqttData, searchText: string): MqttData => {
   if (!searchText) {
     return data;
   }
 
-  const result: MqttData = {};
+  const result = emptyMqttData();
   for (const key in data) {
     const topicData = data[key];
     const filteredChildren = filterData(topicData.children, searchText);
@@ -28,7 +30,11 @@ export const filterData = (data: MqttData, searchText: string): MqttData => {
 
     if (filteredSubtopicCount === 0) {
       if (dataMatchesSearch(topicData, searchText)) {
-        result[key] = { ...topicData, children: {}, subtopicCount: 0 };
+        result[key] = {
+          ...topicData,
+          children: emptyMqttData(),
+          subtopicCount: 0,
+        };
       }
       continue;
     }

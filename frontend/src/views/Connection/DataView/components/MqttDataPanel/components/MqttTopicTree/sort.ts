@@ -12,14 +12,16 @@ export const getSortedDataKeys = (
   // store (uncloned), so a mutating decay here would corrupt the score objects
   // the next arrival depends on. Precomputing also keeps it to one decay per
   // node instead of one per comparison. Uniform decay preserves sibling rank
-  // between arrivals, so no re-sort ticker is needed.
-  let rateByKey: Record<string, number> | undefined;
+  // between arrivals, so no re-sort ticker is needed. A Map, because the keys
+  // are topic levels and a level named "__proto__" is not an ordinary key on
+  // a plain object.
+  let rateByKey: Map<string, number> | undefined;
   if (sortKey === "rate") {
     const now = Date.now();
-    rateByKey = {};
+    rateByKey = new Map();
     for (const key of Object.keys(data)) {
       const rate = data[key].rate;
-      rateByKey[key] = rate ? peekScore(rate, now, LIST_RATE_TAU_MS) : 0;
+      rateByKey.set(key, rate ? peekScore(rate, now, LIST_RATE_TAU_MS) : 0);
     }
   }
 
@@ -32,8 +34,8 @@ export const getSortedDataKeys = (
     } else if (sortKey === "topic") {
       res = b.localeCompare(a);
     } else if (sortKey === "rate") {
-      const aRate = rateByKey![a];
-      const bRate = rateByKey![b];
+      const aRate = rateByKey!.get(a)!;
+      const bRate = rateByKey!.get(b)!;
       // Equal rates fall through to the alphabetical order the "topic" key uses
       // (b.localeCompare(a), so ties render A -> Z under dir "desc") instead of
       // a constant 1, which left tie order dependent on Object.keys iteration.

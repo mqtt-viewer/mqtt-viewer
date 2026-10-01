@@ -13,7 +13,9 @@ interface MatchedTopicsStore {
 export const createMatchedTopicsStore = (connId: number) => {
   const { subscribe, set, update } = writable<MatchedTopicsStore>({
     connectionId: connId,
-    topics: {},
+    // No prototype: the keys are topics, and "toString" or "constructor"
+    // must not read as an already cached match.
+    topics: Object.create(null),
   });
 
   const getTopicMatch = async (topic: string) => {
@@ -37,7 +39,7 @@ export const createMatchedTopicsStore = (connId: number) => {
 
   const clearCache = () => {
     update((store) => {
-      store.topics = {};
+      store.topics = Object.create(null);
       return store;
     });
   };

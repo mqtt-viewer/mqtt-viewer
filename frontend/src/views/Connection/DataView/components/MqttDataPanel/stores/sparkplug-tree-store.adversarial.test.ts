@@ -290,3 +290,26 @@ describe("final review regressions", () => {
     store.destroy();
   });
 });
+
+describe("metric names that match Object.prototype members", () => {
+  it("a replay's omitted map only marks the metrics it names", async () => {
+    // Metric names are publisher-controlled. Replay omits Label, so the other
+    // metrics in the same replayed payload must keep their values.
+    const names = ["toString", "constructor", "valueOf", "hasOwnProperty", "__proto__"];
+    const metrics = [
+      { name: "Label", datatype: 12 },
+      ...names.map((name, i) => ({ name, datatype: 3, intValue: i + 1 })),
+    ];
+    const d = mk("spBv1.0/G/NDATA/N", { metrics }, { msgType: "NDATA", group: "G", edgeNode: "N", resolution: "names", replayed: true, omitted: { Label: 300011 } });
+    mocks.getSparkplugHistory.mockResolvedValue({ messages: [d], suspendedOrd: 0 });
+    const replayed = await fold([]);
+    const byName = new Map<string, any>(
+      replayed.groups[0].nodes[0].metrics.map((m: any) => [m.name, m])
+    );
+    expect(byName.get("Label").value).toMatch(/^Not kept/);
+    names.forEach((name, i) => {
+      expect(byName.get(name)?.value, name).toBe(String(i + 1));
+      expect(byName.get(name)?.omitted, name).toBeUndefined();
+    });
+  });
+});

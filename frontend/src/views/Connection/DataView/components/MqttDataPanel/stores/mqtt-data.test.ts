@@ -410,3 +410,96 @@ describe("rate score bumps", () => {
     unsub();
   });
 });
+
+// Topic levels come from whoever publishes on the broker, so a level that
+// shares its name with an Object.prototype member must be an ordinary topic.
+describe("topic levels named after Object.prototype members", () => {
+  const PROTO_LEVELS = [
+    "__proto__",
+    "constructor",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "__defineGetter__",
+  ];
+
+  const nodeAt = (data: any, topic: string) => {
+    let children = data;
+    let node: any;
+    for (const level of topic.split("/")) {
+      if (!Object.prototype.hasOwnProperty.call(children, level)) return undefined;
+      node = children[level];
+      children = node.children;
+    }
+    return node;
+  };
+
+  it("stores them as ordinary topics without touching Object or its prototype", () => {
+    const highlightStore = createHighlightedMqttTopicsStore();
+    const store = createMqttDataStore(highlightStore, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    const topics: string[] = [];
+    for (const level of PROTO_LEVELS) {
+      topics.push(level, `${level}/x`, `a/${level}`, `a/${level}/y`);
+    }
+    // A topic after all the hostile ones, to prove the batch is not cut short.
+    topics.push("after/last");
+    const messages = topics.map((t, i) => makeMessage(`m${i}`, t, `p:${t}`, i + 1));
+
+    expect(() => fireMessages(messages)).not.toThrow();
+
+    const data = get(store);
+    for (const t of topics) {
+      const node = nodeAt(data, t);
+      expect(node, t).toBeDefined();
+      expect(node.topic).toBe(t);
+      expect(node.message).toBe(`p:${t}`);
+    }
+    expect(Object.keys(data)).toEqual(
+      expect.arrayContaining([...PROTO_LEVELS, "a", "after"])
+    );
+    expect(nodeAt(data, "a").subtopicCount).toBe(PROTO_LEVELS.length);
+    expect(store.getAllTopics()).toEqual(expect.arrayContaining(topics));
+
+    // Nothing leaked onto the globals.
+    const leaked = ["messageCount", "message", "children", "topic", "rate", "isRetained"];
+    for (const key of leaked) {
+      expect(Object.prototype.hasOwnProperty.call(Object.prototype, key), key).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(Object, key), key).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(Object.prototype.toString, key),
+        key
+      ).toBe(false);
+    }
+    expect(({} as any).messageCount).toBeUndefined();
+
+    // A second batch on the same topics updates them in place.
+    fireMessages(topics.map((t, i) => makeMessage(`n${i}`, t, `q:${t}`, 1000 + i)));
+    const again = get(store);
+    for (const t of topics) {
+      expect(nodeAt(again, t).message).toBe(`q:${t}`);
+    }
+
+    unsub();
+  });
+
+  it("clears the retained marker on such a topic and ignores missing ones", () => {
+    const highlightStore = createHighlightedMqttTopicsStore();
+    const store = createMqttDataStore(highlightStore, connectionEventSet);
+    const unsub = store.subscribe(() => {});
+
+    fireMessages([
+      { ...makeMessage("1", "constructor/x", "v", 1), retain: true } as any,
+    ]);
+    expect(nodeAt(get(store), "constructor/x").isRetained).toBe(true);
+    expect(() =>
+      store.markRetainedCleared(["constructor/x", "toString", "valueOf/y", "__proto__"])
+    ).not.toThrow();
+    expect(nodeAt(get(store), "constructor/x").isRetained).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, "isRetained")).toBe(false);
+
+    unsub();
+  });
+});

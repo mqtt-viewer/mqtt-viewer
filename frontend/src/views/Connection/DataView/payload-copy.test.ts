@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   findTopicIsRetained,
+  findTopicNode,
   findTopicPayload,
   formatPayloadForCopy,
 } from "./payload-copy";
@@ -70,6 +71,57 @@ describe("findTopicIsRetained", () => {
 
   it("reports false for an unknown topic", () => {
     expect(findTopicIsRetained(data, "home/nope")).toBe(false);
+  });
+});
+
+// Topic levels are publisher-controlled, so a level named after an
+// Object.prototype member must be looked up like any other.
+describe("lookups of levels named after Object.prototype members", () => {
+  const PROTO_LEVELS = [
+    "__proto__",
+    "constructor",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+  ];
+
+  it("returns null rather than an inherited member when no such topic exists", () => {
+    for (const level of PROTO_LEVELS) {
+      for (const topic of [level, `${level}/x`, `home/${level}`, `home/${level}/x`]) {
+        expect(findTopicNode(data, topic), topic).toBeNull();
+        expect(findTopicPayload(data, topic), topic).toBeNull();
+        expect(findTopicIsRetained(data, topic), topic).toBe(false);
+      }
+    }
+  });
+
+  it("finds a real topic with such a level", () => {
+    const children: MqttData = {};
+    for (const level of PROTO_LEVELS) {
+      // A computed key defines an own property, even for __proto__.
+      Object.defineProperty(children, level, {
+        value: node(`home/${level}`, { message: `p:${level}`, isRetained: true }),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+    const d: MqttData = {
+      ["__proto__"]: node("__proto__", {
+        subtopicCount: 1,
+        children: { ["constructor"]: node("__proto__/constructor", { message: "deep" }) },
+      }),
+      home: node("home", { subtopicCount: PROTO_LEVELS.length, children }),
+    };
+    expect(findTopicNode(d, "__proto__")?.topic).toBe("__proto__");
+    expect(findTopicPayload(d, "__proto__/constructor")).toBe("deep");
+    for (const level of PROTO_LEVELS) {
+      expect(findTopicPayload(d, `home/${level}`)).toBe(`p:${level}`);
+      expect(findTopicIsRetained(d, `home/${level}`)).toBe(true);
+      expect(findTopicNode(d, `home/${level}/x`)).toBeNull();
+    }
+    expect(findTopicNode(d, "toString")).toBeNull();
   });
 });
 

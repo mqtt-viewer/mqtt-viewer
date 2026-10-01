@@ -450,3 +450,59 @@ test("search string with trailing empty space filters correctly", () => {
   const filteredData = filterData(unfilteredData, "test-message ");
   expect(JSON.stringify(filteredData)).toEqual(expectedResultString);
 });
+
+test("levels named after Object.prototype members survive filtering as ordinary keys", () => {
+  // Topic levels are publisher-controlled, and the store holds them in
+  // null-prototype maps. Build the tree the same way.
+  const levels = ["__proto__", "constructor", "toString", "hasOwnProperty"];
+  const leaf = (topic: string, message: string): MqttData[string] => ({
+    topic,
+    isDecodedProto: false,
+    isRetained: false,
+    latestMessageTime: new Date(1000),
+    message,
+    messageCount: 1,
+    subtopicCount: 0,
+    children: Object.create(null),
+  });
+  const define = (target: MqttData, key: string, value: MqttData[string]) =>
+    Object.defineProperty(target, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+
+  const children: MqttData = Object.create(null);
+  for (const level of levels) define(children, level, leaf(`a/${level}`, "match"));
+  define(children, "other", leaf("a/other", "nope"));
+  const data: MqttData = Object.create(null);
+  define(data, "a", {
+    ...leaf("a", "nope"),
+    message: undefined,
+    messageCount: levels.length + 1,
+    subtopicCount: levels.length + 1,
+    children,
+  });
+  // A top-level __proto__ with a matching child of its own.
+  const protoChildren: MqttData = Object.create(null);
+  define(protoChildren, "constructor", leaf("__proto__/constructor", "match"));
+  define(data, "__proto__", {
+    ...leaf("__proto__", "nope"),
+    message: undefined,
+    subtopicCount: 1,
+    children: protoChildren,
+  });
+
+  const filtered = filterData(data, "match");
+
+  expect(Object.keys(filtered).sort()).toEqual(["__proto__", "a"]);
+  expect(Object.keys(filtered.a.children).sort()).toEqual([...levels].sort());
+  expect(filtered.a.subtopicCount).toBe(levels.length);
+  expect(filtered.a.messageCount).toBe(levels.length);
+  expect(filtered.__proto__.subtopicCount).toBe(1);
+  expect(Object.keys(filtered.__proto__.children)).toEqual(["constructor"]);
+  // A pruned level holds no inherited member under a hostile name.
+  expect(Object.hasOwn(filtered.a.children, "valueOf")).toBe(false);
+  expect(Object.hasOwn(Object.prototype, "subtopicCount")).toBe(false);
+});
