@@ -59,6 +59,13 @@
       "default": false
     },
     {
+      "name": "isRetained",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether this topic holds a retained message, as far as the app knows. Renders the retained dot only; the backend is authoritative for counting and clearing."
+    },
+    {
       "name": "toggleExpansion",
       "type": "function",
       "required": false,

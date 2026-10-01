@@ -80,13 +80,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Added",
         title: "Pinned topics open to show everything beneath them",
-        body: "A pinned branch now expands in place at the top of the tree. Pinning a branch opens its first level for you.",
+        body: "A pinned branch now expands in place at the top of the tree, and pinning one opens its first level for you. Drag the bottom edge of the pinned block to resize it, and right-click a row in it for Show in tree.",
         thanks: [
           {
             name: "mrpiggi",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/153#issuecomment-5560389408",
           },
         ],
+      },
+      {
+        group: "Fixed",
+        title: "The topic tree no longer goes blank when it shrinks",
+        body: "Collapsing branches or narrowing a search while scrolled down could leave the tree empty until you scrolled again.",
       },
       {
         group: "Fixed",

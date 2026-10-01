@@ -30,6 +30,12 @@
   export let onClearRetained: (topic: string) => void;
   export let onClearRetainedBelow: (prefix: string) => void;
   export let onTogglePin: (topic: string) => void;
+  /**
+   * Opens the topic's ancestors in the topic tree and scrolls to it. Only
+   * passed for a right-click in the pinned block, where the topic is shown
+   * apart from the tree; the item is not rendered without it.
+   */
+  export let onShowInTree: ((topic: string) => void) | undefined = undefined;
 
   // Right-click does not move selection, so the menu names its own target.
   // Without this, a right-click on one topic while another is selected gives no
@@ -61,6 +67,15 @@
     <span>{isPinned ? "Unpin topic" : "Pin topic"}</span>
   </span>
 </DropdownMenuItem>
+
+{#if onShowInTree}
+  <DropdownMenuItem onClick={() => onShowInTree?.(topic)}>
+    <span class="flex items-center gap-2">
+      <Icon type="show" size={16} />
+      <span>Show in tree</span>
+    </span>
+  </DropdownMenuItem>
+{/if}
 
 <DropdownMenuItem onClick={() => onCopyTopic(topic)}>
   <span class="flex items-center gap-2">

@@ -31,18 +31,25 @@ const data: MqttData = {
   }),
 };
 
+// A plain list opens those topics under every pin, which is all most cases
+// need; a record sets each pin's own entry.
 const build = (
   pinnedTopics: string[],
-  expanded: string[] = [],
+  expanded: string[] | Record<string, string[]> = [],
   overrides: Partial<Parameters<typeof buildPinnedRows>[0]> = {}
 ) =>
   buildPinnedRows({
     data,
     pinnedTopics,
     pinnedSet: new Set(pinnedTopics),
-    expandedTopics: new Set(expanded),
+    expansion: new Map(
+      Array.isArray(expanded)
+        ? pinnedTopics.map((pin) => [pin, new Set(expanded)])
+        : Object.entries(expanded).map(([pin, t]) => [pin, new Set(t)])
+    ),
     sortKey: "topic",
     sortDir: "desc",
+    searchText: "",
     ...overrides,
   });
 
@@ -159,5 +166,118 @@ describe("buildPinnedRows", () => {
     expect(row.isExpanded).toBe(true);
     expect(row.countSubtopicTotal).toBe(3);
     expect(row.isPinned).toBe(true);
+  });
+
+  it("keeps a topic's expansion apart under each pin it shows beneath", () => {
+    // factory/line1 is a pin of its own and a descendant of factory.
+    const pins = ["factory", "factory/line1"];
+    const openUnderFactory = build(pins, {
+      factory: ["factory", "factory/line1"],
+    });
+    expect(summary(openUnderFactory)).toEqual([
+      "pin 0 factory",
+      "descendant 1 line1",
+      "descendant 2 motor",
+      "descendant 2 pressure",
+      "descendant 2 temperature",
+      "descendant 1 line2",
+      "pin 0 factory/line1",
+    ]);
+
+    const openAsPin = build(pins, {
+      factory: ["factory"],
+      "factory/line1": ["factory/line1"],
+    });
+    expect(summary(openAsPin)).toEqual([
+      "pin 0 factory",
+      "descendant 1 line1",
+      "descendant 1 line2",
+      "pin 0 factory/line1",
+      "descendant 1 motor",
+      "descendant 1 pressure",
+      "descendant 1 temperature",
+    ]);
+  });
+
+  it("tags every row with the pin it sits under", () => {
+    const rows = build(["factory", "factory/line1"], {
+      factory: ["factory", "factory/line1"],
+      "factory/line1": ["factory/line1"],
+    });
+    const roots = rows.map((row) =>
+      row.kind === "placeholder" ? null : `${row.topic} < ${row.pinRoot}`
+    );
+    expect(roots).toContain("factory/line1 < factory");
+    expect(roots).toContain("factory/line1 < factory/line1");
+    expect(roots).toContain("factory/line1/motor < factory");
+    expect(roots).toContain("factory/line1/motor < factory/line1");
+  });
+
+  describe("with a search", () => {
+    const search = (
+      pins: string[],
+      searchText: string,
+      expanded: string[] | Record<string, string[]> = []
+    ) => summary(build(pins, expanded, { searchText }));
+
+    it("keeps a pin whose full path matches, though no single level does", () => {
+      expect(search(["factory/line1"], "y/line")).toEqual([
+        "pin 0 factory/line1",
+      ]);
+    });
+
+    it("keeps a pin when only something beneath it matches, and prunes the rest", () => {
+      const pins = ["factory/line1", "factory/line2"];
+      expect(search(pins, "rpm", ["factory/line1", "factory/line1/motor"]))
+        .toEqual([
+          "pin 0 factory/line1",
+          "descendant 1 motor",
+          "descendant 2 rpm",
+        ]);
+      // Counted as the tree counts a filtered branch.
+      const [pin] = build(pins, [], { searchText: "rpm" });
+      expect(pin.kind !== "placeholder" && pin.countSubtopicTotal).toBe(1);
+    });
+
+    it("matches payloads, as the tree does", () => {
+      expect(search(["factory/line1", "factory/line2"], "idle")).toEqual([
+        "pin 0 factory/line2",
+      ]);
+    });
+
+    it("matches a placeholder on its path only", () => {
+      expect(search(["warehouse/door", "factory/line2"], "door")).toEqual([
+        "placeholder warehouse/door",
+      ]);
+      expect(search(["warehouse/door"], "idle")).toEqual([]);
+    });
+
+    it("shows nothing when nothing matches", () => {
+      expect(search(["factory", "warehouse/door"], "nothing-here")).toEqual(
+        []
+      );
+    });
+
+    it("opens nothing and leaves the expansion it was given alone", () => {
+      const expansion = new Map([["factory", new Set(["factory"])]]);
+      const rows = buildPinnedRows({
+        data,
+        pinnedTopics: ["factory"],
+        pinnedSet: new Set(["factory"]),
+        expansion,
+        sortKey: "topic",
+        sortDir: "desc",
+        searchText: "rpm",
+      });
+      // line1 holds the match but stays closed, as it would in the tree.
+      expect(summary(rows)).toEqual(["pin 0 factory", "descendant 1 line1"]);
+      expect([...expansion]).toEqual([["factory", new Set(["factory"])]]);
+    });
+
+    it("leaves the data it was given untouched", () => {
+      build(["factory"], ["factory"], { searchText: "rpm" });
+      expect(data.factory.subtopicCount).toBe(2);
+      expect(Object.keys(data.factory.children)).toEqual(["line1", "line2"]);
+    });
   });
 });

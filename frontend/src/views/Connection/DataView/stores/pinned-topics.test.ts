@@ -311,4 +311,132 @@ describe("pinned-topics store", () => {
     expect(changes).toEqual(["loaded"]);
     off();
   });
+
+  // A promise the test settles by hand, for a write still in flight.
+  const deferred = () => {
+    let resolve: (v?: unknown) => void = () => {};
+    let reject: (e: unknown) => void = () => {};
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+
+  it("does not let another window's read flicker a pin still being written", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const { seen, off } = observe(store);
+    await flush();
+
+    const write = deferred();
+    PinTopic.mockReturnValueOnce(write.promise);
+    store.pin("b/two");
+    expect(seen.value.order).toEqual(["a/one", "b/two"]);
+
+    // Another window's change lands mid-write; its read predates this write.
+    listeners.get("PinnedTopicsChanged")!({ data: { connectionId: 1 } });
+    await flush();
+    expect(seen.value.order).toEqual(["a/one", "b/two"]);
+
+    // Once the write commits, the database holds both windows' changes.
+    GetPinnedTopics.mockResolvedValue(rows("a/one", "c/three", "b/two"));
+    write.resolve();
+    await flush();
+    expect(seen.value.order).toEqual(["a/one", "c/three", "b/two"]);
+    off();
+  });
+
+  it("replays a read set aside mid-write only once the last write settles", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const changes: string[] = [];
+    store.onChange((change) => changes.push(change.kind));
+    const { seen, off } = observe(store);
+    await flush();
+    changes.length = 0;
+
+    const first = deferred();
+    const second = deferred();
+    PinTopic.mockReturnValueOnce(first.promise);
+    PinTopic.mockReturnValueOnce(second.promise);
+    store.pin("b/two");
+    store.pin("c/three");
+
+    listeners.get("PinnedTopicsChanged")!({ data: { connectionId: 1 } });
+    await flush();
+    expect(GetPinnedTopics).toHaveBeenCalledTimes(2);
+
+    first.resolve();
+    await flush();
+    // c/three is still being written, so reading now could still miss it.
+    expect(GetPinnedTopics).toHaveBeenCalledTimes(2);
+    expect(seen.value.order).toEqual(["a/one", "b/two", "c/three"]);
+
+    GetPinnedTopics.mockResolvedValue(rows("a/one", "b/two", "c/three", "d/four"));
+    second.resolve();
+    await flush();
+    expect(GetPinnedTopics).toHaveBeenCalledTimes(3);
+    expect(seen.value.order).toEqual(["a/one", "b/two", "c/three", "d/four"]);
+    expect(changes).toEqual(["pin", "pin", "loaded"]);
+    off();
+  });
+
+  it("does not read again after a write when nothing was set aside", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const { off } = observe(store);
+    await flush();
+
+    store.pin("b/two");
+    await flush();
+    expect(GetPinnedTopics).toHaveBeenCalledTimes(1);
+    off();
+  });
+
+  it("still falls back to the persisted pins when one of several writes fails", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const store = createPinnedTopicsStore(1);
+    const { seen, off } = observe(store);
+    await flush();
+
+    const failing = deferred();
+    const succeeding = deferred();
+    PinTopic.mockReturnValueOnce(failing.promise);
+    PinTopic.mockReturnValueOnce(succeeding.promise);
+    store.pin("b/two");
+    store.pin("c/three");
+
+    failing.reject(new Error("db locked"));
+    await flush();
+    expect(seen.value.order).toEqual(["a/one", "b/two", "c/three"]);
+
+    GetPinnedTopics.mockResolvedValue(rows("a/one", "c/three"));
+    succeeding.resolve();
+    await flush();
+    expect(seen.value.order).toEqual(["a/one", "c/three"]);
+    off();
+  });
+  it("treats a write that throws outright as a failed write, not a stuck one", async () => {
+    GetPinnedTopics.mockResolvedValue(rows("a/one"));
+    const store = createPinnedTopicsStore(1);
+    const { seen, off } = observe(store);
+    await flush();
+
+    PinTopic.mockImplementation(() => {
+      throw new Error("binding unavailable");
+    });
+    store.pin("b/two");
+    await flush();
+    // Fell back to what is persisted...
+    expect(seen.value.order).toEqual(["a/one"]);
+
+    // ...and later reads are still applied rather than set aside for ever.
+    GetPinnedTopics.mockResolvedValue(rows("a/one", "c/three"));
+    listeners.get("PinnedTopicsChanged")?.({ data: { connectionId: 1 } });
+    await flush();
+    expect(seen.value.order).toEqual(["a/one", "c/three"]);
+    off();
+  });
 });

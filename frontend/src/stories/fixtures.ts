@@ -1591,7 +1591,7 @@ export const getStoryArgTypes = (_componentName: string, props: string[]) => {
     resizeEdge: ["left", "right", "top"],
     size: ["small", "medium"],
     sortDir: ["asc", "desc"],
-    sortKey: ["topic", "time"],
+    sortKey: ["time", "topic", "rate", "msgs"],
     state: ["connected", "disconnected", "connecting", "reconnecting"],
     triggerVariant: ["primary", "secondary", "text"],
     variant: ["primary", "secondary", "text"],

@@ -82,6 +82,13 @@
       "name": "onTogglePin",
       "type": "function",
       "required": true
+    },
+    {
+      "name": "onShowInTree",
+      "type": "function",
+      "required": false,
+      "default": "undefined",
+      "description": "Opens the topic's ancestors in the topic tree and scrolls to it. Passed only for a right-click in the pinned block; the \"Show in tree\" item is not rendered without it, so the graph, the pop-out and the selected-topic panel never show it."
     }
   ],
   "tokens": [

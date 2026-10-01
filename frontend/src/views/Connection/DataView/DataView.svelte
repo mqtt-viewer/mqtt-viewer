@@ -67,8 +67,8 @@
     connection.connectionDetails.id
   );
   // What is open inside the pinned block. Lives here, beside the pins, so it
-  // outlives the tree and the data panel. Anything no longer under a pin is
-  // forgotten so the saved set cannot grow without bound, but only against a
+  // outlives the tree and the data panel. A pin's entry is forgotten once it
+  // is unpinned so the saved state cannot grow without bound, but only against a
   // pin list read back from the database. Every unpin, here or in another
   // window, ends in that read, whereas the local list is empty until the
   // first load and wrong while a failed write is being undone, and pruning

@@ -30,6 +30,7 @@
   import type { PinnedExpansionStore } from "../../stores/pinned-expansion";
   import { createHighlightedMqttTopicsStore } from "./stores/highlighted-topics";
   import defaultSorts from "@/stores/default-sorts";
+  import panelSizes from "@/stores/panel-sizes";
   import { get } from "svelte/store";
   import ContextMenu from "@/components/ContextMenu/ContextMenu.svelte";
   import TopicContextMenu from "../TopicContextMenu/TopicContextMenu.svelte";
@@ -66,6 +67,19 @@
     mqttHighlightStore,
     connection.eventSet
   );
+
+  // Bound so the context menu's "Show in tree" can reach the tree's list.
+  let topicTree: MqttTopicTree | undefined;
+
+  // The pinned block's dragged height, kept with the app's other panel sizes
+  // (one row per connection). 0 is stored for "not chosen", so the default
+  // two fifths stays in force until the divider is dragged, and a reset goes
+  // back to it.
+  const pinnedBlockPanelId = `pinned-topics:${connection.connectionDetails.id}`;
+  $: pinnedBodyCapPx =
+    $panelSizes.resizablePanelSizes[pinnedBlockPanelId]?.size || null;
+  const onPinnedBodyCapChange = (capPx: number | null) =>
+    panelSizes.updatePanelSize(pinnedBlockPanelId, capPx ?? 0, true);
 
   // The graph is only mounted in graph mode (see the {#if view === "list"}
   // below), so callers optional-chain when forwarding to it.
@@ -106,6 +120,9 @@
   let menuHasPayload = false;
   let menuIsRetained = false;
   let menuRetainedBelowCount = 0;
+  // Whether the right-click came from the pinned block, the one place where
+  // "Show in tree" means something.
+  let menuIsFromPinnedBlock = false;
   // Recomputed from the store so the item reads "Unpin topic" the moment a
   // pin lands, including one made in another window.
   $: menuIsPinned = menuTopic !== null && $pinnedTopicsStore.set.has(menuTopic);
@@ -126,6 +143,10 @@
 
     const data = get(mqttDataStore);
     menuTopic = topic;
+    // A pin nothing has published on yet has no row in the tree to show.
+    menuIsFromPinnedBlock =
+      row?.closest("[data-pinned-block]") != null &&
+      findTopicNode(data, topic) !== null;
     menuHasPayload = findTopicPayload(data, topic) !== null;
     menuIsRetained = findTopicIsRetained(data, topic);
     menuRetainedBelowCount = 0;
@@ -154,15 +175,16 @@
   };
 
   // A branch pinned here opens its first level in the pinned block, since its
-  // children are usually what you pinned it to watch. Wired here because this
-  // is where the topic data lives. Pins arriving from another window come in
-  // as "loaded", not "pin", so they stay collapsed.
+  // children are usually what you pinned it to watch. Only its own entry
+  // opens: the same topic showing beneath another pin stays as it was. Wired
+  // here because this is where the topic data lives. Pins arriving from
+  // another window come in as "loaded", not "pin", so they stay collapsed.
   onMount(() =>
     pinnedTopicsStore.onChange((change) => {
       if (change.kind !== "pin") return;
       const node = findTopicNode(get(mqttDataStore), change.topic);
       if (node !== null && node.subtopicCount > 0) {
-        pinnedExpansionStore.expand(change.topic);
+        pinnedExpansionStore.expand(change.topic, change.topic);
       }
     })
   );
@@ -349,9 +371,12 @@
         bind:clientWidth={treeWidth}
       >
         <MqttTopicTree
+          bind:this={topicTree}
           width={treeWidth || width}
           pinnedTopics={$pinnedTopicsStore.order}
           {pinnedExpansionStore}
+          {pinnedBodyCapPx}
+          {onPinnedBodyCapChange}
           onUnpin={(topic) => pinnedTopicsStore.unpin(topic)}
           onUnpinAll={() => pinnedTopicsStore.unpinAll()}
           selectedTopic={$selectedTopicStore.selectedTopic}
@@ -379,6 +404,9 @@
             retainedBelowCount={menuRetainedBelowCount}
             isPinned={menuIsPinned}
             onTogglePin={(topic) => pinnedTopicsStore.toggle(topic)}
+            onShowInTree={menuIsFromPinnedBlock
+              ? (topic) => topicTree?.revealInTree(topic)
+              : undefined}
             onCopyTopic={copyTopicPath}
             onCopyPayload={copyPayload}
             onExport={exportTopicMessages}

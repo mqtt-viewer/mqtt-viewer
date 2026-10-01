@@ -121,7 +121,6 @@
   </button>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    id={`topic-row-${expandKey}`}
     class={twMerge(
       "text-secondary-text font-thin font-mono ring-inset px-1",
       "flex w-fit min-w-0",
