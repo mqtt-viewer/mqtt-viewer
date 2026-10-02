@@ -134,3 +134,28 @@ test("rate sort never mutates the score objects (live store is uncloned)", () =>
   expect(rateA).toEqual({ score: 30, lastMs: now - 5_000 });
   expect(rateB).toEqual({ score: 8, lastMs: now - 5_000 });
 });
+
+test("rate sort ranks a level named __proto__ by its own score", () => {
+  // Topic levels are publisher-controlled. The store holds them in
+  // null-prototype maps, so build the data the same way.
+  const now = Date.now();
+  const data = Object.assign(Object.create(null), {
+    quiet: { rate: { score: 1, lastMs: now } },
+    medium: { rate: { score: 10, lastMs: now } },
+    toString: { rate: { score: 20, lastMs: now } },
+  });
+  Object.defineProperty(data, "__proto__", {
+    value: { rate: { score: 50, lastMs: now } },
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  const sortedKeys = getSortedDataKeys(data as MqttData, "rate", "desc");
+  expect(sortedKeys).toEqual(["__proto__", "toString", "medium", "quiet"]);
+  expect(getSortedDataKeys(data as MqttData, "rate", "asc")).toEqual([
+    "quiet",
+    "medium",
+    "toString",
+    "__proto__",
+  ]);
+});

@@ -59,6 +59,13 @@
       "default": false
     },
     {
+      "name": "isRetained",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Whether this topic holds a retained message, as far as the app knows. Renders the retained dot only; the backend is authoritative for counting and clearing."
+    },
+    {
       "name": "toggleExpansion",
       "type": "function",
       "required": false,
@@ -94,13 +101,6 @@
       "required": false,
       "default": "undefined",
       "description": "Unpins the topic. The pin marker is a button wherever a pinned row appears, in the tree as well as the pinned block; only pinned rows render it, so unpinned rows pay no listener cost."
-    },
-    {
-      "name": "showChevron",
-      "type": "boolean",
-      "required": false,
-      "default": true,
-      "description": "Hide the expansion chevron column, as the pinned block does."
     }
   ],
   "tokens": [

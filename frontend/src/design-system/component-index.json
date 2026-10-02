@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-01T10:40:22.321Z",
+  "generatedAt": "2026-10-01T13:56:55.416Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -3780,6 +3780,12 @@
           "description": "This connection's pinned topics, shared with the selected-topic panel."
         },
         {
+          "name": "pinnedExpansionStore",
+          "type": "store",
+          "required": true,
+          "description": "What is open inside the pinned block, per pin, owned by DataView so it survives a remount. A branch pinned from this window opens its own first level here."
+        },
+        {
           "name": "onRequestRebirth",
           "type": "function",
           "required": false,
@@ -3805,7 +3811,7 @@
         "SparkplugPanel",
         "ViewToggle"
       ],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic.",
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic. The pinned block's dragged height is kept with the app's panel sizes, one entry per connection. A right-click in the pinned block adds \"Show in tree\" to the topic menu.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/MqttDataPanel.stories.svelte",
@@ -3872,6 +3878,13 @@
           "default": false
         },
         {
+          "name": "isRetained",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Whether this topic holds a retained message, as far as the app knows. Renders the retained dot only; the backend is authoritative for counting and clearing."
+        },
+        {
           "name": "toggleExpansion",
           "type": "function",
           "required": false,
@@ -3907,13 +3920,6 @@
           "required": false,
           "default": "undefined",
           "description": "Unpins the topic. The pin marker is a button wherever a pinned row appears, in the tree as well as the pinned block; only pinned rows render it, so unpinned rows pay no listener cost."
-        },
-        {
-          "name": "showChevron",
-          "type": "boolean",
-          "required": false,
-          "default": true,
-          "description": "Hide the expansion chevron column, as the pinned block does."
         }
       ],
       "tokens": [
@@ -3977,8 +3983,10 @@
           "type": "enum",
           "required": true,
           "options": [
+            "time",
             "topic",
-            "time"
+            "rate",
+            "msgs"
           ]
         },
         {
@@ -4001,7 +4009,7 @@
           "type": "array",
           "required": false,
           "default": [],
-          "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list."
+          "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list; a pinned branch opens in place to show its subtree. The search filters the block as it filters the tree, and the header then counts matching pins out of all of them."
         },
         {
           "name": "onUnpin",
@@ -4014,11 +4022,31 @@
           "type": "function",
           "required": false,
           "default": "> void"
+        },
+        {
+          "name": "pinnedExpansionStore",
+          "type": "store",
+          "required": true,
+          "description": "What is open inside the pinned block, per pin, so a topic shown under two pins opens in each independently. Separate from expandedTopicsStore so the block and the tree expand independently; owned by DataView and persisted per connection."
+        },
+        {
+          "name": "pinnedBodyCapPx",
+          "type": "number",
+          "required": false,
+          "default": null,
+          "description": "The height cap, in px, the user dragged the pinned block's body to; null for the default of two fifths of the panel, block included. Clamped so the tree keeps four rows when there is room."
+        },
+        {
+          "name": "onPinnedBodyCapChange",
+          "type": "function",
+          "required": false,
+          "default": "> void",
+          "description": "Called at the end of a drag on the block's divider, on each arrow key on it, and with null on a double-click or Enter, which go back to the default."
         }
       ],
       "tokens": [],
       "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The divider under the pinned block is a resize handle (role separator, focusable, arrow keys resize by a row). The component exports revealInTree(topic), which the data panel's \"Show in tree\" menu item calls to open a topic's ancestors and scroll the tree to it.",
       "sourcePath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicTree.svelte",
       "specPath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicTree.spec.json",
       "storyPath": "src/views/Connection/DataView/components/MqttDataPanel/components/MqttTopicTree/MqttTopicTree.stories.svelte",
@@ -6450,6 +6478,13 @@
           "name": "onTogglePin",
           "type": "function",
           "required": true
+        },
+        {
+          "name": "onShowInTree",
+          "type": "function",
+          "required": false,
+          "default": "undefined",
+          "description": "Opens the topic's ancestors in the topic tree and scrolls to it. Passed only for a right-click in the pinned block; the \"Show in tree\" item is not rendered without it, so the graph, the pop-out and the selected-topic panel never show it."
         }
       ],
       "tokens": [

@@ -1,3 +1,9 @@
+# Make a fresh checkout or agent worktree ready to work in: frontend deps,
+# scripts/.venv, .claude/launch.json, the dist stub and the git hooks.
+# Idempotent; see scripts/setup-worktree.sh.
+setup:
+  scripts/setup-worktree.sh
+
 test PATH='./...': stub-dist test-broker
   set -o pipefail && go test {{PATH}} fmt -json | tparse -all
 

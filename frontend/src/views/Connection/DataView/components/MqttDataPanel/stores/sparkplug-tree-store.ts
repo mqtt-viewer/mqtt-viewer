@@ -995,13 +995,19 @@ export const createSparkplugTreeStore = (
     omitted?: Record<string, number>
   ) => {
     const name = metricKey(pm);
+    // Own keys only: a metric named "toString" must not read the inherited
+    // function as its omitted size.
+    const omittedSize =
+      omitted !== undefined && Object.prototype.hasOwnProperty.call(omitted, name)
+        ? omitted[name]
+        : undefined;
     const existing = scope.metrics.get(name);
     if (existing) {
       // Same order: a later sample of the metric in the same payload, which
       // wins, as it does in the backend's index.
       if (ord >= existing.lastSeenOrd) {
         applyDeclarations(existing, pm, ord);
-        applyValue(existing, pm, ord, m, payloadTs, omitted?.[name]);
+        applyValue(existing, pm, ord, m, payloadTs, omittedSize);
       } else {
         applyDeclarations(existing, pm, ord);
       }
@@ -1037,7 +1043,7 @@ export const createSparkplugTreeStore = (
       built: null,
     };
     applyDeclarations(rt, pm, ord);
-    applyValue(rt, pm, ord, m, payloadTs, omitted?.[name]);
+    applyValue(rt, pm, ord, m, payloadTs, omittedSize);
     scope.metrics.set(name, rt);
     scope.sortedKeys = null;
     metricCount++;

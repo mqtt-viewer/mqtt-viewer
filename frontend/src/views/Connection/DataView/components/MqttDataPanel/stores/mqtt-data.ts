@@ -8,6 +8,7 @@ import {
   LIST_RATE_TAU_MS,
   type DecayScore,
 } from "@/util/decay-score";
+import { emptyMqttData, getMqttDataChild } from "./mqtt-data-levels";
 import type {
   HighlightCause,
   HighlightedMqttTopicsStore,
@@ -58,7 +59,7 @@ export const createMqttDataStore = (
   highlightedTopicStore: HighlightedMqttTopicsStore,
   eventSet?: events.ConnectionEventsSet
 ) => {
-  const { subscribe, set, update } = writable<MqttData>({}, () => {
+  const { subscribe, set, update } = writable<MqttData>(emptyMqttData(), () => {
     if (eventSet === undefined) return;
     // Capture the unsubscribe handles and tear them down when the last store
     // subscriber leaves, so listeners don't accumulate across tab churn.
@@ -181,6 +182,8 @@ export const createMqttDataStore = (
     retained: boolean | undefined
   ): boolean => {
     const topicLevel = topicLevels[currentTopicLevel];
+    // mqttData is always one of this store's null-prototype maps, so a bare
+    // lookup cannot hit an inherited member.
     if (mqttData[topicLevel] !== undefined) {
       if (currentTopicLevel === topicLevels.length - 1) {
         mqttData[topicLevel].messageCount += count;
@@ -223,14 +226,14 @@ export const createMqttDataStore = (
         isDecodedProto,
         isRetained: retained ?? false,
         message,
-        children: {},
+        children: emptyMqttData(),
         latestMessageTime: timestamp,
       };
       bumpNodeRate(mqttData[topicLevel], timestamp.getTime(), count);
       return true;
     }
 
-    const children: MqttData = {};
+    const children = emptyMqttData();
     insertMqttMessage(
       children,
       topicLevels,
@@ -275,7 +278,7 @@ export const createMqttDataStore = (
   };
 
   const resetMqttData = () => {
-    set({});
+    set(emptyMqttData());
   };
 
   // Walk the topic path and return that exact node, or undefined if any
@@ -287,7 +290,7 @@ export const createMqttDataStore = (
     let children = mqttData;
     let node: MqttData[string] | undefined;
     for (const level of topic.split("/")) {
-      node = children[level];
+      node = getMqttDataChild(children, level);
       if (node === undefined) return undefined;
       children = node.children;
     }

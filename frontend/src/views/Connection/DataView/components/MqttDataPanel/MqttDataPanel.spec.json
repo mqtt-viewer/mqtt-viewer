@@ -56,6 +56,12 @@
       "description": "This connection's pinned topics, shared with the selected-topic panel."
     },
     {
+      "name": "pinnedExpansionStore",
+      "type": "store",
+      "required": true,
+      "description": "What is open inside the pinned block, per pin, owned by DataView so it survives a remount. A branch pinned from this window opens its own first level here."
+    },
+    {
       "name": "onRequestRebirth",
       "type": "function",
       "required": false,
@@ -81,5 +87,5 @@
     "SparkplugPanel",
     "ViewToggle"
   ],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic."
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The List/Sparkplug mode toggle only renders once the connection has seen Sparkplug traffic. The pinned block's dragged height is kept with the app's panel sizes, one entry per connection. A right-click in the pinned block adds \"Show in tree\" to the topic menu."
 }

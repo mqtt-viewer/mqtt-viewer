@@ -98,6 +98,22 @@
   {template}
 />
 
+<!-- Right-clicked in the pinned block, the only place that offers "Show in
+     tree": it opens the topic's ancestors in the tree below and scrolls to
+     it. -->
+<Story
+  name="From the pinned block"
+  args={{
+    topic: "factory/line1/sensor3",
+    hasPayload: false,
+    isRetained: false,
+    retainedBelowCount: 0,
+    isPinned: true,
+    onShowInTree: noop,
+  }}
+  {template}
+/>
+
 <Story
   name="Long topic path"
   args={{

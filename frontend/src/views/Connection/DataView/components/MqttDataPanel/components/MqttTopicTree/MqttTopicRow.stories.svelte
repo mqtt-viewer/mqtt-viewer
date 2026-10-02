@@ -6,7 +6,7 @@
 
   const componentName = "MqttTopicRow";
   const storyId = "Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow";
-  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus","isRetained","isPinned","showChevron"];
+  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus","isRetained","isPinned","onUnpin"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -32,15 +32,20 @@
   {template}
 />
 
-<!-- How the same row looks inside the pinned block: no chevron column, and the
-     whole topic path as the label. -->
+<!-- How a pin looks at the top of the pinned block: the whole topic path as
+     the label. A pinned branch keeps its chevron so it can open in place. -->
 <Story
   name="Pinned block row"
   args={{
     ...storyArgs,
     isPinned: true,
-    showChevron: false,
-    topicLevel: "factory/line/temperature",
+    isExpanded: false,
+    topic: "factory/line",
+    expandKey: "factory/line",
+    topicLevel: "factory/line",
+    subtopicCount: 2,
+    message: undefined,
+    messageCount: 0,
     onUnpin: () => {},
   }}
   {template}

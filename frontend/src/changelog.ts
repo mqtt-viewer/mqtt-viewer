@@ -88,6 +88,17 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "Sends Node Control/Rebirth to one edge node, or to every node missing a birth, after a confirmation.",
       },
       {
+        group: "Added",
+        title: "Pinned topics open to show everything beneath them",
+        body: "A pinned branch now expands in place at the top of the tree, and pinning one opens its first level for you. Drag the bottom edge of the pinned block to resize it, and right-click a row in it for Show in tree.",
+        thanks: [
+          {
+            name: "mrpiggi",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/153#issuecomment-5560389408",
+          },
+        ],
+      },
+      {
         group: "Fixed",
         title: "Crash when decoding Sparkplug on MQTT 3 connections",
         body: "The first Sparkplug message on an MQTT 3.1 or 3.1.1 connection closed the app.",
@@ -154,6 +165,16 @@ export const CHANGELOG: ChangelogEntry[] = [
         group: "Fixed",
         title: "The Docker image stops promptly",
         body: "A request still in flight when the container stopped could hold it for 30 seconds, long enough for Docker to kill it before it disconnected from your brokers. It now gives up after 5 seconds and disconnects cleanly.",
+      },
+      {
+        group: "Fixed",
+        title: "The topic tree no longer goes blank when it shrinks",
+        body: "Collapsing branches or narrowing a search while scrolled down could leave the tree empty until you scrolled again.",
+      },
+      {
+        group: "Fixed",
+        title: "Topics named like toString or constructor show up",
+        body: "A topic level called toString or constructor now appears in the tree like any other, and no longer drops the rest of the messages that arrived with it.",
       },
       {
         group: "Miscellaneous",

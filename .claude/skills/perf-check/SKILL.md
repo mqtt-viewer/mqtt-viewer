@@ -19,16 +19,16 @@ like test.mosquitto.org do to the app.
 # local brokers (macOS)
 brew install mosquitto
 
-# python env for the harness
-python3 -m venv scripts/.venv
-scripts/.venv/bin/pip install paho-mqtt
+# python env for the harness (and the rest of the checkout setup)
+just setup
 ```
 
-`scripts/.venv` is gitignored, so it does not exist in an agent
-worktree. Either re-run those two lines there, or use the main
-checkout's copy at `~/git/mqtt-viewer/scripts/.venv/bin/python3`.
-Backgrounding the flood before checking the interpreter exists fails
-silently and looks like a broker with no traffic.
+`scripts/.venv` is gitignored, so it does not exist in a fresh agent
+worktree. `just setup` (`scripts/setup-worktree.sh`) creates it with
+`paho-mqtt`, or symlinks the main checkout's venv if it cannot, and is
+safe to re-run. Check `scripts/.venv/bin/python -c 'import paho.mqtt'`
+before backgrounding a flood: a missing interpreter fails silently and
+looks like a broker with no traffic.
 
 ## Run
 
@@ -138,3 +138,10 @@ give it the 5 seconds before reaching for `kill -9`. The open event
 WebSocket does not hold it up. Older builds waited 30 seconds and then
 panicked with `server shutdown error: context deadline exceeded`; that
 is the same slow stop, not a crash mid-run.
+
+The browser pane throttles `requestAnimationFrame` to about 2 fps (frames
+1000 ms apart, zero long tasks), so rAF frame timing there means nothing
+and layout read straight after a resize can be stale. Measure main-thread
+load with a `MessageChannel` or `setTimeout` event-loop-lag sampler plus
+a `longtask` `PerformanceObserver`, and wait about a second after a
+resize before measuring.

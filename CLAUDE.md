@@ -32,8 +32,9 @@ contract (`docs/WRITING_STYLE.md`) for anything a user reads.
 
 End-to-end verification IS possible from a browser: run the app in Wails
 server mode via `scripts/serve-browser.sh` (real Go backend, bindings work
-over HTTP). A plain `wails3 dev` Vite port renders but bindings fail. Full
-how-to and gotchas: AGENTS.md "Driving the app from a browser (agents)".
+over HTTP; pass it this checkout's port, `scripts/dev-ports.sh server`). A
+plain `wails3 dev` Vite port renders but bindings fail. Full how-to
+and gotchas: AGENTS.md "Driving the app from a browser (agents)".
 
 ## Commands
 
@@ -62,9 +63,15 @@ placeholder would not survive). The recipe mirrors the stub
 `build/Taskfile.yml`'s `generate:bindings` task creates. A real
 `pnpm build` from `frontend/` satisfies the embed too.
 
+In a fresh checkout or agent worktree, run `just setup`
+(`scripts/setup-worktree.sh`) first: it installs frontend deps, the
+`scripts/.venv` harness env, `.claude/launch.json`, the dist stub and the
+git hooks, and is safe to re-run.
+
 Dev-server ports are derived per checkout so parallel agent worktrees
-never collide. Once per checkout, run `scripts/dev-ports.sh write-launch`
-to generate `.claude/launch.json` (gitignored). See
+never collide. `just setup` runs `scripts/dev-ports.sh write-launch` to
+generate `.claude/launch.json` (gitignored); `scripts/dev-ports.sh`
+prints the Vite, Storybook and server-mode ports. See
 `docs/MULTI_AGENT_DEV.md`.
 
 ### The wails3 CLI

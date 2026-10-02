@@ -117,6 +117,20 @@ die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
 mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
 trailing-slash self-heal (see the file's header for the rest).
 
+### Measuring performance in the browser pane
+
+The in-app browser pane throttles `requestAnimationFrame`: about 2 fps
+observed, frames 1000 ms apart with zero long tasks. rAF-based frame
+timing there is meaningless, and layout read straight after a resize can
+be stale. Instead:
+
+- Measure main-thread load with an event-loop-lag sampler (post a
+  `MessageChannel` message or a `setTimeout(0)` on a short interval and
+  record how late each one runs) plus a `PerformanceObserver` on
+  `longtask`.
+- Wait about a second after a resize before measuring anything that
+  depends on layout.
+
 ### Field-tested walkthrough (Sparkplug e2e, 2026-07)
 
 A full e2e drive of the app (create connection, connect to a local broker,

@@ -47,8 +47,10 @@
       "type": "enum",
       "required": true,
       "options": [
+        "time",
         "topic",
-        "time"
+        "rate",
+        "msgs"
       ]
     },
     {
@@ -71,7 +73,7 @@
       "type": "array",
       "required": false,
       "default": [],
-      "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list."
+      "description": "Pinned topics for this connection, in pin order. Renders the sticky pinned block above the virtual list; a pinned branch opens in place to show its subtree. The search filters the block as it filters the tree, and the header then counts matching pins out of all of them."
     },
     {
       "name": "onUnpin",
@@ -84,9 +86,29 @@
       "type": "function",
       "required": false,
       "default": "> void"
+    },
+    {
+      "name": "pinnedExpansionStore",
+      "type": "store",
+      "required": true,
+      "description": "What is open inside the pinned block, per pin, so a topic shown under two pins opens in each independently. Separate from expandedTopicsStore so the block and the tree expand independently; owned by DataView and persisted per connection."
+    },
+    {
+      "name": "pinnedBodyCapPx",
+      "type": "number",
+      "required": false,
+      "default": null,
+      "description": "The height cap, in px, the user dragged the pinned block's body to; null for the default of two fifths of the panel, block included. Clamped so the tree keeps four rows when there is room."
+    },
+    {
+      "name": "onPinnedBodyCapChange",
+      "type": "function",
+      "required": false,
+      "default": "> void",
+      "description": "Called at the end of a drag on the block's divider, on each arrow key on it, and with null on a double-click or Enter, which go back to the default."
     }
   ],
   "tokens": [],
   "dependencies": [],
-  "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
+  "notes": "Figma is not linked yet; this story uses local Storybook fixtures. The divider under the pinned block is a resize handle (role separator, focusable, arrow keys resize by a row). The component exports revealInTree(topic), which the data panel's \"Show in tree\" menu item calls to open a topic's ancestors and scroll the tree to it."
 }

@@ -1,5 +1,6 @@
 import { formatPayload } from "@/components/CodeEditor/formatting";
 import type { MqttData } from "./components/MqttDataPanel/stores/mqtt-data";
+import { getMqttDataChild } from "./components/MqttDataPanel/stores/mqtt-data-levels";
 
 /**
  * Shared payload-copy rules for the list tree, the graph, and the
@@ -20,15 +21,19 @@ export const formatPayloadForCopy = (payload: string): string => {
   return formatPayload(payload, "json-prettier");
 };
 
-/** Walk a full topic path to its node, or null if it isn't in the tree. */
+/**
+ * Walk a full topic path to its node, or null if it isn't in the tree. Levels
+ * are matched as own keys only, so a topic such as "toString" or
+ * "constructor/x" never resolves to an Object.prototype member.
+ */
 export const findTopicNode = (
   data: MqttData,
   topic: string
 ): MqttData[string] | null => {
   const levels = topic.split("/");
-  let current: MqttData | undefined = data;
+  let current: MqttData = data;
   for (let i = 0; i < levels.length; i++) {
-    const node: MqttData[string] | undefined = current?.[levels[i]];
+    const node = getMqttDataChild(current, levels[i]);
     if (node === undefined) return null;
     if (i === levels.length - 1) return node;
     current = node.children;
