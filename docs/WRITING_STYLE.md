@@ -1,8 +1,8 @@
 # Writing style
 
-How MQTT Viewer sounds in anything a user reads: the changelog / "What's new"
-notes, dialog copy, empty states, tooltips, README, release notes, and the
-website. The goal is simple. It should read like a real person who built the
+How MQTT Viewer sounds in anything a person reads: the changelog / "What's new"
+notes, dialog copy, empty states, tooltips, README, release notes, the
+website, and pull request descriptions and comments. The goal is simple. It should read like a real person who built the
 app wrote it, because one did. It should never read like it came out of a
 template or a language model.
 
@@ -103,6 +103,31 @@ it costs, then stops.
   "Charting improvements". No emoji or icon on the title.
 - Write for someone mid-task who just updated and wants to know what changed.
 - Keep the whole entry skimmable. Nobody reads a wall of text in a dialog.
+
+## Pull requests and comments
+
+PR descriptions, PR comments, review comments and issue replies are read by
+people, in public. Write them the way you would tell someone across the desk.
+
+- Two or three plain sentences: what changed and why, and the issue it
+  answers if there is one. Then stop.
+- No headings, no bullet lists, no checklists, no "Summary" or "Test plan"
+  sections. If it needs a heading it is too long.
+- Nothing about who or what wrote it. No "Generated with", "Written by" or
+  "Co-authored" line for a tool, no session links, no tool name.
+- Leave out the working. Review findings, test logs and how the change was
+  verified belong in the conversation with the maintainer, not in the PR.
+  Mention a risk or a thing left undone only if the reader has to act on it.
+- A comment answers the person in a sentence or two. Thank them if they
+  reported or fixed something; do not restate what they said.
+- The other rules still apply: no em dashes, no emojis, British spelling.
+
+This is the length and tone to copy:
+
+> Pinned branches now expand in place in the pinned block (resizable,
+> searchable) so you can keep a whole subtree in view, as asked for in #153.
+> Also fixes the tree going blank after a collapse and topics named like
+> toString, plus some dev tooling.
 
 ## Quick before / after
 

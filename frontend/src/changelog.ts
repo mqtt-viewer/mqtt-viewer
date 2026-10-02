@@ -60,7 +60,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "In development",
     headline: "What's new in MQTT Viewer 1.2",
     intro:
-      "Sparkplug B with real metric names and a live view of the whole network. Plus a month of fixes.",
+      "Sparkplug B with real metric names and a live view of the whole network, and pinned topics that open to show what is beneath them. Plus a month of fixes.",
     sections: [
       {
         group: "Added",
@@ -90,7 +90,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Added",
         title: "Pinned topics open to show everything beneath them",
-        body: "A pinned branch now expands in place at the top of the tree, and pinning one opens its first level for you. Drag the bottom edge of the pinned block to resize it, and right-click a row in it for Show in tree.",
+        body: "A pinned branch expands in place at the top of the tree. Drag the bottom edge of the pinned block to resize it, and right-click a row in it for Show in tree.",
         thanks: [
           {
             name: "mrpiggi",
@@ -109,7 +109,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Saved passwords stay encrypted when you edit a connection",
-        body: "Saving a connection without changing its password stored it unencrypted. I now encrypt any password stored that way the next time the app opens.",
+        body: "Saving a connection without changing its password stored it unencrypted. Passwords stored that way are encrypted again the next time the app opens, except one of 38 or more letters and digits, which waits until you next change it.",
         thanks: [
           {
             name: "viktak",
@@ -158,13 +158,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
-        title: "Error messages no longer read \"[object Object]\"",
-        body: "An error that arrived as a bare object now shows its message, or \"Unknown error\" when it has none.",
-      },
-      {
-        group: "Fixed",
         title: "The Docker image stops promptly",
-        body: "A request still in flight when the container stopped could hold it for 30 seconds, long enough for Docker to kill it before it disconnected from your brokers. It now gives up after 5 seconds and disconnects cleanly.",
+        body: "A request still in flight could hold a stopping container for 30 seconds, so Docker killed it before it disconnected from your brokers. It now waits 5 seconds at most.",
       },
       {
         group: "Fixed",
@@ -174,7 +169,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Topics named like toString or constructor show up",
-        body: "A topic level called toString or constructor now appears in the tree like any other, and no longer drops the rest of the messages that arrived with it.",
+        body: "A topic level called toString or constructor appears in the tree like any other, and no longer drops the messages that arrived with it.",
       },
       {
         group: "Miscellaneous",
