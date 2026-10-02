@@ -373,7 +373,9 @@
         close={() => (isPublishPanelOpen = false)}
       />
     </ResizableContainer>
-    <div class="flex flex-col grow min-w-0 min-h-0">
+    <!-- basis-0: takes whatever the side panels leave, whatever its content
+         would like to be. -->
+    <div class="flex flex-col grow basis-0 min-w-0 min-h-0">
       <div
         class="grow min-h-0 max-w-full overflow-x-hidden overflow-y-auto"
       >

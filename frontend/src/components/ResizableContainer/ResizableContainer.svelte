@@ -134,7 +134,12 @@
   {...$$restProps}
   class={twMerge(
     $$restProps.class,
-    "relative",
+    // shrink-0: the panel is exactly the size the user dragged it to. Left
+    // shrinkable, flexbox takes space from it in proportion to how wide the
+    // neighbouring content would like to be, so the panel changed width
+    // whenever that content did (switching between list, graph and
+    // Sparkplug).
+    "relative shrink-0",
     !resizing ? (isVertical ? "transition-[height]" : "transition-[width]") : ""
   )}
   style:width={!isVertical ? `${width}px` : undefined}
