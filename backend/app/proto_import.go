@@ -1,9 +1,12 @@
 package app
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"log/slog"
 	"mqtt-viewer/backend/models"
-	"mqtt-viewer/backend/util"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +16,16 @@ import (
 // every connection's imported proto files, one subdirectory per connection
 // id.
 const protoImportsDirName = "proto-imports"
+
+// Import limits. Uploads arrive over HTTP in the Docker web UI, so every
+// import (folder or upload) is bounded before anything is written.
+const (
+	maxProtoImportFiles      = 2000
+	maxProtoImportFileBytes  = 4 << 20
+	maxProtoImportTotalBytes = 32 << 20
+	// maxProtoImportDepth is how many folders deep a file may sit.
+	maxProtoImportDepth = 16
+)
 
 // ProtoUploadFile is a single .proto file uploaded from the browser (the web
 // build has no native folder picker, so files are read client-side and sent
@@ -31,54 +44,112 @@ func (a *App) protoImportDir(connId uint) string {
 	return filepath.Join(a.Paths.ResourcePath, protoImportsDirName, fmt.Sprint(connId))
 }
 
+// protoImportStagingPattern names a connection's staging dirs (an
+// os.MkdirTemp pattern) so DeleteConnection can find leftovers without
+// touching another connection's import in flight.
+func protoImportStagingPattern(connId uint) string {
+	return fmt.Sprintf(".staging-%d-*", connId)
+}
+
 // ImportProtoDir copies every .proto file found under sourceDir (recursively,
 // preserving relative paths) into the connection's internal proto-imports
-// directory, compiles that internal copy, and swaps the result into the live
-// protoState. sourceDir is persisted onto Connection.ProtoRegDir for display
-// and as the source ReimportProto re-reads from; it is not itself compiled
-// from again.
+// directory, compiles it, and swaps the result into the live protoState.
+// sourceDir is persisted onto Connection.ProtoRegDir for display and as the
+// source ReimportProto re-reads from; it is not itself compiled from again.
+// Symlinks and other non-regular files are skipped, never followed. A
+// compile failure changes nothing (see importProtoFiles).
 func (a *App) ImportProtoDir(connId uint, sourceDir string) (*ProtoStateResult, error) {
-	appConnection, ok := a.appConnection(connId)
-	if !ok {
-		return nil, fmt.Errorf("connection not found (%d)", connId)
+	appConnection, unlock, err := a.lockProtoImport(connId)
+	if err != nil {
+		return nil, err
 	}
-	// Serialises against any other import/remove in flight for this
-	// connection (see protoState.importMu) so a concurrent call from a
-	// second window can't interleave the directory swap below.
-	appConnection.ProtoState.LockImport()
-	defer appConnection.ProtoState.UnlockImport()
+	defer unlock()
 
 	info, err := os.Stat(sourceDir)
 	if err != nil || !info.IsDir() {
 		return nil, fmt.Errorf("folder not found")
 	}
 
-	protoFilePaths := util.FindAllNestedFilesWithExtension(sourceDir, ".proto")
-	if len(protoFilePaths) == 0 {
+	files, err := collectProtoDirFiles(sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
 		return nil, fmt.Errorf("no .proto files in that folder")
 	}
 
-	files := make([]ProtoUploadFile, 0, len(protoFilePaths))
-	for _, filePath := range protoFilePaths {
-		rel, err := filepath.Rel(sourceDir, filePath)
-		if err != nil {
-			return nil, err
-		}
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, ProtoUploadFile{Name: filepath.ToSlash(rel), Content: string(content)})
+	return a.importProtoFiles(connId, appConnection, files, &sourceDir)
+}
+
+// collectProtoDirFiles reads every regular .proto file under sourceDir,
+// within the import limits. The root itself may be a symlink (the user
+// picked it); anything below that is a symlink or not a regular file is
+// skipped.
+func collectProtoDirFiles(sourceDir string) ([]ProtoUploadFile, error) {
+	root, err := filepath.EvalSymlinks(sourceDir)
+	if err != nil {
+		return nil, fmt.Errorf("folder not found")
 	}
 
-	if err := a.swapInProtoImportFiles(connId, files); err != nil {
+	files := []ProtoUploadFile{}
+	total := 0
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if rel != "." && len(strings.Split(filepath.ToSlash(rel), "/")) > maxProtoImportDepth {
+				return fmt.Errorf("folders are nested more than %d deep", maxProtoImportDepth)
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() || filepath.Ext(d.Name()) != ".proto" {
+			return nil
+		}
+		name := filepath.ToSlash(rel)
+		if err := validateProtoUploadName(name); err != nil {
+			return err
+		}
+		if len(files) >= maxProtoImportFiles {
+			return fmt.Errorf("too many .proto files (the limit is %d)", maxProtoImportFiles)
+		}
+		content, err := readProtoFileWithinLimit(path, name)
+		if err != nil {
+			return err
+		}
+		total += len(content)
+		if total > maxProtoImportTotalBytes {
+			return fmt.Errorf("the .proto files are too large in total (the limit is %d MiB)", maxProtoImportTotalBytes>>20)
+		}
+		files = append(files, ProtoUploadFile{Name: name, Content: string(content)})
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	if err := a.setProtoRegDir(connId, &sourceDir); err != nil {
-		return nil, err
-	}
+	return files, nil
+}
 
-	return a.refreshProtoImportState(connId)
+// readProtoFileWithinLimit reads at most one byte past the per-file limit,
+// so a file that grows after the walk saw it still can't blow the budget.
+func readProtoFileWithinLimit(path, name string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	content, err := io.ReadAll(io.LimitReader(f, maxProtoImportFileBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > maxProtoImportFileBytes {
+		return nil, fmt.Errorf("%s is too large (the limit is %d MiB per file)", name, maxProtoImportFileBytes>>20)
+	}
+	return content, nil
 }
 
 // ImportProtoFiles writes an in-memory set of uploaded .proto files into the
@@ -87,50 +158,78 @@ func (a *App) ImportProtoDir(connId uint, sourceDir string) (*ProtoStateResult, 
 // swaps them in the same way as ImportProtoDir. Uploads have no source
 // folder to remember, so ProtoRegDir is cleared.
 func (a *App) ImportProtoFiles(connId uint, files []ProtoUploadFile) (*ProtoStateResult, error) {
-	appConnection, ok := a.appConnection(connId)
-	if !ok {
+	if _, ok := a.appConnection(connId); !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no files to import")
-	}
-	for _, f := range files {
-		if err := validateProtoUploadName(f.Name); err != nil {
-			return nil, err
-		}
+	if err := validateProtoUploadFiles(files); err != nil {
+		return nil, err
 	}
 
 	// See ImportProtoDir: serialises against any other import/remove in
 	// flight for this connection.
-	appConnection.ProtoState.LockImport()
-	defer appConnection.ProtoState.UnlockImport()
-
-	if err := a.swapInProtoImportFiles(connId, files); err != nil {
+	appConnection, unlock, err := a.lockProtoImport(connId)
+	if err != nil {
 		return nil, err
 	}
-	if err := a.setProtoRegDir(connId, nil); err != nil {
-		return nil, err
-	}
+	defer unlock()
 
-	return a.refreshProtoImportState(connId)
+	return a.importProtoFiles(connId, appConnection, files, nil)
 }
 
-// validateProtoUploadName guards ImportProtoFiles against a name that would
-// escape the internal import directory (absolute paths, ".." segments,
-// backslashes, which forward-slash-relative names never legitimately need)
-// or that isn't a .proto file. Forward-slash relative subpaths are allowed so
-// a folder-shaped upload can preserve its import-relative layout.
+// validateProtoUploadFiles checks every name and the import limits before
+// anything touches the disk.
+func validateProtoUploadFiles(files []ProtoUploadFile) error {
+	if len(files) == 0 {
+		return fmt.Errorf("no files to import")
+	}
+	if len(files) > maxProtoImportFiles {
+		return fmt.Errorf("too many .proto files (the limit is %d)", maxProtoImportFiles)
+	}
+	total := 0
+	seen := make(map[string]bool, len(files))
+	for _, f := range files {
+		if err := validateProtoUploadName(f.Name); err != nil {
+			return err
+		}
+		if seen[f.Name] {
+			return fmt.Errorf("%s is in the upload twice", f.Name)
+		}
+		seen[f.Name] = true
+		if len(f.Content) > maxProtoImportFileBytes {
+			return fmt.Errorf("%s is too large (the limit is %d MiB per file)", f.Name, maxProtoImportFileBytes>>20)
+		}
+		total += len(f.Content)
+		if total > maxProtoImportTotalBytes {
+			return fmt.Errorf("the .proto files are too large in total (the limit is %d MiB)", maxProtoImportTotalBytes>>20)
+		}
+	}
+	return nil
+}
+
+// validateProtoUploadName guards an import against a name that would escape
+// the internal import directory (absolute paths, "." or ".." segments,
+// backslashes, drive letters or any colon, which forward-slash-relative
+// names never legitimately need), that a filesystem would mangle (empty or
+// whitespace-padded segments), that nests too deep, or that isn't a .proto
+// file. ".." is only rejected as a whole segment: "v1..2.proto" is legal.
 func validateProtoUploadName(name string) error {
 	if name == "" || filepath.IsAbs(name) || strings.HasPrefix(name, "/") {
 		return fmt.Errorf("invalid file name: %q", name)
 	}
-	if strings.Contains(name, "..") {
+	if strings.ContainsAny(name, "\\:\x00") {
 		return fmt.Errorf("invalid file name: %q", name)
 	}
-	if strings.Contains(name, "\\") {
-		return fmt.Errorf("invalid file name: %q", name)
+	segments := strings.Split(name, "/")
+	for _, seg := range segments {
+		if seg == "" || seg == "." || seg == ".." || strings.TrimSpace(seg) != seg {
+			return fmt.Errorf("invalid file name: %q", name)
+		}
 	}
-	if !strings.HasSuffix(name, ".proto") {
+	if len(segments)-1 > maxProtoImportDepth {
+		return fmt.Errorf("invalid file name: %q (nested more than %d folders deep)", name, maxProtoImportDepth)
+	}
+	base := segments[len(segments)-1]
+	if !strings.HasSuffix(base, ".proto") || base == ".proto" {
 		return fmt.Errorf("invalid file name: %q (must end in .proto)", name)
 	}
 	return nil
@@ -158,14 +257,13 @@ func (a *App) ReimportProto(connId uint) (*ProtoStateResult, error) {
 // and forgets the recorded source, leaving any binding rules in place: they
 // simply show as stale once their message types are gone from the registry.
 func (a *App) ClearProtoImport(connId uint) (*ProtoStateResult, error) {
-	appConnection, ok := a.appConnection(connId)
-	if !ok {
-		return nil, fmt.Errorf("connection not found (%d)", connId)
-	}
 	// See ImportProtoDir: serialises against any other import/remove in
 	// flight for this connection.
-	appConnection.ProtoState.LockImport()
-	defer appConnection.ProtoState.UnlockImport()
+	appConnection, unlock, err := a.lockProtoImport(connId)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 
 	if err := os.RemoveAll(a.protoImportDir(connId)); err != nil {
 		return nil, err
@@ -173,40 +271,95 @@ func (a *App) ClearProtoImport(connId uint) (*ProtoStateResult, error) {
 	if err := a.setProtoRegDir(connId, nil); err != nil {
 		return nil, err
 	}
-	return a.refreshProtoImportState(connId)
+	a.refreshProtoImportStateLocked(connId, appConnection)
+	return a.buildProtoStateResult(connId, appConnection)
 }
 
-// swapInProtoImportFiles stages files in a fresh temp directory under the
-// same parent as the connection's internal proto-imports directory
-// (deliberately not the OS temp dir, which can be a different filesystem —
-// os.Rename across filesystems fails with EXDEV, notably inside a Flatpak
-// sandbox) and only then swaps it in for the live directory, so a failure
-// partway through writing or swapping leaves whatever was previously
-// imported untouched.
-func (a *App) swapInProtoImportFiles(connId uint, files []ProtoUploadFile) error {
-	parent := filepath.Join(a.Paths.ResourcePath, protoImportsDirName)
-	if err := os.MkdirAll(parent, 0770); err != nil {
-		return err
+// lockProtoImport takes the connection's import lock (protoState.importMu)
+// and re-checks the connection still exists once it has it: a delete that
+// held the lock first has already removed the import dir, and an import
+// queued behind it must not recreate one.
+func (a *App) lockProtoImport(connId uint) (*AppConnection, func(), error) {
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return nil, nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	appConnection.ProtoState.LockImport()
+	if current, ok := a.appConnection(connId); !ok || current != appConnection {
+		appConnection.ProtoState.UnlockImport()
+		return nil, nil, fmt.Errorf("connection not found (%d)", connId)
+	}
+	return appConnection, appConnection.ProtoState.UnlockImport, nil
+}
+
+// importProtoFiles stages files, compiles the staged copy and, only if that
+// compiles, swaps it in for the live import, records sourceDir (nil clears
+// it) and installs the registry. A compile failure returns the compile error
+// (paths relative to the import root) and leaves the previous on-disk
+// import, the live registry and proto_reg_dir untouched; on a first import
+// nothing is created. The caller holds the import lock.
+func (a *App) importProtoFiles(connId uint, appConnection *AppConnection, files []ProtoUploadFile, sourceDir *string) (*ProtoStateResult, error) {
+	stagingDir, err := a.stageProtoImportFiles(connId, files)
+	if err != nil {
+		return nil, err
+	}
+	// No-op once the swap succeeds (the path no longer exists); cleans up
+	// the staging dir on a compile failure or any other error.
+	defer os.RemoveAll(stagingDir)
+
+	registry, loadErr, _ := compileProtoRegistry(stagingDir)
+	if loadErr != "" {
+		return nil, errors.New(loadErr)
 	}
 
-	stagingDir, err := os.MkdirTemp(parent, ".staging-*")
-	if err != nil {
-		return err
+	if err := a.swapInStagedProtoImport(connId, stagingDir); err != nil {
+		return nil, err
 	}
-	// No-op once the rename below succeeds (the path no longer exists);
-	// cleans up the staging dir on any earlier error.
-	defer os.RemoveAll(stagingDir)
+	dir := a.protoImportDir(connId)
+	registry.Dir = dir
+	appConnection.ProtoState.SetRegistry(registry, dir, "", false)
+	setErr := a.setProtoRegDir(connId, sourceDir)
+	a.emitProtoStateChanged(connId)
+	if setErr != nil {
+		return nil, setErr
+	}
+	return a.buildProtoStateResult(connId, appConnection)
+}
+
+// stageProtoImportFiles writes files into a fresh staging directory under
+// the same parent as the connection's internal proto-imports directory
+// (deliberately not the OS temp dir, which can be a different filesystem —
+// os.Rename across filesystems fails with EXDEV, notably inside a Flatpak
+// sandbox). The caller removes it.
+func (a *App) stageProtoImportFiles(connId uint, files []ProtoUploadFile) (string, error) {
+	parent := filepath.Join(a.Paths.ResourcePath, protoImportsDirName)
+	if err := os.MkdirAll(parent, 0770); err != nil {
+		return "", err
+	}
+
+	stagingDir, err := os.MkdirTemp(parent, protoImportStagingPattern(connId))
+	if err != nil {
+		return "", err
+	}
 
 	for _, f := range files {
 		dest := filepath.Join(stagingDir, filepath.FromSlash(f.Name))
 		if err := os.MkdirAll(filepath.Dir(dest), 0770); err != nil {
-			return err
+			os.RemoveAll(stagingDir)
+			return "", err
 		}
 		if err := os.WriteFile(dest, []byte(f.Content), 0660); err != nil {
-			return err
+			os.RemoveAll(stagingDir)
+			return "", err
 		}
 	}
+	return stagingDir, nil
+}
 
+// swapInStagedProtoImport swaps a staged directory in for the connection's
+// live import, so a failure partway through swapping leaves whatever was
+// previously imported untouched.
+func (a *App) swapInStagedProtoImport(connId uint, stagingDir string) error {
 	dest := a.protoImportDir(connId)
 	asideDir := dest + ".previous"
 
@@ -244,6 +397,21 @@ func (a *App) swapInProtoImportFiles(connId uint, files []ProtoUploadFile) error
 	return nil
 }
 
+// removeProtoImportDirs deletes a connection's import dir plus any aside or
+// staging dirs an interrupted swap left next to it. The caller holds the
+// import lock, so no staging dir of this connection is in use.
+func (a *App) removeProtoImportDirs(connId uint) {
+	dir := a.protoImportDir(connId)
+	paths := []string{dir, dir + ".previous"}
+	staging, _ := filepath.Glob(filepath.Join(filepath.Dir(dir), protoImportStagingPattern(connId)))
+	paths = append(paths, staging...)
+	for _, path := range paths {
+		if err := os.RemoveAll(path); err != nil {
+			slog.Error("failed to remove proto import dir", "connectionId", connId, "path", path, "error", err)
+		}
+	}
+}
+
 // setProtoRegDir writes Connection.ProtoRegDir directly (rather than going
 // through UpdateConnection, which no longer manages this column at all): dir
 // nil clears it.
@@ -251,18 +419,13 @@ func (a *App) setProtoRegDir(connId uint, dir *string) error {
 	return a.Db.Model(&models.Connection{}).Where("id = ?", connId).Update("proto_reg_dir", dir).Error
 }
 
-// refreshProtoImportState (re)compiles the connection's internal proto import
-// dir and swaps the result into its live protoState, emitting
+// refreshProtoImportStateLocked (re)compiles the connection's internal proto
+// import dir and swaps the result into its live protoState, emitting
 // ProtoStateChanged. When nothing has been imported (the internal dir simply
-// doesn't exist), protoState is cleared rather than reporting an error;
-// compileProtoRegistry's own missing-dir check only fires here for a dir that
-// existed a moment ago and vanished before the compile ran.
-func (a *App) refreshProtoImportState(connId uint) (*ProtoStateResult, error) {
-	appConnection, ok := a.appConnection(connId)
-	if !ok {
-		return nil, fmt.Errorf("connection not found (%d)", connId)
-	}
-
+// doesn't exist), protoState is cleared rather than reporting an error. An
+// already-broken dir (found at startup, say) records its compile error as
+// protoState's load error. The caller holds the import lock.
+func (a *App) refreshProtoImportStateLocked(connId uint, appConnection *AppConnection) {
 	dir := a.protoImportDir(connId)
 	if _, err := os.Stat(dir); err != nil {
 		appConnection.ProtoState.Clear()
@@ -271,6 +434,4 @@ func (a *App) refreshProtoImportState(connId uint) (*ProtoStateResult, error) {
 		appConnection.ProtoState.SetRegistry(registry, dir, loadErr, dirMissing)
 	}
 	a.emitProtoStateChanged(connId)
-
-	return a.buildProtoStateResult(connId, appConnection)
 }

@@ -147,6 +147,80 @@ func TestMatchSpecificity(t *testing.T) {
 			wantSource: SourceSparkplug,
 		},
 		{
+			name: "wildcard-first rule loses to implicit sparkplug despite more literals",
+			rules: []models.ProtoBindingRule{
+				rule(1, "+/G/#", "TypeG", 0),
+				rule(2, "+/+/NDATA/+", "TypeNData", 0),
+			},
+			topic:      "spBv1.0/G/NDATA/N",
+			wantType:   sparkplugBMessageType,
+			wantFilter: sparkplugBFilter,
+			wantSource: SourceSparkplug,
+		},
+		{
+			name: "wildcard-first rule never claims sparkplug A",
+			rules: []models.ProtoBindingRule{
+				rule(1, "+/G/#", "TypeG", 0),
+			},
+			topic:      "spAv1.0/G/NDATA/N",
+			wantType:   sparkplugAMessageType,
+			wantFilter: sparkplugAFilter,
+			wantSource: SourceSparkplug,
+		},
+		{
+			name: "wildcard-first rule never claims a legacy STATE topic",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+				rule(2, "+/pump1", "TypePump", 0),
+			},
+			topic:      "STATE/pump1",
+			wantType:   "",
+			wantFilter: "",
+			wantSource: "",
+		},
+		{
+			name: "explicit STATE rule claims a legacy STATE topic",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+				rule(2, "STATE/pump1", "TypeState", 0),
+			},
+			topic:      "STATE/pump1",
+			wantType:   "TypeState",
+			wantFilter: "STATE/pump1",
+			wantSource: SourceRule,
+		},
+		{
+			name: "literal-first spBv1.0 STATE rule beats implicit sparkplug",
+			rules: []models.ProtoBindingRule{
+				rule(1, "spBv1.0/STATE/+", "TypeState", 0),
+			},
+			topic:      "spBv1.0/STATE/host1",
+			wantType:   "TypeState",
+			wantFilter: "spBv1.0/STATE/+",
+			wantSource: SourceRule,
+		},
+		{
+			name: "hash still claims a STATE topic that isn't Sparkplug grammar",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+			},
+			topic:      "STATE/a/b",
+			wantType:   "TypeAll",
+			wantFilter: "#",
+			wantSource: SourceRule,
+		},
+		{
+			name: "persisted bare $share rule matches literally and never panics",
+			rules: []models.ProtoBindingRule{
+				rule(1, "$share", "TypeShare", 0),
+				rule(2, "$shareX/a/b", "TypeShareX", 0),
+			},
+			topic:      "b",
+			wantType:   "",
+			wantFilter: "",
+			wantSource: "",
+		},
+		{
 			name: "bare hash user rule wins on non-sparkplug topics",
 			rules: []models.ProtoBindingRule{
 				rule(1, "#", "TypeAll", 0),
@@ -314,6 +388,8 @@ func TestValidateTopicFilter(t *testing.T) {
 		"a/b/+",
 		"+/b/#",
 		"a//b",
+		"$shared",
+		"$shareX/a/b",
 	}
 	for _, filter := range valid {
 		t.Run("valid_"+filter, func(t *testing.T) {
@@ -329,6 +405,8 @@ func TestValidateTopicFilter(t *testing.T) {
 		"a#",
 		"+a/b",
 		"$share/g/topic",
+		"$share",
+		"$share/g",
 		" a",
 		"a ",
 	}

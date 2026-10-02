@@ -36,23 +36,22 @@ func (a *App) ConnectMqtt(connId uint) error {
 	// Always reload the sub matcher, subscriptions may have changed
 	appConnection.SubscriptionMatcher = topicmatching.NewSubscriptionMatcher(subscriptions)
 
-	protoRules := []models.ProtoBindingRule{}
-	if err = a.Db.Where("connection_id = ?", connId).Order("sort_order, id").Find(&protoRules).Error; err != nil {
-		return err
-	}
 	protoEnabled := connection.IsProtoEnabled != nil && *connection.IsProtoEnabled
 	appConnection.ProtoState.SetEnabled(protoEnabled)
-	appConnection.ProtoState.SetRules(protoRules)
+	// Serialised with rule writes (see refreshProtoBindingRulesAndEmit).
+	err = appConnection.ProtoState.ReloadRules(func() ([]models.ProtoBindingRule, error) {
+		return a.GetProtoBindingRulesByConnectionId(connId)
+	})
+	if err != nil {
+		return err
+	}
 
-	protoDir := a.protoImportDir(connId)
-	if protoEnabled && appConnection.ProtoState.NeedsLoad(protoDir) {
-		// refreshProtoImportState compiles the internal proto-imports copy
-		// (or clears protoState if nothing has been imported) and emits
-		// ProtoStateChanged regardless of outcome, so a compile warning at
-		// connect time reaches every open window.
-		if _, err := a.refreshProtoImportState(connId); err != nil {
-			slog.Error(err.Error())
-		}
+	if protoEnabled {
+		// Compiles the internal proto-imports copy under the import lock
+		// when it hasn't been yet (or clears protoState if nothing has been
+		// imported), emitting ProtoStateChanged regardless of outcome, so a
+		// compile warning at connect time reaches every open window.
+		a.loadProtoImportIfNeeded(connId, appConnection)
 	}
 
 	connectionDetails, err := getConnectionDetailsFromConnectionModel(&connection)

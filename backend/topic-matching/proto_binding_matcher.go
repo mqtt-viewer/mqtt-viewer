@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"mqtt-viewer/backend/models"
+	"mqtt-viewer/backend/sparkplug"
 	"mqtt-viewer/backend/util"
 )
 
@@ -165,28 +166,51 @@ func candidateMatches(c candidate, topic string) bool {
 	if !util.RouteMatchesTopic(c.filter, topic) {
 		return false
 	}
-	return !violatesDollarGuard(c.filter, topic)
+	if !hasWildcardFirstSegment(c.filter) {
+		return true
+	}
+	return !violatesDollarGuard(topic) && !violatesSparkplugGuard(topic)
+}
+
+// hasWildcardFirstSegment reports whether filter starts with a + or #
+// segment. Such a filter is a catch-all for the guards below; a filter with
+// a literal first segment (e.g. "$SYS/#", "spBv1.0/STATE/+", "STATE/pump1")
+// is never guarded and competes on specificity as usual.
+func hasWildcardFirstSegment(filter string) bool {
+	firstFilterSeg := filter
+	if idx := strings.IndexByte(filter, '/'); idx >= 0 {
+		firstFilterSeg = filter[:idx]
+	}
+	return firstFilterSeg == "+" || firstFilterSeg == "#"
 }
 
 // violatesDollarGuard protects $SYS (and other $-prefixed) traffic from
 // wildcard-first-segment rules: a filter starting with + or # never
 // matches a topic whose first segment starts with $, even though
 // util.RouteMatchesTopic (shared with subscription matching) would allow
-// it. A filter with an explicit leading $ segment (e.g. "$SYS/#") is
-// unaffected.
-func violatesDollarGuard(filter, topic string) bool {
-	firstFilterSeg := filter
-	if idx := strings.IndexByte(filter, '/'); idx >= 0 {
-		firstFilterSeg = filter[:idx]
-	}
-	if firstFilterSeg != "+" && firstFilterSeg != "#" {
+// it.
+func violatesDollarGuard(topic string) bool {
+	return strings.HasPrefix(topic, "$")
+}
+
+// violatesSparkplugGuard keeps wildcard-first-segment rules off Sparkplug
+// traffic: the spBv1.0/ and spAv1.0/ namespaces (so "+/G/#" can't outrank
+// the implicit spBv1.0/# rule on specificity) and legacy STATE/<host>
+// topics, which no implicit rule covers. Decode, encode and the topic
+// tester all resolve through here, so they agree on who owns a topic.
+func violatesSparkplugGuard(topic string) bool {
+	return MatchesSparkplugBPrefix(topic) || MatchesSparkplugAPrefix(topic) || isLegacySparkplugState(topic)
+}
+
+// isLegacySparkplugState reports a STATE/<host> topic exactly as
+// sparkplug.ParseTopic recognises it. The prefix check keeps ParseTopic's
+// split off every other topic.
+func isLegacySparkplugState(topic string) bool {
+	if !strings.HasPrefix(topic, "STATE/") {
 		return false
 	}
-	firstTopicSeg := topic
-	if idx := strings.IndexByte(topic, '/'); idx >= 0 {
-		firstTopicSeg = topic[:idx]
-	}
-	return strings.HasPrefix(firstTopicSeg, "$")
+	info, ok := sparkplug.ParseTopic(topic)
+	return ok && info.Type == sparkplug.MessageTypeState
 }
 
 // specificityKey orders candidates by: literal segment count (desc), no-#
@@ -251,7 +275,7 @@ func ValidateTopicFilter(filter string) error {
 	if strings.TrimSpace(filter) != filter {
 		return errors.New("topic filter can't have leading or trailing whitespace")
 	}
-	if strings.HasPrefix(filter, "$share/") {
+	if filter == "$share" || strings.HasPrefix(filter, "$share/") {
 		return errors.New("shared subscription filters can't be bindings")
 	}
 

@@ -182,8 +182,7 @@ func (a *App) ReorderProtoBindingRules(connId uint, orderedIds []uint) error {
 // ProtoStateChanged to every open window) on every dialog open is wasted
 // work once a session has already loaded it successfully. ImportProtoDir,
 // ImportProtoFiles, ReimportProto and ClearProtoImport bypass this gate
-// entirely (they call refreshProtoImportState directly) since they always
-// just changed the files on disk. Compile failure is reported in the
+// entirely since they always just changed the files on disk. Compile failure is reported in the
 // returned ProtoStateResult.LoadError rather than as a hard error, so the UI
 // can render it; a hard error is returned only when the connection itself is
 // unknown.
@@ -192,10 +191,23 @@ func (a *App) LoadProtoRegistry(connId uint) (*ProtoStateResult, error) {
 	if !ok {
 		return nil, fmt.Errorf("connection not found (%d)", connId)
 	}
+	a.loadProtoImportIfNeeded(connId, appConnection)
+	return a.buildProtoStateResult(connId, appConnection)
+}
+
+// loadProtoImportIfNeeded compiles the connection's internal proto import
+// dir into protoState when it hasn't been yet (protoState.NeedsLoad), under
+// the import lock: a compile racing an import would otherwise read the old
+// files and land its registry after the import's, leaving stale types live.
+// Reports whether a compile ran; it emits ProtoStateChanged when one did.
+func (a *App) loadProtoImportIfNeeded(connId uint, appConnection *AppConnection) bool {
+	appConnection.ProtoState.LockImport()
+	defer appConnection.ProtoState.UnlockImport()
 	if !appConnection.ProtoState.NeedsLoad(a.protoImportDir(connId)) {
-		return a.buildProtoStateResult(connId, appConnection)
+		return false
 	}
-	return a.refreshProtoImportState(connId)
+	a.refreshProtoImportStateLocked(connId, appConnection)
+	return true
 }
 
 // GetProtoState is the cheap, no-compile read used for event-driven
@@ -263,16 +275,21 @@ func (a *App) buildProtoStateResult(connId uint, appConnection *AppConnection) (
 
 // refreshProtoBindingRulesAndEmit re-reads a connection's rules from the DB,
 // pushes them into the live matcher, and pings ProtoStateChanged so open
-// windows refetch via the cheap GetProtoState. A no-op if the AppConnection
-// doesn't exist (shouldn't happen in practice, but keeps this safe to call
-// mid-delete).
+// windows refetch via the cheap GetProtoState. The read and the push are
+// serialised per connection (protoState.ReloadRules), so concurrent rule
+// writes can't leave the matcher on a stale read. A no-op if the
+// AppConnection doesn't exist (shouldn't happen in practice, but keeps this
+// safe to call mid-delete).
 func (a *App) refreshProtoBindingRulesAndEmit(connId uint) error {
-	rules, err := a.GetProtoBindingRulesByConnectionId(connId)
+	appConnection, ok := a.appConnection(connId)
+	if !ok {
+		return nil
+	}
+	err := appConnection.ProtoState.ReloadRules(func() ([]models.ProtoBindingRule, error) {
+		return a.GetProtoBindingRulesByConnectionId(connId)
+	})
 	if err != nil {
 		return err
-	}
-	if appConnection, ok := a.appConnection(connId); ok {
-		appConnection.ProtoState.SetRules(rules)
 	}
 	a.emitProtoStateChanged(connId)
 	return nil

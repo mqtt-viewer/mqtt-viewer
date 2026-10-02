@@ -563,16 +563,19 @@ func (m *matcherResolver) RuleDescriptor(name string) (protoreflect.MessageDescr
 	return m.registry.GetMessageDescriptorFromName(name)
 }
 
-// A catch-all binding must not take Sparkplug traffic away from the stateful
-// decode: spBv1.0/# is more specific than #, and STATE topics (including the
-// legacy STATE/<host> form, which no implicit rule covers) are never
-// protobuf.
+// A wildcard-first binding must not take Sparkplug traffic away from the
+// stateful decode: not a catch-all #, and not +/G/# or +/+/NDATA/+ either,
+// which have more literal segments than spBv1.0/#. Legacy STATE/<host>
+// topics, which no implicit rule covers, are guarded the same way.
 func TestCatchAllRuleKeepsSparkplugStateful(t *testing.T) {
 	sparkplugRegistry := loadTestRegistry(t)
 	store := sparkplug.NewSessionStore()
 	resolver := &matcherResolver{
 		matcher: topicmatching.NewProtoBindingMatcher([]models.ProtoBindingRule{
 			{ID: 1, TopicFilter: "#", MessageType: "test.HelloMessage"},
+			{ID: 2, TopicFilter: "+/G/#", MessageType: "test.HelloMessage"},
+			{ID: 3, TopicFilter: "+/+/NDATA/+", MessageType: "test.HelloMessage"},
+			{ID: 4, TopicFilter: "+/scada-primary", MessageType: "test.HelloMessage"},
 		}),
 		registry: loadGoodRegistry(t),
 	}
@@ -586,6 +589,16 @@ func TestCatchAllRuleKeepsSparkplugStateful(t *testing.T) {
 	}
 	if _, named := (*msg.MiddlewareProperties)[PropProtoDescriptorName]; named {
 		t.Errorf("expected a Sparkplug decode, not a binding's, got %v", *msg.MiddlewareProperties)
+	}
+
+	data := encodeSparkplugB(t, sparkplugRegistry,
+		`{"seq":"1","metrics":[{"alias":"3","datatype":10,"doubleValue":240.2}]}`)
+	dataMsg := runMiddleware(t, mw, "spBv1.0/G/NDATA/N", data)
+	if meta := sparkplugMeta(t, dataMsg); meta["msgType"] != "NDATA" {
+		t.Errorf("expected NDATA meta, got %v", meta)
+	}
+	if _, named := (*dataMsg.MiddlewareProperties)[PropProtoDescriptorName]; named {
+		t.Errorf("expected +/+/NDATA/+ not to outrank spBv1.0/#, got %v", *dataMsg.MiddlewareProperties)
 	}
 
 	legacy := runMiddleware(t, mw, "STATE/scada-primary", []byte("ONLINE"))
@@ -618,6 +631,28 @@ func TestSpecificRuleBeatsImplicitSparkplug(t *testing.T) {
 	props := *msg.MiddlewareProperties
 	if props[PropProtoDecodeFailed] != true || props[PropProtoDescriptorName] != "test.HelloMessage" {
 		t.Errorf("expected a failed decode as test.HelloMessage, got %v", props)
+	}
+	if _, ok := props["sparkplug"]; ok {
+		t.Error("expected no Sparkplug meta on a topic a rule claimed")
+	}
+}
+
+// A rule that names a legacy STATE topic explicitly claims it on receive,
+// matching what the topic tester and publish report.
+func TestExplicitStateRuleClaimsLegacyState(t *testing.T) {
+	sparkplugRegistry := loadTestRegistry(t)
+	resolver := &matcherResolver{
+		matcher: topicmatching.NewProtoBindingMatcher([]models.ProtoBindingRule{
+			{ID: 1, TopicFilter: "STATE/pump1", MessageType: "test.HelloMessage"},
+		}),
+		registry: loadGoodRegistry(t),
+	}
+	mw := NewProtoDecodeMiddleware(resolver, sparkplugRegistryFunc(sparkplugRegistry), sparkplug.NewSessionStore())
+
+	msg := runMiddleware(t, mw, "STATE/pump1", []byte("ONLINE"))
+	props := *msg.MiddlewareProperties
+	if props[PropProtoDescriptorName] != "test.HelloMessage" {
+		t.Errorf("expected the STATE rule to claim the topic, got %v", props)
 	}
 	if _, ok := props["sparkplug"]; ok {
 		t.Error("expected no Sparkplug meta on a topic a rule claimed")

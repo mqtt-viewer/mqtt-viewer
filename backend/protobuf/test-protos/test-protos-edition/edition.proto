@@ -1,0 +1,8 @@
+edition = "2023";
+
+package editions;
+
+message Sensor {
+  string id = 1;
+  int32 reading = 2 [features.field_presence = IMPLICIT];
+}

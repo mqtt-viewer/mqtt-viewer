@@ -15,6 +15,10 @@ type ProtoEncodeMiddleware struct {
 
 var PROTO_ENCODE_MIDDLEWARE_ID = "ProtoEncodeMiddleware"
 
+// sparkplugBTypeName is the message name the built-in Sparkplug B registry
+// declares (unqualified: spBv1.proto has no package).
+const sparkplugBTypeName = "SparkplugBPayload"
+
 // NewProtoEncodeMiddleware encodes an outgoing publish's JSON payload to
 // protobuf bytes per params.ProtoOverride: nil resolves via the matcher
 // (rule or implicit sparkplug), "" skips encoding (raw), and any other value
@@ -61,7 +65,20 @@ func NewProtoEncodeMiddleware(resolver ProtoResolver, sparkplugRegistry Sparkplu
 					return nil
 				default:
 					typeName := *params.ProtoOverride
-					descriptor, ok := resolver.RuleDescriptor(typeName)
+					var descriptor protoreflect.MessageDescriptor
+					ok := false
+					// The built-in Sparkplug B type on a Sparkplug B topic (a
+					// rebirth request, say) always means the real one: an
+					// imported file declaring its own unqualified
+					// SparkplugBPayload must not re-type it.
+					if typeName == sparkplugBTypeName && topicmatching.MatchesSparkplugBPrefix(params.Topic) {
+						if reg := sparkplugRegistry(); reg != nil {
+							descriptor, ok = reg.GetMessageDescriptorFromName(typeName)
+						}
+					}
+					if !ok {
+						descriptor, ok = resolver.RuleDescriptor(typeName)
+					}
 					if !ok {
 						if reg := sparkplugRegistry(); reg != nil {
 							descriptor, ok = reg.GetMessageDescriptorFromName(typeName)

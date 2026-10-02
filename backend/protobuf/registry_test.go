@@ -163,3 +163,121 @@ func TestRegistryWithProto2And3LoadsCorrectly(t *testing.T) {
 		t.Errorf("Expected 3 descriptors in name map, got %v", len(*registry.LoadedDescriptorsNameMap))
 	}
 }
+
+func TestRegistryResolvesImportsFromRoot(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-imports-root"))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if _, ok := registry.GetMessageDescriptorFromName("acme.Reading"); !ok {
+		t.Error("Expected acme.Reading to load")
+	}
+	files := *registry.LoadedFilesWithDescriptorsMap
+	for _, want := range []string{"acme/device.proto", "common/units.proto"} {
+		if _, ok := files[want]; !ok {
+			t.Errorf("Expected file key %q, got %v", want, files)
+		}
+	}
+	for key := range files {
+		if strings.HasPrefix(key, "/") || strings.Contains(key, "test-protos-imports-root") {
+			t.Errorf("Expected relative file keys, got %q", key)
+		}
+	}
+}
+
+func TestRegistryResolvesWellKnownTypeAndRoundTrips(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-imports-root"))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	descriptor, ok := registry.GetMessageDescriptorFromName("acme.Reading")
+	if !ok {
+		t.Fatal("Expected acme.Reading to load")
+	}
+	in := []byte(`{"value":1.5,"units":{"symbol":"C"},"takenAt":"2026-10-03T12:00:00Z"}`)
+	wire, err := EncodeFromJSONBytes(in, descriptor)
+	if err != nil {
+		t.Fatalf("Expected encode to succeed, got %v", err)
+	}
+	out, err := DecodeFromProtoBytes(wire, descriptor)
+	if err != nil {
+		t.Fatalf("Expected decode to succeed, got %v", err)
+	}
+	if !strings.Contains(string(out), `"2026-10-03T12:00:00Z"`) {
+		t.Errorf("Expected the Timestamp to round trip, got %s", out)
+	}
+}
+
+func TestRegistryResolvesSubfolderImportsInFlatUpload(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-imports-flat"))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if _, ok := registry.GetMessageDescriptorFromName("acme.Reading"); !ok {
+		t.Error("Expected acme.Reading to load")
+	}
+	if len(*registry.LoadedDescriptorsNameMap) != 2 {
+		t.Errorf("Expected 2 descriptors (no duplicate compile), got %v", registry.GetLoadedDescriptorNames())
+	}
+	files := *registry.LoadedFilesWithDescriptorsMap
+	if _, ok := files["units.proto"]; !ok {
+		t.Errorf("Expected the aliased file keyed by its own path, got %v", files)
+	}
+}
+
+func TestRegistryResolvesImportsFromFolderAboveRoot(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-imports-above"))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if _, ok := registry.GetMessageDescriptorFromName("acme.Reading"); !ok {
+		t.Error("Expected acme.Reading to load")
+	}
+}
+
+func TestRegistryResolvesSiblingBareNameImport(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-imports-sibling"))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if _, ok := registry.GetMessageDescriptorFromName("acme.Reading"); !ok {
+		t.Error("Expected acme.Reading to load")
+	}
+}
+
+func TestRegistryAmbiguousImportFallbackErrors(t *testing.T) {
+	_, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-imports-ambiguous"))
+	if err == nil {
+		t.Fatal("Expected an ambiguous import error")
+	}
+	msg := err.Error()
+	for _, want := range []string{`"units.proto"`, "ambiguous", "x/units.proto", "y/units.proto"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("Expected error to contain %q, got %v", want, msg)
+		}
+	}
+}
+
+func TestRegistrySyntaxErrorUsesRelativePath(t *testing.T) {
+	_, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-syntax-error-nested"))
+	if err == nil {
+		t.Fatal("Expected a syntax error")
+	}
+	msg := err.Error()
+	if !strings.HasPrefix(msg, "sub/bad.proto:") {
+		t.Errorf("Expected error to start with the relative path, got %v", msg)
+	}
+	if strings.Contains(msg, dir) {
+		t.Errorf("Expected no absolute path in the error, got %v", msg)
+	}
+}
+
+func TestRegistryLoadsEdition2023(t *testing.T) {
+	registry, err := LoadProtoRegistry(path.Join(dir, "./test-protos/test-protos-edition"))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if _, ok := registry.GetMessageDescriptorFromName("editions.Sensor"); !ok {
+		t.Error("Expected editions.Sensor to load")
+	}
+}

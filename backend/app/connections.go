@@ -9,7 +9,6 @@ import (
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
 	"mqtt-viewer/events"
-	"os"
 
 	"gorm.io/gorm"
 )
@@ -238,10 +237,17 @@ func (a *App) DeleteConnection(id uint) error {
 	if appConnection, ok := a.appConnection(id); ok && appConnection.MqttManager != nil {
 		appConnection.MqttManager.CloseLogging()
 	}
-	if err := os.RemoveAll(a.protoImportDir(id)); err != nil {
-		slog.Error("failed to remove proto import dir", "connectionId", id, "error", err)
+	// Under the import lock, so an import in flight finishes (or one queued
+	// behind this sees the connection gone) before its files are removed.
+	if appConnection, ok := a.appConnection(id); ok {
+		appConnection.ProtoState.LockImport()
+		a.removeProtoImportDirs(id)
+		a.removeAppConnection(id)
+		appConnection.ProtoState.UnlockImport()
+	} else {
+		a.removeProtoImportDirs(id)
+		a.removeAppConnection(id)
 	}
-	a.removeAppConnection(id)
 	if a.Mode != AppModes.Test {
 		a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
 	}

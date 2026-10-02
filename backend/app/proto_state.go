@@ -36,6 +36,11 @@ type protoState struct {
 	// entire operation, unlike mu, which only ever guards a single field
 	// read/write.
 	importMu sync.Mutex
+
+	// rulesMu serialises each read-rules-from-DB-then-SetRules sequence
+	// (ReloadRules), so two overlapping rule writes can't leave the matcher
+	// holding the older of two reads.
+	rulesMu sync.Mutex
 }
 
 func newProtoState(enabled bool, rules []models.ProtoBindingRule) *protoState {
@@ -73,6 +78,19 @@ func (s *protoState) MatchUncached(topic string) topicmatching.ProtoBindingMatch
 // SetRules replaces the live matcher's rule set (and clears its cache).
 func (s *protoState) SetRules(rules []models.ProtoBindingRule) {
 	s.matcher.SetRules(rules)
+}
+
+// ReloadRules reads the rule set with load and pushes it into the matcher,
+// holding rulesMu across both steps: a later read always lands last.
+func (s *protoState) ReloadRules(load func() ([]models.ProtoBindingRule, error)) error {
+	s.rulesMu.Lock()
+	defer s.rulesMu.Unlock()
+	rules, err := load()
+	if err != nil {
+		return err
+	}
+	s.matcher.SetRules(rules)
+	return nil
 }
 
 // RuleDescriptor resolves a message type name against the per-connection

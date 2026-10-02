@@ -153,7 +153,7 @@ Caddy, which is the point.
 | --- | --- | --- |
 | `WAILS_SERVER_PORT` | `8080` | Port the HTTP server listens on inside the container. |
 | `WAILS_SERVER_HOST` | `0.0.0.0` | Bind address. Leave it alone in Docker. |
-| `MQTT_VIEWER_DATA_DIR` | `/data` | Where the SQLite database and Sparkplug proto files live. Leave it alone in Docker, see below. |
+| `MQTT_VIEWER_DATA_DIR` | `/data` | Where the SQLite database and Sparkplug proto files live, plus each connection's imported `.proto` files under `proto-imports/`. Leave it alone in Docker, see below. |
 | `MQTT_VIEWER_DISABLE_UPDATE_CHECK` | unset | Set to `1` and the app never contacts the portal. See [Update checks](#update-checks). |
 | `MQTT_VIEWER_INSTALL_TYPE` | `docker` | How this deployment updates, which decides the instructions the app shows. The image sets `docker`; set `home-assistant` if you package it as an add-on. |
 

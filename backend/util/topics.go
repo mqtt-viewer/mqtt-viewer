@@ -27,13 +27,14 @@ func match(route []string, topic []string) bool {
 }
 
 // removes $share and sharename when splitting the route to allow
-// shared subscription routes to correctly match the topic
+// shared subscription routes to correctly match the topic. Only a real
+// shared subscription ($share/<group>/<filter>, so at least three segments)
+// is stripped; "$share", "$share/group" or "$shareX/a/b" are matched as
+// ordinary filters.
 func routeSplit(route string) []string {
-	var result []string
-	if strings.HasPrefix(route, "$share") {
-		result = strings.Split(route, "/")[2:]
-	} else {
-		result = strings.Split(route, "/")
+	result := strings.Split(route, "/")
+	if len(result) >= 3 && result[0] == "$share" {
+		return result[2:]
 	}
 	return result
 }

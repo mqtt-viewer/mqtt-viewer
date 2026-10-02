@@ -1,9 +1,12 @@
 package mqttmiddleware
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"mqtt-viewer/backend/protobuf"
 	topicmatching "mqtt-viewer/backend/topic-matching"
 )
 
@@ -183,5 +186,39 @@ func TestProtoEncodeMiddlewareDisabledPassthrough(t *testing.T) {
 	}
 	if string(params.Payload) != string(original) {
 		t.Errorf("expected payload untouched while disabled")
+	}
+}
+
+// An imported file with its own unqualified SparkplugBPayload must not
+// re-type a forced Sparkplug B publish (a rebirth request) on a Sparkplug B
+// topic. Elsewhere the connection's import still wins.
+func TestProtoEncodeMiddlewareForcedSparkplugBIgnoresImportedLookalike(t *testing.T) {
+	dir := t.TempDir()
+	lookalike := "syntax = \"proto3\";\n\nmessage SparkplugBPayload {\n  string hijacked = 1;\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "lookalike.proto"), []byte(lookalike), 0o644); err != nil {
+		t.Fatalf("writing lookalike proto: %v", err)
+	}
+	imported, err := protobuf.LoadProtoRegistry(dir)
+	if err != nil {
+		t.Fatalf("loading lookalike registry: %v", err)
+	}
+	sparkplugRegistry := loadSparkplugRegistry(t)
+	resolver := &fakeResolver{enabled: true, registry: imported}
+	middleware := NewProtoEncodeMiddleware(resolver, sparkplugRegistryFunc(sparkplugRegistry))
+
+	rebirth := []byte(`{"metrics":[{"name":"Node Control/Rebirth","datatype":11,"booleanValue":true}]}`)
+	params := newTestPublish("spBv1.0/G/NCMD/N", rebirth, strPtr("SparkplugBPayload"))
+	if err := middleware.Func(params); err != nil {
+		t.Fatalf("expected the built-in Sparkplug B type to encode, got %v", err)
+	}
+	descriptor, _ := sparkplugRegistry.GetMessageDescriptorFromName("SparkplugBPayload")
+	decoded, err := protobuf.DecodeFromProtoBytes(params.Payload, descriptor)
+	if err != nil || !strings.Contains(string(decoded), "Node Control/Rebirth") {
+		t.Errorf("expected a real Sparkplug B payload, got %s (%v)", decoded, err)
+	}
+
+	other := newTestPublish("plant/line1", []byte(`{"hijacked":"yes"}`), strPtr("SparkplugBPayload"))
+	if err := middleware.Func(other); err != nil {
+		t.Fatalf("expected the imported type to encode off the Sparkplug namespace, got %v", err)
 	}
 }

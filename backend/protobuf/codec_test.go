@@ -36,7 +36,7 @@ message B {
 	return registry
 }
 
-func TestDecodeFromProtoBytesRejectsWrongTypeWithAllUnknownFields(t *testing.T) {
+func TestDecodeFromProtoBytesStrictRejectsWrongTypeWithAllUnknownFields(t *testing.T) {
 	registry := writeMismatchRegistry(t)
 	descA, ok := registry.GetMessageDescriptorFromName("mismatch.A")
 	if !ok {
@@ -52,7 +52,7 @@ func TestDecodeFromProtoBytesRejectsWrongTypeWithAllUnknownFields(t *testing.T) 
 		t.Fatalf("encoding A: %v", err)
 	}
 
-	_, err = DecodeFromProtoBytes(aBytes, descB)
+	_, err = DecodeFromProtoBytesStrict(aBytes, descB)
 	if err == nil {
 		t.Fatal("expected an error decoding A's bytes against B's descriptor, got nil")
 	}
@@ -61,7 +61,7 @@ func TestDecodeFromProtoBytesRejectsWrongTypeWithAllUnknownFields(t *testing.T) 
 	}
 }
 
-func TestDecodeFromProtoBytesRoundTripsSameType(t *testing.T) {
+func TestDecodeFromProtoBytesStrictRoundTripsSameType(t *testing.T) {
 	registry := writeMismatchRegistry(t)
 	descA, ok := registry.GetMessageDescriptorFromName("mismatch.A")
 	if !ok {
@@ -73,7 +73,7 @@ func TestDecodeFromProtoBytesRoundTripsSameType(t *testing.T) {
 		t.Fatalf("encoding A: %v", err)
 	}
 
-	jsonBytes, err := DecodeFromProtoBytes(aBytes, descA)
+	jsonBytes, err := DecodeFromProtoBytesStrict(aBytes, descA)
 	if err != nil {
 		t.Fatalf("expected no error round-tripping A, got %v", err)
 	}
@@ -83,14 +83,14 @@ func TestDecodeFromProtoBytesRoundTripsSameType(t *testing.T) {
 	}
 }
 
-func TestDecodeFromProtoBytesEmptyPayloadStillSucceeds(t *testing.T) {
+func TestDecodeFromProtoBytesStrictEmptyPayloadStillSucceeds(t *testing.T) {
 	registry := writeMismatchRegistry(t)
 	descB, ok := registry.GetMessageDescriptorFromName("mismatch.B")
 	if !ok {
 		t.Fatal("expected mismatch.B to resolve")
 	}
 
-	jsonBytes, err := DecodeFromProtoBytes([]byte{}, descB)
+	jsonBytes, err := DecodeFromProtoBytesStrict([]byte{}, descB)
 	if err != nil {
 		t.Fatalf("expected no error decoding an empty payload, got %v", err)
 	}
@@ -99,7 +99,7 @@ func TestDecodeFromProtoBytesEmptyPayloadStillSucceeds(t *testing.T) {
 	}
 }
 
-func TestDecodeFromProtoBytesKnownFieldSetSucceedsDespiteUnknownBytes(t *testing.T) {
+func TestDecodeFromProtoBytesStrictKnownFieldSetSucceedsDespiteUnknownBytes(t *testing.T) {
 	registry := writeMismatchRegistry(t)
 	descA, ok := registry.GetMessageDescriptorFromName("mismatch.A")
 	if !ok {
@@ -117,12 +117,39 @@ func TestDecodeFromProtoBytesKnownFieldSetSucceedsDespiteUnknownBytes(t *testing
 	unknownFieldTag := byte(15<<3 | 0)
 	aBytesWithUnknown := append(aBytes, unknownFieldTag, 0x01)
 
-	jsonBytes, err := DecodeFromProtoBytes(aBytesWithUnknown, descA)
+	jsonBytes, err := DecodeFromProtoBytesStrict(aBytesWithUnknown, descA)
 	if err != nil {
 		t.Fatalf("expected no error when a known field is set, got %v", err)
 	}
 	got := string(jsonBytes)
 	if !strings.Contains(got, `"code":"x"`) {
 		t.Errorf("expected decoded JSON to contain the known field, got %v", got)
+	}
+}
+
+// The lenient decode keeps develop's semantics: the Sparkplug stateless path
+// uses it, and connections with no rules must decode exactly as before.
+func TestDecodeFromProtoBytesLenientAcceptsAllUnknownFields(t *testing.T) {
+	registry := writeMismatchRegistry(t)
+	descA, ok := registry.GetMessageDescriptorFromName("mismatch.A")
+	if !ok {
+		t.Fatal("expected mismatch.A to resolve")
+	}
+	descB, ok := registry.GetMessageDescriptorFromName("mismatch.B")
+	if !ok {
+		t.Fatal("expected mismatch.B to resolve")
+	}
+
+	aBytes, err := EncodeFromJSONBytes([]byte(`{"code":"x","active":true}`), descA)
+	if err != nil {
+		t.Fatalf("encoding A: %v", err)
+	}
+
+	jsonBytes, err := DecodeFromProtoBytes(aBytes, descB)
+	if err != nil {
+		t.Fatalf("expected the lenient decode to succeed, got %v", err)
+	}
+	if string(jsonBytes) != "{}" {
+		t.Errorf("expected {}, got %v", string(jsonBytes))
 	}
 }

@@ -45,9 +45,10 @@ const (
 // path (birth/alias tracking, metric name injection into the stored payload,
 // and a per-message "sparkplug" meta map in middleware properties); anything
 // else (spAv1.0, and spBv1.0 topics that fail the strict grammar) keeps the
-// stateless decode. A nil store disables the stateful path. Sparkplug STATE
-// topics are never protobuf, so they always take the stateful path, even
-// under a catch-all rule.
+// stateless decode. A nil store disables the stateful path. The matcher
+// keeps wildcard-first rules (a catch-all "#", "+/G/#") off Sparkplug
+// namespaces and legacy STATE/<host> topics, so those only leave the
+// Sparkplug path for a rule that names them explicitly.
 func NewProtoDecodeMiddleware(resolver ProtoResolver, sparkplugRegistry SparkplugRegistryFunc, sparkplugStore *sparkplug.SessionStore) *ProtoDecodeMiddleware {
 	return &ProtoDecodeMiddleware{
 		Middleware: mqtt.Middleware[mqtt.MqttMessage]{
@@ -56,17 +57,15 @@ func NewProtoDecodeMiddleware(resolver ProtoResolver, sparkplugRegistry Sparkplu
 				if !resolver.IsEnabled() {
 					return nil
 				}
+				match := resolver.Match(params.Topic)
+				// A typeless rule is a no-op binding, never a match.
+				if match.Source == topicmatching.SourceRule && match.MessageType != "" {
+					return decodeRule(resolver, params, match.MessageType)
+				}
 				var info sparkplug.TopicInfo
 				isSparkplugGrammar := false
 				if sparkplugStore != nil {
 					info, isSparkplugGrammar = sparkplug.ParseTopic(params.Topic)
-				}
-				if !isSparkplugGrammar || info.Type != sparkplug.MessageTypeState {
-					match := resolver.Match(params.Topic)
-					// A typeless rule is a no-op binding, never a match.
-					if match.Source == topicmatching.SourceRule && match.MessageType != "" {
-						return decodeRule(resolver, params, match.MessageType)
-					}
 				}
 				registry := sparkplugRegistry()
 				if isSparkplugGrammar {
@@ -85,7 +84,7 @@ func decodeRule(resolver ProtoResolver, params *mqtt.MqttMessage, typeName strin
 		setDecodeFailed(params, typeName)
 		return nil
 	}
-	decodedPayload, err := protobuf.DecodeFromProtoBytes(params.Payload, descriptor)
+	decodedPayload, err := protobuf.DecodeFromProtoBytesStrict(params.Payload, descriptor)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("proto decode middleware: %s", err.Error()))
 		setDecodeFailed(params, typeName)

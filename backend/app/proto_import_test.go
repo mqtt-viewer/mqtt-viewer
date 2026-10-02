@@ -338,7 +338,7 @@ func TestDeleteConnectionRemovesProtoImportDir(t *testing.T) {
 }
 
 // TestSwapInProtoImportFilesLeavesPreviousImportIntactOnFailure exercises the
-// atomic-swap failure path directly: staging under proto-imports/ (rather
+// staging failure path: staging under proto-imports/ (rather
 // than the OS temp dir) means a failure to even create the staging directory
 // must never touch the previously-imported dir. Uses a read-only
 // proto-imports/ parent to force that failure deterministically.
@@ -369,9 +369,9 @@ func TestSwapInProtoImportFilesLeavesPreviousImportIntactOnFailure(t *testing.T)
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
-	err = app.swapInProtoImportFiles(connId, []ProtoUploadFile{{Name: "demo.proto", Content: string(content)}})
+	_, err = app.ImportProtoFiles(connId, []ProtoUploadFile{{Name: "demo.proto", Content: string(content)}})
 	if err == nil {
-		t.Fatal("Expected the swap to fail when the proto-imports parent directory isn't writable")
+		t.Fatal("Expected the import to fail when the proto-imports parent directory isn't writable")
 	}
 
 	if err := os.Chmod(parent, 0770); err != nil {

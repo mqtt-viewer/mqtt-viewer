@@ -16,6 +16,18 @@ func DecodeFromProtoBytes(protoBytes []byte, descriptor protoreflect.MessageDesc
 	if err != nil {
 		return nil, err
 	}
+	return MarshalDynamicToJSON(msg)
+}
+
+// DecodeFromProtoBytesStrict is DecodeFromProtoBytes plus checkAnyKnownField,
+// for decodes where the user picked the type (binding rules) and a payload
+// that matched none of its fields should read as a failure. The Sparkplug
+// path keeps the lenient DecodeFromProtoBytes.
+func DecodeFromProtoBytesStrict(protoBytes []byte, descriptor protoreflect.MessageDescriptor) ([]byte, error) {
+	msg, err := UnmarshalToDynamic(protoBytes, descriptor)
+	if err != nil {
+		return nil, err
+	}
 	if err := checkAnyKnownField(protoBytes, msg, descriptor); err != nil {
 		return nil, err
 	}
