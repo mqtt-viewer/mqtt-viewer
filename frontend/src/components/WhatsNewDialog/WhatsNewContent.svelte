@@ -37,10 +37,12 @@
     >
       <div class="absolute bottom-0 h-[1px] w-full bg-outline"></div>
       {#each entries as e, i (e.version)}
+        <!-- The focus ring is inset: the strip scrolls sideways, and its
+             overflow clips anything drawn outside a tab to a sliver. -->
         <button
           role="tab"
           aria-selected={i === selectedIndex}
-          class={`relative px-3 py-2 text-base whitespace-nowrap transition-colors hover:text-emphasis ${
+          class={`relative px-3 py-2 text-base whitespace-nowrap transition-colors hover:text-emphasis rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary ${
             i === selectedIndex ? "text-emphasis" : "text-secondary-text"
           }`}
           on:click={() => (selectedIndex = i)}
