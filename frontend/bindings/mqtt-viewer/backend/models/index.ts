@@ -11,6 +11,7 @@ export {
     FilterHistory,
     PanelSize,
     PinnedTopic,
+    ProtoBindingRule,
     PublishHistory,
     SortState,
     Subscription,

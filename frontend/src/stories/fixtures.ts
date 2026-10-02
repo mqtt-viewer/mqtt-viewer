@@ -81,6 +81,7 @@ export const mockEventSet = {
   mqttLatency: "storybook:mqttLatency",
   mqttClearHistory: "storybook:mqttClearHistory",
   mqttLogs: "storybook:mqttLogs",
+  protoStateChanged: "storybook:protoStateChanged",
 };
 
 export const mockSubscriptions = [
@@ -117,6 +118,11 @@ export const mockConnectionDetails = {
   username: "demo",
   password: "demo",
   isProtoEnabled: true,
+  // Display only (the "Imported from ..." line): matches the initial mock
+  // proto-import state in app.ts's storybook mock, and ChooseDirectory's
+  // mock return value, so picking a folder in a running ProtoSection story
+  // resolves to the same "imported" state as this default.
+  protoRegDir: "/Users/sam/certs",
   isCertsEnabled: false,
   skipCertVerification: false,
   certCa: "",
@@ -134,6 +140,7 @@ export const mockConnectionDetails = {
     },
   ],
   publishHistories: [],
+  debugLoggingEnabled: false,
 };
 
 export const mockConnection = {
@@ -843,6 +850,7 @@ export const mockMqttData = {
             latestMessageTime: new Date(now - 60000),
             message: '{"humidity":42.8}',
             isDecodedProto: true,
+            protoDescriptorName: "mqtt.viewer.HumidityReading",
             children: {},
           },
         },
@@ -868,6 +876,8 @@ export const mockPublishHistory = [
   },
 ];
 
+// Also feeds the Storybook Wails mock's proto-state responses
+// (.storybook/mocks/bindings/mqtt-viewer/backend/app/app.ts).
 export const mockLoadedProtoFiles = {
   "/workspace/protos/sparkplug/spBv1.proto": [
     "org.eclipse.tahu.protobuf.Payload",
@@ -1089,6 +1099,7 @@ export const createMockPublishStore = (
     baseline: null,
     name: "",
     pendingCollectionId: null as number | null,
+    protoOverrideChoice: "auto",
     ...overrides,
   });
   return {
@@ -1099,6 +1110,13 @@ export const createMockPublishStore = (
     setName: (name: string) => update((store) => ({ ...store, name })),
     setPendingCollection: (id: number | null) =>
       update((store) => ({ ...store, pendingCollectionId: id })),
+    setTopic: (topic: string) =>
+      update((store) => ({
+        ...store,
+        topic,
+        protoOverrideChoice:
+          store.protoOverrideChoice === "none" ? "none" : "auto",
+      })),
     getUserProperties: () => ({ source: "storybook" }),
     publish: asyncNoop,
     formatPayload: () =>
@@ -1324,6 +1342,8 @@ const propDefaults: Record<string, () => unknown> = {
   isAutoSelectingMostRecent: () => true,
   isComparing: () => true,
   isDecodedProto: () => false,
+  isProtoDecodeFailed: () => false,
+  protoDescriptorName: () => undefined,
   isExpanded: () => true,
   isOpen: () => writable(true),
   isPublishDisabled: () => false,
@@ -1331,8 +1351,6 @@ const propDefaults: Record<string, () => unknown> = {
   isSelected: () => true,
   label: () => "Enable option",
   left: () => '{"before": true}',
-  loadedProtoFilesWithDescriptorsMap: () => mockLoadedProtoFiles,
-  loadedRootDir: () => "/workspace/protos",
   maxContainerWidth: () => 720,
   maxSize: () => 520,
   message: () => '{"temp":21.4,"unit":"C"}',
@@ -1363,7 +1381,6 @@ const propDefaults: Record<string, () => unknown> = {
   onConfirm: () => noop,
   onCrossClick: () => noop,
   onDeleteClick: () => noop,
-  onDescriptorSelect: () => noop,
   onFileChosen: () => noop,
   onFileRemoved: () => noop,
   onFocus: () => noop,
@@ -1396,8 +1413,6 @@ const propDefaults: Record<string, () => unknown> = {
   searchText: () => "line",
   selected: () => writable({ label: "MQTT", value: "mqtt" }),
   selectedArrivedAtMs: () => now - 60000,
-  selectedDescriptor: () => "org.eclipse.tahu.protobuf.Payload",
-  selectedDescriptorIsMissing: () => false,
   selectedRetain: () => false,
   selectedTopic: () => "factory/line/temperature",
   selectedTopicStore: () => createMockSelectedTopicStore(),
@@ -1432,20 +1447,6 @@ const propDefaults: Record<string, () => unknown> = {
   triggerIconSize: () => 16,
   triggerText: () => "Actions",
   triggerVariant: () => "secondary",
-  treeItems: () => [
-    {
-      id: "/workspace/protos/sparkplug/spBv1.proto",
-      title: "spBv1.proto",
-      type: "file",
-      children: [
-        {
-          id: "org.eclipse.tahu.protobuf.Payload",
-          title: "org.eclipse.tahu.protobuf.Payload",
-          type: "descriptor",
-        },
-      ],
-    },
-  ],
   type: () => "settings",
   userProperties: () => [{ key: "source", value: "storybook" }],
   userPropertiesToCompare: () => ({ source: "previous", priority: "low" }),
@@ -1489,7 +1490,6 @@ const componentDefaults: Record<string, Record<string, unknown>> = {
   },
   Icon: { type: "settings", size: 24 },
   IconButton: { tooltipText: "Settings" },
-  LoadedProtoDetailsDialog: { open: writable(true) },
   PublishPanel: { isOpen: true, open: noop, close: noop },
   ConfirmDeleteDialog: {
     isOpen: writable(true),

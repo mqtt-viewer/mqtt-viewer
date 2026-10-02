@@ -391,12 +391,126 @@ export class OpenTopicWindowParams {
     }
 }
 
+/**
+ * ProtoStateResult is the read model the frontend polls (on dialog open,
+ * after an import, and on ProtoStateChanged) to render the bindings form and
+ * publish panel. Dir/LoadError/FileDescriptors/DescriptorNames describe the
+ * compiled per-connection registry, always the internal proto-imports copy
+ * (all zero values until an import has happened, or until it's been
+ * compiled this session — see HasImport); SourceDir is the
+ * last-imported-from folder, display only, for the "Imported from ..." line
+ * and as what Re-import re-reads from; Rules is always the live DB row set.
+ * HasImport is a plain os.Stat of the internal proto-imports directory,
+ * independent of whether it's been compiled into protoState yet: the
+ * frontend derives its "something is imported" state from this rather than
+ * from Dir being non-empty, so a fresh app launch doesn't flash an
+ * "not imported" empty state for the split second before the lazy compile
+ * finishes.
+ */
+export class ProtoStateResult {
+    "dir": string;
+    "loadError": string;
+    "dirMissing": boolean;
+    "sourceDir": string;
+    "hasImport": boolean;
+    "fileDescriptors": { [_ in string]?: string[] };
+    "descriptorNames": string[];
+    "rules": models$0.ProtoBindingRule[];
+
+    /** Creates a new ProtoStateResult instance. */
+    constructor($$source: Partial<ProtoStateResult> = {}) {
+        if (!("dir" in $$source)) {
+            this["dir"] = "";
+        }
+        if (!("loadError" in $$source)) {
+            this["loadError"] = "";
+        }
+        if (!("dirMissing" in $$source)) {
+            this["dirMissing"] = false;
+        }
+        if (!("sourceDir" in $$source)) {
+            this["sourceDir"] = "";
+        }
+        if (!("hasImport" in $$source)) {
+            this["hasImport"] = false;
+        }
+        if (!("fileDescriptors" in $$source)) {
+            this["fileDescriptors"] = {};
+        }
+        if (!("descriptorNames" in $$source)) {
+            this["descriptorNames"] = [];
+        }
+        if (!("rules" in $$source)) {
+            this["rules"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProtoStateResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProtoStateResult {
+        const $$createField5_0 = $$createType7;
+        const $$createField6_0 = $$createType6;
+        const $$createField7_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fileDescriptors" in $$parsedSource) {
+            $$parsedSource["fileDescriptors"] = $$createField5_0($$parsedSource["fileDescriptors"]);
+        }
+        if ("descriptorNames" in $$parsedSource) {
+            $$parsedSource["descriptorNames"] = $$createField6_0($$parsedSource["descriptorNames"]);
+        }
+        if ("rules" in $$parsedSource) {
+            $$parsedSource["rules"] = $$createField7_0($$parsedSource["rules"]);
+        }
+        return new ProtoStateResult($$parsedSource as Partial<ProtoStateResult>);
+    }
+}
+
+/**
+ * ProtoUploadFile is a single .proto file uploaded from the browser (the web
+ * build has no native folder picker, so files are read client-side and sent
+ * as name+content pairs). Name may carry forward-slash relative subpaths
+ * (e.g. "common/types.proto") to preserve import-relative layouts.
+ */
+export class ProtoUploadFile {
+    "name": string;
+    "content": string;
+
+    /** Creates a new ProtoUploadFile instance. */
+    constructor($$source: Partial<ProtoUploadFile> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("content" in $$source)) {
+            this["content"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProtoUploadFile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProtoUploadFile {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProtoUploadFile($$parsedSource as Partial<ProtoUploadFile>);
+    }
+}
+
 export class PublishParams {
     "topic": string;
     "qos": number;
     "payload": string;
     "retain": boolean;
     "properties": PublishProperties;
+
+    /**
+     * nil = auto (matcher decides), "" = raw (skip protobuf encoding),
+     * "<name>" = forced message type.
+     */
+    "protoOverride": string | null;
 
     /** Creates a new PublishParams instance. */
     constructor($$source: Partial<PublishParams> = {}) {
@@ -415,6 +529,9 @@ export class PublishParams {
         if (!("properties" in $$source)) {
             this["properties"] = (new PublishProperties());
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -423,7 +540,7 @@ export class PublishParams {
      * Creates a new PublishParams instance from a string or object.
      */
     static createFrom($$source: any = {}): PublishParams {
-        const $$createField4_0 = $$createType7;
+        const $$createField4_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("properties" in $$parsedSource) {
             $$parsedSource["properties"] = $$createField4_0($$parsedSource["properties"]);
@@ -455,7 +572,7 @@ export class PublishProperties {
      * Creates a new PublishProperties instance from a string or object.
      */
     static createFrom($$source: any = {}): PublishProperties {
-        const $$createField7_0 = $$createType8;
+        const $$createField7_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("userProperties" in $$parsedSource) {
             $$parsedSource["userProperties"] = $$createField7_0($$parsedSource["userProperties"]);
@@ -485,6 +602,7 @@ export class SaveCollectionMessageParams {
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
     "userProperties": string | null;
+    "protoOverride": string | null;
 
     /** Creates a new SaveCollectionMessageParams instance. */
     constructor($$source: Partial<SaveCollectionMessageParams> = {}) {
@@ -539,6 +657,9 @@ export class SaveCollectionMessageParams {
         if (!("userProperties" in $$source)) {
             this["userProperties"] = null;
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -568,6 +689,7 @@ export class SavePublishHistoryEntryParams {
     "headerTopicAlias": number | null;
     "headerSubscriptionIdentifier": number | null;
     "userProperties": string | null;
+    "protoOverride": string | null;
 
     /** Creates a new SavePublishHistoryEntryParams instance. */
     constructor($$source: Partial<SavePublishHistoryEntryParams> = {}) {
@@ -616,6 +738,9 @@ export class SavePublishHistoryEntryParams {
         if (!("userProperties" in $$source)) {
             this["userProperties"] = null;
         }
+        if (!("protoOverride" in $$source)) {
+            this["protoOverride"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -654,7 +779,7 @@ export class SparkplugHistory {
      * Creates a new SparkplugHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): SparkplugHistory {
-        const $$createField0_0 = $$createType10;
+        const $$createField0_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("messages" in $$parsedSource) {
             $$parsedSource["messages"] = $$createField0_0($$parsedSource["messages"]);
@@ -683,7 +808,7 @@ export class StartupOptions {
      * Creates a new StartupOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): StartupOptions {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType15;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("PathsOverride" in $$parsedSource) {
             $$parsedSource["PathsOverride"] = $$createField0_0($$parsedSource["PathsOverride"]);
@@ -733,9 +858,12 @@ const $$createType3 = $Create.Map($Create.Any, $$createType2);
 const $$createType4 = mqtt$0.ConnectionStats.createFrom;
 const $$createType5 = $Create.Map($Create.Any, $$createType4);
 const $$createType6 = $Create.Array($Create.Any);
-const $$createType7 = PublishProperties.createFrom;
-const $$createType8 = $Create.Map($Create.Any, $Create.Any);
-const $$createType9 = mqtt$0.MqttMessage.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = paths$0.Paths.createFrom;
-const $$createType12 = $Create.Nullable($$createType11);
+const $$createType7 = $Create.Map($Create.Any, $$createType6);
+const $$createType8 = models$0.ProtoBindingRule.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = PublishProperties.createFrom;
+const $$createType11 = $Create.Map($Create.Any, $Create.Any);
+const $$createType12 = mqtt$0.MqttMessage.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = paths$0.Paths.createFrom;
+const $$createType15 = $Create.Nullable($$createType14);

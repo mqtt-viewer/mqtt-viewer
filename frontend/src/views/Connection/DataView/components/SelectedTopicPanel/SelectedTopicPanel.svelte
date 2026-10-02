@@ -12,6 +12,7 @@
   import { HISTORY_WINDOW_SIZE } from "../../stores/selected-topic-store";
   import Button from "@/components/Button/Button.svelte";
   import Icon from "@/components/Icon/Icon.svelte";
+  import ProtobufLogo from "@/components/ProtobufLogo/ProtobufLogo.svelte";
   import SelectedMessageArrivalDetails from "./components/SelectedMessageArrivalDetails.svelte";
   import DropdownMenu from "@/components/DropdownMenu/DropdownMenu.svelte";
   import Switch from "@/components/InputFields/Switch.svelte";
@@ -141,9 +142,11 @@
     selectedMessage?.payloadState !== "loaded" ||
     selectedMessageProps.IsDecodedProto === true ||
     selectedMessageProps.DecodeStateUnknown === true ||
+    // A binding claimed this topic, so it isn't being read as Sparkplug.
+    selectedMessageBindingDecode !== null ||
     !isSparkplugProtobufTopic($selectedTopicStore.selectedTopic ?? "")
       ? null
-      : selectedMessageProps.SparkplugDecodeFailed === true
+      : selectedMessageProps.ProtoDecodeFailed === true
         ? ("failed" as const)
         : isProtoEnabled
           ? ("earlier" as const)
@@ -218,6 +221,24 @@
       });
     }
   };
+
+  // A message a per-topic binding decoded, or tried to: only a binding's
+  // decode names its type. Sparkplug decodes are covered by PayloadTab's
+  // Sparkplug banner and hint instead. Recorded messages keep their decode
+  // state but not the type name, so they show no line.
+  $: selectedMessageBindingDecode = (() => {
+    const name = selectedMessageProps.ProtoDescriptorName;
+    if (typeof name !== "string" || name === "") {
+      return null;
+    }
+    if (selectedMessageProps.IsDecodedProto === true) {
+      return { status: "ok" as const, name };
+    }
+    if (selectedMessageProps.ProtoDecodeFailed === true) {
+      return { status: "failed" as const, name };
+    }
+    return null;
+  })();
 
   $: selectedMessagePayload,
     (() => {
@@ -481,6 +502,22 @@
       No message selected
     </div>
   {:else}
+    {#if selectedMessageBindingDecode}
+      <div class="flex items-center gap-1 text-sm mt-1 mb-1">
+        {#if selectedMessageBindingDecode.status === "ok"}
+          <span class="size-4"><ProtobufLogo isActive /></span>
+          <span class="text-secondary-text">
+            Decoded as {selectedMessageBindingDecode.name}
+          </span>
+        {:else}
+          <span class="text-warning"><Icon type="warning" size={14} /></span>
+          <span class="text-warning">
+            Failed to decode as {selectedMessageBindingDecode.name}. Showing
+            the raw payload.
+          </span>
+        {/if}
+      </div>
+    {/if}
     {#if mqttVersion === "3"}
       <Tabs
         class="w-full grow min-h-0"

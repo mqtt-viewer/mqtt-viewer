@@ -130,7 +130,8 @@
     "secondary",
     "secondary-text",
     "elevation-1",
-    "primary"
+    "primary",
+    "warning"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

@@ -17,7 +17,7 @@ func benchmarkDecode(b *testing.B, store *sparkplug.SessionStore) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	t := &testing.T{}
 	registry := loadTestRegistry(t)
-	mw := NewProtoDecodeMiddleware(registry, store)
+	mw := newSparkplugDecode(registry, store)
 	birth := encodeSparkplugB(t, registry, `{"seq":"0","metrics":[`+
 		`{"name":"Line/Tag0","alias":"1","datatype":10,"doubleValue":1},`+
 		`{"name":"Line/Tag1","alias":"2","datatype":10,"doubleValue":1},`+

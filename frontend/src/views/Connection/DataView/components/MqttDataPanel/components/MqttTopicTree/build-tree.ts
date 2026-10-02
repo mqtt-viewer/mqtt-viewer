@@ -6,6 +6,10 @@ import { getSortedDataKeys } from "./sort";
 export type TreeRow = {
   levelCount: number;
   isDecodedProto: boolean;
+  // A binding or Sparkplug decode failed on this topic's latest message.
+  isProtoDecodeFailed?: boolean;
+  // The binding's message type the latest decode used or tried.
+  protoDescriptorName?: string;
   topicLevel: string;
   topic: string;
   expandKey: string;
@@ -67,6 +71,8 @@ const buildRows = (params: BuildRowParams) => {
     result.push({
       levelCount,
       isDecodedProto: topicData.isDecodedProto,
+      isProtoDecodeFailed: topicData.isProtoDecodeFailed,
+      protoDescriptorName: topicData.protoDescriptorName,
       topic: topicData.topic,
       topicLevel: key,
       expandKey,

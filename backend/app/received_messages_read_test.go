@@ -432,8 +432,8 @@ func TestRecordedMessagesKeepTheirDecodeState(t *testing.T) {
 	if len(datas) != 2 {
 		t.Fatalf("expected 2 data messages, got %d", len(datas))
 	}
-	if !flag(datas[0], "SparkplugDecodeFailed") {
-		t.Errorf("expected SparkplugDecodeFailed on a recorded failed decode, got %v", datas[0].MiddlewareProperties)
+	if !flag(datas[0], "ProtoDecodeFailed") {
+		t.Errorf("expected ProtoDecodeFailed on a recorded failed decode, got %v", datas[0].MiddlewareProperties)
 	}
 	if datas[1].MiddlewareProperties != nil {
 		t.Errorf("expected no flags on a message recorded undecoded, got %v", datas[1].MiddlewareProperties)

@@ -123,15 +123,20 @@ func (a *App) PublishSparkplugRebirth(connectionId uint, group string, edgeNode 
 	if err := a.Db.First(&connection, connectionId).Error; err != nil {
 		return err
 	}
-	// Mirrors the ConnectMqtt condition for registering the encode middleware:
-	// without it the payload would be published as raw JSON.
+	// The encode middleware only runs with protobuf on, and needs the
+	// Sparkplug registry loaded: without them the payload would be published
+	// as raw JSON.
 	if connection.IsProtoEnabled == nil || !*connection.IsProtoEnabled || a.protoRegistry() == nil {
 		return fmt.Errorf("rebirth requests need protobuf decoding enabled on the connection")
 	}
+	// Forced rather than Auto, so a binding rule over the Sparkplug
+	// namespace can't make the request encode as some other type.
+	sparkplugB := "SparkplugBPayload"
 	return a.PublishMqtt(connectionId, PublishParams{
-		Topic:   sparkplug.RebirthTopic(group, edgeNode),
-		QoS:     0,
-		Payload: sparkplug.RebirthPayloadJSON(time.Now().UnixMilli()),
-		Retain:  false,
+		Topic:         sparkplug.RebirthTopic(group, edgeNode),
+		QoS:           0,
+		Payload:       sparkplug.RebirthPayloadJSON(time.Now().UnixMilli()),
+		Retain:        false,
+		ProtoOverride: &sparkplugB,
 	})
 }

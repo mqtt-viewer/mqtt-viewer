@@ -16,7 +16,36 @@ func DecodeFromProtoBytes(protoBytes []byte, descriptor protoreflect.MessageDesc
 	if err != nil {
 		return nil, err
 	}
+	if err := checkAnyKnownField(protoBytes, msg, descriptor); err != nil {
+		return nil, err
+	}
 	return MarshalDynamicToJSON(msg)
+}
+
+// checkAnyKnownField rejects a decode that only "succeeded" because the wire
+// format isn't self-describing: unmarshalling bytes of message type X
+// against descriptor Y succeeds whenever no field number/wire-type pair
+// collides with a known field, and everything lands in unknown fields. Left
+// alone that reports a confident "decoded" result with an empty {} payload.
+// Non-empty input that populated none of the descriptor's known fields but
+// did populate unknown fields is treated as a failed decode. This is
+// conservative, not exact: a partial collision (some fields happen to line
+// up on number and wire type) still reports success, and a payload from a
+// newer .proto that only adds fields this descriptor doesn't know about is
+// reported as failed even though the message type is technically the same.
+func checkAnyKnownField(protoBytes []byte, msg *dynamicpb.Message, descriptor protoreflect.MessageDescriptor) error {
+	if len(protoBytes) == 0 || len(msg.GetUnknown()) == 0 {
+		return nil
+	}
+	hasKnownField := false
+	msg.Range(func(protoreflect.FieldDescriptor, protoreflect.Value) bool {
+		hasKnownField = true
+		return false
+	})
+	if !hasKnownField {
+		return fmt.Errorf("no fields of %s matched the payload", descriptor.FullName())
+	}
+	return nil
 }
 
 // UnmarshalToDynamic decodes protoBytes into a mutable dynamic message so

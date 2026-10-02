@@ -21,6 +21,12 @@ docs/WRITING_STYLE.md.
   metric tree, without becoming a host application or disturbing the
   primary SCADA. Benefit phrase: "see the metric names, not the
   aliases".
+- 2026-10-03. Per-topic protobuf binding (#131). Add to features list
+  and to the protobuf/Sparkplug use-case page. Copy angle: import your
+  .proto files per connection and bind message types to topic patterns;
+  the most specific filter wins; decode and publish both honour the
+  bindings. MQTTX still lacks this (their #1371, #1997 and #1971 remain
+  open; re-verify before publishing).
 
 ## Done
 

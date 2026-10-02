@@ -15,6 +15,9 @@ type MqttPublishParams struct {
 	Payload    []byte             `json:"payloadBytes"`
 	Retain     bool               `json:"retain"`
 	Properties *MessageProperties `json:"properties"`
+	// nil = auto (matcher decides), "" = raw (skip protobuf encoding),
+	// "<name>" = forced message type.
+	ProtoOverride *string `json:"protoOverride"`
 }
 
 func (mm *MqttManager) Publish(message MqttPublishParams) error {

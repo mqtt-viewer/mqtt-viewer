@@ -68,6 +68,9 @@ type AppConnection struct {
 	EventSet            *events.ConnectionEventsSet
 	// Per-connection Sparkplug B session state (births, aliases, seq).
 	SparkplugStore *sparkplug.SessionStore
+	// Per-connection protobuf state: the enabled flag, the compiled
+	// registry of imported .proto files and the topic binding matcher.
+	ProtoState *protoState
 	// connUp guards connectedConnCount against double-counting: the
 	// underlying manager's OnConnectionUp/OnConnectionDown callbacks are not
 	// guaranteed to alternate (e.g. Disconnect() on an already-down

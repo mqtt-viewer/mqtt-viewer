@@ -18,6 +18,8 @@ export {
     MqttStats,
     OpenChartWindowParams,
     OpenTopicWindowParams,
+    ProtoStateResult,
+    ProtoUploadFile,
     PublishParams,
     PublishProperties,
     SaveCollectionMessageParams,

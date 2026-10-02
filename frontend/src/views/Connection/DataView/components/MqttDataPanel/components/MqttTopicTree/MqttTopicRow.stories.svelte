@@ -6,7 +6,7 @@
 
   const componentName = "MqttTopicRow";
   const storyId = "Views/Connection/DataView/MqttDataPanel/MqttTopicTree/MqttTopicRow";
-  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus","isRetained","isPinned","onUnpin"];
+  const props: string[] = ["topic","topicLevel","expandKey","message","messageCount","subtopicCount","isExpanded","isSelected","isDecodedProto","isProtoDecodeFailed","protoDescriptorName","toggleExpansion","onTopicSelect","highlightedTopicStore","onOpenBrokerStatus","isRetained","isPinned","onUnpin"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({
@@ -23,6 +23,20 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<!-- Decoded by a protobuf binding; the marker's title names the type. -->
+<Story
+  name="DecodedOk"
+  args={{ ...storyArgs, isDecodedProto: true, protoDescriptorName: "mqtt.viewer.DeviceState" }}
+  {template}
+/>
+
+<!-- A binding claimed the topic but the payload didn't decode as its type. -->
+<Story
+  name="DecodedFailed"
+  args={{ ...storyArgs, isProtoDecodeFailed: true, protoDescriptorName: "mqtt.viewer.DeviceState" }}
+  {template}
+/>
 
 <!-- A pinned row in the tree. The pin marker is the unpin button here too, so
      a pin can be undone from wherever the row is. -->

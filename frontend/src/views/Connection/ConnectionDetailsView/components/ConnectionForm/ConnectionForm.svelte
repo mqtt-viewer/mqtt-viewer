@@ -43,7 +43,6 @@
     certClientKey,
     customIconSeed,
     skipCertVerification,
-    isProtoEnabled,
   } = connection.connectionDetails;
 
   const { form, errors, data, isValid, setFields, validate } =
@@ -330,13 +329,6 @@
       </div>
     {/if}
   {/if}
-  <Switch
-    disabled={isAllFieldsDisabled}
-    onChange={(checked) => setFields(`isProtoEnabled`, checked, true)}
-    name="isProtoEnabled"
-    label="Automatically encode/decode Sparkplug messages"
-    defaultChecked={isProtoEnabled ?? undefined}
-  />
 </form>
 <ConfirmDeleteConnectionDialog
   {connection}

@@ -22,6 +22,13 @@ export type MqttData = {
     latestMessageTime: Date;
     message?: string; // byte array
     isDecodedProto: boolean;
+    // The latest message on this topic was claimed by a binding (or is
+    // Sparkplug) but failed to decode. Leaf only: a failed message never
+    // marks its ancestors.
+    isProtoDecodeFailed?: boolean;
+    // The binding's message type the latest decode used or tried. Unset
+    // for Sparkplug decodes.
+    protoDescriptorName?: string;
     // Whether this topic currently holds a retained message, as far as we
     // know. Mirrors the backend's retained index (see mqtt.MessageHistory) so
     // the tree can show a retained marker without a binding call per row. The
@@ -53,6 +60,28 @@ export const retainedStateOf = (
   // zero-length payload.
   const payload = (message.payload as unknown as string) ?? "";
   return payload.length > 0;
+};
+
+// What the decode middleware did to a message: the IsDecodedProto,
+// ProtoDecodeFailed and ProtoDescriptorName middleware properties. Only a
+// binding's decode names its type.
+export type ProtoDecode = {
+  isDecodedProto: boolean;
+  isProtoDecodeFailed: boolean;
+  protoDescriptorName?: string;
+};
+
+export const protoDecodeOf = (message: mqtt.MqttMessage): ProtoDecode => {
+  const props = message?.middlewareProperties as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const name = props?.ProtoDescriptorName;
+  return {
+    isDecodedProto: props?.IsDecodedProto === true,
+    isProtoDecodeFailed: props?.ProtoDecodeFailed === true,
+    protoDescriptorName: typeof name === "string" ? name : undefined,
+  };
 };
 
 export const createMqttDataStore = (
@@ -120,7 +149,7 @@ export const createMqttDataStore = (
         const decodedMessage = base64ToUtf8(
           message.payload as unknown as string
         );
-        const isDecodedProto = message?.middlewareProperties?.IsDecodedProto;
+        const decode = protoDecodeOf(message);
 
         let prefix = "";
         for (let i = 0; i < topicLevels.length; i++) {
@@ -138,7 +167,7 @@ export const createMqttDataStore = (
           topicLevels,
           0,
           decodedMessage,
-          isDecodedProto,
+          decode,
           timestamp,
           count,
           retained
@@ -174,7 +203,7 @@ export const createMqttDataStore = (
     topicLevels: string[],
     currentTopicLevel: number,
     message: string,
-    isDecodedProto: boolean,
+    decode: ProtoDecode,
     timestamp: Date,
     count: number,
     // undefined means "this message says nothing about retained state"; only
@@ -188,7 +217,9 @@ export const createMqttDataStore = (
       if (currentTopicLevel === topicLevels.length - 1) {
         mqttData[topicLevel].messageCount += count;
         mqttData[topicLevel].message = message;
-        mqttData[topicLevel].isDecodedProto = isDecodedProto;
+        mqttData[topicLevel].isDecodedProto = decode.isDecodedProto;
+        mqttData[topicLevel].isProtoDecodeFailed = decode.isProtoDecodeFailed;
+        mqttData[topicLevel].protoDescriptorName = decode.protoDescriptorName;
         mqttData[topicLevel].latestMessageTime = timestamp;
         if (retained !== undefined) {
           mqttData[topicLevel].isRetained = retained;
@@ -202,12 +233,15 @@ export const createMqttDataStore = (
         topicLevels,
         currentTopicLevel + 1,
         message,
-        isDecodedProto,
+        decode,
         timestamp,
         count,
         retained
       );
-      mqttData[topicLevel].isDecodedProto = isDecodedProto;
+      mqttData[topicLevel].isDecodedProto = decode.isDecodedProto;
+      if (decode.isDecodedProto) {
+        mqttData[topicLevel].protoDescriptorName = decode.protoDescriptorName;
+      }
       mqttData[topicLevel].messageCount += count;
       if (createdChild) {
         mqttData[topicLevel].subtopicCount += 1;
@@ -223,7 +257,9 @@ export const createMqttDataStore = (
         subtopicCount: 0,
         messageCount: count,
         topic,
-        isDecodedProto,
+        isDecodedProto: decode.isDecodedProto,
+        isProtoDecodeFailed: decode.isProtoDecodeFailed,
+        protoDescriptorName: decode.protoDescriptorName,
         isRetained: retained ?? false,
         message,
         children: emptyMqttData(),
@@ -239,7 +275,7 @@ export const createMqttDataStore = (
       topicLevels,
       currentTopicLevel + 1,
       message,
-      false,
+      decode,
       timestamp,
       count,
       retained

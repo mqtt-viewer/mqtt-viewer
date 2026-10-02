@@ -5,6 +5,7 @@ import (
 	"errors"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"strconv"
 
 	"gorm.io/gorm"
@@ -181,9 +182,9 @@ func middlewarePropertiesFromDecodeState(state *string) *map[string]any {
 	case state == nil:
 		props = map[string]any{"DecodeStateUnknown": true}
 	case *state == models.DecodeStateDecoded:
-		props = map[string]any{"IsDecodedProto": true}
+		props = map[string]any{mqttmiddleware.PropIsDecodedProto: true}
 	case *state == models.DecodeStateFailed:
-		props = map[string]any{"SparkplugDecodeFailed": true}
+		props = map[string]any{mqttmiddleware.PropProtoDecodeFailed: true}
 	default:
 		return nil
 	}

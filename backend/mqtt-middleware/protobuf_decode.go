@@ -17,26 +17,98 @@ type ProtoDecodeMiddleware struct {
 
 var PROTO_DECODE_MIDDLEWARE_ID = "ProtoDecodeMiddleware"
 
-// NewProtoDecodeMiddleware decodes Sparkplug payloads before they enter
-// history. When a session store is provided, topics matching the strict
-// Sparkplug B grammar take the stateful path: birth/alias tracking, metric
-// name injection into the stored payload, and a per-message "sparkplug" meta
-// map in middleware properties. Everything else (spAv1.0, and spBv1.0 topics
-// that fail the strict grammar) keeps the original stateless decode. A nil
-// store disables the stateful path entirely.
-func NewProtoDecodeMiddleware(protoRegistry *protobuf.ProtoRegistry, sparkplugStore *sparkplug.SessionStore) *ProtoDecodeMiddleware {
+// Middleware property keys the decode middleware sets. One decode-state
+// model for every source (Sparkplug and per-topic binding rules), persisted
+// as received_messages.decode_state (decoded, failed or raw):
+//   - PropIsDecodedProto: Payload is the decoded JSON, not the wire bytes.
+//   - PropProtoDecodeFailed: a decode was attempted and failed; raw bytes.
+//   - PropProtoDescriptorName: the message type a binding rule's decode used
+//     or tried. Sparkplug decodes leave it unset to keep that hot path as
+//     lean as it was. Live only, not persisted with recorded messages.
+const (
+	PropIsDecodedProto      = "IsDecodedProto"
+	PropProtoDecodeFailed   = "ProtoDecodeFailed"
+	PropProtoDescriptorName = "ProtoDescriptorName"
+)
+
+// NewProtoDecodeMiddleware decodes an incoming message's payload to JSON
+// before it enters history. It does nothing while the resolver is disabled.
+//
+// A topic claimed by a per-topic binding rule decodes as the rule's message
+// type from the connection's imported registry. A failure there (bad bytes,
+// a payload that matched none of the type's fields, or a type that isn't in
+// the loaded files) leaves the payload untouched and flags it failed with the
+// type name, so the UI can say so.
+//
+// Every other topic keeps the Sparkplug behaviour: when a session store is
+// provided, topics matching the strict Sparkplug B grammar take the stateful
+// path (birth/alias tracking, metric name injection into the stored payload,
+// and a per-message "sparkplug" meta map in middleware properties); anything
+// else (spAv1.0, and spBv1.0 topics that fail the strict grammar) keeps the
+// stateless decode. A nil store disables the stateful path. Sparkplug STATE
+// topics are never protobuf, so they always take the stateful path, even
+// under a catch-all rule.
+func NewProtoDecodeMiddleware(resolver ProtoResolver, sparkplugRegistry SparkplugRegistryFunc, sparkplugStore *sparkplug.SessionStore) *ProtoDecodeMiddleware {
 	return &ProtoDecodeMiddleware{
 		Middleware: mqtt.Middleware[mqtt.MqttMessage]{
 			ID: PROTO_DECODE_MIDDLEWARE_ID,
 			Func: func(params *mqtt.MqttMessage) error {
+				if !resolver.IsEnabled() {
+					return nil
+				}
+				var info sparkplug.TopicInfo
+				isSparkplugGrammar := false
 				if sparkplugStore != nil {
-					if info, ok := sparkplug.ParseTopic(params.Topic); ok {
-						return decodeStateful(protoRegistry, sparkplugStore, params, info)
+					info, isSparkplugGrammar = sparkplug.ParseTopic(params.Topic)
+				}
+				if !isSparkplugGrammar || info.Type != sparkplug.MessageTypeState {
+					match := resolver.Match(params.Topic)
+					// A typeless rule is a no-op binding, never a match.
+					if match.Source == topicmatching.SourceRule && match.MessageType != "" {
+						return decodeRule(resolver, params, match.MessageType)
 					}
 				}
-				return decodeStateless(protoRegistry, params)
+				registry := sparkplugRegistry()
+				if isSparkplugGrammar {
+					return decodeStateful(registry, sparkplugStore, params, info)
+				}
+				return decodeStateless(registry, params)
 			},
 		},
+	}
+}
+
+// decodeRule decodes a message claimed by a per-topic binding rule.
+func decodeRule(resolver ProtoResolver, params *mqtt.MqttMessage, typeName string) error {
+	descriptor, ok := resolver.RuleDescriptor(typeName)
+	if !ok {
+		setDecodeFailed(params, typeName)
+		return nil
+	}
+	decodedPayload, err := protobuf.DecodeFromProtoBytes(params.Payload, descriptor)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("proto decode middleware: %s", err.Error()))
+		setDecodeFailed(params, typeName)
+		return nil
+	}
+	params.Payload = decodedPayload
+	setDecoded(params, typeName)
+	return nil
+}
+
+// setDecoded and setDecodeFailed record the outcome; typeName is empty for
+// Sparkplug decodes.
+func setDecoded(params *mqtt.MqttMessage, typeName string) {
+	setMiddlewareProperty(params, PropIsDecodedProto, true)
+	if typeName != "" {
+		setMiddlewareProperty(params, PropProtoDescriptorName, typeName)
+	}
+}
+
+func setDecodeFailed(params *mqtt.MqttMessage, typeName string) {
+	setMiddlewareProperty(params, PropProtoDecodeFailed, true)
+	if typeName != "" {
+		setMiddlewareProperty(params, PropProtoDescriptorName, typeName)
 	}
 }
 
@@ -64,7 +136,7 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 		// view can say this isn't Sparkplug B rather than suggest turning
 		// on decoding that is already on.
 		slog.Debug(fmt.Sprintf("sparkplug decode middleware error: %s", err.Error()))
-		setMiddlewareProperty(params, "SparkplugDecodeFailed", true)
+		setDecodeFailed(params, "")
 		return nil
 	}
 	meta := store.HandleMessage(info, msg, messageRef(params))
@@ -79,7 +151,7 @@ func decodeStateful(protoRegistry *protobuf.ProtoRegistry, store *sparkplug.Sess
 		return nil
 	}
 	params.Payload = decodedPayload
-	setMiddlewareProperty(params, "IsDecodedProto", true)
+	setDecoded(params, "")
 	setSparkplugMeta(params, meta)
 	return nil
 }
@@ -128,7 +200,7 @@ func decodeStateless(protoRegistry *protobuf.ProtoRegistry, params *mqtt.MqttMes
 		// Don't error - just use payload as normal
 		slog.Debug(fmt.Sprintf("proto decode middleware error: %s", err.Error()))
 		if topicmatching.MatchesSparkplugBPrefix(params.Topic) {
-			setMiddlewareProperty(params, "SparkplugDecodeFailed", true)
+			setDecodeFailed(params, "")
 		}
 		return nil
 	}
@@ -137,7 +209,7 @@ func decodeStateless(protoRegistry *protobuf.ProtoRegistry, params *mqtt.MqttMes
 	}
 	// Indicates that the payload has been decoded
 	// so that the front end can display a marker
-	setMiddlewareProperty(params, "IsDecodedProto", true)
+	setDecoded(params, "")
 	params.Payload = decodedPayload
 	return nil
 }
