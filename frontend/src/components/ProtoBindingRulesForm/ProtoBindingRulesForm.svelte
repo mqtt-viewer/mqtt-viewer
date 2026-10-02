@@ -35,6 +35,7 @@
   import Icon from "@/components/Icon/Icon.svelte";
   import ProtoTypePicker from "./ProtoTypePicker.svelte";
   import { validateTopicFilter } from "@/util/topic-filter";
+  import { errorMessage } from "@/util/strings";
 
   export let rules: ProtoBindingRuleView[] = [];
   export let descriptorNames: string[] = [];
@@ -49,12 +50,18 @@
     topicFilter: string;
     messageType: string;
   }) => void | Promise<void> = () => {};
+  // Each write callback may return a promise. A rejection is shown inline
+  // (on the row for an update, under the list for a delete or move, under
+  // the draft for an add) instead of being swallowed.
   export let onUpdate: (
     id: number,
     changes: Partial<Pick<ProtoBindingRuleView, "topicFilter" | "messageType">>
-  ) => void = () => {};
-  export let onDelete: (id: number) => void = () => {};
-  export let onMove: (id: number, direction: "up" | "down") => void = () => {};
+  ) => void | Promise<void> = () => {};
+  export let onDelete: (id: number) => void | Promise<void> = () => {};
+  export let onMove: (
+    id: number,
+    direction: "up" | "down"
+  ) => void | Promise<void> = () => {};
   export let onTestTopic: (
     topic: string
   ) => Promise<ProtoBindingMatchView | null> = async () => null;
@@ -113,6 +120,23 @@
 
   $: syncEditState(rules);
 
+  // Last failed save per rule id, cleared by the next successful save of
+  // that row. A failed filter save also leaves the row dirty (see
+  // commitRowEdit) so the typed text stays and the next edit or blur
+  // retries it.
+  let saveErrorByRuleId: Record<number, string> = {};
+
+  const setRowSaveError = (ruleId: number, message: string | null) => {
+    const next = { ...saveErrorByRuleId };
+    if (message === null) delete next[ruleId];
+    else next[ruleId] = message;
+    saveErrorByRuleId = next;
+  };
+
+  // A failed delete or move, shown under the list. Cleared by the next
+  // successful one.
+  let listError = "";
+
   const rowFilterValue = (rule: ProtoBindingRuleView) =>
     editStateByRuleId[rule.id]?.value ?? rule.topicFilter;
 
@@ -123,9 +147,10 @@
   // all. Everything the note depends on (edit state, duplicates,
   // descriptorNames, status) is read directly here so it's tracked.
   //
-  // Precedence: validation error, then duplicate filter, then stale type.
-  // Only the first (level "error") blocks the commit; the other two are
-  // amber notes about a binding that is still saved and still valid.
+  // Precedence: validation error, then failed save, then duplicate filter,
+  // then stale type. The first two (level "error") redden the input; only
+  // validation blocks the commit. The last two are amber notes about a
+  // binding that is still saved and still valid.
   //
   // Deliberate trade-off: an invalid edit to a saved row is never persisted
   // (commitRowEdit no-ops while invalid), so closing the dialog reverts the
@@ -136,6 +161,13 @@
     const validationError = validateTopicFilter(value);
     if (validationError) {
       return { level: "error" as const, message: validationError };
+    }
+    const saveError = saveErrorByRuleId[rule.id];
+    if (saveError) {
+      return {
+        level: "error" as const,
+        message: `Could not save: ${saveError}`,
+      };
     }
     if (duplicateFlags[index]) {
       return {
@@ -159,19 +191,76 @@
 
   // Commits a real row's locally-edited topic filter, if it's valid and
   // different from the last-known committed value. No-ops while invalid
-  // (leaves text/error/dirty as-is) so the user can keep fixing it.
-  const commitRowEdit = (rule: ProtoBindingRuleView) => {
+  // (leaves text/error/dirty as-is) so the user can keep fixing it. The row
+  // only goes clean once the write succeeds: a failed write keeps it dirty,
+  // so an incoming refresh can't replace the unsaved text, and shows the
+  // error on the row.
+  const markRowClean = (ruleId: number, value: string) => {
+    // Typing may have moved on while the write was in flight; that newer
+    // text is still unsaved, so leave it dirty.
+    if (editStateByRuleId[ruleId]?.value !== value) return;
+    editStateByRuleId = {
+      ...editStateByRuleId,
+      [ruleId]: { value, dirty: false },
+    };
+  };
+
+  const commitRowEdit = async (rule: ProtoBindingRuleView) => {
     const entry = editStateByRuleId[rule.id];
     if (!entry) return;
     const localValue = entry.value;
     if (validateTopicFilter(localValue)) return;
-    if (localValue !== rule.topicFilter) {
-      onUpdate(rule.id, { topicFilter: localValue });
+    if (localValue === rule.topicFilter) {
+      // Typed back to the saved value: nothing to write, and any failed
+      // filter save is moot. An untouched row keeps a failed type pick's
+      // error.
+      if (entry.dirty) {
+        setRowSaveError(rule.id, null);
+        markRowClean(rule.id, localValue);
+      }
+      return;
     }
-    editStateByRuleId = {
-      ...editStateByRuleId,
-      [rule.id]: { value: localValue, dirty: false },
-    };
+    try {
+      await onUpdate(rule.id, { topicFilter: localValue });
+      setRowSaveError(rule.id, null);
+      markRowClean(rule.id, localValue);
+    } catch (e) {
+      console.error(e);
+      setRowSaveError(rule.id, errorMessage(e));
+    }
+  };
+
+  const onRowTypePicked = async (rule: ProtoBindingRuleView, name: string) => {
+    try {
+      await onUpdate(rule.id, { messageType: name });
+      setRowSaveError(rule.id, null);
+    } catch (e) {
+      console.error(e);
+      setRowSaveError(rule.id, errorMessage(e));
+    }
+  };
+
+  const onRowDelete = async (rule: ProtoBindingRuleView) => {
+    try {
+      await onDelete(rule.id);
+      listError = "";
+    } catch (e) {
+      console.error(e);
+      listError = `Could not delete that binding: ${errorMessage(e)}`;
+    }
+  };
+
+  const onRowMove = async (
+    rule: ProtoBindingRuleView,
+    direction: "up" | "down"
+  ) => {
+    try {
+      await onMove(rule.id, direction);
+      listError = "";
+    } catch (e) {
+      console.error(e);
+      listError = `Could not move that binding: ${errorMessage(e)}`;
+    }
   };
 
   // Debounced commit, one per rule id. The callback looks up the current
@@ -226,12 +315,15 @@
   // "Add binding" doesn't immediately show "Enter a topic filter" before
   // the user has typed anything.
   let draftTouched = false;
+  // The last failed add, cleared on the next attempt.
+  let draftSaveError = "";
   let draftInputEl: HTMLInputElement | undefined = undefined;
 
   const onAddClicked = async () => {
     if (draft !== null) return;
     draft = { topicFilter: "", messageType: "" };
     draftTouched = false;
+    draftSaveError = "";
     await tick();
     draftInputEl?.focus();
   };
@@ -243,6 +335,7 @@
     // match), so don't create one.
     if (!draft.messageType) return;
     draftSubmitting = true;
+    draftSaveError = "";
     try {
       await onAdd({ ...draft });
       draft = null;
@@ -251,6 +344,7 @@
     } catch (e) {
       console.error(e);
       draftSubmitting = false;
+      draftSaveError = `Could not add the binding: ${errorMessage(e)}`;
     }
   };
 
@@ -280,8 +374,12 @@
     commitDraft();
   };
 
+  // Picking a type is a commit attempt, so it marks the filter touched: with
+  // the filter still empty or invalid the draft can't commit, and the user
+  // needs to see why. Opening the picker without choosing doesn't get here.
   const onDraftTypePicked = (name: string) => {
     if (!draft) return;
+    draftTouched = true;
     draft = { ...draft, messageType: name };
     commitDraft();
   };
@@ -289,6 +387,7 @@
   const onDraftCancel = () => {
     draft = null;
     draftTouched = false;
+    draftSaveError = "";
   };
 
   let testTopic = "";
@@ -333,8 +432,10 @@
     The most specific filter wins. Equal filters use list order.
   </div>
   {#if connected}
+    <!-- The dialog header says fields are locked while connected. Bindings
+         are the exception (they apply live), so say so here. -->
     <div class="text-secondary-text text-sm mt-1">
-      Bindings apply to new messages.
+      Bindings stay editable while connected and apply to new messages.
     </div>
   {/if}
 
@@ -354,15 +455,17 @@
             <div class="flex flex-col -my-1">
               <IconButton
                 tooltipText="Move up"
+                ariaLabel="Move up"
                 disabled={disabled || index === 0}
-                onClick={() => onMove(rule.id, "up")}
+                onClick={() => onRowMove(rule, "up")}
               >
                 <Icon type="up" size={12} />
               </IconButton>
               <IconButton
                 tooltipText="Move down"
+                ariaLabel="Move down"
                 disabled={disabled || index === rules.length - 1}
-                onClick={() => onMove(rule.id, "down")}
+                onClick={() => onRowMove(rule, "down")}
               >
                 <Icon type="down" size={12} />
               </IconButton>
@@ -383,14 +486,14 @@
             {disabled}
             {descriptorNames}
             value={rule.messageType}
-            onPick={(name) => onUpdate(rule.id, { messageType: name })}
+            onPick={(name) => onRowTypePicked(rule, name)}
           />
           <Button
             {disabled}
             variant="text"
             iconType="closeCircle"
             aria-label="Delete binding"
-            on:click={() => onDelete(rule.id)}
+            on:click={() => onRowDelete(rule)}
           />
         </div>
         {#if note}
@@ -451,8 +554,13 @@
         </div>
         {#if showDraftError}
           <div class="text-error text-sm mt-1">{draftError}</div>
+        {:else if draftSaveError}
+          <div class="text-error text-sm mt-1">{draftSaveError}</div>
         {/if}
       </div>
+    {/if}
+    {#if listError}
+      <div class="text-error text-sm">{listError}</div>
     {/if}
   </div>
 

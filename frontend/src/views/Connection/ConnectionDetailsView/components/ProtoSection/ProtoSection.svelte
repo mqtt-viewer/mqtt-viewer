@@ -15,9 +15,17 @@
   import ProtoBindingRulesForm, {
     type ProtoBindingMatchView,
   } from "@/components/ProtoBindingRulesForm/ProtoBindingRulesForm.svelte";
+  import envStore from "@/stores/env";
   import { errorMessage } from "@/util/strings";
 
   export let connection: Connection;
+  // Overrides the env store's server-mode flag, so a story can render the
+  // browser (web UI) folder picker. Leave unset in the app.
+  export let serverMode: boolean | undefined = undefined;
+
+  // The web UI has no native folder dialog (ChooseDirectory returns "" in
+  // server mode), so folder imports go through a directory file input.
+  $: isServerMode = serverMode ?? $envStore.isServerMode;
 
   $: connectionId = connection.connectionDetails.id;
   $: isConnected = connection.connectionState !== "disconnected";
@@ -101,7 +109,7 @@
         : isCompileError
           ? `Failed to compile: ${loadError}`
           : typeCount === 0
-            ? "No message types found in this folder."
+            ? "No message types in the imported files."
             : `${fileCount} file${fileCount === 1 ? "" : "s"}, ${typeCount} message type${typeCount === 1 ? "" : "s"}`;
 
   $: switchSubLine = isConnected && !currentProtoEnabled
@@ -110,11 +118,21 @@
       ? "Sparkplug topics decode without any setup."
       : null;
 
-  // Most recent import/re-import action's failure, shown separately from
-  // statusLineText (which describes the last successful compile, not the
-  // action that just failed).
-  let importActionError = "";
+  // Most recent import/re-import/remove action's failure, shown separately
+  // from statusLineText (which describes the last successful compile, not
+  // the action that just failed). A failed import leaves any previous import
+  // in place, so the lead line says whether one was kept; detail is the
+  // backend's message (for a compile failure, the compile error).
+  let importActionError: { lead: string; detail: string } | null = null;
 
+  const setImportFailure = (e: unknown, hadImport: boolean) => {
+    importActionError = {
+      lead: hadImport
+        ? "Import failed, so I kept the previous files."
+        : "Import failed.",
+      detail: errorMessage(e),
+    };
+  };
 
   onMount(async () => {
     protoState.ensureConnection(connectionId, connection.eventSet);
@@ -132,65 +150,105 @@
     }
   });
 
+  // Used for both the first import and "Replace with folder". The native
+  // app uses the OS folder dialog; the web UI opens a directory file input.
   const onChooseFolder = async () => {
     if (busy) return;
+    if (isServerMode) {
+      folderInputEl?.click();
+      return;
+    }
+    const hadImport = imported;
     try {
       const dir = await ChooseDirectory("Choose .proto folder");
       // A cancelled picker resolves with an empty string.
       if (!dir) return;
-      importActionError = "";
+      importActionError = null;
       busy = true;
       await protoState.importDir(connectionId, dir);
     } catch (e) {
       console.error(e);
-      importActionError = errorMessage(e);
+      setImportFailure(e, hadImport);
     } finally {
       busy = false;
     }
   };
 
+  // Flat multi-file selection ("or import .proto files", "Replace with
+  // files"); the input's accept filter already limits it to .proto.
   let fileInputEl: HTMLInputElement | undefined;
+  // Directory selection, web UI only (webkitdirectory).
+  let folderInputEl: HTMLInputElement | undefined;
 
   const onChooseFiles = () => {
     if (busy) return;
     fileInputEl?.click();
   };
 
-  const onFilesSelected = async (event: Event) => {
-    const input = event.currentTarget as HTMLInputElement;
+  // A directory input's webkitRelativePath starts with the chosen folder's
+  // own name ("protos/common/units.proto"). Imports resolve relative to the
+  // chosen folder, so drop that first segment ("common/units.proto") to keep
+  // `import "common/units.proto"` working. A flat selection has no relative
+  // path, so it falls back to the bare file name.
+  const uploadPathFor = (file: File) => {
+    const relative = file.webkitRelativePath;
+    if (!relative) return file.name;
+    const slash = relative.indexOf("/");
+    return slash === -1 ? relative : relative.slice(slash + 1);
+  };
+
+  const importSelectedFiles = async (input: HTMLInputElement, onlyProto: boolean) => {
     const fileList = input.files;
     if (!fileList || fileList.length === 0) return;
+    const hadImport = imported;
     try {
+      // A directory input hands over every file in the folder, so keep only
+      // the .proto ones there. The flat input sends what was picked as-is
+      // and lets the backend reject a wrong name.
+      const picked = Array.from(fileList).filter(
+        (file) => !onlyProto || file.name.endsWith(".proto")
+      );
+      if (picked.length === 0) {
+        importActionError = {
+          lead: "That folder has no .proto files.",
+          detail: "",
+        };
+        return;
+      }
       const files = await Promise.all(
-        Array.from(fileList).map(async (file) => ({
-          // webkitRelativePath preserves a folder-shaped selection's
-          // subpaths (e.g. "common/types.proto"), falling back to the bare
-          // file name for a flat multi-file selection.
-          name: file.webkitRelativePath || file.name,
+        picked.map(async (file) => ({
+          name: uploadPathFor(file),
           content: await file.text(),
         }))
       );
-      importActionError = "";
+      importActionError = null;
       busy = true;
       await protoState.importFiles(connectionId, files);
     } catch (e) {
       console.error(e);
-      importActionError = errorMessage(e);
+      setImportFailure(e, hadImport);
     } finally {
       busy = false;
       input.value = "";
     }
   };
 
+  const onFilesSelected = (event: Event) =>
+    importSelectedFiles(event.currentTarget as HTMLInputElement, false);
+
+  const onFolderSelected = (event: Event) =>
+    importSelectedFiles(event.currentTarget as HTMLInputElement, true);
+
   const onReimport = async () => {
     if (busy) return;
+    const hadImport = imported;
     try {
-      importActionError = "";
+      importActionError = null;
       busy = true;
       await protoState.reimport(connectionId);
     } catch (e) {
       console.error(e);
-      importActionError = errorMessage(e);
+      setImportFailure(e, hadImport);
     } finally {
       busy = false;
     }
@@ -210,11 +268,14 @@
   const onRemove = async () => {
     confirmRemoveOpen.set(false);
     try {
-      importActionError = "";
+      importActionError = null;
       await protoState.clearImport(connectionId);
     } catch (e) {
       console.error(e);
-      importActionError = errorMessage(e);
+      importActionError = {
+        lead: "Could not remove the imported files.",
+        detail: errorMessage(e),
+      };
     }
   };
 
@@ -229,6 +290,9 @@
     }
   };
 
+  // Rule writes let a failure propagate: ProtoBindingRulesForm catches it and
+  // shows it inline (on the row, under the list, or under the draft) and
+  // keeps the unsaved edit so a retry is possible. protoState already logs.
   const onAddRule = async (rule: { topicFilter: string; messageType: string }) => {
     await protoState.addRule(connectionId, rule);
   };
@@ -239,22 +303,14 @@
   ) => {
     const existing = rules.find((r) => r.id === id);
     if (!existing) return;
-    try {
-      await protoState.updateRule(connectionId, {
-        ...existing,
-        ...changes,
-      } as models.ProtoBindingRule);
-    } catch (e) {
-      console.error(e);
-    }
+    await protoState.updateRule(connectionId, {
+      ...existing,
+      ...changes,
+    } as models.ProtoBindingRule);
   };
 
   const onDeleteRule = async (id: number) => {
-    try {
-      await protoState.deleteRule(connectionId, id);
-    } catch (e) {
-      console.error(e);
-    }
+    await protoState.deleteRule(connectionId, id);
   };
 
   const onMoveRule = async (id: number, direction: "up" | "down") => {
@@ -267,11 +323,7 @@
       orderedIds[swapWith],
       orderedIds[index],
     ];
-    try {
-      await protoState.reorderRules(connectionId, orderedIds);
-    } catch (e) {
-      console.error(e);
-    }
+    await protoState.reorderRules(connectionId, orderedIds);
   };
 
   const onTestTopic = async (
@@ -338,12 +390,18 @@
             <bdi>Imported from {sourceDir}</bdi>
           </div>
         {/if}
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
           {#if sourceDir}
             <Button variant="text" disabled={busy} on:click={onReimport}>
               Re-import
             </Button>
           {/if}
+          <Button variant="text" disabled={busy} on:click={onChooseFolder}>
+            Replace with folder
+          </Button>
+          <Button variant="text" disabled={busy} on:click={onChooseFiles}>
+            Replace with files
+          </Button>
           <Button variant="text" disabled={busy} on:click={onRemoveClicked}>
             Remove
           </Button>
@@ -355,10 +413,27 @@
         multiple
         accept=".proto"
         class="hidden"
+        data-testid="proto-files-input"
         on:change={onFilesSelected}
       />
+      <input
+        bind:this={folderInputEl}
+        type="file"
+        webkitdirectory
+        multiple
+        class="hidden"
+        data-testid="proto-folder-input"
+        on:change={onFolderSelected}
+      />
       {#if importActionError}
-        <div class="text-error text-sm">{importActionError}</div>
+        <div class="text-error text-sm flex flex-col">
+          <span>{importActionError.lead}</span>
+          {#if importActionError.detail}
+            <span class="line-clamp-3" title={importActionError.detail}
+              >{importActionError.detail}</span
+            >
+          {/if}
+        </div>
       {/if}
     </div>
 
@@ -385,7 +460,10 @@
   title="Remove the imported .proto files?"
 >
   <div class="flex flex-col gap-3 mt-3">
-    <p>Your bindings stay, but nothing will decode until you import again.</p>
+    <p>
+      Your bindings stay. Sparkplug still decodes, but bound topics show raw
+      payloads until you import again.
+    </p>
     <div class="flex gap-3 justify-end items-center">
       <Button variant="text" on:click={() => confirmRemoveOpen.set(false)}>
         Cancel

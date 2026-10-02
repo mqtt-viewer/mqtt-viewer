@@ -283,9 +283,23 @@ const updateConnectionDetails = async (
     markSaved(connectionDetails.id);
   } catch (e) {
     console.error(e);
+    // Roll back only the details this call changed. Restoring the whole
+    // pre-call connection object would also undo anything that landed during
+    // the await (a connection-state change, latency, errors), so take the
+    // current entry and swap its details back. lastConnectedAt is stamped by
+    // updateConnectionState rather than by this call, so keep the newer one.
     if (previous) {
       update((store) => {
-        store.connections[connectionId] = previous;
+        const current = store.connections[connectionId];
+        if (!current) return store;
+        store.connections[connectionId] = {
+          ...current,
+          connectionDetails: {
+            ...previous.connectionDetails,
+            lastConnectedAt: current.connectionDetails.lastConnectedAt,
+          },
+          connectionString: previous.connectionString,
+        };
         return store;
       });
     }

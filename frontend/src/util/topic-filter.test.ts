@@ -128,6 +128,17 @@ describe("validateTopicFilter", () => {
     expect(validateTopicFilter("$share/group/sensors/#")).toBe(
       "Shared subscription filters can't be bindings"
     );
+    expect(validateTopicFilter("$share")).toBe(
+      "Shared subscription filters can't be bindings"
+    );
+    expect(validateTopicFilter("$share/g/t")).toBe(
+      "Shared subscription filters can't be bindings"
+    );
+  });
+
+  test("only an exact $share first segment is a shared subscription", () => {
+    expect(validateTopicFilter("$shared/x")).toBeNull();
+    expect(validateTopicFilter("$SYS/#")).toBeNull();
   });
 
   test("'#' must be the last segment", () => {

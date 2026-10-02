@@ -3,6 +3,7 @@
   import Component from "./ProtoBindingRulesForm.svelte";
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
+  import { expect, waitFor } from "storybook/test";
 
   const componentName = "ProtoBindingRulesForm";
   const storyId = "Components/ProtoBindingRulesForm";
@@ -72,6 +73,10 @@
     onTestTopic: async () => mockTestResult,
   };
 
+  const rejectWrite = async () => {
+    throw new Error("database is locked");
+  };
+
   const { Story } = defineMeta({
     title: "Components/ProtoBindingRulesForm",
     component: Component,
@@ -116,4 +121,43 @@
   name="Disabled"
   args={{ ...baseArgs, rules: mockRules, status: okStatus, disabled: true }}
   {template}
+/>
+<!-- A failed filter save: the typed text stays (the row stays dirty, so the
+     next edit or blur retries) and the error shows on the row. -->
+<Story
+  name="RowSaveError"
+  args={{ ...baseArgs, rules: mockRules, status: okStatus, onUpdate: rejectWrite }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    const input = canvasElement.querySelector(
+      'input[name="proto-binding-filter-1"]'
+    );
+    if (!(input instanceof HTMLInputElement)) throw new Error("row input not found");
+    input.value = "sensors/+/status";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("blur"));
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain(
+        "Could not save: database is locked"
+      )
+    );
+    expect(input.value).toBe("sensors/+/status");
+  }}
+/>
+<Story
+  name="DeleteError"
+  args={{ ...baseArgs, rules: mockRules, status: okStatus, onDelete: rejectWrite }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    const button = canvasElement.querySelector(
+      'button[aria-label="Delete binding"]'
+    );
+    if (!(button instanceof HTMLButtonElement)) throw new Error("delete button not found");
+    button.click();
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain(
+        "Could not delete that binding: database is locked"
+      )
+    );
+  }}
 />

@@ -110,11 +110,13 @@ export const validateTopicFilter = (filter: string): string | null => {
   if (filter.trim() !== filter) {
     return "No leading or trailing spaces";
   }
-  if (filter.startsWith("$share/")) {
+  const segments = filter.split("/");
+  // Any filter whose first segment is exactly "$share" (bare "$share" too),
+  // but not lookalikes such as "$shared/x".
+  if (segments[0] === "$share") {
     return "Shared subscription filters can't be bindings";
   }
 
-  const segments = filter.split("/");
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
     if (segment === "#") {

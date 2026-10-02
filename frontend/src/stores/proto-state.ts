@@ -15,6 +15,7 @@ import type * as app from "bindings/mqtt-viewer/backend/app/models";
 import type * as models from "bindings/mqtt-viewer/backend/models/models";
 import type * as events from "bindings/mqtt-viewer/events/models";
 import { Events } from "@wailsio/runtime";
+import { markSaved } from "./last-saved";
 
 export type ProtoState = app.ProtoStateResult;
 
@@ -68,11 +69,14 @@ const loadRegistry = async (connId: number) => {
 
 // Copies every .proto file under sourceDir into the connection's internal
 // proto-imports dir and compiles it. Throws (with a message fit to show the
-// user) on a missing folder, an empty folder, or a compile-time hard error.
+// user) on a missing folder, an empty folder, or files that don't compile
+// (the compile error, with paths relative to the import). A failed import,
+// re-import or upload leaves any previous import intact.
 const importDir = async (connId: number, sourceDir: string) => {
   try {
     const result = await ImportProtoDir(connId, sourceDir);
     setState(connId, result);
+    markSaved(connId);
   } catch (e) {
     console.error(e);
     throw e;
@@ -86,6 +90,7 @@ const importFiles = async (connId: number, files: app.ProtoUploadFile[]) => {
   try {
     const result = await ImportProtoFiles(connId, files);
     setState(connId, result);
+    markSaved(connId);
   } catch (e) {
     console.error(e);
     throw e;
@@ -98,6 +103,7 @@ const reimport = async (connId: number) => {
   try {
     const result = await ReimportProto(connId);
     setState(connId, result);
+    markSaved(connId);
   } catch (e) {
     console.error(e);
     throw e;
@@ -110,6 +116,7 @@ const clearImport = async (connId: number) => {
   try {
     const result = await ClearProtoImport(connId);
     setState(connId, result);
+    markSaved(connId);
   } catch (e) {
     console.error(e);
     throw e;
@@ -142,12 +149,16 @@ const removeConnection = (connId: number) => {
   });
 };
 
+// Every successful rule or import write (above and below) calls markSaved so
+// the details dialog's "last saved" footer moves, the same as a
+// connection-field save.
 const addRule = async (
   connId: number,
   rule: Pick<models.ProtoBindingRule, "topicFilter" | "messageType">
 ) => {
   try {
     await AddProtoBindingRule(connId, rule as models.ProtoBindingRule);
+    markSaved(connId);
     await refresh(connId);
   } catch (e) {
     console.error(e);
@@ -158,6 +169,7 @@ const addRule = async (
 const updateRule = async (connId: number, rule: models.ProtoBindingRule) => {
   try {
     await UpdateProtoBindingRule(connId, rule);
+    markSaved(connId);
     await refresh(connId);
   } catch (e) {
     console.error(e);
@@ -168,6 +180,7 @@ const updateRule = async (connId: number, rule: models.ProtoBindingRule) => {
 const deleteRule = async (connId: number, ruleId: number) => {
   try {
     await DeleteProtoBindingRule(connId, ruleId);
+    markSaved(connId);
     await refresh(connId);
   } catch (e) {
     console.error(e);
@@ -178,6 +191,7 @@ const deleteRule = async (connId: number, ruleId: number) => {
 const reorderRules = async (connId: number, orderedIds: number[]) => {
   try {
     await ReorderProtoBindingRules(connId, orderedIds);
+    markSaved(connId);
     await refresh(connId);
   } catch (e) {
     console.error(e);

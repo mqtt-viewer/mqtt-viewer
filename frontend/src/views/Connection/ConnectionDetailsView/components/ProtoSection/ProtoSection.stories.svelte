@@ -9,10 +9,11 @@
     mockConnectionDetails,
   } from "@/stories/fixtures";
   import type { Connection } from "@/stores/connections";
+  import { expect, waitFor } from "storybook/test";
 
   const componentName = "ProtoSection";
   const storyId = "Views/Connection/ConnectionDetailsView/ProtoSection";
-  const props: string[] = ["connection"];
+  const props: string[] = ["connection", "serverMode"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   // Distinct connection ids so each story's proto-import mock state (see
@@ -44,6 +45,55 @@
       protoRegDir: "/Users/sam/broken-protos",
       customIconSeed: "storybook-broken-protos-broker",
     },
+  };
+
+  const connectionWithId = (
+    id: number,
+    name: string,
+    protoRegDir: string
+  ): Connection => ({
+    ...mockConnection,
+    connectionState: "connected",
+    connectionDetails: {
+      ...mockConnectionDetails,
+      id,
+      name,
+      protoRegDir,
+      customIconSeed: `storybook-proto-${id}`,
+    },
+  });
+
+  // Mock id 103: imported from a folder; the play uploads a file that fails
+  // to compile, and the mock keeps the previous import.
+  const keptPreviousConnection = connectionWithId(
+    103,
+    "Kept previous broker",
+    "/Users/sam/certs"
+  );
+  // Mock ids 104, 105 and 107: never imported, rendered as the web UI.
+  const serverModeConnection = connectionWithId(107, "Web UI fresh broker", "");
+  const serverModeEmptyFolderConnection = connectionWithId(
+    104,
+    "Web UI broker",
+    ""
+  );
+  const serverModeFolderConnection = connectionWithId(
+    105,
+    "Web UI folder broker",
+    ""
+  );
+  // Mock id 106: imported by upload, so there's no folder to re-import from.
+  const uploadedConnection = connectionWithId(106, "Uploaded protos broker", "");
+
+  // Bypasses the native picker: sets a hidden file input's FileList directly
+  // and fires the change event the browser would. A constructed File has an
+  // empty webkitRelativePath, so a folder upload here sends bare names.
+  const pickFiles = (input: Element | null, files: File[]) => {
+    if (!(input instanceof HTMLInputElement)) throw new Error("file input not found");
+    const dataTransfer = new DataTransfer();
+    files.forEach((file) => dataTransfer.items.add(file));
+    input.files = dataTransfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   };
 
   const { Story } = defineMeta({
@@ -83,7 +133,9 @@
     // uploading a non-.proto file so the mock rejects it the way the real
     // backend's validateProtoUploadName would, surfacing the action-error
     // line.
-    const input = canvasElement.querySelector('input[type="file"]');
+    const input = canvasElement.querySelector(
+      'input[data-testid="proto-files-input"]'
+    );
     if (!(input instanceof HTMLInputElement)) return;
     const file = new File(["not a proto"], "device.txt", {
       type: "text/plain",
@@ -92,5 +144,80 @@
     dataTransfer.items.add(file);
     input.files = dataTransfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
+  }}
+/>
+
+<!-- Imported from a folder, so Re-import shows beside the replace actions. -->
+<Story
+  name="Import failed, kept previous"
+  args={{ ...storyArgs, connection: keptPreviousConnection }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain("Replace with files")
+    );
+    pickFiles(canvasElement.querySelector('input[data-testid="proto-files-input"]'), [
+      new File(['import "common/units.proto"; BROKEN'], "telemetry.proto"),
+    ]);
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain(
+        "Import failed, so I kept the previous files."
+      )
+    );
+  }}
+/>
+
+<Story
+  name="Imported from upload"
+  args={{ ...storyArgs, connection: uploadedConnection }}
+  {template}
+/>
+
+<Story
+  name="Server mode"
+  args={{ ...storyArgs, connection: serverModeConnection, serverMode: true }}
+  {template}
+/>
+
+<Story
+  name="Server mode, folder without protos"
+  args={{
+    ...storyArgs,
+    connection: serverModeEmptyFolderConnection,
+    serverMode: true,
+  }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    pickFiles(
+      canvasElement.querySelector('input[data-testid="proto-folder-input"]'),
+      [new File(["# notes"], "README.md", { type: "text/markdown" })]
+    );
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain(
+        "That folder has no .proto files."
+      )
+    );
+  }}
+/>
+
+<Story
+  name="Server mode, folder imported"
+  args={{
+    ...storyArgs,
+    connection: serverModeFolderConnection,
+    serverMode: true,
+  }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    pickFiles(
+      canvasElement.querySelector('input[data-testid="proto-folder-input"]'),
+      [
+        new File(['syntax = "proto3";'], "telemetry.proto"),
+        new File(["# notes"], "README.md", { type: "text/markdown" }),
+      ]
+    );
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain("Replace with folder")
+    );
   }}
 />

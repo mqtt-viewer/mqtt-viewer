@@ -48,7 +48,20 @@ let mockProtoImportByConnectionId: Record<
     sourceDir: "/Users/sam/broken-protos",
     loadError: 'broken.proto:12:3: syntax error: unexpected "}"',
   },
+  // Connection id 103: ProtoSection's "Import failed, kept previous" story.
+  103: { imported: true, sourceDir: "/Users/sam/certs" },
+  // Connection id 106: ProtoSection's "Imported from upload" story (no
+  // source folder, so no Re-import).
+  106: { imported: true, sourceDir: "" },
 };
+
+// Mirrors the backend's import contract: files that don't compile reject
+// with the compile error (paths relative to the import) and leave any
+// previous import untouched. A story triggers it by uploading a file whose
+// content contains MOCK_PROTO_BROKEN_MARKER.
+const MOCK_PROTO_BROKEN_MARKER = "BROKEN";
+const MOCK_PROTO_COMPILE_ERROR =
+  "telemetry.proto:4:8: open common/units.proto: no such file or directory";
 
 let mockProtoRulesByConnectionId: Record<number, models.ProtoBindingRule[]> = {
   1: [
@@ -180,6 +193,9 @@ export async function ImportProtoFiles(
   const badName = files.find((f) => !f.name.endsWith(".proto"));
   if (badName) {
     throw new Error(`invalid file name: "${badName.name}" (must end in .proto)`);
+  }
+  if (files.some((f) => f.content.includes(MOCK_PROTO_BROKEN_MARKER))) {
+    throw new Error(MOCK_PROTO_COMPILE_ERROR);
   }
   mockProtoImportByConnectionId[connectionId] = { imported: true, sourceDir: "" };
   return buildMockProtoStateResult(connectionId);
