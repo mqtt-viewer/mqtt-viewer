@@ -73,7 +73,16 @@
 </script>
 
 {#if entries.length}
-  <Dialog title="What's new" isOpen={whatsNewOpen} showCloseButton={false}>
+  <!-- openFocus lands initial focus on the dialog panel itself. Melt's default
+       is the first focusable element, the newest version's tab, which then
+       wore a focus ring nobody asked for every time the notes opened. Tab
+       still reaches it first. -->
+  <Dialog
+    title="What's new"
+    isOpen={whatsNewOpen}
+    showCloseButton={false}
+    openFocus="[data-melt-dialog-content]"
+  >
     <WhatsNewContent {entries} {initialVersion} onClose={close} />
   </Dialog>
 {/if}
