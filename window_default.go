@@ -2,7 +2,11 @@
 
 package main
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"mqtt-viewer/backend/app"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
 
 // createMainWindow opens the native webview window. Excluded from server-mode
 // builds (scripts/serve-browser.sh): a headless window's runtime never signals
@@ -17,7 +21,7 @@ func createMainWindow(wailsApp *application.App) {
 		MinHeight:        660,
 		BackgroundColour: application.NewRGB(35, 33, 32),
 		Mac: application.MacWindow{
-			TitleBar: application.MacTitleBarHiddenInset,
+			TitleBar: app.MacTitleBar,
 		},
 		URL: "/",
 	})
