@@ -14,24 +14,26 @@ But wait, there's more:
 
 | Feature | Notes |
 | --- | --- |
-| Live topic tree | Every topic on the broker, with counts, last values and a text filter. |
-| Topic Graph | The namespace drawn as a tree where node size is message rate and colour is recency. Collapse branches, follow the hottest, pause. |
-| Topic actions | Right-click any topic to copy its path or payload, export its history, or clear retained messages below it. Retained topics are marked. |
-| Up to 10 connections at once | Each in its own tab. MQTT v3.1.1 and v5, TCP, TLS, mutual TLS and WebSocket. |
+| Live topic tree | Every topic on the broker, with counts, last values and a text filter. [Filter the topic tree](https://mqttviewer.app/walkthroughs/filter-topic-tree/). |
+| Topic Graph | The namespace drawn as a tree where node size is message rate and colour is recency. Collapse branches, follow the hottest, pause. [Explore the topic graph](https://mqttviewer.app/walkthroughs/topic-graph/). |
+| Topic actions | Right-click any topic to copy its path or payload, export its history, or clear retained messages below it. Retained topics are marked. [Clear retained messages](https://mqttviewer.app/walkthroughs/retained-messages/). |
+| Up to 10 connections at once | Each in its own tab. MQTT v3.1.1 and v5, TCP, TLS, mutual TLS and WebSocket. [Connect to a broker](https://mqttviewer.app/walkthroughs/connect-broker/). |
 | Interactive message timeline | Scrub through a topic's history. Hover a marker to preview the payload. |
-| Message comparison | Diff a message against the previous one on the same topic. |
-| Live charting | Tick numeric fields in a JSON payload and plot them. Time windows from seconds to days, pop-out chart windows. |
-| Broker status page | Clients, rates, subscriptions, retained count, uptime and health signals from `$SYS`, plus client-side rates and loudest topics for brokers that publish nothing. |
-| Client logs | A terminal-style view of what the MQTT library is doing on each connection, with a debug level and a rotating log file. |
-| Message collections | Save messages into folders, global or per connection, drag them between folders and republish with a click. |
-| Publish history | Everything you have sent, searchable, ready to send again. |
-| Payload decoding | Sparkplug B, Base64 and Hex codecs. PNG, JPEG, GIF, WebP and BMP payloads render as images. |
+| Message comparison | Diff a message against the previous one on the same topic. [Inspect and compare messages](https://mqttviewer.app/walkthroughs/inspect-messages/). |
+| Live charting | Tick numeric fields in a JSON payload and plot them. Time windows from seconds to days, pop-out chart windows. [Chart numeric values](https://mqttviewer.app/walkthroughs/chart-values/). |
+| Broker status page | Clients, rates, subscriptions, retained count, uptime and health signals from `$SYS`, plus client-side rates and loudest topics for brokers that publish nothing. [Monitor broker status](https://mqttviewer.app/walkthroughs/broker-status/). |
+| Client logs | A terminal-style view of what the MQTT library is doing on each connection, with a debug level and a rotating log file. [Read connection logs](https://mqttviewer.app/walkthroughs/client-logs/). |
+| Message collections | Save messages into folders, global or per connection, drag them between folders and republish with a click. [Save messages](https://mqttviewer.app/walkthroughs/save-messages/). |
+| Publishing | Send a message and check that it arrives. [Publish a message](https://mqttviewer.app/walkthroughs/publish-message/). |
+| Publish history | Everything you have sent, searchable, ready to send again. [Search saved messages](https://mqttviewer.app/walkthroughs/search-messages/). |
+| Payload decoding | Sparkplug B, Base64 and Hex codecs. PNG, JPEG, GIF, WebP and BMP payloads render as images. [Decode text and images](https://mqttviewer.app/walkthroughs/decode-payloads/) or [Sparkplug B](https://mqttviewer.app/walkthroughs/sparkplug-b/). |
+| Custom Protobuf | Import a schema and bind message types to topic filters. [Decode custom Protobuf](https://mqttviewer.app/walkthroughs/protobuf-topics/). |
 | Dockable topic panel | Dock the selected-topic panel right, bottom, or pop it out into its own window. |
-| Bounded memory | History stays inside a memory budget you set, with optional recording to disk. |
+| Bounded memory | History stays inside a memory budget you set, with optional recording to disk. [Set memory limits](https://mqttviewer.app/walkthroughs/memory-limits/) or [record and export messages](https://mqttviewer.app/walkthroughs/record-and-export/). |
 | Web UI | The full app served over HTTP from a Docker image, and a Home Assistant add-on. |
-| Light and dark themes | |
+| Light and dark themes | [Change the theme](https://mqttviewer.app/walkthroughs/light-dark-mode/). |
 
-Every one of these has its own page, with screenshots, at [mqttviewer.app/features](https://mqttviewer.app/features). A few of them:
+See the [feature pages](https://mqttviewer.app/features) for an overview, or follow the [walkthroughs](https://mqttviewer.app/walkthroughs/) for steps with screenshots. A few of the features:
 
 ![The broker status window: health strip, traffic chart, loudest topics and metric tiles from $SYS](docs/images/broker-status.png)
 
@@ -65,9 +67,9 @@ docker run -d --name mqtt-viewer \
   ghcr.io/mqtt-viewer/mqtt-viewer:latest
 ```
 
-Open http://localhost:8080. There is no login screen, so keep it on localhost or a trusted network, or put an authenticating proxy in front. [docs/DOCKER.md](docs/DOCKER.md) has the details, a Caddy example and the security caveats.
+Open http://localhost:8080. There is no login screen, so keep it on localhost or a trusted network, or put an authenticating proxy in front. Follow the [Docker walkthrough](https://mqttviewer.app/walkthroughs/docker-web-ui/) to publish a test message and check that saved data survives a restart. [docs/DOCKER.md](docs/DOCKER.md) has the details, a Caddy example and the security caveats.
 
-For Home Assistant, add [github.com/mqtt-viewer/home-assistant-addon](https://github.com/mqtt-viewer/home-assistant-addon) as an add-on repository and install MQTT Viewer from the store.
+For Home Assistant, add [github.com/mqtt-viewer/home-assistant-addon](https://github.com/mqtt-viewer/home-assistant-addon) as an add-on repository and install MQTT Viewer from the store. Follow the [Home Assistant walkthrough](https://mqttviewer.app/walkthroughs/home-assistant/) to connect to a broker through ingress.
 
 ### macOS
 
