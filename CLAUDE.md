@@ -16,7 +16,7 @@ to carry design, engineering, and release work, not just patches.
 | `backend/protobuf/` | Protobuf and Sparkplug (v1a/v1b) codec + descriptor registry |
 | `events/` + `backend/event-runtime/` | Event name constants and the Wails event wrapper (global + per-connection events) |
 | `frontend/src/` | Svelte app: `stores/` for global state, `components/` + `views/` as the design-system library |
-| `frontend/bindings/` | Generated Go-to-TS bindings. Never edit; regenerate with `wails3 task common:generate:bindings` |
+| `frontend/bindings/` | Generated Go-to-TS bindings. Never edit; regenerate with `just bindings` |
 | `build/` | Wails Taskfiles per platform, dev config, icons |
 | `Dockerfile` + `docker/` | Web UI image (Wails server mode, `-tags server`); see `docs/DOCKER.md` |
 | `scripts/` | `mqtt-flood.py` (load harness), `mqtt-sim.py` (realistic traffic) |
@@ -43,10 +43,15 @@ Backend (repo root):
 ```sh
 just dev                 # wails3 dev: run the app with hot reload
 just test                # go test ./... via tparse
+just bindings            # regenerate frontend/bindings with the pinned wails3
 just stub-dist           # create the embedded frontend/dist stub
 just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
+
+The rtk shell hook rewrites `go test` and benchmark output into a
+summary; when you need the raw verbose output, run it as
+`rtk proxy <cmd>` (for example `rtk proxy just test`).
 
 `just test` runs `stub-dist` first, so it works on a fresh tree. For a
 bare `go build ./...` or `go vet ./...`, run the stub once yourself:
@@ -77,24 +82,27 @@ prints the Vite, Storybook and server-mode ports. See
 ### The wails3 CLI
 
 The binding generator ships in the CLI, not the module, so a CLI built
-from a different tag than the `go.mod` pin rewrites every file under
-`frontend/bindings/` on the next generate. Install the matching one:
+from a different tag than the `go.mod` pin (currently
+`v3.0.0-beta.16`) rewrites every file under `frontend/bindings/` on the
+next generate. Never run a global `wails3` against this repo. Use the
+recipes instead:
 
 ```sh
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.16
+just bindings   # regenerate frontend/bindings
+just dev        # also regenerates bindings on each dev build
 ```
 
-`wails3 version` prints the pinned tag. The build metadata names it too:
-
-```sh
-go version -m "$(which wails3)" | grep -E '^\s+mod\s'
-```
+These and `just build` go through `scripts/wails3.sh`, which reads the pin from `go.mod`,
+installs that exact CLI into the checkout's gitignored `.bin/` when it
+is missing or the wrong version (checked with `go version -m`), and puts
+`.bin` first on `PATH` so the Taskfile's own `wails3` calls get it too.
+Bumping the pin in `go.mod` is enough; the next run reinstalls.
 
 To prove alignment, wipe the bindings and regenerate. A clean tree means
 the CLI reproduces the committed output byte for byte:
 
 ```sh
-rm -rf frontend/bindings && wails3 task common:generate:bindings && git status --porcelain
+rm -rf frontend/bindings && just bindings && git status --porcelain
 ```
 
 Frontend (from `frontend/`, pnpm version pinned in package.json):

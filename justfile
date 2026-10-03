@@ -4,8 +4,11 @@
 setup:
   scripts/setup-worktree.sh
 
+# tparse is pinned and run through go run: releases before v0.17.0 misread the
+# build-output events go1.24+ emits (linker warnings included) as a failed
+# package with a blank name.
 test PATH='./...': stub-dist test-broker
-  set -o pipefail && go test {{PATH}} fmt -json | tparse -all
+  set -o pipefail && go test {{PATH}} -json | go run github.com/mfridman/tparse@v0.18.0 -all
 
 # main.go embeds frontend/dist, which is gitignored and so missing on a fresh
 # checkout - without it the root package fails to load and any ./... command
@@ -24,13 +27,20 @@ test-broker:
 new-migration NAME:
   atlas migrate diff --env gorm {{NAME}}
 
+# Regenerate frontend/bindings. Runs the wails3 CLI pinned in go.mod, installed
+# into .bin/ on first use: a CLI from any other tag rewrites every bindings
+# file. See scripts/wails3.sh.
+bindings:
+  scripts/wails3.sh task -f common:generate:bindings
+
 build VERSION="v0.0.1-defaultv":
-  wails3 task package VERSION={{VERSION}} LD_FLAGS="-X mqtt-viewer/backend/env.Version={{VERSION}}"
+  scripts/wails3.sh task package VERSION={{VERSION}} LD_FLAGS="-X mqtt-viewer/backend/env.Version={{VERSION}}"
 
 # Port derived per checkout (scripts/dev-ports.sh) so parallel worktrees
-# don't collide; set WAILS_VITE_PORT to override.
+# don't collide; set WAILS_VITE_PORT to override. The dev build regenerates
+# bindings, so it runs the pinned CLI too.
 dev:
-  wails3 dev -port $(scripts/dev-ports.sh vite)
+  scripts/wails3.sh dev -port $(scripts/dev-ports.sh vite)
 
 # The body comes from the promoted entry in frontend/src/changelog.ts, rendered
 # as markdown. It is what lands on the GitHub release, goes to the portal, and
