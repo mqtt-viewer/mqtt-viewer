@@ -159,7 +159,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Error messages no longer read \"[object Object]\"",
-        body: "An error that arrived as a bare object now shows its message, or \"Unknown error\" when it has none.",
+        body: "Errors returned as objects, including connection failures, show readable messages without crashing their notifications.",
       },
       {
         group: "Fixed",

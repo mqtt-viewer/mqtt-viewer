@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { errorMessage } from "@/util/strings";
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import { writable } from "svelte/store";
@@ -79,7 +80,7 @@
       addToast({
         data: {
           title: isConnected ? "Failed to disconnect" : "Failed to connect",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
