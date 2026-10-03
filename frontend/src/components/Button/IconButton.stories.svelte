@@ -6,7 +6,7 @@
 
   const componentName = "IconButton";
   const storyId = "Primitives/Button/IconButton";
-  const props: string[] = ["disabled","tooltipText","tooltipPlacement","onClick","tooltipOpenDelay","feedbackText","preventFocus"];
+  const props: string[] = ["disabled","tooltipText","tooltipPlacement","onClick","tooltipOpenDelay","feedbackText","preventFocus","ariaLabel"];
   const storyArgs = getStoryArgs(storyId, componentName, props);
 
   const { Story } = defineMeta({

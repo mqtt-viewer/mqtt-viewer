@@ -19,6 +19,7 @@ import type { DeepOmit } from "@/util/types";
 import { addToast } from "@/components/Toast/Toast.svelte";
 import tabs from "@/stores/tabs";
 import subscriptions from "./subscriptions";
+import protoState from "./proto-state";
 
 export type ConnectionState =
   | "connected"
@@ -104,6 +105,7 @@ const init = async () => {
       const id: number = e.data;
       await tabs.closeTab(id);
       await subscriptions.removeConnection(id);
+      protoState.removeConnection(id);
       update((store) => {
         delete store.connections[id];
         return store;
@@ -258,27 +260,71 @@ const updateConnectionState = (
   });
 };
 
+// The details object each connection's latest optimistic update wrote. A
+// failed update rolls back only while its own write is still the latest:
+// with call A pending, call B succeeding and then A failing, restoring A's
+// pre-call snapshot would clobber B's saved result. Tracked here rather than
+// by comparing store.connections[id].connectionDetails, because
+// updateConnectionState copies that object on every state change.
+const latestDetailsWrite = new Map<number, Connection["connectionDetails"]>();
+
 const updateConnectionDetails = async (
   connectionDetails: Connection["connectionDetails"]
 ) => {
+  const connectionId = connectionDetails.id;
+  const previous = get({ subscribe }).connections[connectionId];
+  const previousWrite = latestDetailsWrite.get(connectionId);
+  const connectionString = getConnectionString(connectionDetails);
+  latestDetailsWrite.set(connectionId, connectionDetails);
+  update((store) => {
+    const existingConnection = store.connections[connectionId];
+    store.connections[connectionId] = {
+      ...existingConnection,
+      connectionDetails,
+      connectionString,
+    };
+    return store;
+  });
   try {
     console.log("updating connection details", connectionDetails);
     await UpdateConnection(
       connectionDetails as unknown as app.Connection["connectionDetails"]
     );
-    const connectionString = getConnectionString(connectionDetails);
-    update((store) => {
-      const existingConnection = store.connections[connectionDetails.id];
-      store.connections[connectionDetails.id] = {
-        ...existingConnection,
-        connectionDetails: connectionDetails,
-        connectionString,
-      };
-      return store;
-    });
     markSaved(connectionDetails.id);
+    if (latestDetailsWrite.get(connectionId) === connectionDetails) {
+      latestDetailsWrite.delete(connectionId);
+    }
   } catch (e) {
     console.error(e);
+    // A later call has written since; its value stands.
+    if (latestDetailsWrite.get(connectionId) !== connectionDetails) {
+      throw e;
+    }
+    if (previousWrite === undefined) {
+      latestDetailsWrite.delete(connectionId);
+    } else {
+      latestDetailsWrite.set(connectionId, previousWrite);
+    }
+    // Roll back only the details this call changed. Restoring the whole
+    // pre-call connection object would also undo anything that landed during
+    // the await (a connection-state change, latency, errors), so take the
+    // current entry and swap its details back. lastConnectedAt is stamped by
+    // updateConnectionState rather than by this call, so keep the newer one.
+    if (previous) {
+      update((store) => {
+        const current = store.connections[connectionId];
+        if (!current) return store;
+        store.connections[connectionId] = {
+          ...current,
+          connectionDetails: {
+            ...previous.connectionDetails,
+            lastConnectedAt: current.connectionDetails.lastConnectedAt,
+          },
+          connectionString: previous.connectionString,
+        };
+        return store;
+      });
+    }
     throw e;
   }
 };
@@ -314,6 +360,7 @@ const deleteConnection = async (id: number) => {
   try {
     await DeleteConnection(id);
     subscriptionsStore.removeConnection(id);
+    protoState.removeConnection(id);
     update((store) => {
       delete store.connections[id];
       return store;

@@ -53,6 +53,13 @@
       "type": "boolean",
       "required": false,
       "default": false
+    },
+    {
+      "name": "ariaLabel",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "description": "Accessible name for the inner button. Set it on icon-only buttons; the tooltip is not announced as the name."
     }
   ],
   "tokens": [

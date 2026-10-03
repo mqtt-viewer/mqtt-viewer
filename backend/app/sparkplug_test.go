@@ -55,10 +55,15 @@ func newSparkplugPipeline(t *testing.T, conn *AppConnection) *sparkplugPipeline 
 		t.Fatalf("loading proto registry: %v", err)
 	}
 	return &sparkplugPipeline{
-		t:          t,
-		conn:       conn,
-		registry:   registry,
-		middleware: mqttmiddleware.NewProtoDecodeMiddleware(registry, conn.SparkplugStore),
+		t:        t,
+		conn:     conn,
+		registry: registry,
+		// Decoding on, no binding rules: only the implicit Sparkplug rules.
+		middleware: mqttmiddleware.NewProtoDecodeMiddleware(
+			newProtoState(true, nil),
+			func() *protobuf.ProtoRegistry { return registry },
+			conn.SparkplugStore,
+		),
 	}
 }
 

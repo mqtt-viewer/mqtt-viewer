@@ -13,6 +13,9 @@
   export let tooltipOpenDelay = 500;
   export let feedbackText = undefined as string | undefined;
   export let preventFocus = false;
+  // Accessible name for an icon-only button. The tooltip is not announced as
+  // the button's name, so icon-only buttons need this set explicitly.
+  export let ariaLabel: string | undefined = undefined;
   let className = "";
   export { className as class };
 
@@ -58,7 +61,7 @@
         disabled ? "opacity-40 hover:bg-inherit cursor-default" : ""
       )}
     >
-      <Button variant="text" on:click={click} {disabled}>
+      <Button variant="text" on:click={click} {disabled} aria-label={ariaLabel}>
         {#if $$slots["feedback-icon"]}
           {#if clicked}
             <div in:fly={{ y: 4 }}>
@@ -85,7 +88,7 @@
       disabled ? "opacity-60 hover:bg-inherit cursor-default" : ""
     )}
   >
-    <Button variant="text" on:click={click} {disabled} preventFocus>
+    <Button variant="text" on:click={click} {disabled} preventFocus aria-label={ariaLabel}>
       {#if $$slots["feedback-icon"]}
         {#if clicked}
           <div in:fly={{ y: 4 }}>

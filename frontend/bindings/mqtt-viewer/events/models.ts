@@ -15,6 +15,7 @@ export class ConnectionEventsSet {
     "mqttLatency": string;
     "mqttClearHistory": string;
     "mqttLogs": string;
+    "protoStateChanged": string;
 
     /** Creates a new ConnectionEventsSet instance. */
     constructor($$source: Partial<ConnectionEventsSet> = {}) {
@@ -44,6 +45,9 @@ export class ConnectionEventsSet {
         }
         if (!("mqttLogs" in $$source)) {
             this["mqttLogs"] = "";
+        }
+        if (!("protoStateChanged" in $$source)) {
+            this["protoStateChanged"] = "";
         }
 
         Object.assign(this, $$source);

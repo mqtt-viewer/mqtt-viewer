@@ -31,6 +31,7 @@ func main() {
 		&models.CollectionCollapsedState{},
 		&models.SysMetricMapping{},
 		&models.PinnedTopic{},
+		&models.ProtoBindingRule{},
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load gorm schema: %v\n", err)

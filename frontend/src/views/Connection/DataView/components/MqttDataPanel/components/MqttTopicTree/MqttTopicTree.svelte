@@ -426,6 +426,8 @@
                   <MqttTopicRow
                     topic={row.topic}
                     isDecodedProto={row.isDecodedProto}
+                    isProtoDecodeFailed={row.isProtoDecodeFailed}
+                    protoDescriptorName={row.protoDescriptorName}
                     isRetained={row.isRetained}
                     isPinned={row.isPinned}
                     isSelected={selectedTopic === row.topic}
@@ -502,6 +504,8 @@
             <MqttTopicRow
               topic={item.expandKey}
               isDecodedProto={item.isDecodedProto}
+              isProtoDecodeFailed={item.isProtoDecodeFailed}
+              protoDescriptorName={item.protoDescriptorName}
               isRetained={item.isRetained}
               isPinned={item.isPinned}
               isSelected={selectedTopic === item.topic ||

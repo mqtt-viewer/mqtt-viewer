@@ -89,6 +89,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Added",
+        title: "Decode your own Protobuf messages by topic",
+        body: "Import your .proto files in the connection settings and bind topic filters to message types. Matching messages decode as they arrive and encode when you publish, and the publish panel lets you pick another type or send raw.",
+      },
+      {
+        group: "Added",
         title: "Pinned topics open to show everything beneath them",
         body: "A pinned branch now expands in place at the top of the tree, and pinning one opens its first level for you. Drag the bottom edge of the pinned block to resize it, and right-click a row in it for Show in tree.",
         thanks: [
@@ -160,6 +165,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         group: "Fixed",
         title: "Error messages no longer read \"[object Object]\"",
         body: "An error that arrived as a bare object now shows its message, or \"Unknown error\" when it has none.",
+      },
+      {
+        group: "Fixed",
+        title: "Failed publishes say why",
+        body: "A publish the app couldn't send showed no message at all. It now does, including when the payload doesn't fit the Protobuf type you picked.",
       },
       {
         group: "Fixed",

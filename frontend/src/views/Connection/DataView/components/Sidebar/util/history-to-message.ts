@@ -23,4 +23,6 @@ export const historyEntryToMessage = (
   headerMessageExpiryInterval: entry.headerMessageExpiryInterval,
   headerTopicAlias: entry.headerTopicAlias,
   headerSubscriptionIdentifier: entry.headerSubscriptionIdentifier,
+  // Keeps the entry's Protobuf choice (Auto, a forced type or Raw).
+  protoOverride: entry.protoOverride,
 });

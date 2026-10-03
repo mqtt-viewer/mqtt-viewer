@@ -93,3 +93,53 @@ export const topicMatchesQuery = (
 
   return substringMatch || topicMatchesSubscription(lowerTopic, q);
 };
+
+// A filter may not start or end with anything Go (Unicode White_Space) or
+// JavaScript (\s, which adds U+FEFF and lacks U+0085) treats as whitespace;
+// the backend's isEdgeWhitespace uses the same union.
+const EDGE_WHITESPACE = /^[\s\u0085]|[\s\u0085]$/;
+
+// validateTopicFilter mirrors backend/topic-matching/proto_binding_matcher.go's
+// ValidateTopicFilter: same rules, same order, worded for the UI. Returns
+// null when filter is a valid proto binding topic filter, otherwise the
+// message to show under the field. Each rule gets its own message rather
+// than collapsing into a single "Enter a topic filter", so a filter that
+// merely has a trailing space says so.
+export const validateTopicFilter = (filter: string): string | null => {
+  if (!filter) {
+    return "Enter a topic filter";
+  }
+  if (filter.includes("\0")) {
+    return "No NUL bytes allowed";
+  }
+  if (EDGE_WHITESPACE.test(filter)) {
+    return "No leading or trailing spaces";
+  }
+  const segments = filter.split("/");
+  // Any filter whose first segment is exactly "$share" (bare "$share" too),
+  // but not lookalikes such as "$shared/x".
+  if (segments[0] === "$share") {
+    return "Shared subscription filters can't be bindings";
+  }
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (segment === "#") {
+      if (i !== segments.length - 1) {
+        return "'#' must be the last segment";
+      }
+      continue;
+    }
+    if (segment.includes("#")) {
+      return "'#' must be the last segment";
+    }
+    if (segment === "+") {
+      continue;
+    }
+    if (segment.includes("+")) {
+      return "'+' must be a whole segment";
+    }
+  }
+
+  return null;
+};

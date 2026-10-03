@@ -42,6 +42,24 @@ export class Subscription {
   }
 }
 
+export class ProtoBindingRule {
+  id = 0;
+  createdAt: any = null;
+  updatedAt: any = null;
+  connectionId = 0;
+  topicFilter = "";
+  messageType = "";
+  sortOrder = 0;
+
+  static createFrom(source: any = {}) {
+    return new ProtoBindingRule(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
 export class SysMetricMapping {
   id = 0;
   createdAt: any = null;
@@ -121,6 +139,7 @@ export class Connection {
   username: any = null;
   password: any = null;
   isProtoEnabled: boolean | null = false;
+  protoRegDir: any = null;
   isCertsEnabled: boolean | null = false;
   skipCertVerification: boolean | null = false;
   certCa: any = null;

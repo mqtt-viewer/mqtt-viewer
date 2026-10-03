@@ -15,6 +15,11 @@
   export let isExpanded: boolean;
   export let isSelected: boolean;
   export let isDecodedProto: boolean = false;
+  // The latest message's decode (a binding or Sparkplug) failed, so the row
+  // shows the raw payload with a warning.
+  export let isProtoDecodeFailed: boolean = false;
+  // The message type the decode used or tried, for the marker's title.
+  export let protoDescriptorName: string | undefined = undefined;
   // Whether this topic holds a retained message, as far as we know. Drives the
   // retained marker only; the backend is authoritative for counting/clearing.
   export let isRetained: boolean = false;
@@ -219,9 +224,25 @@
         <Icon type="pulse" size={14} />
       </button>
     {/if}
+    <!-- Native title attributes only, no melt Tooltip per row (the tree-row
+         performance rule in docs/broker-status-spec.md). -->
     {#if isDecodedProto}
-      <span class="inline-block ml-2 mt-[1px]">
+      <span
+        class="inline-block ml-2 mt-[1px]"
+        title={protoDescriptorName
+          ? `Decoded as ${protoDescriptorName}`
+          : "Decoded"}
+      >
         <ProtobufLogo class="size-4" isActive />
+      </span>
+    {:else if isProtoDecodeFailed}
+      <span
+        class="inline-flex size-4 items-center justify-center ml-2 mt-[1px] text-warning"
+        title={protoDescriptorName
+          ? `Failed to decode as ${protoDescriptorName}. Showing the raw payload.`
+          : "Failed to decode. Showing the raw payload."}
+      >
+        <Icon type="warning" size={14} />
       </span>
     {/if}
     {#if message !== undefined}

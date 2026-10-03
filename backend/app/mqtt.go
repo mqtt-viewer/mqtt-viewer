@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
-	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 	"mqtt-viewer/backend/security"
 	topicmatching "mqtt-viewer/backend/topic-matching"
 	"sort"
@@ -34,25 +33,25 @@ func (a *App) ConnectMqtt(connId uint) error {
 		return err
 	}
 
-	// Always reload the sub matcher / proto matcher, subscriptions may have changed
+	// Always reload the sub matcher, subscriptions may have changed
 	appConnection.SubscriptionMatcher = topicmatching.NewSubscriptionMatcher(subscriptions)
 
-	// Add protobuf middlewares if enabled. Load the registry once: it is
-	// populated by a background goroutine at startup, so re-reading it could
-	// hand the encode and decode middleware different registries.
-	protoRegistry := a.protoRegistry()
-	if connection.IsProtoEnabled != nil && *connection.IsProtoEnabled && protoRegistry != nil {
-		// TODO: load sparkplug proto registry
-		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{
-			BeforePublish: []mqtt.Middleware[mqtt.MqttPublishParams]{
-				mqttmiddleware.NewProtoEncodeMiddleware(protoRegistry).Middleware,
-			},
-			BeforeAddToHistory: []mqtt.Middleware[mqtt.MqttMessage]{
-				mqttmiddleware.NewProtoDecodeMiddleware(protoRegistry, appConnection.SparkplugStore).Middleware,
-			},
-		})
-	} else {
-		appConnection.MqttManager.UseMiddleware(mqtt.MqttMiddlewares{})
+	protoEnabled := connection.IsProtoEnabled != nil && *connection.IsProtoEnabled
+	appConnection.ProtoState.SetEnabled(protoEnabled)
+	// Serialised with rule writes (see refreshProtoBindingRulesAndEmit).
+	err = appConnection.ProtoState.ReloadRules(func() ([]models.ProtoBindingRule, error) {
+		return a.GetProtoBindingRulesByConnectionId(connId)
+	})
+	if err != nil {
+		return err
+	}
+
+	if protoEnabled {
+		// Compiles the internal proto-imports copy under the import lock
+		// when it hasn't been yet (or clears protoState if nothing has been
+		// imported), emitting ProtoStateChanged regardless of outcome, so a
+		// compile warning at connect time reaches every open window.
+		a.loadProtoImportIfNeeded(connId, appConnection)
 	}
 
 	connectionDetails, err := getConnectionDetailsFromConnectionModel(&connection)
@@ -239,6 +238,9 @@ type PublishParams struct {
 	Payload    string            `json:"payload"`
 	Retain     bool              `json:"retain"`
 	Properties PublishProperties `json:"properties"`
+	// nil = auto (matcher decides), "" = raw (skip protobuf encoding),
+	// "<name>" = forced message type.
+	ProtoOverride *string `json:"protoOverride"`
 }
 
 type PublishProperties struct {
@@ -265,11 +267,12 @@ func (a *App) PublishMqtt(connId uint, message PublishParams) error {
 
 	bytesPayload := []byte(message.Payload)
 	mqttPublishParams := mqtt.MqttPublishParams{
-		Topic:      message.Topic,
-		QoS:        message.QoS,
-		Payload:    bytesPayload,
-		Retain:     message.Retain,
-		Properties: properties,
+		Topic:         message.Topic,
+		QoS:           message.QoS,
+		Payload:       bytesPayload,
+		Retain:        message.Retain,
+		Properties:    properties,
+		ProtoOverride: message.ProtoOverride,
 	}
 	err = appConnection.MqttManager.Publish(mqttPublishParams)
 	if err != nil {
@@ -303,6 +306,7 @@ func (a *App) DeleteRetainedMessage(connId uint, topic string) error {
 		return fmt.Errorf("won't clear %s: topics under $ belong to the broker", topic)
 	}
 
+	raw := ""
 	publishParams := PublishParams{
 		Topic: topic,
 		// QoS 1, not 0: with QoS 0, "cleared" is a guess, since a dropped or
@@ -311,6 +315,8 @@ func (a *App) DeleteRetainedMessage(connId uint, topic string) error {
 		QoS:     1,
 		Payload: "",
 		Retain:  true,
+		// Raw: a zero-length retained clear must never be protobuf-encoded.
+		ProtoOverride: &raw,
 	}
 	err := a.PublishMqtt(connId, publishParams)
 	if err != nil {

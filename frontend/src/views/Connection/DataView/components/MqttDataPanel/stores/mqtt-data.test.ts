@@ -503,3 +503,56 @@ describe("topic levels named after Object.prototype members", () => {
     unsub();
   });
 });
+
+describe("decode state", () => {
+  const withProps = (
+    message: mqtt.MqttMessage,
+    props: Record<string, unknown>
+  ): mqtt.MqttMessage => ({ ...message, middlewareProperties: props }) as any;
+
+  it("marks a decoded leaf, names its type, and never marks ancestors failed", () => {
+    const store = createMqttDataStore(
+      createHighlightedMqttTopicsStore(),
+      connectionEventSet
+    );
+    const unsub = store.subscribe(() => {});
+
+    fireMessages([
+      withProps(makeMessage("1", "plant/a/ok", "{}", 1), {
+        IsDecodedProto: true,
+        ProtoDescriptorName: "demo.Telemetry",
+      }),
+    ]);
+    let data = get(store);
+    const ok = data.plant.children.a.children.ok;
+    expect(ok.isDecodedProto).toBe(true);
+    expect(ok.protoDescriptorName).toBe("demo.Telemetry");
+    expect(ok.isProtoDecodeFailed).toBe(false);
+
+    fireMessages([
+      withProps(makeMessage("2", "plant/a/bad", "raw", 2), {
+        ProtoDecodeFailed: true,
+        ProtoDescriptorName: "demo.Alarm",
+      }),
+    ]);
+    data = get(store);
+    const bad = data.plant.children.a.children.bad;
+    expect(bad.isProtoDecodeFailed).toBe(true);
+    expect(bad.isDecodedProto).toBe(false);
+    expect(bad.protoDescriptorName).toBe("demo.Alarm");
+    expect(data.plant.isProtoDecodeFailed).toBeFalsy();
+    expect(data.plant.children.a.isProtoDecodeFailed).toBeFalsy();
+
+    // A later good decode on the same topic clears the failure.
+    fireMessages([
+      withProps(makeMessage("3", "plant/a/bad", "{}", 3), {
+        IsDecodedProto: true,
+        ProtoDescriptorName: "demo.Alarm",
+      }),
+    ]);
+    expect(get(store).plant.children.a.children.bad.isProtoDecodeFailed).toBe(
+      false
+    );
+    unsub();
+  });
+});

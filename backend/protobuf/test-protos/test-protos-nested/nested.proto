@@ -1,0 +1,11 @@
+syntax = "proto3";
+package nested;
+
+message Outer {
+    message Inner {
+        string value = 1;
+    }
+
+    Inner inner = 1;
+    map<string, string> tags = 2;
+}

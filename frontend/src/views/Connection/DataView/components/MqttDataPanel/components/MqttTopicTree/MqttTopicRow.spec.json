@@ -59,6 +59,20 @@
       "default": false
     },
     {
+      "name": "isProtoDecodeFailed",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "The latest message was claimed by a protobuf binding or is Sparkplug, but failed to decode. Renders a warning marker; the row shows the raw payload."
+    },
+    {
+      "name": "protoDescriptorName",
+      "type": "string",
+      "required": false,
+      "default": "undefined",
+      "description": "The message type the latest decode used or tried, shown in the marker's title."
+    },
+    {
       "name": "isRetained",
       "type": "boolean",
       "required": false,
@@ -106,7 +120,8 @@
   "tokens": [
     "primary",
     "secondary",
-    "secondary-text"
+    "secondary-text",
+    "warning"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

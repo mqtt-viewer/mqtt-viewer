@@ -1,0 +1,454 @@
+package topicmatching
+
+import (
+	"fmt"
+	"testing"
+
+	"mqtt-viewer/backend/models"
+)
+
+func rule(id uint, filter, msgType string, sortOrder int) models.ProtoBindingRule {
+	return models.ProtoBindingRule{ID: id, TopicFilter: filter, MessageType: msgType, SortOrder: sortOrder}
+}
+
+func TestMatchSpecificity(t *testing.T) {
+	tests := []struct {
+		name       string
+		rules      []models.ProtoBindingRule
+		topic      string
+		wantType   string
+		wantFilter string
+		wantSource string
+	}{
+		{
+			name: "literal segment beats single-level wildcard",
+			rules: []models.ProtoBindingRule{
+				rule(1, "sensors/#", "TypeHash", 0),
+				rule(2, "sensors/+/telemetry", "TypePlus", 0),
+			},
+			topic:      "sensors/room1/telemetry",
+			wantType:   "TypePlus",
+			wantFilter: "sensors/+/telemetry",
+			wantSource: SourceRule,
+		},
+		{
+			name: "literal beats plus",
+			rules: []models.ProtoBindingRule{
+				rule(1, "sensors/+/telemetry", "TypePlus", 0),
+				rule(2, "sensors/room1/telemetry", "TypeLiteral", 0),
+			},
+			topic:      "sensors/room1/telemetry",
+			wantType:   "TypeLiteral",
+			wantFilter: "sensors/room1/telemetry",
+			wantSource: SourceRule,
+		},
+		{
+			name: "a/+/+ beats a/#",
+			rules: []models.ProtoBindingRule{
+				rule(1, "a/#", "TypeHash", 0),
+				rule(2, "a/+/+", "TypePlusPlus", 0),
+			},
+			topic:      "a/b/c",
+			wantType:   "TypePlusPlus",
+			wantFilter: "a/+/+",
+			wantSource: SourceRule,
+		},
+		{
+			name: "tie broken by sort order",
+			rules: []models.ProtoBindingRule{
+				rule(1, "a/b", "TypeSecond", 5),
+				rule(2, "a/b", "TypeFirst", 1),
+			},
+			topic:      "a/b",
+			wantType:   "TypeFirst",
+			wantFilter: "a/b",
+			wantSource: SourceRule,
+		},
+		{
+			name: "tie broken by id when sort order equal",
+			rules: []models.ProtoBindingRule{
+				rule(9, "a/b", "TypeHigherID", 1),
+				rule(3, "a/b", "TypeLowerID", 1),
+			},
+			topic:      "a/b",
+			wantType:   "TypeLowerID",
+			wantFilter: "a/b",
+			wantSource: SourceRule,
+		},
+		{
+			name: "sport/# matches bare topic sport (util semantics)",
+			rules: []models.ProtoBindingRule{
+				rule(1, "sport/#", "TypeSport", 0),
+			},
+			topic:      "sport",
+			wantType:   "TypeSport",
+			wantFilter: "sport/#",
+			wantSource: SourceRule,
+		},
+		{
+			name: "ranking stays coherent with sport/# vs sport/+",
+			rules: []models.ProtoBindingRule{
+				rule(1, "sport/#", "TypeHash", 0),
+				rule(2, "sport/tennis", "TypeLiteral", 0),
+			},
+			topic:      "sport/tennis",
+			wantType:   "TypeLiteral",
+			wantFilter: "sport/tennis",
+			wantSource: SourceRule,
+		},
+		{
+			name: "bare hash user rule does not match dollar topic",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+			},
+			topic:      "$SYS/broker/uptime",
+			wantType:   "",
+			wantFilter: "",
+			wantSource: "",
+		},
+		{
+			name: "explicit dollar sys filter with literal first segment matches",
+			rules: []models.ProtoBindingRule{
+				rule(1, "$SYS/#", "TypeSys", 0),
+			},
+			topic:      "$SYS/broker/uptime",
+			wantType:   "TypeSys",
+			wantFilter: "$SYS/#",
+			wantSource: SourceRule,
+		},
+		{
+			name: "implicit sparkplug B resolves with no user rules present but other rules exist",
+			rules: []models.ProtoBindingRule{
+				rule(1, "unrelated/topic", "TypeUnrelated", 0),
+			},
+			topic:      "spBv1.0/G/NBIRTH/N",
+			wantType:   sparkplugBMessageType,
+			wantFilter: sparkplugBFilter,
+			wantSource: SourceSparkplug,
+		},
+		{
+			name: "explicit user rule on spBv1.0/# outranks implicit sparkplug on sort order tie",
+			rules: []models.ProtoBindingRule{
+				rule(1, sparkplugBFilter, "CustomSparkplugB", 0),
+			},
+			topic:      "spBv1.0/G/NBIRTH/N",
+			wantType:   "CustomSparkplugB",
+			wantFilter: sparkplugBFilter,
+			wantSource: SourceRule,
+		},
+		{
+			name: "bare hash user rule loses to implicit sparkplug on sparkplug topics",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+			},
+			topic:      "spBv1.0/G/NBIRTH/N",
+			wantType:   sparkplugBMessageType,
+			wantFilter: sparkplugBFilter,
+			wantSource: SourceSparkplug,
+		},
+		{
+			name: "wildcard-first rule loses to implicit sparkplug despite more literals",
+			rules: []models.ProtoBindingRule{
+				rule(1, "+/G/#", "TypeG", 0),
+				rule(2, "+/+/NDATA/+", "TypeNData", 0),
+			},
+			topic:      "spBv1.0/G/NDATA/N",
+			wantType:   sparkplugBMessageType,
+			wantFilter: sparkplugBFilter,
+			wantSource: SourceSparkplug,
+		},
+		{
+			name: "wildcard-first rule never claims sparkplug A",
+			rules: []models.ProtoBindingRule{
+				rule(1, "+/G/#", "TypeG", 0),
+			},
+			topic:      "spAv1.0/G/NDATA/N",
+			wantType:   sparkplugAMessageType,
+			wantFilter: sparkplugAFilter,
+			wantSource: SourceSparkplug,
+		},
+		{
+			name: "wildcard-first rule never claims a legacy STATE topic",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+				rule(2, "+/pump1", "TypePump", 0),
+			},
+			topic:      "STATE/pump1",
+			wantType:   "",
+			wantFilter: "",
+			wantSource: "",
+		},
+		{
+			name: "explicit STATE rule claims a legacy STATE topic",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+				rule(2, "STATE/pump1", "TypeState", 0),
+			},
+			topic:      "STATE/pump1",
+			wantType:   "TypeState",
+			wantFilter: "STATE/pump1",
+			wantSource: SourceRule,
+		},
+		{
+			name: "literal-first spBv1.0 STATE rule beats implicit sparkplug",
+			rules: []models.ProtoBindingRule{
+				rule(1, "spBv1.0/STATE/+", "TypeState", 0),
+			},
+			topic:      "spBv1.0/STATE/host1",
+			wantType:   "TypeState",
+			wantFilter: "spBv1.0/STATE/+",
+			wantSource: SourceRule,
+		},
+		{
+			name: "hash still claims a STATE topic that isn't Sparkplug grammar",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+			},
+			topic:      "STATE/a/b",
+			wantType:   "TypeAll",
+			wantFilter: "#",
+			wantSource: SourceRule,
+		},
+		{
+			name: "persisted bare $share rule matches literally and never panics",
+			rules: []models.ProtoBindingRule{
+				rule(1, "$share", "TypeShare", 0),
+				rule(2, "$shareX/a/b", "TypeShareX", 0),
+			},
+			topic:      "b",
+			wantType:   "",
+			wantFilter: "",
+			wantSource: "",
+		},
+		{
+			name: "bare hash user rule wins on non-sparkplug topics",
+			rules: []models.ProtoBindingRule{
+				rule(1, "#", "TypeAll", 0),
+			},
+			topic:      "foo/bar",
+			wantType:   "TypeAll",
+			wantFilter: "#",
+			wantSource: SourceRule,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewProtoBindingMatcher(tt.rules)
+			got := m.Match(tt.topic)
+			want := ProtoBindingMatch{MessageType: tt.wantType, Filter: tt.wantFilter, Source: tt.wantSource}
+			if got != want {
+				t.Errorf("Match(%q) = %+v, want %+v", tt.topic, got, want)
+			}
+		})
+	}
+}
+
+// TestMatchTypelessRuleDoesNotShadowLowerRule covers a legacy row saved
+// before the API started rejecting an empty MessageType: even though it's
+// more specific, it must not win over a lower, less specific typed rule.
+func TestMatchTypelessRuleDoesNotShadowLowerRule(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "sensors/room1/telemetry", "", 0),
+		rule(2, "sensors/+/telemetry", "TypePlus", 1),
+	})
+
+	got := m.Match("sensors/room1/telemetry")
+	want := ProtoBindingMatch{MessageType: "TypePlus", Filter: "sensors/+/telemetry", Source: SourceRule}
+	if got != want {
+		t.Errorf("Match(sensors/room1/telemetry) = %+v, want %+v", got, want)
+	}
+}
+
+// TestMatchTypelessHashRuleDoesNotShadowImplicitSparkplug covers the same
+// legacy case for a bare "#" rule: it must not beat the implicit Sparkplug
+// candidates just because it has no type to lose on.
+func TestMatchTypelessHashRuleDoesNotShadowImplicitSparkplug(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "#", "", 0),
+	})
+
+	got := m.Match("spBv1.0/G/NBIRTH/N")
+	want := ProtoBindingMatch{MessageType: sparkplugBMessageType, Filter: sparkplugBFilter, Source: SourceSparkplug}
+	if got != want {
+		t.Errorf("Match(spBv1.0/...) = %+v, want %+v", got, want)
+	}
+}
+
+func TestMatchImplicitSparkplugRankingNoUserRules(t *testing.T) {
+	m := NewProtoBindingMatcher(nil)
+
+	got := m.Match("spBv1.0/G/NBIRTH/N")
+	want := ProtoBindingMatch{MessageType: sparkplugBMessageType, Filter: sparkplugBFilter, Source: SourceSparkplug}
+	if got != want {
+		t.Errorf("Match(spBv1.0/...) = %+v, want %+v", got, want)
+	}
+
+	gotA := m.Match("spAv1.0/G/DBIRTH/N")
+	wantA := ProtoBindingMatch{MessageType: sparkplugAMessageType, Filter: sparkplugAFilter, Source: SourceSparkplug}
+	if gotA != wantA {
+		t.Errorf("Match(spAv1.0/...) = %+v, want %+v", gotA, wantA)
+	}
+
+	gotNone := m.Match("foo/bar")
+	if gotNone != (ProtoBindingMatch{}) {
+		t.Errorf("Match(foo/bar) = %+v, want zero value", gotNone)
+	}
+}
+
+func TestSetRulesClearsCache(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "a/b", "TypeOld", 0),
+	})
+
+	got := m.Match("a/b")
+	want := ProtoBindingMatch{MessageType: "TypeOld", Filter: "a/b", Source: SourceRule}
+	if got != want {
+		t.Fatalf("Match before SetRules = %+v, want %+v", got, want)
+	}
+
+	// Without SetRules, a stale cache entry would keep returning TypeOld.
+	m.SetRules([]models.ProtoBindingRule{
+		rule(2, "a/b", "TypeNew", 0),
+	})
+
+	got = m.Match("a/b")
+	want = ProtoBindingMatch{MessageType: "TypeNew", Filter: "a/b", Source: SourceRule}
+	if got != want {
+		t.Errorf("Match after SetRules = %+v, want %+v", got, want)
+	}
+}
+
+func TestMatchCacheOverflowClearsAndStaysCorrect(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "sensors/+/telemetry", "TypePlus", 0),
+		rule(2, "sensors/room1/telemetry", "TypeLiteral", 0),
+	})
+
+	for i := 0; i < maxCacheEntries+500; i++ {
+		topic := fmt.Sprintf("filler/%d", i)
+		m.Match(topic)
+	}
+
+	if len(m.cache) > maxCacheEntries {
+		t.Errorf("Expected cache to have been cleared on overflow, len=%v", len(m.cache))
+	}
+
+	got := m.Match("sensors/room1/telemetry")
+	want := ProtoBindingMatch{MessageType: "TypeLiteral", Filter: "sensors/room1/telemetry", Source: SourceRule}
+	if got != want {
+		t.Errorf("Match after cache overflow = %+v, want %+v", got, want)
+	}
+
+	gotPlus := m.Match("sensors/room2/telemetry")
+	wantPlus := ProtoBindingMatch{MessageType: "TypePlus", Filter: "sensors/+/telemetry", Source: SourceRule}
+	if gotPlus != wantPlus {
+		t.Errorf("Match after cache overflow = %+v, want %+v", gotPlus, wantPlus)
+	}
+}
+
+func TestMatchUncachedDoesNotPopulateCache(t *testing.T) {
+	m := NewProtoBindingMatcher([]models.ProtoBindingRule{
+		rule(1, "a/b", "TypeA", 0),
+	})
+
+	m.MatchUncached("a/b")
+	if len(m.cache) != 0 {
+		t.Errorf("Expected cache to stay empty after MatchUncached, len=%v", len(m.cache))
+	}
+
+	got := m.MatchUncached("a/b")
+	want := ProtoBindingMatch{MessageType: "TypeA", Filter: "a/b", Source: SourceRule}
+	if got != want {
+		t.Errorf("MatchUncached = %+v, want %+v", got, want)
+	}
+}
+
+func TestMatchEmptyRulesShortCircuitResolvesSparkplug(t *testing.T) {
+	m := NewProtoBindingMatcher(nil)
+
+	got := m.Match("spBv1.0/G/NBIRTH/N")
+	want := ProtoBindingMatch{MessageType: sparkplugBMessageType, Filter: sparkplugBFilter, Source: SourceSparkplug}
+	if got != want {
+		t.Errorf("Match = %+v, want %+v", got, want)
+	}
+	if len(m.cache) != 0 {
+		t.Errorf("Expected no cache writes with empty rules, len=%v", len(m.cache))
+	}
+
+	m.Match("foo/bar")
+	if len(m.cache) != 0 {
+		t.Errorf("Expected no cache writes with empty rules for non-sparkplug topics, len=%v", len(m.cache))
+	}
+}
+
+func TestValidateTopicFilter(t *testing.T) {
+	valid := []string{
+		"#",
+		"a/b/+",
+		"+/b/#",
+		"a//b",
+		"$shared",
+		"$shareX/a/b",
+	}
+	for _, filter := range valid {
+		t.Run("valid_"+filter, func(t *testing.T) {
+			if err := ValidateTopicFilter(filter); err != nil {
+				t.Errorf("ValidateTopicFilter(%q) = %v, want nil", filter, err)
+			}
+		})
+	}
+
+	invalid := []string{
+		"",
+		"a/#/b",
+		"a#",
+		"+a/b",
+		"$share/g/topic",
+		"$share",
+		"$share/g",
+		" a",
+		"a ",
+	}
+	for _, filter := range invalid {
+		t.Run(fmt.Sprintf("invalid_%q", filter), func(t *testing.T) {
+			if err := ValidateTopicFilter(filter); err == nil {
+				t.Errorf("ValidateTopicFilter(%q) = nil, want error", filter)
+			}
+		})
+	}
+}
+
+// edgeWhitespaceCases is shared with frontend/src/util/topic-filter.test.ts
+// (EDGE_WHITESPACE_CASES); keep the two tables identical. Each code point is
+// what Go or JavaScript treats as whitespace, and a filter starting or ending
+// with any of them must fail both validators.
+var edgeWhitespaceCodePoints = []rune{
+	0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x0085, 0x00A0,
+	0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+	0x2007, 0x2008, 0x2009, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F,
+	0x3000, 0xFEFF,
+}
+
+// Not whitespace on either side; allowed at the edges.
+var edgeNonWhitespaceCodePoints = []rune{0x200B, 0x180E, 0x001C, 0x00AD}
+
+func TestValidateTopicFilterEdgeWhitespace(t *testing.T) {
+	for _, r := range edgeWhitespaceCodePoints {
+		for _, filter := range []string{string(r) + "a", "a" + string(r)} {
+			if err := ValidateTopicFilter(filter); err == nil {
+				t.Errorf("ValidateTopicFilter(%q) (U+%04X) = nil, want error", filter, r)
+			}
+		}
+		if err := ValidateTopicFilter("a" + string(r) + "b"); err != nil {
+			t.Errorf("ValidateTopicFilter(%q) (U+%04X inside) = %v, want nil", "a"+string(r)+"b", r, err)
+		}
+	}
+	for _, r := range edgeNonWhitespaceCodePoints {
+		for _, filter := range []string{string(r) + "a", "a" + string(r)} {
+			if err := ValidateTopicFilter(filter); err != nil {
+				t.Errorf("ValidateTopicFilter(%q) (U+%04X) = %v, want nil", filter, r, err)
+			}
+		}
+	}
+}

@@ -44,6 +44,10 @@ export interface PublishDetails {
   name: string;
   // Collection a draft will be filed into on Save. Cleared once saved.
   pendingCollectionId: number | null;
+  // 'auto' (matcher/sparkplug decide), 'none' (raw, no protobuf), or a
+  // message type name (forced). Maps to PublishParams.protoOverride at the
+  // PublishMqtt boundary: auto -> null, none -> "", type -> name.
+  protoOverrideChoice: string;
 }
 
 // Flat record shape shared by publish history entries and collection messages.
@@ -62,6 +66,7 @@ export interface StoredPublishMessage {
   headerMessageExpiryInterval?: number | null;
   headerTopicAlias?: number | null;
   headerSubscriptionIdentifier?: number | null;
+  protoOverride?: string | null;
 }
 
 // Single mapper from a stored message (history entry or collection message)
@@ -97,7 +102,25 @@ export const publishDetailsFromStoredMessage = (
     },
     userPropertiesArray,
     topicError: null,
+    protoOverrideChoice: protoOverrideChoiceFromStored(message.protoOverride),
   };
+};
+
+// Stored protoOverride -> editor choice: null/undefined = auto, "" = raw,
+// anything else = that message type.
+export const protoOverrideChoiceFromStored = (
+  protoOverride?: string | null
+): string => {
+  if (protoOverride === undefined || protoOverride === null) return "auto";
+  if (protoOverride === "") return "none";
+  return protoOverride;
+};
+
+// Editor choice -> PublishParams.protoOverride / stored protoOverride.
+export const protoOverrideParamFromChoice = (choice: string): string | null => {
+  if (choice === "auto") return null;
+  if (choice === "none") return "";
+  return choice;
 };
 
 // The fields that count towards "Modified (unsaved)" for a saved message.
@@ -112,6 +135,7 @@ export const snapshotPublishDetails = (
     | "format"
     | "properties"
     | "userPropertiesArray"
+    | "protoOverrideChoice"
   >
 ) => {
   return JSON.stringify({
@@ -123,6 +147,7 @@ export const snapshotPublishDetails = (
     format: details.format,
     properties: details.properties,
     userProperties: details.userPropertiesArray.filter((p) => p.key !== ""),
+    protoOverride: details.protoOverrideChoice,
   });
 };
 
@@ -162,6 +187,7 @@ export const createPublishStore = (connId: number) => {
     baseline: null,
     name: "",
     pendingCollectionId: null,
+    protoOverrideChoice: "auto",
   });
 
   const publish = async () => {
@@ -188,6 +214,9 @@ export const createPublishStore = (connId: number) => {
         ...storeVals,
         properties: { ...storeVals.properties, userProperties },
         payload: encodedPayload,
+        protoOverride: protoOverrideParamFromChoice(
+          storeVals.protoOverrideChoice
+        ),
       };
       console.log("publishing", toPublish);
       await PublishMqtt(connId, toPublish);
@@ -216,6 +245,22 @@ export const createPublishStore = (connId: number) => {
       return { ...store, ...partial };
     });
     console.log("new store values", get({ subscribe }));
+  };
+
+  // Topic EDITS reset a FORCED type back to auto (the old type may not suit
+  // the new topic), but preserve an explicit 'none': the user said "don't
+  // encode this", and silently protobuf-encoding the next publish because
+  // they corrected a typo in the topic is a footgun. Loads of saved/history
+  // messages must NOT use this: they restore topic and protoOverrideChoice
+  // together via setPartial/setSource, so the persisted choice survives the
+  // load.
+  const setTopic = (topic: string) => {
+    update((store) => ({
+      ...store,
+      topic,
+      protoOverrideChoice:
+        store.protoOverrideChoice === "none" ? "none" : "auto",
+    }));
   };
 
   const formatPayload = () => {
@@ -247,6 +292,7 @@ export const createPublishStore = (connId: number) => {
     codec: "none",
     format: "none",
     topicError: null,
+    protoOverrideChoice: "auto",
   };
 
   // Loads a saved collection message into the editor as a scratch copy
@@ -310,6 +356,7 @@ export const createPublishStore = (connId: number) => {
     subscribe,
     setPartial,
     set,
+    setTopic,
     getUserProperties,
     publish,
     formatPayload,

@@ -1,4 +1,4 @@
-h1:ahNo/HVk63+b1Qj3GL9/VUOI/rs9rRFdchMl8xr+/Kw=
+h1:mNOA20Rg62mBMM3j1MmimEbE5j+Db8+JGmMhhtNZJtg=
 20240615025345_init.sql h1:NFrr86aryLwiPyIBHiQrnC5H2zDZJAPULxq5nn+PaxA=
 20240616060546_add-websocket-path.sql h1:jdu2Qw0nnbgNdT8Wv7vUlPr2AeXzQVNS8jEAQMjEUUM=
 20240731092726_persist-sort-and-panel-open-state.sql h1:RH3UzybXX/3HMLqwzbhRZNnTAV/aAq5ELXUbQJpnlUg=
@@ -21,3 +21,4 @@ h1:ahNo/HVk63+b1Qj3GL9/VUOI/rs9rRFdchMl8xr+/Kw=
 20260903023223_collection-ordering.sql h1:k5oZiFNZYU6CCnPmJzmZ/esoS9juLqeOzhiw1sT6ZE4=
 20260905055903_pinned-topics.sql h1:6gdNIedsC6xCnHMyXaLhmBazzjbZfpv3BrhKrNS6sso=
 20261001104155_received-message-decode-state.sql h1:qmiW0JMOr7qzkq9JJbuRKAkOsTkoh91UWqX7VtrnKS8=
+20261002175648_proto-binding-rules.sql h1:ixVb5C20DhUy/fRKbORqh4fgvSQDF8XnvAKmIyPVQnI=

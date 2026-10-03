@@ -117,7 +117,12 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	updated := models.Connection{
 		ID: conn.ID,
 	}
-	err := a.Db.Model(updated).Updates(conn)
+	// proto_reg_dir is owned by the proto-import operations (ImportProtoDir,
+	// ImportProtoFiles, ReimportProto, ClearProtoImport) now, not by the
+	// connection edit form; omit it so a frontend row holding a stale
+	// ProtoRegDir pointer (fetched before an import changed it) can't
+	// silently revert it on save.
+	err := a.Db.Model(updated).Omit("proto_reg_dir").Updates(conn)
 	if err.Error != nil {
 		return err.Error
 	}
@@ -125,6 +130,8 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	// Update name stored in ctx for logging
 	newCtx := logging.ReplaceCtx(*appConnection.ctx, slog.String("name", getMqttManagerName(conn)))
 	appConnection.ctx = &newCtx
+
+	a.refreshProtoStateAfterConnectionUpdate(appConnection, conn)
 
 	return nil
 }
@@ -164,6 +171,23 @@ func (a *App) encryptIncomingPassword(conn *models.Connection) error {
 	return nil
 }
 
+// refreshProtoStateAfterConnectionUpdate keeps the live protoState's enabled
+// flag in sync when a connection edit touches IsProtoEnabled. Proto imports
+// (ImportProtoDir, ImportProtoFiles, ReimportProto, ClearProtoImport) manage
+// ProtoRegDir and the compiled registry themselves; UpdateConnection never
+// touches either.
+func (a *App) refreshProtoStateAfterConnectionUpdate(appConnection *AppConnection, updated *models.Connection) {
+	if updated.IsProtoEnabled == nil {
+		return
+	}
+	newEnabled := *updated.IsProtoEnabled
+	if newEnabled == appConnection.ProtoState.IsEnabled() {
+		return
+	}
+	appConnection.ProtoState.SetEnabled(newEnabled)
+	a.emitProtoStateChanged(updated.ID)
+}
+
 func (a *App) DeleteConnection(id uint) error {
 	// Durable history can run to millions of rows; sweep the bulk of it in
 	// short chunked deletes first so the transaction below never holds the
@@ -194,8 +218,9 @@ func (a *App) DeleteConnection(id uint) error {
 		if err := deletePinnedTopicsForConnection(tx, id); err != nil {
 			return err
 		}
-		// sys_metric_mappings has ON DELETE CASCADE; every other child table
-		// uses a NO ACTION foreign key and must be cleared above.
+		// sys_metric_mappings and proto_binding_rules have ON DELETE
+		// CASCADE; every other child table uses a NO ACTION foreign key and
+		// must be cleared above.
 		if res := tx.Delete(&models.Connection{}, id); res.Error != nil {
 			return res.Error
 		}
@@ -212,7 +237,17 @@ func (a *App) DeleteConnection(id uint) error {
 	if appConnection, ok := a.appConnection(id); ok && appConnection.MqttManager != nil {
 		appConnection.MqttManager.CloseLogging()
 	}
-	a.removeAppConnection(id)
+	// Under the import lock, so an import in flight finishes (or one queued
+	// behind this sees the connection gone) before its files are removed.
+	if appConnection, ok := a.appConnection(id); ok {
+		appConnection.ProtoState.LockImport()
+		a.removeProtoImportDirs(id)
+		a.removeAppConnection(id)
+		appConnection.ProtoState.UnlockImport()
+	} else {
+		a.removeProtoImportDirs(id)
+		a.removeAppConnection(id)
+	}
 	if a.Mode != AppModes.Test {
 		a.EventRuntime.EventsEmit(string(events.ConnectionDeleted), id)
 	}

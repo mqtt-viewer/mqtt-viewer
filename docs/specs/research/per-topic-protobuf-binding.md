@@ -127,9 +127,8 @@ binding, which MQTTX still lacks (their #1371/#1997/#1971 remain open).
 
 1. Import proto by file(s) as well as directory? Old code was dir-only.
    Suggest dir-only v1.
-2. Should a rule optionally pin QoS/format defaults per topic (MQTTX
-   #591 asks for per-subscription default format)? Suggest no for v1 —
-   separate concern.
+2. Should a rule optionally pin QoS/format defaults per topic? Suggest
+   no for v1; it's a separate concern.
 3. Publish-side strictness: reject publish when JSON does not match the
    bound type, or send raw with a warning? Suggest reject with inline
    error (encode already errors today).

@@ -1,0 +1,97 @@
+{
+  "$schema": "../../design-system/component-spec.schema.json",
+  "name": "ProtoBindingRulesForm",
+  "tier": "component",
+  "description": "Per-connection protobuf topic-binding rules: add, edit, reorder, delete, and test topic matches against loaded message types.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "rules",
+      "type": "object",
+      "required": false,
+      "default": "[]",
+      "description": "ProtoBindingRuleView[] in priority order; the topmost wins ties on an equally specific filter."
+    },
+    {
+      "name": "descriptorNames",
+      "type": "object",
+      "required": false,
+      "default": "[]",
+      "description": "Full message-type names available from the loaded proto registry."
+    },
+    {
+      "name": "status",
+      "type": "object",
+      "required": false,
+      "description": "loadError/dirMissing/folderNotFound summary. dirMissing (no dir configured) picks the empty-state copy; loadError and folderNotFound gate the stale-type warning on rows. The section's own status line (file/type counts) is rendered by the container above this component and isn't passed down."
+    },
+    {
+      "name": "disabled",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "connected",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Shows 'Bindings stay editable while connected and apply to new messages.' when true, so the section doesn't read as locked under the dialog's locked-while-connected notice."
+    },
+    {
+      "name": "onAdd",
+      "type": "function",
+      "required": false,
+      "default": "(rule) => void | Promise<void>",
+      "description": "May return a promise; a rejection is shown inline instead of being swallowed."
+    },
+    {
+      "name": "onUpdate",
+      "type": "function",
+      "required": false,
+      "default": "(id, changes) => void | Promise<void>",
+      "description": "May return a promise; a rejection is shown inline instead of being swallowed."
+    },
+    {
+      "name": "onDelete",
+      "type": "function",
+      "required": false,
+      "default": "(id) => void | Promise<void>",
+      "description": "May return a promise; a rejection is shown inline instead of being swallowed."
+    },
+    {
+      "name": "onMove",
+      "type": "function",
+      "required": false,
+      "default": "(id, direction) => void | Promise<void>",
+      "description": "May return a promise; a rejection is shown inline instead of being swallowed."
+    },
+    {
+      "name": "onTestTopic",
+      "type": "function",
+      "required": false,
+      "default": "(topic) => Promise<match|null>"
+    }
+  ],
+  "tokens": [
+    "white-text",
+    "secondary-text",
+    "error",
+    "warning"
+  ],
+  "dependencies": [
+    "BaseInput",
+    "Button",
+    "IconButton",
+    "AddFieldButton",
+    "Icon"
+  ],
+  "notes": "Props-only render (no store reads, no bindings imports); the ProtoSection container owns bindings calls, rule CRUD, and ProtoStateChanged refetch. The type picker lives in the sibling ProtoTypePicker component (shared by committed rows and the draft row); it isn't listed in dependencies[] because both are tier 'component' and the validator only allows component -> primitive edges. Extracting a shared SearchableDropdownMenu primitive across components is a good follow-up (explicitly a v1 non-goal in the per-topic-protobuf design doc). Row notes are a single derived array (rowNotes) with precedence validation error > failed save > duplicate filter > stale type; the first two redden the input, only validation blocks the commit, the rest are amber. A failed onUpdate keeps the row's edit dirty (so a refresh can't replace the unsaved text and the next edit or blur retries) and shows 'Could not save: <error>' on the row; a failed onDelete/onMove shows under the list, a failed onAdd under the draft. Picking a type in the draft row marks the filter touched, so an empty or invalid filter shows its error then; opening the picker alone doesn't. Reorder buttons carry aria-labels ('Move up', 'Move down') via IconButton's ariaLabel."
+}

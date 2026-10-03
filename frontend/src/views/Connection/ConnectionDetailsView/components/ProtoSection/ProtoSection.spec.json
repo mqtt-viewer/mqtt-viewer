@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../../../design-system/component-spec.schema.json",
+  "name": "ProtoSection",
+  "tier": "view",
+  "description": "Storybook coverage for ProtoSection.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "connection",
+      "type": "object",
+      "required": true,
+      "description": "The live Connection record (connectionDetails plus connection state) this section renders controls for; reactively bound so switch/dir/rule-list state track the connections and proto-state stores."
+    },
+    {
+      "name": "serverMode",
+      "type": "boolean",
+      "required": false,
+      "default": null,
+      "description": "Overrides envStore.isServerMode (for stories). When true, the folder actions open a hidden webkitdirectory file input instead of the native ChooseDirectory dialog, which returns nothing in the web UI."
+    }
+  ],
+  "tokens": [],
+  "dependencies": [
+    "Switch",
+    "Button",
+    "Dialog",
+    "ProtoBindingRulesForm"
+  ],
+  "notes": "Wiring component: owns proto-state store reads, connections.updateConnectionDetails calls, proto import/re-import/replace/remove actions, and rule CRUD/reorder/test bindings, then passes props to ProtoBindingRulesForm. Folder import uses the native picker in the app and a hidden webkitdirectory input in the web UI (server mode); the folder upload keeps only .proto files and sends each path relative to the chosen folder so imports between files resolve, and says so inline when the folder has none. Once imported, 'Replace with folder' and 'Replace with files' reuse the same pickers, so a schema can be swapped without removing it first. A failed import, re-import or replace keeps the previous import (backend contract), and the action error says so ('Import failed, so I kept the previous files.') above the compile error; with nothing imported it reads 'Import failed.'. Rule write failures propagate to ProtoBindingRulesForm, which shows them inline. Remove goes through an inline confirmation Dialog (nested inside ConnectionDetailsDialog, same as ConfirmDeleteConnectionDialog) because it stops every binding from decoding (Sparkplug still decodes). .proto files are imported (copied into the app's data folder), never compiled from the picked path directly. Renders last in ConnectionDetailsDialog, after SubscriptionsForm. Figma is not linked yet; this story uses local Storybook fixtures."
+}

@@ -3,6 +3,7 @@ import {
   topicMatchesQuery,
   topicMatchesSubscription,
   validateTopic,
+  validateTopicFilter,
 } from "./topic-filter";
 
 describe("validateTopic", () => {
@@ -87,4 +88,114 @@ describe("topicMatchesQuery", () => {
     expect(topicMatchesQuery("house", "house/+")).toBe(false);
     expect(topicMatchesQuery("house/kitchen", "house/+")).toBe(true);
   });
+});
+
+describe("validateTopicFilter", () => {
+  test("valid filters pass", () => {
+    expect(validateTopicFilter("sensors/+/telemetry")).toBeNull();
+    expect(validateTopicFilter("sensors/#")).toBeNull();
+    expect(validateTopicFilter("#")).toBeNull();
+    expect(validateTopicFilter("+")).toBeNull();
+    expect(validateTopicFilter("a/b/c")).toBeNull();
+    expect(validateTopicFilter("$SYS/#")).toBeNull();
+  });
+
+  test("empty filter", () => {
+    expect(validateTopicFilter("")).toBe("Enter a topic filter");
+  });
+
+  test("leading or trailing whitespace", () => {
+    expect(validateTopicFilter("   ")).toBe("No leading or trailing spaces");
+    expect(validateTopicFilter(" sensors/#")).toBe(
+      "No leading or trailing spaces"
+    );
+    expect(validateTopicFilter("sensors/# ")).toBe(
+      "No leading or trailing spaces"
+    );
+    expect(validateTopicFilter("sensors/temp ")).toBe(
+      "No leading or trailing spaces"
+    );
+  });
+
+  test("NUL byte is rejected, and takes precedence over whitespace", () => {
+    expect(validateTopicFilter("sensors/\0/telemetry")).toBe(
+      "No NUL bytes allowed"
+    );
+    expect(validateTopicFilter(" sensors/\0 ")).toBe("No NUL bytes allowed");
+  });
+
+  test("shared subscription filters are rejected", () => {
+    expect(validateTopicFilter("$share/group/sensors/#")).toBe(
+      "Shared subscription filters can't be bindings"
+    );
+    expect(validateTopicFilter("$share")).toBe(
+      "Shared subscription filters can't be bindings"
+    );
+    expect(validateTopicFilter("$share/g/t")).toBe(
+      "Shared subscription filters can't be bindings"
+    );
+  });
+
+  test("only an exact $share first segment is a shared subscription", () => {
+    expect(validateTopicFilter("$shared/x")).toBeNull();
+    expect(validateTopicFilter("$SYS/#")).toBeNull();
+  });
+
+  test("'#' must be the last segment", () => {
+    expect(validateTopicFilter("sensors/#/telemetry")).toBe(
+      "'#' must be the last segment"
+    );
+    expect(validateTopicFilter("sensors/foo#bar")).toBe(
+      "'#' must be the last segment"
+    );
+  });
+
+  test("'+' must be a whole segment", () => {
+    expect(validateTopicFilter("sensors/foo+bar/telemetry")).toBe(
+      "'+' must be a whole segment"
+    );
+    expect(validateTopicFilter("+sensors/telemetry")).toBe(
+      "'+' must be a whole segment"
+    );
+  });
+});
+
+// Shared with backend/topic-matching/proto_binding_matcher_test.go
+// (edgeWhitespaceCodePoints); keep the two tables identical. Each code point
+// is what Go or JavaScript treats as whitespace, and a filter starting or
+// ending with any of them must fail both validators.
+const EDGE_WHITESPACE_CASES = [
+  0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x0020, 0x0085, 0x00a0, 0x1680,
+  0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008,
+  0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+];
+
+// Not whitespace on either side; allowed at the edges.
+const EDGE_NON_WHITESPACE_CASES = [0x200b, 0x180e, 0x001c, 0x00ad];
+
+const hex = (cp: number) => cp.toString(16).toUpperCase().padStart(4, "0");
+
+describe("validateTopicFilter edge whitespace matches the backend", () => {
+  test.each(EDGE_WHITESPACE_CASES.map((cp) => [hex(cp), cp]))(
+    "U+%s at either edge is rejected, inside is fine",
+    (_label, cp) => {
+      const ch = String.fromCodePoint(cp as number);
+      expect(validateTopicFilter(ch + "a")).toBe(
+        "No leading or trailing spaces"
+      );
+      expect(validateTopicFilter("a" + ch)).toBe(
+        "No leading or trailing spaces"
+      );
+      expect(validateTopicFilter("a" + ch + "b")).toBeNull();
+    }
+  );
+
+  test.each(EDGE_NON_WHITESPACE_CASES.map((cp) => [hex(cp), cp]))(
+    "U+%s at either edge is allowed",
+    (_label, cp) => {
+      const ch = String.fromCodePoint(cp as number);
+      expect(validateTopicFilter(ch + "a")).toBeNull();
+      expect(validateTopicFilter("a" + ch)).toBeNull();
+    }
+  );
 });

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/mqtt"
+	mqttmiddleware "mqtt-viewer/backend/mqtt-middleware"
 )
 
 // receivedMessageInsertBatch caps rows per INSERT so a busy 300ms drain stays
@@ -98,9 +99,9 @@ func decodeStateOf(m *mqtt.MqttMessage) *string {
 	state := models.DecodeStateRaw
 	if m.MiddlewareProperties != nil {
 		props := *m.MiddlewareProperties
-		if decoded, _ := props["IsDecodedProto"].(bool); decoded {
+		if decoded, _ := props[mqttmiddleware.PropIsDecodedProto].(bool); decoded {
 			state = models.DecodeStateDecoded
-		} else if failed, _ := props["SparkplugDecodeFailed"].(bool); failed {
+		} else if failed, _ := props[mqttmiddleware.PropProtoDecodeFailed].(bool); failed {
 			state = models.DecodeStateFailed
 		}
 	}
