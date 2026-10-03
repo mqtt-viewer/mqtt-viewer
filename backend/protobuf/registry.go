@@ -3,6 +3,7 @@ package protobuf
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"mqtt-viewer/backend/util"
@@ -50,12 +51,18 @@ func LoadProtoRegistry(importPath string) (*ProtoRegistry, error) {
 	for _, absPath := range absPaths {
 		rel, err := filepath.Rel(importPath, absPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s is outside the import folder", filepath.Base(absPath))
 		}
 		rel = filepath.ToSlash(rel)
 		content, err := os.ReadFile(absPath)
 		if err != nil {
-			return nil, err
+			// Name the file by its relative path; the PathError carries the
+			// absolute data-dir path.
+			var pathErr *fs.PathError
+			if errors.As(err, &pathErr) {
+				err = pathErr.Err
+			}
+			return nil, fmt.Errorf("%s can't be read: %w", rel, err)
 		}
 		sources[rel] = content
 		relPaths = append(relPaths, rel)
@@ -133,20 +140,35 @@ func LoadProtoRegistry(importPath string) (*ProtoRegistry, error) {
 // instead. A tie is an error naming the import and the candidates, as is one
 // file being imported under two different names. Files that fail to parse
 // are skipped here; the compile reports their syntax errors.
+//
+// A user copy of a well-known type that isn't at exactly google/protobuf/ at
+// the root (vendored under third_party/, or flat with package
+// google.protobuf) is compiled under the standard name, so it replaces the
+// built-in rather than defining its symbols a second time (see
+// standardImportAliases).
 func resolveImportAliases(relPaths []string, sources map[string][]byte) (map[string]string, error) {
 	isRel := make(map[string]bool, len(relPaths))
 	for _, rel := range relPaths {
 		isRel[rel] = true
 	}
 
-	aliasOf := map[string]string{}        // relPath -> import name it's compiled as
-	importedDirectly := map[string]bool{} // relPaths some file imports by exact path
-	for _, importer := range relPaths {
-		imports, err := scanImports(importer, sources[importer])
+	scanned := make(map[string]scannedFile, len(relPaths))
+	for _, rel := range relPaths {
+		file, err := scanFile(rel, sources[rel])
 		if err != nil {
 			continue
 		}
-		for _, imp := range imports {
+		scanned[rel] = file
+	}
+
+	aliasOf := map[string]string{}        // relPath -> import name it's compiled as
+	importedDirectly := map[string]bool{} // relPaths some file imports by exact path
+	for _, importer := range relPaths {
+		file, ok := scanned[importer]
+		if !ok {
+			continue
+		}
+		for _, imp := range file.imports {
 			if isRel[imp] {
 				importedDirectly[imp] = true
 				continue
@@ -154,7 +176,7 @@ func resolveImportAliases(relPaths []string, sources map[string][]byte) (map[str
 			if isStandardImport(imp) {
 				continue
 			}
-			target, err := fallbackImportTarget(imp, relPaths)
+			target, err := fallbackImportTarget(imp, importer, relPaths)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", importer, err)
 			}
@@ -167,6 +189,21 @@ func resolveImportAliases(relPaths []string, sources map[string][]byte) (map[str
 			}
 			aliasOf[target] = imp
 		}
+	}
+
+	standardAliases, err := standardImportAliases(relPaths, scanned, isRel)
+	if err != nil {
+		return nil, err
+	}
+	for rel, std := range standardAliases {
+		if importedDirectly[rel] {
+			// Imported by its own path; keep that name rather than break it.
+			continue
+		}
+		if existing, ok := aliasOf[rel]; ok && existing != std {
+			return nil, fmt.Errorf("%s is imported as both %q and %q; use one import path", rel, existing, std)
+		}
+		aliasOf[rel] = std
 	}
 
 	canonical := make(map[string]string, len(relPaths))
@@ -185,14 +222,86 @@ func resolveImportAliases(relPaths []string, sources map[string][]byte) (map[str
 	return canonical, nil
 }
 
-// fallbackImportTarget returns the file whose path shares the most trailing
-// segments with imp, "" when none shares even the basename, or an error when
-// the best match is a tie.
-func fallbackImportTarget(imp string, relPaths []string) (string, error) {
+// standardImportAliases maps each user file that is a copy of a standard
+// google/protobuf import to that standard name, unless a file already sits at
+// exactly that path under the root (which the resolver serves first anyway).
+// A file qualifies when its path ends with the whole standard path, segment
+// aligned, or when it has the standard file's basename and declares package
+// google.protobuf. Path matches win over package matches; more than one
+// candidate at the winning tier is an error.
+func standardImportAliases(relPaths []string, scanned map[string]scannedFile, isRel map[string]bool) (map[string]string, error) {
+	type candidates struct{ byPath, byPackage []string }
+	perStd := map[string]*candidates{}
+	for _, rel := range relPaths {
+		std, byPath := standardNameFor(rel, scanned)
+		if std == "" || isRel[std] {
+			continue
+		}
+		c := perStd[std]
+		if c == nil {
+			c = &candidates{}
+			perStd[std] = c
+		}
+		if byPath {
+			c.byPath = append(c.byPath, rel)
+		} else {
+			c.byPackage = append(c.byPackage, rel)
+		}
+	}
+
+	result := map[string]string{}
+	stds := make([]string, 0, len(perStd))
+	for std := range perStd {
+		stds = append(stds, std)
+	}
+	sort.Strings(stds)
+	for _, std := range stds {
+		c := perStd[std]
+		chosen := c.byPath
+		if len(chosen) == 0 {
+			chosen = c.byPackage
+		}
+		if len(chosen) > 1 {
+			return nil, fmt.Errorf("%s is provided by more than one file: %s; keep one copy", std, strings.Join(chosen, ", "))
+		}
+		result[chosen[0]] = std
+	}
+	return result, nil
+}
+
+// standardNameFor returns the standard import rel is a copy of, if any, and
+// whether it matched on its path (rather than basename plus package).
+func standardNameFor(rel string, scanned map[string]scannedFile) (string, bool) {
+	segments := strings.Split(rel, "/")
+	if n := len(segments); n >= 3 && segments[n-3] == "google" && segments[n-2] == "protobuf" {
+		std := strings.Join(segments[n-3:], "/")
+		if isStandardImport(std) {
+			return std, true
+		}
+	}
+	file, ok := scanned[rel]
+	if !ok || file.pkg != "google.protobuf" {
+		return "", false
+	}
+	std := "google/protobuf/" + path.Base(rel)
+	if isStandardImport(std) {
+		return std, false
+	}
+	return "", false
+}
+
+// fallbackImportTarget returns the file other than importer whose path shares
+// the most trailing segments with imp, "" when none shares even the basename,
+// or an error when the best match is a tie. A file never resolves an import
+// to itself; that would surface as a cycle rather than a missing file.
+func fallbackImportTarget(imp, importer string, relPaths []string) (string, error) {
 	impSegments := strings.Split(imp, "/")
 	best := 0
 	var candidates []string
 	for _, rel := range relPaths {
+		if rel == importer {
+			continue
+		}
 		score := commonTrailingSegments(impSegments, strings.Split(rel, "/"))
 		if score == 0 || score < best {
 			continue
@@ -220,19 +329,32 @@ func commonTrailingSegments(a, b []string) int {
 	return n
 }
 
-// scanImports parses one file just far enough to list its import paths.
-func scanImports(name string, content []byte) ([]string, error) {
+type scannedFile struct {
+	pkg     string
+	imports []string
+}
+
+// scanFile parses one file just far enough to read its package and list its
+// import paths.
+func scanFile(name string, content []byte) (scannedFile, error) {
 	fileNode, err := parser.Parse(name, bytes.NewReader(content), reporter.NewHandler(nil))
 	if err != nil {
-		return nil, err
+		return scannedFile{}, err
 	}
-	imports := []string{}
+	result := scannedFile{imports: []string{}}
 	for _, decl := range fileNode.Decls {
-		if importNode, ok := decl.(*ast.ImportNode); ok && importNode.Name != nil {
-			imports = append(imports, importNode.Name.AsString())
+		switch node := decl.(type) {
+		case *ast.ImportNode:
+			if node.Name != nil {
+				result.imports = append(result.imports, node.Name.AsString())
+			}
+		case *ast.PackageNode:
+			if node.Name != nil {
+				result.pkg = string(node.Name.AsIdentifier())
+			}
 		}
 	}
-	return imports, nil
+	return result, nil
 }
 
 var standardImportProbe = protocompile.WithStandardImports(protocompile.ResolverFunc(

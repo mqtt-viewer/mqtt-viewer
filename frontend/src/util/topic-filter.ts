@@ -94,6 +94,11 @@ export const topicMatchesQuery = (
   return substringMatch || topicMatchesSubscription(lowerTopic, q);
 };
 
+// A filter may not start or end with anything Go (Unicode White_Space) or
+// JavaScript (\s, which adds U+FEFF and lacks U+0085) treats as whitespace;
+// the backend's isEdgeWhitespace uses the same union.
+const EDGE_WHITESPACE = /^[\s\u0085]|[\s\u0085]$/;
+
 // validateTopicFilter mirrors backend/topic-matching/proto_binding_matcher.go's
 // ValidateTopicFilter: same rules, same order, worded for the UI. Returns
 // null when filter is a valid proto binding topic filter, otherwise the
@@ -107,7 +112,7 @@ export const validateTopicFilter = (filter: string): string | null => {
   if (filter.includes("\0")) {
     return "No NUL bytes allowed";
   }
-  if (filter.trim() !== filter) {
+  if (EDGE_WHITESPACE.test(filter)) {
     return "No leading or trailing spaces";
   }
   const segments = filter.split("/");

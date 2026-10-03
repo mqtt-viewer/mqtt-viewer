@@ -235,18 +235,6 @@ func TestImportProtoDirEnforcesLimits(t *testing.T) {
 		t.Errorf("Expected a per-file size error, got %v", err)
 	}
 
-	deepDir := t.TempDir()
-	nested := filepath.Join(deepDir, filepath.FromSlash(strings.Repeat("d/", maxProtoImportDepth+1)))
-	if err := os.MkdirAll(nested, 0770); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(nested, "deep.proto"), []byte("syntax = \"proto3\";\n"), 0660); err != nil {
-		t.Fatalf("writing deep proto: %v", err)
-	}
-	if _, err := app.ImportProtoDir(connId, deepDir); err == nil || !strings.Contains(err.Error(), "nested") {
-		t.Errorf("Expected a depth error, got %v", err)
-	}
-
 	if _, err := os.Stat(app.protoImportDir(connId)); !os.IsNotExist(err) {
 		t.Errorf("Expected nothing imported, got %v", err)
 	}

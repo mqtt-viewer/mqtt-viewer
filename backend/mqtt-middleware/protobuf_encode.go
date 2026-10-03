@@ -71,9 +71,16 @@ func NewProtoEncodeMiddleware(resolver ProtoResolver, sparkplugRegistry Sparkplu
 					// rebirth request, say) always means the real one: an
 					// imported file declaring its own unqualified
 					// SparkplugBPayload must not re-type it.
+					// If that registry isn't loaded, fail rather than fall
+					// through to a lookalike.
 					if typeName == sparkplugBTypeName && topicmatching.MatchesSparkplugBPrefix(params.Topic) {
-						if reg := sparkplugRegistry(); reg != nil {
-							descriptor, ok = reg.GetMessageDescriptorFromName(typeName)
+						reg := sparkplugRegistry()
+						if reg == nil {
+							return fmt.Errorf("the built-in Sparkplug B types aren't loaded yet, so %s can't be encoded", typeName)
+						}
+						descriptor, ok = reg.GetMessageDescriptorFromName(typeName)
+						if !ok {
+							return fmt.Errorf("the built-in Sparkplug B types don't include %s", typeName)
 						}
 					}
 					if !ok {

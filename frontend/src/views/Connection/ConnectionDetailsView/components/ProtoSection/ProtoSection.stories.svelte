@@ -82,6 +82,9 @@
     "Web UI folder broker",
     ""
   );
+  // Mock id 108: never imported; the play picks twice while the first pick
+  // is still being read.
+  const doublePickConnection = connectionWithId(108, "Double pick broker", "");
   // Mock id 106: imported by upload, so there's no folder to re-import from.
   const uploadedConnection = connectionWithId(106, "Uploaded protos broker", "");
 
@@ -95,6 +98,18 @@
     input.files = dataTransfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
   };
+
+  // Picks are ignored while the mount compile is busy (as the disabled
+  // buttons imply), so a play waits for an import button to enable first.
+  const waitUntilIdle = (canvasElement: HTMLElement) =>
+    waitFor(() => {
+      const button = Array.from(canvasElement.querySelectorAll("button")).find(
+        (b) =>
+          b.textContent?.includes("Choose .proto folder") ||
+          b.textContent?.includes("Replace with files")
+      );
+      expect(button?.disabled).toBe(false);
+    });
 
   const { Story } = defineMeta({
     title: "Views/Connection/ConnectionDetailsView/ProtoSection",
@@ -133,6 +148,7 @@
     // uploading a non-.proto file so the mock rejects it the way the real
     // backend's validateProtoUploadName would, surfacing the action-error
     // line.
+    await waitUntilIdle(canvasElement);
     const input = canvasElement.querySelector(
       'input[data-testid="proto-files-input"]'
     );
@@ -153,9 +169,7 @@
   args={{ ...storyArgs, connection: keptPreviousConnection }}
   {template}
   play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
-    await waitFor(() =>
-      expect(canvasElement.textContent).toContain("Replace with files")
-    );
+    await waitUntilIdle(canvasElement);
     pickFiles(canvasElement.querySelector('input[data-testid="proto-files-input"]'), [
       new File(['import "common/units.proto"; BROKEN'], "telemetry.proto"),
     ]);
@@ -188,6 +202,7 @@
   }}
   {template}
   play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    await waitUntilIdle(canvasElement);
     pickFiles(
       canvasElement.querySelector('input[data-testid="proto-folder-input"]'),
       [new File(["# notes"], "README.md", { type: "text/markdown" })]
@@ -209,6 +224,7 @@
   }}
   {template}
   play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    await waitUntilIdle(canvasElement);
     pickFiles(
       canvasElement.querySelector('input[data-testid="proto-folder-input"]'),
       [
@@ -219,5 +235,24 @@
     await waitFor(() =>
       expect(canvasElement.textContent).toContain("Replace with folder")
     );
+  }}
+/>
+
+<!-- A second pick while the first is still being read is ignored: only the
+     first (good) upload imports, so the broken second one never runs. -->
+<Story
+  name="Second pick while reading"
+  args={{ ...storyArgs, connection: doublePickConnection }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    await waitUntilIdle(canvasElement);
+    const input = canvasElement.querySelector('input[data-testid="proto-files-input"]');
+    pickFiles(input, [new File(['syntax = "proto3";'], "telemetry.proto")]);
+    pickFiles(input, [new File(["BROKEN"], "telemetry.proto")]);
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain("Replace with files")
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(canvasElement.textContent).not.toContain("Import failed");
   }}
 />

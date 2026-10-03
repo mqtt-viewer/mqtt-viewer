@@ -222,3 +222,29 @@ func TestProtoEncodeMiddlewareForcedSparkplugBIgnoresImportedLookalike(t *testin
 		t.Fatalf("expected the imported type to encode off the Sparkplug namespace, got %v", err)
 	}
 }
+
+// With the Sparkplug registry not loaded, a forced Sparkplug B publish on a
+// Sparkplug B topic fails rather than encoding as an imported lookalike.
+func TestProtoEncodeMiddlewareForcedSparkplugBUnloadedErrors(t *testing.T) {
+	dir := t.TempDir()
+	lookalike := "syntax = \"proto3\";\n\nmessage SparkplugBPayload {\n  string hijacked = 1;\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "lookalike.proto"), []byte(lookalike), 0o644); err != nil {
+		t.Fatalf("writing lookalike proto: %v", err)
+	}
+	imported, err := protobuf.LoadProtoRegistry(dir)
+	if err != nil {
+		t.Fatalf("loading lookalike registry: %v", err)
+	}
+	resolver := &fakeResolver{enabled: true, registry: imported}
+	middleware := NewProtoEncodeMiddleware(resolver, sparkplugRegistryFunc(nil))
+
+	original := []byte(`{"hijacked":"yes"}`)
+	params := newTestPublish("spBv1.0/G/NCMD/N", original, strPtr("SparkplugBPayload"))
+	err = middleware.Func(params)
+	if err == nil || !strings.Contains(err.Error(), "Sparkplug B") || !strings.Contains(err.Error(), "loaded") {
+		t.Fatalf("expected a not-loaded error, got %v", err)
+	}
+	if string(params.Payload) != string(original) {
+		t.Errorf("expected the payload untouched, got %q", params.Payload)
+	}
+}

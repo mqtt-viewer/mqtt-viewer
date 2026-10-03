@@ -205,21 +205,34 @@
     };
   };
 
+  // One filter write in flight per row. A commit asked for meanwhile (the
+  // debounce firing, then the blur) is folded into a single follow-up that
+  // runs once the write settles, and only if the text has changed since:
+  // otherwise the same update would go out twice.
+  const filterWriteInFlight = new Set<number>();
+  const filterFollowUpWanted = new Set<number>();
+
   const commitRowEdit = async (rule: ProtoBindingRuleView) => {
+    if (filterWriteInFlight.has(rule.id)) {
+      filterFollowUpWanted.add(rule.id);
+      return;
+    }
     const entry = editStateByRuleId[rule.id];
-    if (!entry) return;
+    // A clean row has nothing unsaved. Its value can differ from
+    // rule.topicFilter for a moment, after a write lands and before the
+    // refreshed `rules` arrive.
+    if (!entry || !entry.dirty) return;
     const localValue = entry.value;
     if (validateTopicFilter(localValue)) return;
     if (localValue === rule.topicFilter) {
       // Typed back to the saved value: nothing to write, and any failed
       // filter save is moot. An untouched row keeps a failed type pick's
       // error.
-      if (entry.dirty) {
-        setRowSaveError(rule.id, null);
-        markRowClean(rule.id, localValue);
-      }
+      setRowSaveError(rule.id, null);
+      markRowClean(rule.id, localValue);
       return;
     }
+    filterWriteInFlight.add(rule.id);
     try {
       await onUpdate(rule.id, { topicFilter: localValue });
       setRowSaveError(rule.id, null);
@@ -227,13 +240,39 @@
     } catch (e) {
       console.error(e);
       setRowSaveError(rule.id, errorMessage(e));
+    } finally {
+      filterWriteInFlight.delete(rule.id);
+      if (filterFollowUpWanted.delete(rule.id)) {
+        const current = editStateByRuleId[rule.id];
+        if (current?.dirty && current.value !== localValue) {
+          const currentRule = rules.find((r) => r.id === rule.id);
+          if (currentRule) commitRowEdit(currentRule);
+        }
+      }
     }
   };
 
+  // A type pick also carries a filter edit still waiting to save (say one
+  // whose save failed), so the row's error only clears once that text has
+  // actually saved. Without it the error would vanish while the text stayed
+  // unsaved, and closing the dialog would drop it silently.
   const onRowTypePicked = async (rule: ProtoBindingRuleView, name: string) => {
+    const entry = editStateByRuleId[rule.id];
+    const pendingFilter =
+      entry?.dirty &&
+      !validateTopicFilter(entry.value) &&
+      entry.value !== rule.topicFilter
+        ? entry.value
+        : undefined;
     try {
-      await onUpdate(rule.id, { messageType: name });
-      setRowSaveError(rule.id, null);
+      await onUpdate(
+        rule.id,
+        pendingFilter === undefined
+          ? { messageType: name }
+          : { messageType: name, topicFilter: pendingFilter }
+      );
+      if (pendingFilter !== undefined) markRowClean(rule.id, pendingFilter);
+      if (!editStateByRuleId[rule.id]?.dirty) setRowSaveError(rule.id, null);
     } catch (e) {
       console.error(e);
       setRowSaveError(rule.id, errorMessage(e));
@@ -297,10 +336,14 @@
   };
 
   onDestroy(() => {
-    // Flush, not cancel: closing the dialog (which destroys this component)
-    // should persist a just-typed valid edit sitting in the debounce window
-    // rather than drop it.
-    Object.values(debouncedCommitByRuleId).forEach((fn) => fn.flush());
+    // Closing the dialog (which destroys this component) makes one last
+    // attempt at every unsaved row: a just-typed valid edit sitting in the
+    // debounce window, and one whose earlier save failed with nothing
+    // pending to retry it.
+    Object.values(debouncedCommitByRuleId).forEach((fn) => fn.cancel());
+    for (const rule of rules) {
+      if (editStateByRuleId[rule.id]?.dirty) commitRowEdit(rule);
+    }
   });
 
   // Draft row: "Add binding" opens this instead of writing to the backend
@@ -384,6 +427,9 @@
     commitDraft();
   };
 
+  // Cancel never commits. Its button doesn't take focus on mousedown
+  // (preventFocus), so clicking it doesn't blur the draft input first, which
+  // would retry a failed add and could create the binding being discarded.
   const onDraftCancel = () => {
     draft = null;
     draftTouched = false;
@@ -549,6 +595,7 @@
             variant="text"
             iconType="closeCircle"
             aria-label="Cancel"
+            preventFocus
             on:click={onDraftCancel}
           />
         </div>

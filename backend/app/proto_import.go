@@ -25,6 +25,11 @@ const (
 	maxProtoImportTotalBytes = 32 << 20
 	// maxProtoImportDepth is how many folders deep a file may sit.
 	maxProtoImportDepth = 16
+	// Common filesystem limits: a name (one path segment) of at most 255
+	// bytes, a whole relative path well inside PATH_MAX once the data-dir
+	// prefix is added.
+	maxProtoImportSegmentBytes = 255
+	maxProtoImportNameBytes    = 1024
 )
 
 // ProtoUploadFile is a single .proto file uploaded from the browser (the web
@@ -84,7 +89,11 @@ func (a *App) ImportProtoDir(connId uint, sourceDir string) (*ProtoStateResult, 
 // collectProtoDirFiles reads every regular .proto file under sourceDir,
 // within the import limits. The root itself may be a symlink (the user
 // picked it); anything below that is a symlink or not a regular file is
-// skipped.
+// skipped. So is anything unrelated to the protos that would otherwise fail
+// the import: hidden files and folders (.git, macOS ._x.proto AppleDouble
+// files), folders that can't be read, and folders more than
+// maxProtoImportDepth deep. Errors name files by their relative path, never
+// the absolute one.
 func collectProtoDirFiles(sourceDir string) ([]ProtoUploadFile, error) {
 	root, err := filepath.EvalSymlinks(sourceDir)
 	if err != nil {
@@ -94,17 +103,29 @@ func collectProtoDirFiles(sourceDir string) ([]ProtoUploadFile, error) {
 	files := []ProtoUploadFile{}
 	total := 0
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("folder not found")
+		}
+		if rel == "." {
+			if walkErr != nil {
+				return fmt.Errorf("folder can't be read")
+			}
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
 		}
 		if d.IsDir() {
-			if rel != "." && len(strings.Split(filepath.ToSlash(rel), "/")) > maxProtoImportDepth {
-				return fmt.Errorf("folders are nested more than %d deep", maxProtoImportDepth)
+			if walkErr != nil || len(strings.Split(filepath.ToSlash(rel), "/")) > maxProtoImportDepth {
+				return fs.SkipDir
 			}
+			return nil
+		}
+		if walkErr != nil {
 			return nil
 		}
 		if !d.Type().IsRegular() || filepath.Ext(d.Name()) != ".proto" {
@@ -139,12 +160,12 @@ func collectProtoDirFiles(sourceDir string) ([]ProtoUploadFile, error) {
 func readProtoFileWithinLimit(path, name string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s can't be read: %w", name, withoutPath(err))
 	}
 	defer f.Close()
 	content, err := io.ReadAll(io.LimitReader(f, maxProtoImportFileBytes+1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s can't be read: %w", name, withoutPath(err))
 	}
 	if len(content) > maxProtoImportFileBytes {
 		return nil, fmt.Errorf("%s is too large (the limit is %d MiB per file)", name, maxProtoImportFileBytes>>20)
@@ -186,15 +207,19 @@ func validateProtoUploadFiles(files []ProtoUploadFile) error {
 		return fmt.Errorf("too many .proto files (the limit is %d)", maxProtoImportFiles)
 	}
 	total := 0
+	// Keyed case-insensitively: on a case-insensitive filesystem (macOS,
+	// Windows) "A.proto" and "a.proto" are one file and the second write
+	// would silently replace the first.
 	seen := make(map[string]bool, len(files))
 	for _, f := range files {
 		if err := validateProtoUploadName(f.Name); err != nil {
 			return err
 		}
-		if seen[f.Name] {
-			return fmt.Errorf("%s is in the upload twice", f.Name)
+		key := strings.ToLower(f.Name)
+		if seen[key] {
+			return fmt.Errorf("%s is in the upload twice (names that differ only by case count as the same file)", f.Name)
 		}
-		seen[f.Name] = true
+		seen[key] = true
 		if len(f.Content) > maxProtoImportFileBytes {
 			return fmt.Errorf("%s is too large (the limit is %d MiB per file)", f.Name, maxProtoImportFileBytes>>20)
 		}
@@ -210,9 +235,13 @@ func validateProtoUploadFiles(files []ProtoUploadFile) error {
 // the internal import directory (absolute paths, "." or ".." segments,
 // backslashes, drive letters or any colon, which forward-slash-relative
 // names never legitimately need), that a filesystem would mangle (empty or
-// whitespace-padded segments), that nests too deep, or that isn't a .proto
-// file. ".." is only rejected as a whole segment: "v1..2.proto" is legal.
+// whitespace-padded segments, or segments or whole names too long to
+// create), that nests too deep, or that isn't a .proto file. ".." is only
+// rejected as a whole segment: "v1..2.proto" is legal.
 func validateProtoUploadName(name string) error {
+	if len(name) > maxProtoImportNameBytes {
+		return fmt.Errorf("invalid file name: %q (longer than %d bytes)", name[:64]+"...", maxProtoImportNameBytes)
+	}
 	if name == "" || filepath.IsAbs(name) || strings.HasPrefix(name, "/") {
 		return fmt.Errorf("invalid file name: %q", name)
 	}
@@ -223,6 +252,9 @@ func validateProtoUploadName(name string) error {
 	for _, seg := range segments {
 		if seg == "" || seg == "." || seg == ".." || strings.TrimSpace(seg) != seg {
 			return fmt.Errorf("invalid file name: %q", name)
+		}
+		if len(seg) > maxProtoImportSegmentBytes {
+			return fmt.Errorf("invalid file name: %q (a folder or file name is longer than %d bytes)", name, maxProtoImportSegmentBytes)
 		}
 	}
 	if len(segments)-1 > maxProtoImportDepth {
@@ -266,7 +298,7 @@ func (a *App) ClearProtoImport(connId uint) (*ProtoStateResult, error) {
 	defer unlock()
 
 	if err := os.RemoveAll(a.protoImportDir(connId)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't remove the imported files: %w", withoutPath(err))
 	}
 	if err := a.setProtoRegDir(connId, nil); err != nil {
 		return nil, err
@@ -313,7 +345,7 @@ func (a *App) importProtoFiles(connId uint, appConnection *AppConnection, files 
 	}
 
 	if err := a.swapInStagedProtoImport(connId, stagingDir); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't save the imported files: %w", withoutPath(err))
 	}
 	dir := a.protoImportDir(connId)
 	registry.Dir = dir
@@ -334,23 +366,23 @@ func (a *App) importProtoFiles(connId uint, appConnection *AppConnection, files 
 func (a *App) stageProtoImportFiles(connId uint, files []ProtoUploadFile) (string, error) {
 	parent := filepath.Join(a.Paths.ResourcePath, protoImportsDirName)
 	if err := os.MkdirAll(parent, 0770); err != nil {
-		return "", err
+		return "", fmt.Errorf("couldn't create the import folder: %w", withoutPath(err))
 	}
 
 	stagingDir, err := os.MkdirTemp(parent, protoImportStagingPattern(connId))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("couldn't create the import folder: %w", withoutPath(err))
 	}
 
 	for _, f := range files {
 		dest := filepath.Join(stagingDir, filepath.FromSlash(f.Name))
 		if err := os.MkdirAll(filepath.Dir(dest), 0770); err != nil {
 			os.RemoveAll(stagingDir)
-			return "", err
+			return "", fmt.Errorf("%s can't be written: %w", f.Name, withoutPath(err))
 		}
 		if err := os.WriteFile(dest, []byte(f.Content), 0660); err != nil {
 			os.RemoveAll(stagingDir)
-			return "", err
+			return "", fmt.Errorf("%s can't be written: %w", f.Name, withoutPath(err))
 		}
 	}
 	return stagingDir, nil
@@ -397,6 +429,35 @@ func (a *App) swapInStagedProtoImport(connId uint, stagingDir string) error {
 	return nil
 }
 
+// recoverInterruptedProtoImportSwapLocked repairs what a process death
+// partway through swapInStagedProtoImport leaves on disk. The swap is two
+// renames (live dir to .previous, staging to live), so a crash between them
+// leaves .previous and a staging dir but no live dir: .previous is renamed
+// back so the old import isn't silently lost. With both present the swap had
+// finished and .previous is just stale. Staging dirs are never in use outside
+// the import lock, which the caller holds, so any found are leftovers.
+func (a *App) recoverInterruptedProtoImportSwapLocked(connId uint) {
+	dir := a.protoImportDir(connId)
+	asideDir := dir + ".previous"
+	if _, err := os.Stat(asideDir); err == nil {
+		if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
+			if err := os.Rename(asideDir, dir); err != nil {
+				slog.Error("failed to restore interrupted proto import", "connectionId", connId, "error", err)
+			}
+		} else if err == nil {
+			if err := os.RemoveAll(asideDir); err != nil {
+				slog.Error("failed to remove stale proto import dir", "connectionId", connId, "path", asideDir, "error", err)
+			}
+		}
+	}
+	staging, _ := filepath.Glob(filepath.Join(filepath.Dir(dir), protoImportStagingPattern(connId)))
+	for _, path := range staging {
+		if err := os.RemoveAll(path); err != nil {
+			slog.Error("failed to remove stale proto import staging dir", "connectionId", connId, "path", path, "error", err)
+		}
+	}
+}
+
 // removeProtoImportDirs deletes a connection's import dir plus any aside or
 // staging dirs an interrupted swap left next to it. The caller holds the
 // import lock, so no staging dir of this connection is in use.
@@ -434,4 +495,20 @@ func (a *App) refreshProtoImportStateLocked(connId uint, appConnection *AppConne
 		appConnection.ProtoState.SetRegistry(registry, dir, loadErr, dirMissing)
 	}
 	a.emitProtoStateChanged(connId)
+}
+
+// withoutPath strips the absolute path an *fs.PathError or *os.LinkError
+// carries, leaving only its cause (permission denied, file name too long),
+// so an import error never shows the data-dir path. Callers name the file by
+// its relative path themselves.
+func withoutPath(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return pathErr.Err
+	}
+	var linkErr *os.LinkError
+	if errors.As(err, &linkErr) {
+		return linkErr.Err
+	}
+	return err
 }

@@ -260,12 +260,22 @@ const updateConnectionState = (
   });
 };
 
+// The details object each connection's latest optimistic update wrote. A
+// failed update rolls back only while its own write is still the latest:
+// with call A pending, call B succeeding and then A failing, restoring A's
+// pre-call snapshot would clobber B's saved result. Tracked here rather than
+// by comparing store.connections[id].connectionDetails, because
+// updateConnectionState copies that object on every state change.
+const latestDetailsWrite = new Map<number, Connection["connectionDetails"]>();
+
 const updateConnectionDetails = async (
   connectionDetails: Connection["connectionDetails"]
 ) => {
   const connectionId = connectionDetails.id;
   const previous = get({ subscribe }).connections[connectionId];
+  const previousWrite = latestDetailsWrite.get(connectionId);
   const connectionString = getConnectionString(connectionDetails);
+  latestDetailsWrite.set(connectionId, connectionDetails);
   update((store) => {
     const existingConnection = store.connections[connectionId];
     store.connections[connectionId] = {
@@ -281,8 +291,20 @@ const updateConnectionDetails = async (
       connectionDetails as unknown as app.Connection["connectionDetails"]
     );
     markSaved(connectionDetails.id);
+    if (latestDetailsWrite.get(connectionId) === connectionDetails) {
+      latestDetailsWrite.delete(connectionId);
+    }
   } catch (e) {
     console.error(e);
+    // A later call has written since; its value stands.
+    if (latestDetailsWrite.get(connectionId) !== connectionDetails) {
+      throw e;
+    }
+    if (previousWrite === undefined) {
+      latestDetailsWrite.delete(connectionId);
+    } else {
+      latestDetailsWrite.set(connectionId, previousWrite);
+    }
     // Roll back only the details this call changed. Restoring the whole
     // pre-call connection object would also undo anything that landed during
     // the await (a connection-state change, latency, errors), so take the

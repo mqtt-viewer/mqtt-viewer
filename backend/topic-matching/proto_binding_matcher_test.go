@@ -418,3 +418,37 @@ func TestValidateTopicFilter(t *testing.T) {
 		})
 	}
 }
+
+// edgeWhitespaceCases is shared with frontend/src/util/topic-filter.test.ts
+// (EDGE_WHITESPACE_CASES); keep the two tables identical. Each code point is
+// what Go or JavaScript treats as whitespace, and a filter starting or ending
+// with any of them must fail both validators.
+var edgeWhitespaceCodePoints = []rune{
+	0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x0085, 0x00A0,
+	0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+	0x2007, 0x2008, 0x2009, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F,
+	0x3000, 0xFEFF,
+}
+
+// Not whitespace on either side; allowed at the edges.
+var edgeNonWhitespaceCodePoints = []rune{0x200B, 0x180E, 0x001C, 0x00AD}
+
+func TestValidateTopicFilterEdgeWhitespace(t *testing.T) {
+	for _, r := range edgeWhitespaceCodePoints {
+		for _, filter := range []string{string(r) + "a", "a" + string(r)} {
+			if err := ValidateTopicFilter(filter); err == nil {
+				t.Errorf("ValidateTopicFilter(%q) (U+%04X) = nil, want error", filter, r)
+			}
+		}
+		if err := ValidateTopicFilter("a" + string(r) + "b"); err != nil {
+			t.Errorf("ValidateTopicFilter(%q) (U+%04X inside) = %v, want nil", "a"+string(r)+"b", r, err)
+		}
+	}
+	for _, r := range edgeNonWhitespaceCodePoints {
+		for _, filter := range []string{string(r) + "a", "a" + string(r)} {
+			if err := ValidateTopicFilter(filter); err != nil {
+				t.Errorf("ValidateTopicFilter(%q) (U+%04X) = %v, want nil", filter, r, err)
+			}
+		}
+	}
+}

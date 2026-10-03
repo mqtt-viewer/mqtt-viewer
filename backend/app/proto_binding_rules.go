@@ -206,6 +206,7 @@ func (a *App) loadProtoImportIfNeeded(connId uint, appConnection *AppConnection)
 	if !appConnection.ProtoState.NeedsLoad(a.protoImportDir(connId)) {
 		return false
 	}
+	a.recoverInterruptedProtoImportSwapLocked(connId)
 	a.refreshProtoImportStateLocked(connId, appConnection)
 	return true
 }

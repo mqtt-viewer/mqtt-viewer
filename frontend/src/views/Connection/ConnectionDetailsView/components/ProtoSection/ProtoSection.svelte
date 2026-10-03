@@ -200,7 +200,14 @@
   const importSelectedFiles = async (input: HTMLInputElement, onlyProto: boolean) => {
     const fileList = input.files;
     if (!fileList || fileList.length === 0) return;
+    // Reading a large folder takes a while; a second pick in the meantime
+    // must not start a second import.
+    if (busy) {
+      input.value = "";
+      return;
+    }
     const hadImport = imported;
+    busy = true;
     try {
       // A directory input hands over every file in the folder, so keep only
       // the .proto ones there. The flat input sends what was picked as-is
@@ -222,7 +229,6 @@
         }))
       );
       importActionError = null;
-      busy = true;
       await protoState.importFiles(connectionId, files);
     } catch (e) {
       console.error(e);

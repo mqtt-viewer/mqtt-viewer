@@ -3,7 +3,7 @@
   import Component from "./ProtoBindingRulesForm.svelte";
   import StoryRender from "@/stories/StoryRender.svelte";
   import { getStoryArgTypes, getStoryArgs } from "@/stories/fixtures";
-  import { expect, waitFor } from "storybook/test";
+  import { expect, userEvent, waitFor, within } from "storybook/test";
 
   const componentName = "ProtoBindingRulesForm";
   const storyId = "Components/ProtoBindingRulesForm";
@@ -75,6 +75,44 @@
 
   const rejectWrite = async () => {
     throw new Error("database is locked");
+  };
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  type RuleChanges = { topicFilter?: string; messageType?: string };
+
+  // Records every onUpdate call; each play resets it first.
+  let updateCalls: RuleChanges[] = [];
+
+  // Slower than the 400ms debounce, so a blur lands mid-write.
+  const slowUpdate = async (_id: number, changes: RuleChanges) => {
+    updateCalls.push(changes);
+    await sleep(500);
+  };
+
+  // A filter-only save fails; anything else succeeds.
+  const failFilterOnlyUpdate = async (_id: number, changes: RuleChanges) => {
+    updateCalls.push(changes);
+    if (changes.messageType === undefined) throw new Error("database is locked");
+  };
+
+  let addCalls = 0;
+  const rejectAdd = async () => {
+    addCalls++;
+    throw new Error("database is locked");
+  };
+
+  const rowInput = (canvasElement: HTMLElement, id: number | "draft") => {
+    const input = canvasElement.querySelector(
+      `input[name="proto-binding-filter-${id}"]`
+    );
+    if (!(input instanceof HTMLInputElement)) throw new Error("row input not found");
+    return input;
+  };
+
+  const typeInto = (input: HTMLInputElement, value: string) => {
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
   };
 
   const { Story } = defineMeta({
@@ -159,5 +197,91 @@
         "Could not delete that binding: database is locked"
       )
     );
+  }}
+/>
+<!-- The debounce fires a filter write; the blur that follows while it's in
+     flight must not send the same update again. -->
+<Story
+  name="RowBlurDuringWrite"
+  args={{ ...baseArgs, rules: mockRules, status: okStatus, onUpdate: slowUpdate }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    updateCalls = [];
+    const input = rowInput(canvasElement, 1);
+    typeInto(input, "sensors/+/status");
+    await sleep(450);
+    input.dispatchEvent(new Event("blur"));
+    await sleep(600);
+    expect(updateCalls).toEqual([{ topicFilter: "sensors/+/status" }]);
+  }}
+/>
+<!-- A failed filter save, then a type pick on the same row: the pick saves
+     the unsaved filter with it, so the error only clears once the text has
+     actually saved. -->
+<Story
+  name="TypePickAfterFilterSaveError"
+  args={{
+    ...baseArgs,
+    rules: mockRules,
+    status: okStatus,
+    onUpdate: failFilterOnlyUpdate,
+  }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    updateCalls = [];
+    const input = rowInput(canvasElement, 1);
+    typeInto(input, "sensors/+/status");
+    input.dispatchEvent(new Event("blur"));
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain(
+        "Could not save: database is locked"
+      )
+    );
+    const triggers = canvasElement.querySelectorAll("button.trigger");
+    await userEvent.click(triggers[0] as HTMLElement);
+    const option = await within(document.body).findByRole("menuitem", {
+      name: "acme.Envelope.Inner",
+    });
+    await userEvent.click(option);
+    await waitFor(() =>
+      expect(updateCalls[1]).toEqual({
+        messageType: "acme.Envelope.Inner",
+        topicFilter: "sensors/+/status",
+      })
+    );
+    await waitFor(() =>
+      expect(canvasElement.textContent).not.toContain("Could not save")
+    );
+  }}
+/>
+<!-- After a failed add, Cancel discards the draft without retrying it. -->
+<Story
+  name="CancelAfterAddError"
+  args={{ ...baseArgs, rules: mockRules, status: okStatus, onAdd: rejectAdd }}
+  {template}
+  play={async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    addCalls = 0;
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText("Add binding"));
+    const input = await waitFor(() => rowInput(canvasElement, "draft"));
+    await userEvent.type(input, "plant/#");
+    const triggers = canvasElement.querySelectorAll("button.trigger");
+    await userEvent.click(triggers[triggers.length - 1] as HTMLElement);
+    const option = await within(document.body).findByRole("menuitem", {
+      name: "acme.Envelope",
+    });
+    await userEvent.click(option);
+    await waitFor(() =>
+      expect(canvasElement.textContent).toContain(
+        "Could not add the binding: database is locked"
+      )
+    );
+    expect(addCalls).toBe(1);
+    await userEvent.click(input);
+    await userEvent.click(canvas.getByLabelText("Cancel"));
+    await waitFor(() =>
+      expect(canvasElement.querySelector('input[name="proto-binding-filter-draft"]')).toBeNull()
+    );
+    expect(addCalls).toBe(1);
   }}
 />

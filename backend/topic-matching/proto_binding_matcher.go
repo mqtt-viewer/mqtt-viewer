@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"unicode"
 
 	"mqtt-viewer/backend/models"
 	"mqtt-viewer/backend/sparkplug"
@@ -262,6 +263,15 @@ func (k specificityKey) better(other specificityKey) bool {
 	return k.id < other.id
 }
 
+// isEdgeWhitespace is the union of what Go (unicode.IsSpace: Unicode
+// White_Space) and JavaScript (String.prototype.trim: WhiteSpace plus
+// LineTerminator, which adds U+FEFF and lacks U+0085) treat as whitespace, so
+// this and the frontend's validateTopicFilter
+// (frontend/src/util/topic-filter.ts) reject exactly the same filters.
+func isEdgeWhitespace(r rune) bool {
+	return unicode.IsSpace(r) || r == '\uFEFF'
+}
+
 // ValidateTopicFilter checks a proto binding rule's topic filter for the
 // MQTT wildcard rules plus binding-specific restrictions (no shared
 // subscription filters).
@@ -272,7 +282,7 @@ func ValidateTopicFilter(filter string) error {
 	if strings.ContainsRune(filter, 0) {
 		return errors.New("topic filter can't contain a NUL byte")
 	}
-	if strings.TrimSpace(filter) != filter {
+	if strings.TrimFunc(filter, isEdgeWhitespace) != filter {
 		return errors.New("topic filter can't have leading or trailing whitespace")
 	}
 	if filter == "$share" || strings.HasPrefix(filter, "$share/") {
