@@ -1074,3 +1074,26 @@ describe("createBrokerStatusStore — browsed topic cap", () => {
     store.destroy();
   });
 });
+
+
+describe("broker status navigation during startup", () => {
+  it.each(["mappings", "history"])(
+    "does not restart listeners or timers after leaving during %s loading",
+    async (stage) => {
+      let finish!: (rows: any[]) => void;
+      const pending = new Promise<any[]>((resolve) => { finish = resolve; });
+      if (stage === "mappings") mocks.getMappings.mockReturnValueOnce(pending);
+      else mocks.getSys.mockReturnValueOnce(pending);
+      const store = createBrokerStatusStore(CONN, eventSet, { connected: true });
+      const ready = store.init();
+      await vi.waitFor(() => {
+        expect(stage === "mappings" ? mocks.getMappings : mocks.getSys).toHaveBeenCalled();
+      });
+      store.destroy();
+      finish([]);
+      await ready;
+      expect(vi.getTimerCount()).toBe(0);
+      expect([...mocks.handlers.values()].every((handlers) => handlers.size === 0)).toBe(true);
+    },
+  );
+});

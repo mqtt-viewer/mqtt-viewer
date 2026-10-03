@@ -11,7 +11,21 @@
     "lastSyncedHash": null,
     "lastSyncedAt": null
   },
-  "props": [],
+  "props": [
+    {
+      "name": "connectionId",
+      "type": "number",
+      "required": false,
+      "description": "Connection to display; defaults to the conn URL parameter for a detached window."
+    },
+    {
+      "name": "embedded",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Fits the parent panel and reuses the main app stores and toast host."
+    }
+  ],
   "tokens": [
     "warning",
     "emphasis",
