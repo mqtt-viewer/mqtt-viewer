@@ -2,12 +2,14 @@
   import { twMerge } from "tailwind-merge";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
 
-  type DataView = "list" | "graph" | "sparkplug";
+  type DataView = "list" | "graph" | "sparkplug" | "status";
 
   export let view: DataView;
   export let onChange: (view: DataView) => void;
   /** Adds the Sparkplug option. Only offered once Sparkplug traffic is seen. */
   export let showSparkplug = false;
+  /** Adds the in-page broker status option in browser mode. */
+  export let showBrokerStatus = false;
   /** Open Sparkplug warnings, shown as a count on the Sparkplug option. */
   export let sparkplugWarningCount = 0;
 
@@ -16,6 +18,7 @@
       { value: "list", label: "List" },
       { value: "graph", label: "Graph" },
       ...(showSparkplug ? [{ value: "sparkplug", label: "Sparkplug" }] : []),
+      ...(showBrokerStatus ? [{ value: "status", label: "Broker status" }] : []),
     ] as { value: DataView; label: string }[]
   );
 </script>
@@ -45,8 +48,6 @@
     {/each}
   </div>
   <span slot="tooltip-content"
-    >{showSparkplug
-      ? "Switch between list, graph and Sparkplug views"
-      : "Switch between list and graph views"}</span
+    >Switch data view</span
   >
 </Tooltip>

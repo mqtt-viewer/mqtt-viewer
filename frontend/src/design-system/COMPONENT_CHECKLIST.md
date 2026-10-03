@@ -81,7 +81,7 @@
 
 | View | Story | Figma | Props | Tokens |
 |---|:---:|:---:|:---:|:---:|
-| Views/BrokerStatusWindow | [x] | [ ] | [ ] | [x] |
+| Views/BrokerStatusWindow | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/BrokerStatusView | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/FactsRow | [x] | [ ] | [x] | [x] |
 | Views/BrokerStatusWindow/HealthChip | [x] | [ ] | [x] | [x] |

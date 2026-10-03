@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-01T13:56:55.416Z",
+  "generatedAt": "2026-10-03T14:09:55.666Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -2606,7 +2606,21 @@
         "lastSyncedHash": null,
         "lastSyncedAt": null
       },
-      "props": [],
+      "props": [
+        {
+          "name": "connectionId",
+          "type": "number",
+          "required": false,
+          "description": "Connection to display; defaults to the conn URL parameter for a detached window."
+        },
+        {
+          "name": "embedded",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Fits the parent panel and reuses the main app stores and toast host."
+        }
+      ],
       "tokens": [
         "warning",
         "emphasis",
@@ -4407,7 +4421,7 @@
     {
       "name": "ViewToggle",
       "tier": "component",
-      "description": "Segmented List/Graph/Sparkplug switch shown at the left of the data panel header in every view. The Sparkplug option appears once the connection has seen Sparkplug traffic.",
+      "description": "Segmented List/Graph/Sparkplug switch shown at the left of the data panel header in every view. The Sparkplug option appears once the connection has seen Sparkplug traffic. Browser mode also offers Broker status.",
       "status": "story-only",
       "figma": {
         "fileKey": "",
@@ -4440,6 +4454,13 @@
           "required": false,
           "default": 0,
           "description": "Open Sparkplug warnings, shown as a count on the Sparkplug option."
+        },
+        {
+          "name": "showBrokerStatus",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Adds the in-page Broker status option in browser mode."
         }
       ],
       "tokens": [
