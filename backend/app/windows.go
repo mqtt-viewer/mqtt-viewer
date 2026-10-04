@@ -21,6 +21,21 @@ type OpenChartWindowParams struct {
 	Fields       []string `json:"fields"`
 }
 
+// MacTitleBar is the macOS title bar for windows whose header is the 38px app
+// bar (the main window and broker status): hidden, with the traffic lights
+// kept over the header. It is Wails' MacTitleBarHiddenInset with the compact
+// toolbar style, which centres the lights on a bar that height. The default
+// style suits a taller header and leaves them about 7pt low, so the chart
+// and topic windows, whose headers are taller, keep the preset.
+var MacTitleBar = application.MacTitleBar{
+	AppearsTransparent:   true,
+	HideTitle:            true,
+	FullSizeContent:      true,
+	UseToolbar:           true,
+	HideToolbarSeparator: true,
+	ToolbarStyle:         application.MacToolbarStyleUnifiedCompact,
+}
+
 var (
 	chartWindowsMu sync.Mutex
 	// keyed by "<connId>|<topic>" so we focus an existing chart window rather
@@ -143,7 +158,7 @@ func (a *App) OpenBrokerStatusWindow(connectionId uint) error {
 			MinHeight:        380,
 			BackgroundColour: application.NewRGB(18, 18, 18),
 			Mac: application.MacWindow{
-				TitleBar: application.MacTitleBarHiddenInset,
+				TitleBar: MacTitleBar,
 			},
 			URL: buildStatusWindowURL(connectionId),
 		}

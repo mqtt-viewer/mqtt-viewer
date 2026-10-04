@@ -152,6 +152,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
+        title: "Panels keep their width when you switch views",
+        body: "The sidebar and the topic panel changed width when switching between the list and graph views.",
+      },
+      {
+        group: "Fixed",
+        title: "Window buttons line up with the tab bar on macOS",
+        body: "The close, minimise and zoom buttons sat below the centre of the tab bar.",
+      },
+      {
+        group: "Fixed",
         title: "Startup failures show an error instead of a blank window",
         body: "If the app or a pop-out window cannot initialise, it says what went wrong and where to report it.",
       },

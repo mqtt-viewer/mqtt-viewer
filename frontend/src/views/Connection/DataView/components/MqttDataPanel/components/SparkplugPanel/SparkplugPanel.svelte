@@ -450,14 +450,14 @@
     </div>
   {:else}
     {#if !treeState.connected && treeState.droppedAtMs !== undefined}
-      <div class="shrink-0 flex items-center gap-2 px-2 py-1 border-b border-divider text-secondary-text">
+      <div class="shrink-0 flex items-center gap-2 px-2 py-1 border-b border-outline text-secondary-text">
         <Icon type="info" size={14} />
         <span class="min-w-0"
           >Not connected. This is the state as of {formatClockTime(treeState.droppedAtMs)}.</span
         >
       </div>
     {:else if rebirthCandidates.length > 0}
-      <div class="shrink-0 border-b border-divider text-secondary-text">
+      <div class="shrink-0 border-b border-outline text-secondary-text">
         <div class="flex items-center gap-2 px-2 py-1 max-w-[1000px]">
           <span class="shrink-0 text-warning"><Icon type="warning" size={14} /></span>
           <span class="min-w-0 line-clamp-2" title={unverifiedCount > 0
@@ -486,7 +486,7 @@
     {/if}
 
     {#if allNodes.length > 0}
-      <div class="shrink-0 border-b border-divider text-secondary-text">
+      <div class="shrink-0 border-b border-outline text-secondary-text">
         <div class="flex items-center gap-3 px-2 py-0.5 whitespace-nowrap overflow-hidden max-w-[1000px]">
           <span class="truncate min-w-0">
             {plural(allNodes.length, "node")}: {onlineCount} online{#if offlineCount > 0}, {offlineCount} offline{/if}{#if unknownCount > 0}, {unknownCount} unknown{/if}
@@ -526,7 +526,7 @@
 
     {#if treeState.hosts.length > 0}
       <div
-        class="shrink-0 flex items-center gap-4 px-2 py-0.5 text-secondary-text font-mono border-b border-divider overflow-x-hidden whitespace-nowrap"
+        class="shrink-0 flex items-center gap-4 px-2 py-0.5 text-secondary-text font-mono border-b border-outline overflow-x-hidden whitespace-nowrap"
       >
         <span class="font-sans">Host applications</span>
         {#each treeState.hosts as host (host.hostId)}
@@ -606,7 +606,7 @@
     {/if}
 
     {#if treeState.warnings.length > 0}
-      <div class="shrink-0 border-t border-divider">
+      <div class="shrink-0 border-t border-outline">
         <div class="flex items-center gap-2 px-2 pt-0.5 text-secondary-text max-w-[1000px]">
           <span>{plural(treeState.warnings.length, "warning")}</span>
           <div class="grow"></div>
