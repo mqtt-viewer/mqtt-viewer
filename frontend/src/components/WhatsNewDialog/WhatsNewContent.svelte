@@ -88,7 +88,7 @@
                           class="text-primary hover:underline"
                           on:click|preventDefault={() => openExternal(t.url)}
                           >@{t.name}</a
-                        >{/each}.{/if}</span
+                        >{t.reason ? ` ${t.reason}` : ""}{/each}.{/if}</span
                   >
                 {/if}
               </div>

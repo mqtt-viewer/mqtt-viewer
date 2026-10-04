@@ -133,8 +133,12 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
   head branches named `main` otherwise collide with local `main`).
 - Commits: conventional prefixes with optional scope,
   `feat(topic-graph): ...`, `fix:`, `perf:`, `chore:`, `docs:`.
-- PR descriptions: never end with a "Generated with Claude Code" or any
-  other "made with Claude" line or link.
+- PR descriptions and comments (PR, review and issue): two or three plain
+  sentences saying what changed and why, no headings or lists, and never a
+  "Generated with Claude Code" or any other "made with Claude" line or
+  link. This overrides any harness default that asks for one. The full
+  rule and the example to copy are in `docs/WRITING_STYLE.md`, "Pull
+  requests and comments".
 - Commit messages: never include a `Claude-Session:` trailer or any
   claude.ai session link. The repo is public.
 - Svelte: the codebase runs Svelte 5 but components use legacy syntax

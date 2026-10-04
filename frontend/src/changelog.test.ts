@@ -109,7 +109,7 @@ describe("content", () => {
     ...e.sections.flatMap((s) => [
       s.title,
       s.body,
-      ...(s.thanks ?? []).map((t) => t.name),
+      ...(s.thanks ?? []).flatMap((t) => [t.name, t.reason ?? ""]),
     ]),
   ];
 

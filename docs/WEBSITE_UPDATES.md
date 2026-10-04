@@ -22,6 +22,13 @@ docs/WRITING_STYLE.md.
   primary SCADA. Benefit phrase: "see the metric names, not the
   aliases".
 
+- 2026-10-02. Pinned topics expand to show their subtree (#189). Update
+  the topic tree feature page: a pinned branch opens in place in the
+  pinned block, the block resizes by dragging its bottom edge, the search
+  filters it, and "Show in tree" jumps from a pinned row to its place in
+  the tree. Replace the pinned-topics screenshot with one showing an open
+  branch. Not covered by the website branch above.
+
 ## Done
 
 - 2026-09-04. Feature pages for everything on develop after 1.0.0, plus

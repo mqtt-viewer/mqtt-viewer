@@ -161,12 +161,14 @@ For pixel-level UI checks, prefer **Storybook** on its own dev port (see
 exercise real bindings over HTTP without a native webview.
 ## Writing style (binding, always)
 
-Anything a user reads follows `docs/WRITING_STYLE.md`: the changelog and
+Anything a person reads follows `docs/WRITING_STYLE.md`: the changelog and
 "What's new" notes, dialog copy, tooltips, empty states, README, release
-notes. Read that file before writing any of it. The hard rules, so they are
+notes, and pull request descriptions and comments. Read that file before writing any of it. The hard rules, so they are
 never missed:
 
 - No em dashes, ever. It is the fastest tell that a machine wrote it.
 - No emojis.
 - First person singular ("I", not "we"), British spelling.
 - Terse. Changelog section bodies are one sentence, dev-changelog style.
+- PR descriptions and comments are two or three plain sentences. No headings,
+  no lists, and no line saying a tool wrote it.
