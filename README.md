@@ -10,28 +10,28 @@
 
 ## Features
 
-First and foremost, MQTT Viewer is fast, responsive and easy to use. It stays smooth with two brokers each pushing a couple of thousand messages a second, because that is how I test it.
+First and foremost, MQTT Viewer is fast, responsive and easy to use.
 
 But wait, there's more:
 
-| Feature | Walkthrough |
-| --- | --- |
-| Live topic tree | [Filter and pin topics](https://mqttviewer.app/walkthroughs/filter-topic-tree/) |
-| Topic graph <sup>★ New</sup> | [Explore the topic graph](https://mqttviewer.app/walkthroughs/topic-graph/) |
-| Topic actions <sup>★ New</sup> | [Clear retained messages](https://mqttviewer.app/walkthroughs/retained-messages/), [Record and export](https://mqttviewer.app/walkthroughs/record-and-export/) |
-| Up to 10 connections | [Connect to a broker](https://mqttviewer.app/walkthroughs/connect-broker/) |
-| Message timeline | [Inspect messages](https://mqttviewer.app/walkthroughs/inspect-messages/) |
-| Message comparison | [Compare messages](https://mqttviewer.app/walkthroughs/inspect-messages/) |
-| Live charting | [Chart values](https://mqttviewer.app/walkthroughs/chart-values/) |
-| Broker status <sup>★ New</sup> | [Check broker status](https://mqttviewer.app/walkthroughs/broker-status/) |
-| Client logs <sup>★ New</sup> | [Read client logs](https://mqttviewer.app/walkthroughs/client-logs/) |
-| Message collections | [Save messages](https://mqttviewer.app/walkthroughs/save-messages/) |
-| Publish history | [Publish messages](https://mqttviewer.app/walkthroughs/publish-message/) |
-| Payload decoding | [Text and images](https://mqttviewer.app/walkthroughs/decode-payloads/), [Sparkplug B](https://mqttviewer.app/walkthroughs/sparkplug-b/) |
-| Dockable topic panel <sup>★ New</sup> | [Inspect messages](https://mqttviewer.app/walkthroughs/inspect-messages/) |
-| Bounded memory | [Set memory limits](https://mqttviewer.app/walkthroughs/memory-limits/), [Record to disk](https://mqttviewer.app/walkthroughs/record-and-export/) |
-| Web UI (Docker and Home Assistant) <sup>★ New</sup> | [Run the Web UI](https://mqttviewer.app/walkthroughs/docker-web-ui/) |
-| Light and dark themes | [Change theme](https://mqttviewer.app/walkthroughs/light-dark-mode/) |
+| Feature                                             | Walkthrough                                                                                                                                                    |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live topic tree                                     | [Filter and pin topics](https://mqttviewer.app/walkthroughs/filter-topic-tree/)                                                                                |
+| Topic graph <sup>★ New</sup>                        | [Explore the topic graph](https://mqttviewer.app/walkthroughs/topic-graph/)                                                                                    |
+| Topic actions <sup>★ New</sup>                      | [Clear retained messages](https://mqttviewer.app/walkthroughs/retained-messages/), [Record and export](https://mqttviewer.app/walkthroughs/record-and-export/) |
+| Up to 10 connections                                | [Connect to a broker](https://mqttviewer.app/walkthroughs/connect-broker/)                                                                                     |
+| Message timeline                                    | [Inspect messages](https://mqttviewer.app/walkthroughs/inspect-messages/)                                                                                      |
+| Message comparison                                  | [Compare messages](https://mqttviewer.app/walkthroughs/inspect-messages/)                                                                                      |
+| Live charting                                       | [Chart values](https://mqttviewer.app/walkthroughs/chart-values/)                                                                                              |
+| Broker status <sup>★ New</sup>                      | [Check broker status](https://mqttviewer.app/walkthroughs/broker-status/)                                                                                      |
+| Client logs <sup>★ New</sup>                        | [Read client logs](https://mqttviewer.app/walkthroughs/client-logs/)                                                                                           |
+| Message collections                                 | [Save messages](https://mqttviewer.app/walkthroughs/save-messages/)                                                                                            |
+| Publish history                                     | [Publish messages](https://mqttviewer.app/walkthroughs/publish-message/)                                                                                       |
+| Payload decoding                                    | [Text and images](https://mqttviewer.app/walkthroughs/decode-payloads/), [Sparkplug B](https://mqttviewer.app/walkthroughs/sparkplug-b/)                       |
+| Dockable topic panel <sup>★ New</sup>               | [Inspect messages](https://mqttviewer.app/walkthroughs/inspect-messages/)                                                                                      |
+| Bounded memory                                      | [Set memory limits](https://mqttviewer.app/walkthroughs/memory-limits/), [Record to disk](https://mqttviewer.app/walkthroughs/record-and-export/)              |
+| Web UI (Docker and Home Assistant) <sup>★ New</sup> | [Run the Web UI](https://mqttviewer.app/walkthroughs/docker-web-ui/)                                                                                           |
+| Light and dark themes                               | [Change theme](https://mqttviewer.app/walkthroughs/light-dark-mode/)                                                                                           |
 
 View more info + guides for these at [mqttviewer.app/features](https://mqttviewer.app/features). A few of them:
 
