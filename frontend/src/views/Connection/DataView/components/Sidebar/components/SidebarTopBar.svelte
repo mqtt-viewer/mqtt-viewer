@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { errorMessage } from "@/util/strings";
   import Icon from "@/components/Icon/Icon.svelte";
   import IconButton from "@/components/Button/IconButton.svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
@@ -26,7 +27,7 @@
       addToast({
         data: {
           title: isConnected ? "Failed to disconnect" : "Failed to connect",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });

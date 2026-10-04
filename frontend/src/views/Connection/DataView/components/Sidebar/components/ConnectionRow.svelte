@@ -6,7 +6,7 @@
   import ConfirmDeleteConnectionDialog from "@/views/Connection/ConnectionDetailsView/components/ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte";
   import connections, { type Connection } from "@/stores/connections";
   import { addToast } from "@/components/Toast/Toast.svelte";
-  import { capitalizeFirstLetter } from "@/util/strings";
+  import { capitalizeFirstLetter, errorMessage } from "@/util/strings";
   import { writable } from "svelte/store";
   import InlineNameInput from "./InlineNameInput.svelte";
   import ConnectionDetailsDialog from "./ConnectionDetailsDialog.svelte";
@@ -70,7 +70,7 @@
       addToast({
         data: {
           title: isConnected ? "Failed to disconnect" : "Failed to connect",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -86,7 +86,7 @@
       addToast({
         data: {
           title: "Failed to rename connection",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
@@ -100,7 +100,7 @@
       addToast({
         data: {
           title: "Failed to delete connection",
-          description: e as string,
+          description: errorMessage(e),
           type: "error",
         },
       });
