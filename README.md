@@ -6,36 +6,38 @@
 
 ![MQTT Viewer connected to two brokers, with the topic tree, a selected topic's payload and the message timeline](docs/images/screenshot.png)
 
+![Topic graph with nodes sized by message rate and coloured by recency](docs/images/topic-graph.webp)
+
 ## Features
 
-First and foremost, MQTT Viewer is fast, responsive and easy to use. It stays smooth with two brokers each pushing a couple of thousand messages a second, because that is how I test it.
+First and foremost, MQTT Viewer is fast, responsive and easy to use.
 
 But wait, there's more:
 
-| Feature | Notes |
-| --- | --- |
-| Live topic tree | Every topic on the broker, with counts, last values and a text filter. |
-| Topic Graph | The namespace drawn as a tree where node size is message rate and colour is recency. Collapse branches, follow the hottest, pause. |
-| Topic actions | Right-click any topic to copy its path or payload, export its history, or clear retained messages below it. Retained topics are marked. |
-| Up to 10 connections at once | Each in its own tab. MQTT v3.1.1 and v5, TCP, TLS, mutual TLS and WebSocket. |
-| Interactive message timeline | Scrub through a topic's history. Hover a marker to preview the payload. |
-| Message comparison | Diff a message against the previous one on the same topic. |
-| Live charting | Tick numeric fields in a JSON payload and plot them. Time windows from seconds to days, pop-out chart windows. |
-| Broker status page | Clients, rates, subscriptions, retained count, uptime and health signals from `$SYS`, plus client-side rates and loudest topics for brokers that publish nothing. |
-| Client logs | A terminal-style view of what the MQTT library is doing on each connection, with a debug level and a rotating log file. |
-| Message collections | Save messages into folders, global or per connection, drag them between folders and republish with a click. |
-| Publish history | Everything you have sent, searchable, ready to send again. |
-| Payload decoding | Sparkplug B, Base64 and Hex codecs. PNG, JPEG, GIF, WebP and BMP payloads render as images. |
-| Dockable topic panel | Dock the selected-topic panel right, bottom, or pop it out into its own window. |
-| Bounded memory | History stays inside a memory budget you set, with optional recording to disk. |
-| Web UI | The full app served over HTTP from a Docker image, and a Home Assistant add-on. |
-| Light and dark themes | |
+| Feature                                             | Walkthrough                                                                                                                                                    |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live topic tree                                     | [Filter and pin topics](https://mqttviewer.app/walkthroughs/filter-topic-tree/)                                                                                |
+| Topic graph <sup>★ New</sup>                        | [Explore the topic graph](https://mqttviewer.app/walkthroughs/topic-graph/)                                                                                    |
+| Topic actions <sup>★ New</sup>                      | [Clear retained messages](https://mqttviewer.app/walkthroughs/retained-messages/), [Record and export](https://mqttviewer.app/walkthroughs/record-and-export/) |
+| Up to 10 connections                                | [Connect to a broker](https://mqttviewer.app/walkthroughs/connect-broker/)                                                                                     |
+| Message timeline                                    | [Inspect messages](https://mqttviewer.app/walkthroughs/inspect-messages/)                                                                                      |
+| Message comparison                                  | [Compare messages](https://mqttviewer.app/walkthroughs/inspect-messages/)                                                                                      |
+| Live charting                                       | [Chart values](https://mqttviewer.app/walkthroughs/chart-values/)                                                                                              |
+| Broker status <sup>★ New</sup>                      | [Check broker status](https://mqttviewer.app/walkthroughs/broker-status/)                                                                                      |
+| Client logs <sup>★ New</sup>                        | [Read client logs](https://mqttviewer.app/walkthroughs/client-logs/)                                                                                           |
+| Message collections                                 | [Save messages](https://mqttviewer.app/walkthroughs/save-messages/)                                                                                            |
+| Publish history                                     | [Publish messages](https://mqttviewer.app/walkthroughs/publish-message/)                                                                                       |
+| Payload decoding                                    | [Text and images](https://mqttviewer.app/walkthroughs/decode-payloads/), [Sparkplug B](https://mqttviewer.app/walkthroughs/sparkplug-b/)                       |
+| Dockable topic panel <sup>★ New</sup>               | [Inspect messages](https://mqttviewer.app/walkthroughs/inspect-messages/)                                                                                      |
+| Bounded memory                                      | [Set memory limits](https://mqttviewer.app/walkthroughs/memory-limits/), [Record to disk](https://mqttviewer.app/walkthroughs/record-and-export/)              |
+| Web UI (Docker and Home Assistant) <sup>★ New</sup> | [Run the Web UI](https://mqttviewer.app/walkthroughs/docker-web-ui/)                                                                                           |
+| Light and dark themes                               | [Change theme](https://mqttviewer.app/walkthroughs/light-dark-mode/)                                                                                           |
 
-Every one of these has its own page, with screenshots, at [mqttviewer.app/features](https://mqttviewer.app/features). A few of them:
+View more info + guides for these at [mqttviewer.app/features](https://mqttviewer.app/features). A few of them:
 
 ![The broker status window: health strip, traffic chart, loudest topics and metric tiles from $SYS](docs/images/broker-status.png)
 
-![Charting a numeric payload field with the time window menu open](docs/images/chart.png)
+![Numeric payload values in a wide chart docked along the bottom](docs/images/chart.png)
 
 ![Client logs for a connection in a terminal-style view](docs/images/client-logs.png)
 
@@ -46,13 +48,13 @@ Still thinking about, and would love to hear whether you'd use them:
 - An in-app local test broker, as an alternative to running mosquitto for development. [Discussion](https://github.com/mqtt-viewer/mqtt-viewer/discussions/2)
 - Team workspaces and cloud sync for collections. [Discussion](https://github.com/mqtt-viewer/mqtt-viewer/discussions/3)
 
-Don't see a feature that would make your life easier? [I really, really want to know.](https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=feature_idea.yml)
+Don't see a feature that would make your life easier? [I want to know.](https://github.com/mqtt-viewer/mqtt-viewer/issues/new?template=feature_idea.yml)
 
 ## Installing
 
-The [download page](https://mqttviewer.app/download) picks the build for your machine and lists every file with its size and sha256 checksum. Every release ships macOS, Windows and Linux builds.
+The [download page](https://mqttviewer.app/download) has everything you need to get started.
 
-Installed apps on macOS and Windows update themselves. AppImage, deb and rpm installs show a notice when a new version is out and link to it. Flatpak and Nix update through their own tools.
+Checkout the [walkthroughs](https://mqttviewer.app/walkthroughs) after you download.
 
 ### Docker and Home Assistant
 
@@ -71,23 +73,23 @@ For Home Assistant, add [github.com/mqtt-viewer/home-assistant-addon](https://gi
 
 ### macOS
 
-[mqttviewer.app/download/mac](https://mqttviewer.app/download/mac) has zips for Apple Silicon and Intel. Unzip and drag MQTT Viewer to Applications. The app is signed and notarised. macOS 12 or later.
+[mqttviewer.app/download/mac](https://mqttviewer.app/download/mac) has zips for Apple Silicon and Intel. Unzip and drag MQTT Viewer to Applications. The app is signed and notarised. Works on macOS 12 or later.
 
 ### Windows
 
-[mqttviewer.app/download/windows](https://mqttviewer.app/download/windows) has signed installers and portable zips for x64 and ARM64, so Snapdragon laptops get a native build rather than emulation. Windows 10 or later.
+[mqttviewer.app/download/windows](https://mqttviewer.app/download/windows) has signed installers and portable zips for x64 and ARM64. Works on Windows 10 or later.
 
 ### Linux
 
-Builds cover x86_64 and ARM64. [mqttviewer.app/download/linux](https://mqttviewer.app/download/linux) has the files, checksums and install steps for each format. Pick whichever fits your distribution:
+[mqttviewer.app/download/linux](https://mqttviewer.app/download/linux) has the files, checksums and install steps for each format. Pick whichever fits your distribution:
 
-| Format | Install | Updates |
-| --- | --- | --- |
-| AppImage | `chmod +x MQTT_Viewer_*.AppImage && ./MQTT_Viewer_*.AppImage` | The app tells you; download the next AppImage |
-| deb | `sudo apt install ./MQTT_Viewer_*.deb` | The app tells you; install the next deb |
-| rpm | `sudo dnf install ./MQTT_Viewer_*.rpm` | The app tells you; install the next rpm |
-| Flatpak | See below | `flatpak update` |
-| Nix | See below | `nix profile upgrade --all` |
+| Format   | Install                                                       | Updates                     |
+| -------- | ------------------------------------------------------------- | --------------------------- |
+| AppImage | `chmod +x MQTT_Viewer_*.AppImage && ./MQTT_Viewer_*.AppImage` | Redownload new AppImages    |
+| deb      | `sudo apt install ./MQTT_Viewer_*.deb`                        | Follow in-app instructions  |
+| rpm      | `sudo dnf install ./MQTT_Viewer_*.rpm`                        | Follow in-app instructions  |
+| Flatpak  | See below                                                     | `flatpak update`            |
+| Nix      | See below                                                     | `nix profile upgrade --all` |
 
 #### Flatpak
 
@@ -135,7 +137,7 @@ The package itself is 23 MiB. The catch is everything under it: the app needs GT
 nix path-info -Sh github:mqtt-viewer/mqtt-viewer#default
 ```
 
-Most of it comes prebuilt from cache.nixos.org instead of being compiled locally, and it is shared with every other GTK app in your store, so the marginal cost is smaller if you already run one.
+Most of it comes prebuilt from cache.nixos.org instead of being compiled locally.
 
 Update through Nix, not through the app:
 
@@ -143,7 +145,7 @@ Update through Nix, not through the app:
 nix profile upgrade --all
 ```
 
-The app recognises a Nix install and points you at Nix. Store paths are immutable, so it will not try to replace its own binary. The in-app text assumes a profile install; if you pinned MQTT Viewer in a NixOS or home-manager configuration, update the flake input and rebuild instead.
+The app recognises a Nix install and points you at Nix. Store paths are immutable, so it will not try to replace its own binary. The in-app text assumes a profile install. If you pinned MQTT Viewer in a NixOS or home-manager configuration, update the flake input and rebuild instead.
 
 ## Contributing
 
