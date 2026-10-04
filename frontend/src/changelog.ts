@@ -57,9 +57,9 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "unreleased",
-    released: false,
-    date: "In development",
+    version: "1.2.0",
+    released: true,
+    date: "October 2026",
     headline: "What's new in MQTT Viewer 1.2",
     intro:
       "Sparkplug metric names, a live network view and expandable pinned topics.",
@@ -71,7 +71,12 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Added",
-        title: "Sparkplug B with the names filled in",
+        title: "A live view of your Sparkplug network",
+        body: "Inspect groups, nodes, devices and metrics with warnings and rebirth requests.",
+      },
+      {
+        group: "Added",
+        title: "Improved Sparkplug B decoding",
         body: "Sparkplug decoding resolves NDATA and DDATA aliases to metric names.",
         thanks: [
           {
@@ -79,11 +84,6 @@ export const CHANGELOG: ChangelogEntry[] = [
             url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14#discussioncomment-12612115",
           },
         ],
-      },
-      {
-        group: "Added",
-        title: "A live view of your Sparkplug network",
-        body: "Inspect groups, nodes, devices and metrics with warnings and rebirth requests.",
       },
       {
         group: "Added",
@@ -191,7 +191,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         body: "",
       },
     ],
-    outro: "Found a bug? Let me know through Feedback.",
+    outro: "Found a bug? Let me know through the Feedback button.",
   },
   {
     version: "1.1.0",
