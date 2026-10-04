@@ -1347,10 +1347,14 @@ export const createBrokerStatusStore = (
   // Opens the store: binds live listeners first (so nothing is missed during
   // the async backfill), loads mappings, then backfills $SYS + custom topics.
   // The $SYS and custom backfills are independent, so run them together.
+  let destroyed = false;
   const init = async () => {
+    if (destroyed) return;
     bindListeners();
     const rows = await loadMappings();
+    if (destroyed) return;
     await Promise.all([backfillSys(), backfillCustomTopics(rows)]);
+    if (destroyed) return;
     // A restored long range must have its stitched series before the first
     // tick, or the hero draws one frame off the raw buffers alone.
     refreshRangeDerived(Date.now(), true);
@@ -1370,6 +1374,7 @@ export const createBrokerStatusStore = (
   };
 
   const destroy = () => {
+    destroyed = true;
     offMessages?.();
     offClear?.();
     offConnected?.();

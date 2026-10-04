@@ -64,6 +64,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         group: "Added",
+        title: "Broker status in the browser",
+        body: "Docker and Home Assistant users can open Broker status from the view selector beside List, Graph and Sparkplug.",
+      },
+      {
+        group: "Added",
         title: "Sparkplug B with the names filled in",
         body: "With Sparkplug decoding on, NDATA and DDATA messages show the metric names from the node's birth instead of bare aliases.",
         thanks: [

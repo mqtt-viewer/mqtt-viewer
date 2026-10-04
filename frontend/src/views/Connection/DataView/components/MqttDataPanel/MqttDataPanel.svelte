@@ -6,6 +6,9 @@
   import SparkplugPanel from "./components/SparkplugPanel/SparkplugPanel.svelte";
   import { metricListJson } from "./components/SparkplugPanel/build-sparkplug-tree";
   import MqttGraphView from "../MqttGraphView/MqttGraphView.svelte";
+  import envStore from "@/stores/env";
+  import PanelHeader from "@/components/PanelHeader/PanelHeader.svelte";
+  import BrokerStatusWindow from "@/views/BrokerStatusWindow/BrokerStatusWindow.svelte";
   import ViewToggle from "./components/ViewToggle/ViewToggle.svelte";
 
   import { createMqttDataStore } from "./stores/mqtt-data";
@@ -310,12 +313,12 @@
   // Which view you last used, kept per connection alongside the graph's own
   // preferences, so a connection you work on in the graph opens in the graph
   // next time.
-  type DataView = "list" | "graph" | "sparkplug";
+  type DataView = "list" | "graph" | "sparkplug" | "status";
   const viewKey = `mqtt-viewer-topicpanel-view:${connection.connectionDetails.id}`;
   const loadView = (): DataView => {
     try {
       const saved = localStorage.getItem(viewKey);
-      return saved === "graph" || saved === "sparkplug" ? saved : "list";
+      return saved === "graph" || saved === "sparkplug" || saved === "status" ? saved : "list";
     } catch (e) {
       console.error("topic panel view load failed", e);
       return "list";
@@ -334,7 +337,10 @@
   // The Sparkplug option only exists once the connection has seen Sparkplug
   // traffic, so a saved Sparkplug preference shows the list until then.
   $: view =
-    preferredView === "sparkplug" && !showSparkplug ? "list" : preferredView;
+    (preferredView === "sparkplug" && !showSparkplug) ||
+    (preferredView === "status" && !$envStore.isServerMode)
+      ? "list"
+      : preferredView;
   // The tree is only decoded and built while its view is showing, in the tab
   // you are looking at. Showing it again replays the backend's snapshot,
   // which covers anything that happened while it was hidden, drops included.
@@ -364,6 +370,7 @@
         slot="leading"
         {view}
         {showSparkplug}
+        showBrokerStatus={$envStore.isServerMode}
         sparkplugWarningCount={$sparkplugStore.warningCount}
         onChange={(v) => setView(v)}
       />
@@ -423,6 +430,23 @@
         {/if}
       </svelte:fragment>
     </ContextMenu>
+  {:else if view === "status"}
+    <PanelHeader class="bg-elevation-0">
+      <div class="flex items-center min-h-[50px] px-2 overflow-x-auto">
+        <ViewToggle
+          {view}
+          {showSparkplug}
+          showBrokerStatus={$envStore.isServerMode}
+          sparkplugWarningCount={$sparkplugStore.warningCount}
+          onChange={setView}
+        />
+      </div>
+    </PanelHeader>
+    {#if isTabActive}
+      <div class="grow min-h-0 min-w-0">
+        <BrokerStatusWindow connectionId={connection.connectionDetails.id} embedded />
+      </div>
+    {/if}
   {:else if view === "sparkplug"}
     <SearchActionBar
       getAllTopics={mqttDataStore.getAllTopics}
@@ -436,6 +460,7 @@
         slot="leading"
         {view}
         {showSparkplug}
+        showBrokerStatus={$envStore.isServerMode}
         sparkplugWarningCount={$sparkplugStore.warningCount}
         onChange={(v) => setView(v)}
       />
@@ -481,6 +506,7 @@
           slot="leading"
           {view}
           {showSparkplug}
+          showBrokerStatus={$envStore.isServerMode}
           sparkplugWarningCount={$sparkplugStore.warningCount}
           onChange={(v) => setView(v)}
         />
