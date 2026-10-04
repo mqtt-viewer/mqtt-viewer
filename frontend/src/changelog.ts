@@ -83,6 +83,10 @@ export const CHANGELOG: ChangelogEntry[] = [
             name: "adamwoodland2",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14#discussioncomment-12612115",
           },
+          {
+            name: "thebaldgeek",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14#discussioncomment-12629663",
+          },
         ],
       },
       {
