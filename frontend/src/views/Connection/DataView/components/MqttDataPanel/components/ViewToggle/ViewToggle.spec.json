@@ -2,7 +2,7 @@
   "$schema": "../../../../../../../design-system/component-spec.schema.json",
   "name": "ViewToggle",
   "tier": "component",
-  "description": "Segmented List/Graph/Sparkplug switch shown at the left of the data panel header in every view. The Sparkplug option appears once the connection has seen Sparkplug traffic.",
+  "description": "Segmented List/Graph/Sparkplug switch shown at the left of the data panel header in every view. The Sparkplug option appears once the connection has seen Sparkplug traffic. Browser mode also offers Broker status.",
   "status": "story-only",
   "figma": {
     "fileKey": "",
@@ -35,6 +35,13 @@
       "required": false,
       "default": 0,
       "description": "Open Sparkplug warnings, shown as a count on the Sparkplug option."
+    },
+    {
+      "name": "showBrokerStatus",
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "description": "Adds the in-page Broker status option in browser mode."
     }
   ],
   "tokens": [

@@ -196,8 +196,8 @@ connection settings.
 
 - Exports download through the browser instead of a save dialog.
 - Chart pop-outs open as browser tabs.
-- Broker status and device monitoring controls are hidden for now. They need an
-  in-page route before they can work in the browser.
+- Broker status is available in the view selector beside List, Graph and Sparkplug.
+- Device monitoring controls are hidden until they have an in-page view.
 - No self-update. The app tells you when a newer image is available and shows
   the pull command, but it never replaces itself. You update by pulling a new
   image: `docker pull ghcr.io/mqtt-viewer/mqtt-viewer:latest` and recreating the

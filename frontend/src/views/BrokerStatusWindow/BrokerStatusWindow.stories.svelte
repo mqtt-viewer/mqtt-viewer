@@ -39,3 +39,5 @@
 {/snippet}
 
 <Story name="Default" args={storyArgs} {template} />
+
+<Story name="Embedded" args={{ ...storyArgs, connectionId: 1, embedded: true }} {template} />

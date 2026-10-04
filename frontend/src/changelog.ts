@@ -64,6 +64,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     sections: [
       {
         group: "Added",
+        title: "Broker status in the browser",
+        body: "Docker and Home Assistant users can open Broker status from the view selector beside List, Graph and Sparkplug.",
+      },
+      {
+        group: "Added",
         title: "Sparkplug B with the names filled in",
         body: "With Sparkplug decoding on, NDATA and DDATA messages show the metric names from the node's birth instead of bare aliases.",
         thanks: [
@@ -90,7 +95,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Added",
         title: "Pinned topics open to show everything beneath them",
-        body: "A pinned branch expands in place at the top of the tree. Drag the bottom edge of the pinned block to resize it, and right-click a row in it for Show in tree.",
+        body: "Pinned branches expand in place, follow the topic search, and sit in a resizable block with Show in tree on each row's right-click menu.",
         thanks: [
           {
             name: "mrpiggi",
@@ -109,7 +114,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Saved passwords stay encrypted when you edit a connection",
-        body: "Saving a connection without changing its password stored it unencrypted. Passwords stored that way are encrypted again the next time the app opens, except one of 38 or more letters and digits, which waits until you next change it.",
+        body: "Saving an unchanged password previously left it unencrypted; the app now repairs this on startup, but some long passwords that resemble encrypted data need to be changed once.",
         thanks: [
           {
             name: "viktak",
@@ -120,7 +125,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Windows updates work when the app runs from another drive",
-        body: "The portable exe could not update itself from a drive other than the one holding Windows' temp folder. From 1.1.0 or earlier, download this version by hand once.",
+        body: "The portable exe can now update itself from a drive other than the one holding Windows' temp folder, but from 1.1.0 or earlier you need to download this version by hand once.",
         thanks: [{ name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181" }],
       },
       {
@@ -147,6 +152,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
+        title: "Panels keep their width when you switch views",
+        body: "The sidebar and the topic panel changed width when switching between the list and graph views.",
+      },
+      {
+        group: "Fixed",
+        title: "Window buttons line up with the tab bar on macOS",
+        body: "The close, minimise and zoom buttons sat below the centre of the tab bar.",
+      },
+      {
+        group: "Fixed",
         title: "Startup failures show an error instead of a blank window",
         body: "If the app or a pop-out window cannot initialise, it says what went wrong and where to report it.",
       },
@@ -158,8 +173,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         group: "Fixed",
+        title: "Connection failures show readable errors",
+        body: "Connection errors returned as objects now show readable messages without crashing their notifications.",
+      },
+      {
+        group: "Fixed",
         title: "The Docker image stops promptly",
-        body: "A request still in flight could hold a stopping container for 30 seconds, so Docker killed it before it disconnected from your brokers. It now waits 5 seconds at most.",
+        body: "A stopping container now waits at most 5 seconds for in-flight HTTP requests before disconnecting from your brokers, down from 30 seconds.",
       },
       {
         group: "Fixed",

@@ -24,12 +24,14 @@
   // State comes from the window URL the backend opened:
   // /?view=status&conn=<id>
   const params = new URLSearchParams(window.location.search);
-  const connectionId = parseInt(params.get("conn") ?? "0", 10);
+  export let embedded = false;
+  export let connectionId = parseInt(params.get("conn") ?? "0", 10);
 
   // How long after opening (or a history clear) with no $SYS before the pill
   // treats the broker as a no-$SYS broker and hides itself.
   const PILL_GRACE_MS = 10_000;
 
+  let destroyed = false;
   let store: BrokerStatusStore | null = null;
   let viewRef: BrokerStatusView | null = null;
   let connectionName = "Broker status";
@@ -144,12 +146,16 @@
     // duplicate "$SYS/#" subscription the connection already has). env feeds
     // the macOS traffic-light inset in the header.
     try {
-      await Promise.all([os.init(), connections.init(), subscriptions.init()]);
+      // The main app already owns these stores when this view is embedded.
+      if (!embedded) {
+        await Promise.all([os.init(), connections.init(), subscriptions.init()]);
+      }
     } catch (e) {
       startupError = e;
       console.error("Failed to initialise stores", e);
       return;
     }
+    if (destroyed) return;
     const connection = get(connections).connections[connectionId];
     if (!connection) {
       error = "Connection not found";
@@ -168,6 +174,7 @@
       console.error("Failed to load the broker status time range", e);
     }
 
+    if (destroyed) return;
     store = createBrokerStatusStore(connectionId, connection.eventSet, {
       connected: connection.connectionState === "connected",
       rangeMinutes: seededRange,
@@ -175,10 +182,16 @@
     bindHeader(store);
     // Backfills $SYS + mapped-topic history and begins live-appending from the
     // shared event stream.
-    await store.init();
+    try {
+      await store.init();
+    } catch (e) {
+      if (!destroyed) startupError = e;
+      store.destroy();
+    }
   });
 
   onDestroy(() => {
+    destroyed = true;
     // Drop the app-global event listeners (and the 1 s ticker) when the window
     // closes so we don't leak listeners on the shared backend.
     unsubStore?.();
@@ -191,18 +204,18 @@
   {#if startupError}
     <StartupError error={startupError} />
   {:else}
-    <main class="h-screen w-screen bg-elevation-0 text-white-text flex flex-col">
+    <main class="{embedded ? 'h-full w-full min-h-0 min-w-0' : 'h-screen w-screen'} bg-elevation-0 text-white-text flex flex-col">
       <!-- The top padding is what lines the row up with the macOS traffic
            lights, so it stays at pt-2 on every platform; only the bottom was
            trimmed to bring the bar to the main window's app-bar height. -->
       <header
-        class="flex items-center gap-2 px-4 border-b border-outline {$os.isMac &&
+        class="flex flex-wrap items-center gap-2 px-4 border-b border-outline {!embedded && $os.isMac &&
         !$os.isFullscreen
           ? 'pt-2 pb-2'
           : 'py-2'}"
-        style="--wails-draggable:drag"
+        style:--wails-draggable={embedded ? "false" : "drag"}
       >
-        {#if $os.isMac && !$os.isFullscreen}
+        {#if !embedded && $os.isMac && !$os.isFullscreen}
           <!-- Clear the macOS traffic lights (frameless hidden-inset titlebar). -->
           <div class="w-[62px] shrink-0" />
         {/if}
@@ -271,7 +284,7 @@
           Loading…
         </div>
       {/if}
-      <Toast />
+      {#if !embedded}<Toast />{/if}
     </main>
   {/if}
 </IconContext>

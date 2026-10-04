@@ -29,6 +29,9 @@ scripts/.venv
 # Per-checkout dev-server ports; generate with scripts/dev-ports.sh write-launch
 .claude/launch.json
 
+# Per-checkout wails3 CLI pinned to go.mod; see scripts/wails3.sh
+/.bin/
+
 # nix build symlinks
 result
 result-*
