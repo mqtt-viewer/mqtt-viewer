@@ -10,6 +10,7 @@ import {
   releaseNotesForVersion,
   renderReleaseNotes,
 } from "./release-notes";
+import { parseReleaseNotes } from "./components/UpdateDialog/release-notes-parser";
 
 const entry = (over: Partial<ChangelogEntry> = {}): ChangelogEntry => ({
   version: "1.2.0",
@@ -103,6 +104,41 @@ describe("renderReleaseNotes", () => {
       "Thanks [one](https://github.com/one), [two](https://github.com/two) and [three](https://github.com/three)."
     );
   });
+
+  it.each([false, true])(
+    "keeps a credit's reason in release notes and the update dialog (grouped: %s)",
+    (grouped) => {
+      const title = "Repair unencrypted saved passwords";
+      const url = "https://github.com/mqtt-viewer/mqtt-viewer/issues/181#issuecomment-5864069262";
+      const notes = renderReleaseNotes(
+        entry({
+          sections: [
+            {
+              group: grouped ? "Fixed" : undefined,
+              title,
+              body: "",
+              thanks: [
+                {
+                  name: "viktak",
+                  url,
+                  reason: "for the logs that led to this",
+                },
+              ],
+            },
+          ],
+        }),
+        opts
+      );
+      expect(notes).toContain(
+        `Thanks [viktak](${url}) for the logs that led to this.\n`
+      );
+      const creditText = "Thanks viktak for the logs that led to this.";
+      expect(parseReleaseNotes(notes)).toContainEqual({
+        kind: grouped ? "bullet" : "text",
+        text: grouped ? `${title}. ${creditText}` : creditText,
+      });
+    }
+  );
 
   it("renders the outro when there is one, and nothing when there isn't", () => {
     expect(renderReleaseNotes(entry({ outro: "More soon." }), opts)).toContain(

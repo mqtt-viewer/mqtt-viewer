@@ -20,6 +20,8 @@
 export interface ChangelogThanks {
   name: string;
   url: string;
+  // Optional text after the linked name, without trailing punctuation.
+  reason?: string;
 }
 
 // Sections are grouped under these headings in the dialog and the release
@@ -60,42 +62,33 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "In development",
     headline: "What's new in MQTT Viewer 1.2",
     intro:
-      "Sparkplug B with real metric names and a live view of the whole network, and pinned topics that open to show what is beneath them. Plus a month of fixes.",
+      "Sparkplug metric names, a live network view and expandable pinned topics.",
     sections: [
       {
         group: "Added",
         title: "Broker status in the browser",
-        body: "Docker and Home Assistant users can open Broker status from the view selector beside List, Graph and Sparkplug.",
+        body: "Open Broker status from the view selector in Docker and Home Assistant.",
       },
       {
         group: "Added",
         title: "Sparkplug B with the names filled in",
-        body: "With Sparkplug decoding on, NDATA and DDATA messages show the metric names from the node's birth instead of bare aliases.",
+        body: "Sparkplug decoding resolves NDATA and DDATA aliases to metric names.",
         thanks: [
           {
             name: "adamwoodland2",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14",
-          },
-          {
-            name: "thebaldgeek",
-            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/discussions/14#discussioncomment-12612115",
           },
         ],
       },
       {
         group: "Added",
         title: "A live view of your Sparkplug network",
-        body: "Groups, edge nodes, devices and metrics in one tree beside the list and graph views, with sequence gaps, rebirth storms, offline nodes and unnamed metrics flagged.",
+        body: "Inspect groups, nodes, devices and metrics with warnings and rebirth requests.",
       },
       {
         group: "Added",
-        title: "Request a rebirth from the Sparkplug view",
-        body: "Sends Node Control/Rebirth to one edge node, or to every node missing a birth, after a confirmation.",
-      },
-      {
-        group: "Added",
-        title: "Pinned topics open to show everything beneath them",
-        body: "Pinned branches expand in place, follow the topic search, and sit in a resizable block with Show in tree on each row's right-click menu.",
+        title: "Expandable pinned topics",
+        body: "Expand pinned branches, filter them with search and resize the pinned block.",
         thanks: [
           {
             name: "mrpiggi",
@@ -106,37 +99,38 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Crash when decoding Sparkplug on MQTT 3 connections",
-        body: "The first Sparkplug message on an MQTT 3.1 or 3.1.1 connection closed the app.",
+        body: "",
         thanks: [
           { name: "CantDecodeMe", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/184" },
         ],
       },
       {
         group: "Fixed",
-        title: "Saved passwords stay encrypted when you edit a connection",
-        body: "Saving an unchanged password previously left it unencrypted; the app now repairs this on startup, but some long passwords that resemble encrypted data need to be changed once.",
+        title: "Repair unencrypted saved passwords",
+        body: "Unchanged passwords were saved unencrypted; startup now repairs them, but some long passwords resembling encrypted data need changing once.",
         thanks: [
           {
             name: "viktak",
             url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181#issuecomment-5864069262",
+            reason: "for the logs that led to this",
           },
         ],
       },
       {
         group: "Fixed",
-        title: "Windows updates work when the app runs from another drive",
-        body: "The portable exe can now update itself from a drive other than the one holding Windows' temp folder, but from 1.1.0 or earlier you need to download this version by hand once.",
+        title: "Windows updates across drives",
+        body: "From 1.1.0 or earlier, download this version manually once.",
         thanks: [{ name: "viktak", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/181" }],
       },
       {
         group: "Fixed",
-        title: "Windows installs in protected folders no longer try to update themselves",
-        body: "An install under Program Files can't replace itself without admin rights, so the update dialog points to the releases page instead.",
+        title: "Updates from protected Windows folders",
+        body: "Installs under Program Files now link to the download instead of trying to update themselves.",
       },
       {
         group: "Fixed",
         title: "New messages no longer stick at \"Loading message...\"",
-        body: "The topic panel shows a new message as it arrives, or when you step onto it with the arrow keys.",
+        body: "",
         thanks: [
           { name: "ejannink", url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/177" },
           {
@@ -148,22 +142,22 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Deleting a connection no longer mixes up the other tabs",
-        body: "The tabs after a deleted connection showed another connection's topics until the app restarted.",
+        body: "",
       },
       {
         group: "Fixed",
         title: "Panels keep their width when you switch views",
-        body: "The sidebar and the topic panel changed width when switching between the list and graph views.",
+        body: "",
       },
       {
         group: "Fixed",
         title: "Window buttons line up with the tab bar on macOS",
-        body: "The close, minimise and zoom buttons sat below the centre of the tab bar.",
+        body: "",
       },
       {
         group: "Fixed",
         title: "Startup failures show an error instead of a blank window",
-        body: "If the app or a pop-out window cannot initialise, it says what went wrong and where to report it.",
+        body: "",
       },
       {
         group: "Fixed",
@@ -174,30 +168,30 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         group: "Fixed",
         title: "Connection failures show readable errors",
-        body: "Connection errors returned as objects now show readable messages without crashing their notifications.",
+        body: "",
       },
       {
         group: "Fixed",
         title: "The Docker image stops promptly",
-        body: "A stopping container now waits at most 5 seconds for in-flight HTTP requests before disconnecting from your brokers, down from 30 seconds.",
+        body: "Shutdown waits at most 5 seconds for in-flight HTTP requests, down from 30.",
       },
       {
         group: "Fixed",
         title: "The topic tree no longer goes blank when it shrinks",
-        body: "Collapsing branches or narrowing a search while scrolled down could leave the tree empty until you scrolled again.",
+        body: "",
       },
       {
         group: "Fixed",
         title: "Topics named like toString or constructor show up",
-        body: "A topic level called toString or constructor appears in the tree like any other, and no longer drops the messages that arrived with it.",
+        body: "",
       },
       {
         group: "Miscellaneous",
-        title: "Updated the Wails desktop shell to the current beta",
-        body: "The app runtime and the native shell now come from the same Wails release.",
+        title: "Wails desktop shell updated to beta.16",
+        body: "",
       },
     ],
-    outro: "Found a bug or a rough edge? Use the Feedback button, I want to know.",
+    outro: "Found a bug? Let me know through Feedback.",
   },
   {
     version: "1.1.0",

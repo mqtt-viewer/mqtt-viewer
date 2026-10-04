@@ -46,7 +46,9 @@ const joinList = (parts: string[]): string =>
 const thanksLine = (section: ChangelogSection): string | null => {
   const thanks = section.thanks ?? [];
   if (thanks.length === 0) return null;
-  const links = thanks.map((t) => `[${t.name}](${t.url})`);
+  const links = thanks.map(
+    (t) => `[${t.name}](${t.url})${t.reason ? ` ${t.reason}` : ""}`
+  );
   return `Thanks ${joinList(links)}.`;
 };
 
