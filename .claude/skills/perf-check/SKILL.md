@@ -126,7 +126,8 @@ than watching the UI. Two traps:
 ## Driving the app headlessly
 
 `scripts/serve-browser.sh` runs the real backend and is drivable from
-the browser pane, which is usually easier than the native window. Two
+any browser, including one your harness drives, which is usually easier
+than the native window. Two
 things to know: live message events already flow with no changes to the
 page, because the runtime loads `/wails/custom.js` itself. Do not inject
 that script tag by hand: it opens a second event WebSocket and every
@@ -135,12 +136,11 @@ message count and rate reads double (see `AGENTS.md`).
 On SIGTERM or Ctrl+C it waits up to 5 seconds for in-flight HTTP
 requests, then exits. Further signals during that wait are ignored, so
 give it the 5 seconds before reaching for `kill -9`. The open event
-WebSocket does not hold it up. Older builds waited 30 seconds and then
-panicked with `server shutdown error: context deadline exceeded`; that
-is the same slow stop, not a crash mid-run.
+WebSocket does not hold it up.
 
-The browser pane throttles `requestAnimationFrame` to about 2 fps (frames
-1000 ms apart, zero long tasks), so rAF frame timing there means nothing
+An agent-embedded browser or hidden tab can throttle
+`requestAnimationFrame` to about 2 fps (frames 1000 ms apart, zero long
+tasks), so rAF frame timing there means nothing
 and layout read straight after a resize can be stale. Measure main-thread
 load with a `MessageChannel` or `setTimeout` event-loop-lag sampler plus
 a `longtask` `PerformanceObserver`, and wait about a second after a

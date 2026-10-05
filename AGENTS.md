@@ -6,9 +6,10 @@ design-system work, `frontend/AGENTS.md` is the binding contract.
 
 ## Delegate implementation work
 
-When the session is running on a high-capability model (Fable, Opus) and the
-task contains a well-scoped, delegatable chunk (writing or editing code,
-running builds, mechanical refactors), do not implement it inline. Plan the
+When the session is running on a top-tier model, the harness can delegate to
+subagents, and the task contains a well-scoped, delegatable chunk (writing
+or editing code, running builds, mechanical refactors), do not implement it
+inline. Plan the
 change yourself, hand the implementation to a subagent with a precise brief
 (files, exact edits or behaviour, constraints), then test and review the
 result yourself. This keeps the expensive model's context for design,
@@ -57,8 +58,8 @@ SKIP_FRONTEND=1 scripts/serve-browser.sh "$(scripts/dev-ports.sh server)"   # re
 The port argument is optional and defaults to 9500, which parallel worktrees
 will fight over. `scripts/dev-ports.sh server` prints this checkout's own port
 (9700-9899), and the `server-mode` entry that `scripts/dev-ports.sh
-write-launch` puts in `.claude/launch.json` uses the same one, so the preview
-tool can start it by name. The examples below use 9500; substitute your port.
+write-launch` puts in `.claude/launch.json` uses the same one, so Claude
+Code's preview tool can start it by name. The examples below use 9500; substitute your port.
 Point `scripts/ingress-sim.go` at it with `-upstream http://127.0.0.1:<port>`.
 
 Verified round-trip (this is exactly what a browser sends):
@@ -117,10 +118,11 @@ die at exec with "missing LC_UUID load command" on macOS. `-redirect=false`
 mirrors a bare nginx/Caddy `strip_prefix`, which is how to check the page's
 trailing-slash self-heal (see the file's header for the rest).
 
-### Measuring performance in the browser pane
+### Measuring performance in an agent-driven browser
 
-The in-app browser pane throttles `requestAnimationFrame`: about 2 fps
-observed, frames 1000 ms apart with zero long tasks. rAF-based frame
+A browser embedded in an agent harness, or any hidden tab, can throttle
+`requestAnimationFrame`: about 2 fps observed in Claude Code's browser
+pane, frames 1000 ms apart with zero long tasks. rAF-based frame
 timing there is meaningless, and layout read straight after a resize can
 be stale. Instead:
 
@@ -131,7 +133,7 @@ be stale. Instead:
 - Wait about a second after a resize before measuring anything that
   depends on layout.
 
-### Field-tested walkthrough (Sparkplug e2e, 2026-07)
+### Walkthrough tips
 
 A full e2e drive of the app (create connection, connect to a local broker,
 watch live traffic, click UI actions, verify a publish round trip) works in
@@ -147,8 +149,6 @@ server mode from an agent-driven browser. Lessons that save time:
   nested `connectionDetails`. After `UpdateConnection` (e.g. flipping
   `isProtoEnabled`), disconnect + reconnect so per-connection middleware
   reinstalls.
-- **Pass real ids**: methods like `DisconnectMqtt` panic the whole app on an
-  unknown connection id (no not-found guard yet).
 - Drive traffic with `scripts/mqtt-sim.py` (`--sparkplug` for births/aliases/
   seq faults; it answers NCMD rebirth requests) against a local mosquitto on
   1883, or `scripts/mqtt-flood.py` for load.
@@ -156,7 +156,7 @@ server mode from an agent-driven browser. Lessons that save time:
 ### Fallback for human/visual verification
 
 For pixel-level UI checks, prefer **Storybook** on its own dev port (see
-`scripts/dev-ports.sh` / `.claude/launch.json`) plus the **native app** via
+`scripts/dev-ports.sh`) plus the **native app** via
 `wails3 dev` for real end-to-end behaviour. Use server mode when an agent needs to
 exercise real bindings over HTTP without a native webview.
 ## Writing style (binding, always)

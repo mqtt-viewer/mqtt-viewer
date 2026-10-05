@@ -99,4 +99,3 @@ When cutting release `vX.Y.Z` (see `docs/RELEASING.md`):
   asking whether it reads well.
 - No version guessing ahead of release. Keep changes in the staging entry.
 - No marketing voice. See `docs/WRITING_STYLE.md`.
-- Don't hand-edit `frontend/src/design-system/component-index.json`.
