@@ -26,7 +26,7 @@ Read first: `frontend/AGENTS.md` and `docs/design-system/STORYBOOK_SPEC.md`
 3. **Per component, in order:**
    - Edit `<Name>.svelte` per the concrete instructions (add a variant, swap a
      child, retoken). Keep Svelte 4 syntax — **do not migrate to runes**. No
-     store reads / `wailsjs` calls added to the render path (props only).
+     store reads / `bindings/...` calls added to the render path (props only).
    - Update `<Name>.spec.json`: `props[]`/`options`, `tokens[]`, `dependencies[]`,
      and write the new `figma.lastSyncedHash` + `lastSyncedAt` from the handover.
      Advance `status` if its requirements are now met.

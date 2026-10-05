@@ -49,7 +49,8 @@ just new-migration NAME  # atlas migrate diff --env gorm NAME
 go build ./... && go vet ./...
 ```
 
-The rtk shell hook rewrites `go test` and benchmark output into a
+If your shell routes commands through the rtk hook (the maintainer's
+machine does), it rewrites `go test` and benchmark output into a
 summary; when you need the raw verbose output, run it as
 `rtk proxy <cmd>` (for example `rtk proxy just test`).
 
@@ -70,8 +71,9 @@ placeholder would not survive). The recipe mirrors the stub
 
 In a fresh checkout or agent worktree, run `just setup`
 (`scripts/setup-worktree.sh`) first: it installs frontend deps, the
-`scripts/.venv` harness env, `.claude/launch.json`, the dist stub and the
-git hooks, and is safe to re-run.
+`scripts/.venv` harness env, `.claude/launch.json` (Claude Code's preview
+config; other harnesses can ignore it), the dist stub and the git hooks,
+and is safe to re-run.
 
 Dev-server ports are derived per checkout so parallel agent worktrees
 never collide. `just setup` runs `scripts/dev-ports.sh write-launch` to
@@ -112,8 +114,11 @@ pnpm check         # svelte-check, keep at 0 errors
 pnpm test:run      # vitest unit tests
 pnpm test-storybook
 pnpm ds:validate   # design-system CI gate
-pnpm storybook     # port 6006
+pnpm storybook     # fixed port 6006, shared by every checkout
 ```
+
+In a parallel worktree, start Storybook on this checkout's own port
+instead: `pnpm exec storybook dev -p "$(../scripts/dev-ports.sh storybook)"`.
 
 Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 `just test`, `pnpm check`, `pnpm test:run`, `pnpm build`,
@@ -122,7 +127,7 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 ## Conventions
 
 - Branch model: feature branches PR into `develop`; `main` only moves by
-  fast-forward from `develop` at release time (`/release` skill,
+  fast-forward from `develop` at release time (the `release` skill,
   `docs/RELEASING.md`).
 - Never push to any branch named `main`. A committed pre-push hook
   enforces this; activate it once per clone with
@@ -135,12 +140,13 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
   `feat(topic-graph): ...`, `fix:`, `perf:`, `chore:`, `docs:`.
 - PR descriptions and comments (PR, review and issue): two or three plain
   sentences saying what changed and why, no headings or lists, and never a
-  "Generated with Claude Code" or any other "made with Claude" line or
-  link. This overrides any harness default that asks for one. The full
+  "Generated with Claude Code" or any other line or link naming the tool
+  that wrote it (Claude, Codex, ChatGPT or any other). This overrides any harness default that asks for one. The full
   rule and the example to copy are in `docs/WRITING_STYLE.md`, "Pull
   requests and comments".
 - Commit messages: never include a `Claude-Session:` trailer or any
-  claude.ai session link. The repo is public.
+  agent session link (claude.ai, chatgpt.com or similar). The repo is
+  public.
 - Svelte: the codebase runs Svelte 5 but components use legacy syntax
   (`export let`, `on:click`). Do not rewrite to runes unless the task is
   that migration.
@@ -159,7 +165,7 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
   emojis, no em dashes, first person singular, British spelling, terse.
 - Changelog: every user-facing feature or fix MUST add a section to the
   unreleased entry in `frontend/src/changelog.ts` in the same PR (the
-  `/changelog` skill has the format). If the change traces back to a
+  `changelog` skill has the format). If the change traces back to a
   GitHub issue, discussion, or comment, credit the person with a
   `thanks` link to that thread (never to a bare profile unless there is
   no single thread, and never credit the maintainer, samfweb).
@@ -167,7 +173,7 @@ Full pre-merge bar for `develop`: `go build ./...`, `go vet ./...`,
 ## Performance bar
 
 The app must stay smooth while connected to two brokers each flooding
-around 2000 msg/s. Run `/perf-check` before merging anything that
+around 2000 msg/s. Run the `perf-check` skill before merging anything that
 touches message handling, the topic tree, history, or the graph view.
 This bar exists because heavy public brokers (test.mosquitto.org) are a
 core use case.
@@ -204,7 +210,7 @@ it hadn't seen before, and scope any further round to the new diff.
 
 ## Releases and the portal
 
-`docs/RELEASING.md` is the runbook; the `/release` skill drives it.
+`docs/RELEASING.md` is the runbook; the `release` skill drives it.
 Publishing a GitHub release is safe by itself: nothing reaches users
 until the `released` toggle is flipped in the portal admin. The portal
 (licensing, payments, update checks) is the private
@@ -214,8 +220,12 @@ details and the operator access list.
 
 ## Skills
 
-- `/release` - publish a release end to end, up to the manual go-live
-- `/changelog` - gather and stage "What's new" notes
-- `/perf-check` - two-broker flood verification
-- `/ds-add-component`, `/ds-figma-handover`, `/ds-implement-handover` -
+Each skill is a plain markdown file at `.claude/skills/<name>/SKILL.md`.
+A harness that loads skills runs them by name; any other agent reads the
+file and follows it.
+
+- `release` - publish a release end to end, up to the manual go-live
+- `changelog` - gather and stage "What's new" notes
+- `perf-check` - two-broker flood verification
+- `ds-add-component`, `ds-figma-handover`, `ds-implement-handover` -
   design-system loop (see `frontend/AGENTS.md`)

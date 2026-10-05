@@ -30,10 +30,11 @@ the gate that lets them see, and shape, what's going into the upcoming release.
 
 - Gather what shipped since `PREV`: `git log PREV..origin/develop --oneline`
   plus the merged PRs (`gh pr list --state merged --base develop`). Keep only
-  user-visible changes, per the `/changelog` skill's rules.
+  user-visible changes, per the `changelog` skill's rules
+  (`.claude/skills/changelog/SKILL.md`).
 - Build the draft from the staging entry in `frontend/src/changelog.ts` if one
   exists, folding in anything that landed since it was last updated. If there's
-  no staging entry, draft one from scratch using the `/changelog` skill.
+  no staging entry, draft one from scratch using the `changelog` skill.
   Follow `docs/WRITING_STYLE.md`.
 - Present the full draft in chat: headline, intro, every section, outro. Also
   list anything you judged NOT worth mentioning, so the user can veto that

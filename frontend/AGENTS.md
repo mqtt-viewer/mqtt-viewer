@@ -107,7 +107,7 @@ Hard rules (validator enforces):
 
 Validated by `src/design-system/component-spec.schema.json`. Minimum: `name`,
 `tier`, `status`. When `figma-linked`: `figma.url` + `figma.nodeId` + `props[]`.
-`tokens[]` must all exist in `design-tokens.json`. Scaffold with `make:spec <Name>`.
+`tokens[]` must all exist in `design-tokens.json`. Scaffold with `pnpm ds:make-spec <Name>`.
 
 ## Status lifecycle
 
@@ -138,11 +138,14 @@ specs (it knows rendered reality; the specs know Figma drift + the dep graph).
 Anything a user reads (dialog copy, empty states, tooltips, the "What's new"
 changelog, README) follows `docs/WRITING_STYLE.md`: warm, first person, British
 spelling, concise, and no em dashes. The changelog lives in
-`frontend/src/changelog.ts`; use the `/changelog` skill to update it.
+`frontend/src/changelog.ts`; use the `changelog` skill to update it.
 
 ## Skills
 
-- `/ds-add-component` — scaffold or formalize a component (spec + story + tier).
-- `/ds-figma-handover` — diff Figma library vs this code, emit a handover doc.
-- `/ds-implement-handover` — apply a handover doc to code + specs + stories.
-- `/changelog` — add to the "What's new" changelog, or promote it at release.
+Each lives at `.claude/skills/<name>/SKILL.md` in the repo root; run it by
+name if your harness loads skills, otherwise read the file and follow it.
+
+- `ds-add-component` — scaffold or formalize a component (spec + story + tier).
+- `ds-figma-handover` — diff Figma library vs this code, emit a handover doc.
+- `ds-implement-handover` — apply a handover doc to code + specs + stories.
+- `changelog` — add to the "What's new" changelog, or promote it at release.

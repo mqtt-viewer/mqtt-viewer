@@ -23,9 +23,9 @@ Read first: `frontend/AGENTS.md` and `docs/design-system/STORYBOOK_SPEC.md`
    - yes, domain-agnostic, props-only → `primitive`
    - knows MQTT/connections/app concepts, composes primitives → `component`
    - a screen/frame → `view`
-   When unsure, read the source: store reads / `wailsjs` / domain types ⇒ not a
+   When unsure, read the source: store reads / `bindings/...` imports / domain types ⇒ not a
    primitive. See spec §7c for why this matters.
-3. **Scaffold the spec:** `pnpm make:spec <Name>` (or create `<Name>.spec.json`
+3. **Scaffold the spec:** `pnpm ds:make-spec <Name>` (or create `<Name>.spec.json`
    by hand against `frontend/src/design-system/component-spec.schema.json`; the
    `$schema` relative path depth depends on how deep the component folder sits).
    Fill:
