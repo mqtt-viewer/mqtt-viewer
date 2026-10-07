@@ -121,13 +121,19 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.normalise_version.outputs.version }}
+          TEST_BUILD: ${{ inputs.test_build }}
         run: |
           echo "building app for darwin/${{ matrix.build.arch }}"
+          bundle_version="$VERSION"
+          if [ "$TEST_BUILD" = true ]; then
+            # Apple bundle metadata needs a numeric version, without the prerelease suffix.
+            bundle_version="${VERSION%%-*}"
+          fi
           LD_FLAGS="-X mqtt-viewer/backend/env.Version=$VERSION"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          wails3 task darwin:package ARCH=${{ matrix.build.arch }} VERSION="$VERSION" LD_FLAGS="${LD_FLAGS}"
+          wails3 task darwin:package ARCH=${{ matrix.build.arch }} VERSION="$bundle_version" LD_FLAGS="${LD_FLAGS}"
 
       - name: Sign, zip, notarize macOS app
         shell: bash
