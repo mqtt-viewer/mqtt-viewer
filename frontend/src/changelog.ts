@@ -57,6 +57,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "unreleased",
+    released: false,
+    date: "In development",
+    headline: "In the next update",
+    intro:
+      "Here's what's landed since 1.2.0. I'll tidy these notes up and give them a version when the update ships.",
+    sections: [
+      {
+        group: "Fixed",
+        title: "Startup on older macOS WebKit",
+        body: "I removed a hostname validation expression that could leave a blank window on older WebKit versions.",
+        thanks: [
+          {
+            name: "sikmir",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/48",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "1.2.0",
     released: true,
     date: "October 2026",
