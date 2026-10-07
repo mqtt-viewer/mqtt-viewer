@@ -10,8 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build for (e.g. v1.1.0)"
+        description: "Existing release tag, or a new diagnostic prerelease (e.g. v1.2.1-alpha1)"
         required: true
+      test_build:
+        description: "Publish an Intel-only diagnostic prerelease without portal registration"
+        type: boolean
+        default: false
 
 env:
   GO_VERSION: "1.25.x"
@@ -20,16 +24,12 @@ env:
 
 jobs:
   release:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        build:
-          - arch: amd64
-            os: macos-latest
-            tag: darwin_amd64
-          - arch: arm64
-            os: macos-latest
-            tag: darwin_arm64
+        build: ${{ fromJSON(inputs.test_build && '[{"arch":"amd64","os":"macos-latest","tag":"darwin_amd64"}]' || '[{"arch":"amd64","os":"macos-latest","tag":"darwin_amd64"},{"arch":"arm64","os":"macos-latest","tag":"darwin_arm64"}]') }}
     runs-on: ${{ matrix.build.os }}
     name: Release MQTT Viewer (${{ matrix.build.tag }})
     steps:
@@ -41,18 +41,48 @@ jobs:
       - name: Normalise version tag
         id: normalise_version
         shell: bash
+        env:
+          REQUESTED_VERSION: ${{ github.event.release.tag_name || inputs.tag }}
+          TEST_BUILD: ${{ inputs.test_build }}
         run: |
-          version="${{ github.event.release.tag_name || inputs.tag }}"
+          version="$REQUESTED_VERSION"
+          if [ "$TEST_BUILD" = true ] && ! [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|rc)[1-9][0-9]*$ ]]; then
+            echo "Diagnostic builds require a tag such as v1.2.1-alpha1" >&2
+            exit 1
+          fi
           if [ -z "$version" ]; then
             version="v0.0.0"
           fi
           echo "version=$version" >> $GITHUB_OUTPUT
 
+      - name: Check diagnostic tag and release are unused
+        if: ${{ inputs.test_build }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.normalise_version.outputs.version }}
+        run: |
+          assert_missing() {
+            local response
+            if response=$(gh api --include "$1"); then
+              echo "Refusing to overwrite existing $1" >&2
+              exit 1
+            fi
+            if [ "$(awk '/^HTTP\// {print $2}' <<< "$response")" != 404 ]; then
+              echo "Could not confirm $1 is unused" >&2
+              exit 1
+            fi
+          }
+          assert_missing "repos/$GITHUB_REPOSITORY/releases/tags/$VERSION"
+          assert_missing "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION"
+
       - name: Define output filename
         id: define_filename
         shell: bash
+        env:
+          VERSION: ${{ steps.normalise_version.outputs.version }}
         run: |
-          echo "filename=MQTT_Viewer_${{ steps.normalise_version.outputs.version }}_${{ matrix.build.tag }}" >> $GITHUB_OUTPUT
+          echo "filename=MQTT_Viewer_${VERSION}_${{ matrix.build.tag }}" >> $GITHUB_OUTPUT
 
       # Set up development dependencies
 
@@ -89,13 +119,15 @@ jobs:
 
       - name: Build and package macOS app
         shell: bash
+        env:
+          VERSION: ${{ steps.normalise_version.outputs.version }}
         run: |
           echo "building app for darwin/${{ matrix.build.arch }}"
-          LD_FLAGS="-X mqtt-viewer/backend/env.Version=${{ steps.normalise_version.outputs.version }}"
+          LD_FLAGS="-X mqtt-viewer/backend/env.Version=$VERSION"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.MachineIdProtectString=${{ secrets.MACHINE_ID_SECRET }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudUsername=${{ secrets.CLOUD_USERNAME }}"
           LD_FLAGS="${LD_FLAGS} -X mqtt-viewer/backend/env.CloudPassword=${{ secrets.CLOUD_PASSWORD }}"
-          wails3 task darwin:package ARCH=${{ matrix.build.arch }} VERSION=${{ steps.normalise_version.outputs.version }} LD_FLAGS="${LD_FLAGS}"
+          wails3 task darwin:package ARCH=${{ matrix.build.arch }} VERSION="$VERSION" LD_FLAGS="${LD_FLAGS}"
 
       - name: Sign, zip, notarize macOS app
         shell: bash
@@ -104,6 +136,17 @@ jobs:
           codesign --remove-signature "./bin/MQTT Viewer.app"
           echo "Signing Package"
           gon -log-level=info ./build/darwin/gon.sign.json
+          if [ "$TEST_BUILD" = true ]; then
+            codesign --verify --deep --strict "./bin/MQTT Viewer.app"
+            binary="./bin/MQTT Viewer.app/Contents/MacOS/mqtt-viewer"
+            file "$binary"
+            test "$(lipo -archs "$binary")" = x86_64
+            build_info=$(xcrun vtool -show-build "$binary")
+            echo "$build_info"
+            minos=$(awk '$1 == "minos" {print $2}' <<< "$build_info")
+            [[ "$minos" = 12.0 || "$minos" = 12.0.0 ]]
+            test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' './bin/MQTT Viewer.app/Contents/Info.plist')" = 12.0.0
+          fi
           echo "Zipping Package"
           # --norsrc/--noextattr/--noqtn: keep AppleDouble (._*) entries out of
           # the zip. The in-app updater extracts this zip verbatim; stray ._
@@ -115,6 +158,7 @@ jobs:
           echo "Notarizing Zip Files"
           gon -log-level=info ./build/darwin/gon.notarize.json
         env:
+          TEST_BUILD: ${{ inputs.test_build }}
           AC_USERNAME: ${{ secrets.AC_USERNAME }}
           AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
           AC_PROVIDER: ${{ secrets.AC_PROVIDER }}
@@ -123,29 +167,53 @@ jobs:
 
       - name: Rename release zip and create checksum
         shell: bash
+        env:
+          FILENAME: ${{ steps.define_filename.outputs.filename }}
         run: |
-          mv bin/MQTTViewer.zip bin/${{ steps.define_filename.outputs.filename }}.zip
-          cd bin && shasum -a 256 ${{ steps.define_filename.outputs.filename }}.zip > ${{ steps.define_filename.outputs.filename }}.zip.sha256
+          mv bin/MQTTViewer.zip "bin/$FILENAME.zip"
+          cd bin && shasum -a 256 "$FILENAME.zip" > "$FILENAME.zip.sha256"
 
-      - name: Upload release assets
+      - name: Publish diagnostic prerelease
+        if: ${{ inputs.test_build }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.normalise_version.outputs.version }}
+          FILENAME: ${{ steps.define_filename.outputs.filename }}
         run: |
-          gh release upload "${{ steps.normalise_version.outputs.version }}" \
-            "bin/${{ steps.define_filename.outputs.filename }}.zip" \
-            "bin/${{ steps.define_filename.outputs.filename }}.zip.sha256" \
+          cat > diagnostic-notes.txt <<'EOF'
+          Signed and notarised Intel macOS compatibility test for [issue #48](https://github.com/mqtt-viewer/mqtt-viewer/issues/48), intended for testing on macOS 12. This build removes regex lookbehind from hostname validation; whether it resolves the reporter's blank window remains unconfirmed.
+          EOF
+          # GITHUB_TOKEN publication does not trigger the other release workflows.
+          gh release create "$VERSION" "bin/$FILENAME.zip" "bin/$FILENAME.zip.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --latest=false --title "MQTT Viewer $VERSION compatibility test" \
+            --notes-file diagnostic-notes.txt
+
+      - name: Upload release assets
+        if: ${{ !inputs.test_build }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.normalise_version.outputs.version }}
+          FILENAME: ${{ steps.define_filename.outputs.filename }}
+        run: |
+          gh release upload "$VERSION" \
+            "bin/$FILENAME.zip" \
+            "bin/$FILENAME.zip.sha256" \
             --clobber --repo "${{ github.repository }}"
 
       # The release body and publish time come from the release itself, so a
       # dispatch run sends the portal the same notes the release event would.
       - name: Read release metadata
+        if: ${{ !inputs.test_build }}
         id: release_meta
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.normalise_version.outputs.version }}
         run: |
-          gh release view "${{ steps.normalise_version.outputs.version }}" \
+          gh release view "$VERSION" \
             --repo "${{ github.repository }}" --json body,publishedAt > release.json
           {
             echo "published_at=$(jq -r .publishedAt release.json)"
@@ -159,6 +227,7 @@ jobs:
       # it visible to in-app update checks.
 
       - name: Register release with portal
+        if: ${{ !inputs.test_build }}
         shell: bash
         env:
           PORTAL_URL: https://cloud.mqttviewer.app
@@ -166,14 +235,16 @@ jobs:
           CI_RELEASES_PASSWORD: ${{ secrets.CI_RELEASES_PASSWORD }}
           RELEASE_NOTES: ${{ steps.release_meta.outputs.notes }}
           PUBLISHED_AT: ${{ steps.release_meta.outputs.published_at }}
+          VERSION: ${{ steps.normalise_version.outputs.version }}
+          FILENAME: ${{ steps.define_filename.outputs.filename }}
         run: |
-          asset=bin/${{ steps.define_filename.outputs.filename }}.zip
+          asset="bin/$FILENAME.zip"
           name=$(basename "$asset")
           size=$(wc -c < "$asset" | tr -d ' ')
           sha256=$(cut -d' ' -f1 < "$asset.sha256")
-          url="https://github.com/${{ github.repository }}/releases/download/${{ steps.normalise_version.outputs.version }}/$name"
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$VERSION/$name"
           jq -n \
-            --arg version "${{ steps.normalise_version.outputs.version }}" \
+            --arg version "$VERSION" \
             --arg notes "$RELEASE_NOTES" \
             --arg published_at "$PUBLISHED_AT" \
             --arg key "darwin_${{ matrix.build.arch }}" \
