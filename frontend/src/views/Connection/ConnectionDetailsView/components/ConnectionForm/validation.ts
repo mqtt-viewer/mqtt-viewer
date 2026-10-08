@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-const VALID_DOMAIN_REGEX = new RegExp(
-  "^(?!-)[A-Za-z0-9-]{1,63}(?:(?<!-)\\.(?!-)[A-Za-z0-9-]{1,63})*(?<!-)$"
-);
+// Avoid lookbehind: older WebKit throws while loading this module, before the app mounts.
+const VALID_DOMAIN_REGEX =
+  /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
 
 export const ConnectionFormValidationSchema = z
   .object({
