@@ -1,0 +1,68 @@
+import type { Connection } from "@/stores/connections";
+import type { ConnectionGroup } from "bindings/mqtt-viewer/backend/models/models";
+import { filterConnections } from "@/views/NewTab/helpers/filter";
+
+export interface HomeSection {
+  group: ConnectionGroup | null; // null = Ungrouped
+  connections: Connection[]; // matches only, in Home order
+  total: number; // all connections in the section, ignoring search
+  open: boolean; // render the card grid
+}
+
+export const sortForHome = (connections: Connection[]): Connection[] =>
+  [...connections].sort((a, b) => {
+    if (!a.connectionDetails.lastConnectedAt) {
+      return 1;
+    }
+    if (!b.connectionDetails.lastConnectedAt) {
+      return -1;
+    }
+    if (a.connectionState == "connected" && b.connectionState != "connected") {
+      return -1;
+    }
+    if (a.connectionState != "connected" && b.connectionState == "connected") {
+      return 1;
+    }
+    return (
+      b.connectionDetails.lastConnectedAt.getTime() -
+      a.connectionDetails.lastConnectedAt.getTime()
+    );
+  });
+
+export const buildHomeSections = ({
+  connections,
+  groups,
+  search,
+  isDragging,
+}: {
+  connections: Connection[];
+  groups: ConnectionGroup[];
+  search: string;
+  isDragging: boolean;
+}): HomeSection[] => {
+  const term = search.trim();
+  const searching = term !== "";
+  const sorted = sortForHome(connections);
+  const groupIds = new Set(groups.map((g) => g.id));
+  const bucket = (group: ConnectionGroup | null) =>
+    sorted.filter((c) => {
+      const id = c.connectionDetails.groupId;
+      return group ? id === group.id : id == null || !groupIds.has(id);
+    });
+
+  const sections = [null, ...groups].map((group) => {
+    const all = bucket(group);
+    return {
+      group,
+      connections: filterConnections(all, term),
+      total: all.length,
+      open: searching ? true : !group?.collapsed,
+    };
+  });
+
+  return sections.filter((s, i) => {
+    if (searching) return s.connections.length > 0;
+    if (i > 0) return true;
+    return s.total > 0 || isDragging || groups.length === 0;
+  });
+};

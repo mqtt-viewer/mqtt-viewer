@@ -5,6 +5,7 @@
 
   import connectionsStore from "@/stores/connections";
   import Button from "@/components/Button/Button.svelte";
+  import { sortForHome } from "./helpers/sections";
 
   $: connections = Object.keys($connectionsStore.connections ?? {}).map(
     (key) => $connectionsStore.connections[parseInt(key)]
@@ -18,24 +19,7 @@
     return daysAgo < 7;
   };
 
-  $: connectionsByLastConnectedAt = connections.sort((a, b) => {
-    if (!a.connectionDetails.lastConnectedAt) {
-      return 1;
-    }
-    if (!b.connectionDetails.lastConnectedAt) {
-      return -1;
-    }
-    if (a.connectionState == "connected" && b.connectionState != "connected") {
-      return -1;
-    }
-    if (a.connectionState != "connected" && b.connectionState == "connected") {
-      return 1;
-    }
-    return (
-      b.connectionDetails.lastConnectedAt.getTime() -
-      a.connectionDetails.lastConnectedAt.getTime()
-    );
-  });
+  $: connectionsByLastConnectedAt = sortForHome(connections);
 </script>
 
 <div class="h-full w-full flex flex-col">
