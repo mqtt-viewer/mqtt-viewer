@@ -15,6 +15,9 @@
   export let isDropTarget = false;
   export let onToggle: () => void = () => {};
   export let onRename: (name: string) => void = () => {};
+  // Fires on every end of a rename (commit or Escape) so the parent can drop
+  // its own rename state.
+  export let onRenameEnd: () => void = () => {};
   export let onDelete: () => void = () => {};
 
   $: group = section.group;
@@ -25,8 +28,13 @@
     : `${section.total}`;
 
   const commitRename = (name: string) => {
-    renaming = false;
+    endRename();
     if (name && name !== group?.name) onRename(name);
+  };
+
+  const endRename = () => {
+    renaming = false;
+    onRenameEnd();
   };
 </script>
 
@@ -47,7 +55,7 @@
           initialValue={group.name}
           selectAll
           onCommit={commitRename}
-          onCancel={() => (renaming = false)}
+          onCancel={endRename}
         />
       </div>
     {:else}

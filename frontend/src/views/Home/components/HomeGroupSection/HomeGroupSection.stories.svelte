@@ -38,6 +38,7 @@
     ...getStoryArgs(storyId, componentName, props),
     onToggle: fn(),
     onRename: fn(),
+    onRenameEnd: fn(),
     onDelete: fn(),
   };
 
@@ -122,6 +123,41 @@
     await userEvent.clear(input);
     await userEvent.type(input, "Cold store{Enter}");
     expect(args.onRename).toHaveBeenCalledWith("Cold store");
+    expect(args.onRenameEnd).toHaveBeenCalledTimes(1);
+  }}
+/>
+
+<Story
+  name="RenameUnchanged"
+  args={{
+    ...storyArgs,
+    isRenaming: true,
+    section: { group, connections: [], total: 0, open: true },
+  }}
+  {template}
+  play={async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole("textbox"), "{Enter}");
+    expect(args.onRename).not.toHaveBeenCalled();
+    expect(args.onRenameEnd).toHaveBeenCalledTimes(1);
+    expect(canvas.queryByRole("textbox")).toBeNull();
+  }}
+/>
+
+<Story
+  name="RenameEscape"
+  args={{
+    ...storyArgs,
+    isRenaming: true,
+    section: { group, connections: [], total: 0, open: true },
+  }}
+  {template}
+  play={async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole("textbox"), "x{Escape}");
+    expect(args.onRename).not.toHaveBeenCalled();
+    expect(args.onRenameEnd).toHaveBeenCalledTimes(1);
+    expect(canvas.queryByRole("textbox")).toBeNull();
   }}
 />
 

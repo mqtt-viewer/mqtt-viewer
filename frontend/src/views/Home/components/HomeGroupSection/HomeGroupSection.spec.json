@@ -54,6 +54,12 @@
       "default": "> void = () => {}"
     },
     {
+      "name": "onRenameEnd",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
       "name": "onDelete",
       "type": "function",
       "required": false,

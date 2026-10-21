@@ -1,78 +1,8 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-21T20:20:04.677Z",
+  "generatedAt": "2026-10-21T20:31:02.439Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
-    {
-      "name": "AppBarBottom",
-      "tier": "component",
-      "description": "Storybook coverage for AppBarBottom.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [],
-      "tokens": [
-        "secondary",
-        "secondary-text",
-        "elevation-1"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/components/AppBarBottom/AppBarBottom.svelte",
-      "specPath": "src/components/AppBarBottom/AppBarBottom.spec.json",
-      "storyPath": "src/components/AppBarBottom/AppBarBottom.stories.svelte",
-      "storyId": "Components/AppBarBottom",
-      "specMissing": false
-    },
-    {
-      "name": "LicenseStatus",
-      "tier": "component",
-      "description": "Storybook coverage for LicenseStatus.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [],
-      "tokens": [],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/components/AppBarBottom/components/LicenseStatus.svelte",
-      "specPath": "src/components/AppBarBottom/components/LicenseStatus.spec.json",
-      "storyPath": "src/components/AppBarBottom/components/LicenseStatus.stories.svelte",
-      "storyId": "Components/AppBarBottom/LicenseStatus",
-      "specMissing": false
-    },
-    {
-      "name": "MessageStats",
-      "tier": "component",
-      "description": "Storybook coverage for MessageStats.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [],
-      "tokens": [],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/components/AppBarBottom/components/MessageStats.svelte",
-      "specPath": "src/components/AppBarBottom/components/MessageStats.spec.json",
-      "storyPath": "src/components/AppBarBottom/components/MessageStats.stories.svelte",
-      "storyId": "Components/AppBarBottom/MessageStats",
-      "specMissing": false
-    },
     {
       "name": "AppBar",
       "tier": "component",
@@ -380,6 +310,76 @@
       "specPath": "src/components/AppBar/components/NotificationsButton.spec.json",
       "storyPath": "src/components/AppBar/components/NotificationsButton.stories.svelte",
       "storyId": "Components/AppBar/NotificationsButton",
+      "specMissing": false
+    },
+    {
+      "name": "AppBarBottom",
+      "tier": "component",
+      "description": "Storybook coverage for AppBarBottom.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/AppBarBottom.svelte",
+      "specPath": "src/components/AppBarBottom/AppBarBottom.spec.json",
+      "storyPath": "src/components/AppBarBottom/AppBarBottom.stories.svelte",
+      "storyId": "Components/AppBarBottom",
+      "specMissing": false
+    },
+    {
+      "name": "LicenseStatus",
+      "tier": "component",
+      "description": "Storybook coverage for LicenseStatus.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/components/LicenseStatus.svelte",
+      "specPath": "src/components/AppBarBottom/components/LicenseStatus.spec.json",
+      "storyPath": "src/components/AppBarBottom/components/LicenseStatus.stories.svelte",
+      "storyId": "Components/AppBarBottom/LicenseStatus",
+      "specMissing": false
+    },
+    {
+      "name": "MessageStats",
+      "tier": "component",
+      "description": "Storybook coverage for MessageStats.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/components/MessageStats.svelte",
+      "specPath": "src/components/AppBarBottom/components/MessageStats.spec.json",
+      "storyPath": "src/components/AppBarBottom/components/MessageStats.stories.svelte",
+      "storyId": "Components/AppBarBottom/MessageStats",
       "specMissing": false
     },
     {
@@ -6676,6 +6676,12 @@
           "type": "function",
           "required": false,
           "default": "> void = () => {}"
+        },
+        {
+          "name": "onRenameEnd",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
         },
         {
           "name": "onDelete",

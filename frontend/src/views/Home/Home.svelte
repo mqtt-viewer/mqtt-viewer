@@ -42,10 +42,8 @@
       renamingGroupId = created.id;
     });
 
-  const renameGroup = (id: number, name: string) => {
-    renamingGroupId = null;
-    return run("Failed to rename group", () => connectionGroups.rename(id, name));
-  };
+  const renameGroup = (id: number, name: string) =>
+    run("Failed to rename group", () => connectionGroups.rename(id, name));
 
   const deleteGroup = (id: number) =>
     run("Failed to delete group", () => connectionGroups.remove(id));
@@ -88,6 +86,7 @@
           isDropTarget={dropTarget === (group?.id ?? "ungrouped")}
           onToggle={() => group && toggleGroup(group.id, !group.collapsed)}
           onRename={(name) => group && renameGroup(group.id, name)}
+          onRenameEnd={() => (renamingGroupId = null)}
           onDelete={() => group && deleteGroup(group.id)}
         />
       {/each}
