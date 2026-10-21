@@ -21,6 +21,9 @@
   import { writable } from "svelte/store";
   import Icon from "@/components/Icon/Icon.svelte";
   import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
+  import connectionGroups from "@/stores/connection-groups";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import { errorMessage } from "@/util/strings";
 
   export let connection: Connection;
   $: connectionId = connection.connectionDetails.id;
@@ -67,6 +70,23 @@
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Membership is written only here, never through the felte autosave (the
+  // backend's UpdateConnection ignores group_id), so the select stays outside
+  // felte's fields.
+  const onGroupChange = async (groupId: number | null | undefined) => {
+    try {
+      await connectionGroups.assign(connectionId, groupId ?? null);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to move connection",
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
     }
   };
 
@@ -162,6 +182,17 @@
       />
     </div>
   </div>
+  <Select
+    disabled={isAllFieldsDisabled}
+    onChange={onGroupChange}
+    defaultValue={connection.connectionDetails.groupId ?? null}
+    label="Group"
+    getOptionLabel={(option) =>
+      option === null
+        ? "None"
+        : ($connectionGroups.find((g) => g.id === option)?.name ?? "")}
+    options={[null, ...$connectionGroups.map((g) => g.id)]}
+  />
 
   <div class="flex gap-3 relative">
     <div class="flex relative gap-3 w-3/4">
