@@ -125,6 +125,7 @@ export const mockConnectionDetails = {
   subscriptions: mockSubscriptions,
   lastConnectedAt: new Date(now - 300000),
   customIconSeed: "storybook-local-broker",
+  groupId: null,
   filterHistories: [
     {
       id: 1,

@@ -117,7 +117,7 @@ func (a *App) UpdateConnection(conn *models.Connection) error {
 	updated := models.Connection{
 		ID: conn.ID,
 	}
-	err := a.Db.Model(updated).Updates(conn)
+	err := a.Db.Model(updated).Omit("group_id").Updates(conn)
 	if err.Error != nil {
 		return err.Error
 	}

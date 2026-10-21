@@ -350,6 +350,37 @@ export async function DeleteCollection(id: number): Promise<void> {
   if (index >= 0) mockCollectionsState.splice(index, 1);
 }
 
+export async function GetConnectionGroups(): Promise<
+  models.ConnectionGroup[]
+> {
+  return [];
+}
+
+export async function NewConnectionGroup(
+  name: string
+): Promise<models.ConnectionGroup> {
+  return new models.ConnectionGroup({ id: 1, name });
+}
+
+export async function RenameConnectionGroup(
+  id: number,
+  name: string
+): Promise<models.ConnectionGroup> {
+  return new models.ConnectionGroup({ id, name });
+}
+
+export async function SetConnectionGroupCollapsed(
+  _id: number,
+  _collapsed: boolean
+): Promise<void> {}
+
+export async function DeleteConnectionGroup(_id: number): Promise<void> {}
+
+export async function SetConnectionGroup(
+  _connectionId: number,
+  _groupId: number | null
+): Promise<void> {}
+
 export async function SaveCollectionMessage(
   params: app.SaveCollectionMessageParams
 ): Promise<models.CollectionMessage> {
