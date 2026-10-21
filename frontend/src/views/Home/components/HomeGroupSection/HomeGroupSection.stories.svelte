@@ -72,6 +72,7 @@
     expect(canvas.getByText("Plant gateway")).toBeTruthy();
     await userEvent.click(canvas.getByRole("button", { name: /Factory floor/ }));
     expect(args.onToggle).toHaveBeenCalled();
+    expect(canvas.getByRole("button", { name: /Group actions/ })).toBeTruthy();
   }}
 />
 
@@ -172,4 +173,36 @@
     section: { group, connections: [], total: 0, open: true },
   }}
   {template}
+/>
+
+<Story
+  name="AllConnections"
+  args={{
+    ...storyArgs,
+    ungroupedLabel: "All connections",
+    section: { group: null, connections: cards, total: 3, open: true },
+  }}
+  {template}
+  play={async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText("All connections")).toBeTruthy();
+    expect(canvas.queryByText("Ungrouped")).toBeNull();
+  }}
+/>
+
+<Story
+  name="DropZone"
+  args={{
+    ...storyArgs,
+    isDropZone: true,
+    isDropTarget: true,
+    section: { group: null, connections: [], total: 0, open: true },
+  }}
+  {template}
+  play={async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText("Ungrouped")).toBeTruthy();
+    expect(canvas.getByText("Drop here to ungroup")).toBeTruthy();
+    expect(canvasElement.querySelector('[data-group-drop="ungrouped"]')).toBeTruthy();
+  }}
 />

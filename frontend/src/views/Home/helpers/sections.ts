@@ -29,8 +29,12 @@ export const sortForHome = (connections: Connection[]): Connection[] =>
     );
   });
 
+// With no groups the section is simply every connection, as Home always read.
+export const ungroupedLabel = (groups: ConnectionGroup[]): string =>
+  groups.length === 0 ? "All connections" : "Ungrouped";
+
 // The Ungrouped section that exists only as a drag-time drop zone (no cards)
-// is split off so Home can float it instead of shifting the sections below.
+// is split off so Home can float it over the header bar instead of the list.
 export const splitDropZone = (
   sections: HomeSection[]
 ): { zone: HomeSection | null; rest: HomeSection[] } => {

@@ -6,7 +6,12 @@
   import connectionGroups from "@/stores/connection-groups";
   import Button from "@/components/Button/Button.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
-  import { buildHomeSections, splitDropZone } from "./helpers/sections";
+  import {
+    buildHomeSections,
+    splitDropZone,
+    ungroupedLabel,
+  } from "./helpers/sections";
+  import { errorMessage } from "@/util/strings";
   import type { GroupDrop } from "./dnd/resolve-group-drop";
 
   let search = "";
@@ -27,6 +32,7 @@
     isDragging: draggingConnectionId !== null,
   });
 
+  $: label = ungroupedLabel($connectionGroups);
   $: ({ zone, rest } = splitDropZone(sections));
 
   const run = async (title: string, action: () => Promise<unknown>) => {
@@ -34,13 +40,15 @@
       await action();
     } catch (e) {
       addToast({
-        data: { title, description: e as string, type: "error" },
+        data: { title, description: errorMessage(e), type: "error" },
       });
     }
   };
 
   const addGroup = () =>
     run("Failed to create group", async () => {
+      // A new group has no matches, so it would stay hidden mid-search.
+      search = "";
       const created = await connectionGroups.create("New group");
       renamingGroupId = created.id;
     });
@@ -77,7 +85,21 @@
 </script>
 
 <div class="h-full w-full flex flex-col">
-  <HomeHeaderBar bind:search onAddGroup={addGroup} />
+  <div class="relative">
+    <HomeHeaderBar bind:search onAddGroup={addGroup} />
+    {#if zone}
+      <!-- Drag-time Ungrouped drop zone: covers the header bar, which holds no
+           drop targets, so it never shifts or hides a section. -->
+      <div class="absolute inset-0 z-20 bg-elevation-2">
+        <HomeGroupSection
+          section={zone}
+          isDropZone
+          ungroupedLabel={label}
+          isDropTarget={dropTarget === "ungrouped"}
+        />
+      </div>
+    {/if}
+  </div>
   {#if connections.length === 0}
     <div
       class="bg-elevation-1 flex-grow flex flex-col items-center justify-center"
@@ -100,6 +122,7 @@
           {@const group = section.group}
           <HomeGroupSection
             {section}
+            ungroupedLabel={label}
             {search}
             {isSearching}
             isRenaming={group !== null && renamingGroupId === group.id}
@@ -117,24 +140,6 @@
           <div class="px-4 text-secondary-text">No matching connections</div>
         {/if}
       </div>
-      {#if zone}
-        <!-- Drag-time Ungrouped drop zone: floats over the top of the scroll
-             area so showing it never moves a section. -->
-        <div
-          class="absolute top-0 inset-x-0 z-20 px-4 pt-2 pointer-events-none"
-        >
-          <div
-            class="pointer-events-auto bg-elevation-2 rounded shadow-lg [&>section]:mb-0"
-          >
-            <HomeGroupSection
-              section={zone}
-              {search}
-              {isSearching}
-              isDropTarget={dropTarget === "ungrouped"}
-            />
-          </div>
-        </div>
-      {/if}
     </div>
   {/if}
 </div>

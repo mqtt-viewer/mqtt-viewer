@@ -14,6 +14,11 @@
   export let isRenaming = false;
   // Highlight while a dragged card hovers this section.
   export let isDropTarget = false;
+  // The drag-time Ungrouped target floating over the header bar: one compact
+  // line, fills its parent.
+  export let isDropZone = false;
+  // Heading of the Ungrouped section.
+  export let ungroupedLabel = "Ungrouped";
   export let onToggle: () => void = () => {};
   export let onRename: (name: string) => void = () => {};
   // Fires on every end of a rename (commit or Escape) so the parent can drop
@@ -47,14 +52,18 @@
 </script>
 
 <section
-  class={`mb-4 rounded ${
-    isDropTarget ? "bg-hovered ring-1 ring-inset ring-primary" : ""
-  }`}
+  class={`rounded ${
+    isDropZone ? "h-full flex items-center gap-3 px-4 text-secondary-text" : "mb-4"
+  } ${isDropTarget ? "bg-hovered ring-1 ring-inset ring-primary" : ""}`}
   data-group-drop={group?.id ?? "ungrouped"}
 >
+  {#if isDropZone}
+    <span class="font-medium">{ungroupedLabel}</span>
+    <span class="text-sm">Drop here to ungroup</span>
+  {:else}
   <div class="group relative flex items-center px-4 py-2 text-secondary-text">
     {#if !group}
-      <span class="font-medium">Ungrouped</span>
+      <span class="font-medium">{ungroupedLabel}</span>
       <span class="ml-2 text-sm">{count}</span>
     {:else if renaming}
       <div class="max-w-[320px]">
@@ -88,6 +97,7 @@
             class="flex items-center justify-center p-1 rounded text-secondary-text hover:text-emphasis hover:bg-hovered"
           >
             <Icon type="menuDots" size={16} />
+            <span class="sr-only">Group actions</span>
           </div>
           <div class="flex flex-col" slot="menu-content">
             <DropdownMenuItem iconType="edit" onClick={() => (renaming = true)}
@@ -117,5 +127,6 @@
         {group ? "Drag connections here" : "Drop here to ungroup"}
       </div>
     {/if}
+  {/if}
   {/if}
 </section>

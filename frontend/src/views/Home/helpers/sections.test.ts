@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Connection } from "@/stores/connections";
 import type { ConnectionGroup } from "bindings/mqtt-viewer/backend/models/models";
-import { buildHomeSections, sortForHome, splitDropZone } from "./sections";
+import {
+  buildHomeSections,
+  sortForHome,
+  splitDropZone,
+  ungroupedLabel,
+} from "./sections";
 
 const conn = (
   id: number,
@@ -168,5 +173,12 @@ describe("splitDropZone", () => {
   it("leaves sections alone when there is no Ungrouped section", () => {
     const sections = build([conn(1, { groupId: 1 })], [A]);
     expect(splitDropZone(sections)).toEqual({ zone: null, rest: sections });
+  });
+});
+
+describe("ungroupedLabel", () => {
+  it("keeps the old Home heading until a group exists", () => {
+    expect(ungroupedLabel([])).toBe("All connections");
+    expect(ungroupedLabel([A])).toBe("Ungrouped");
   });
 });

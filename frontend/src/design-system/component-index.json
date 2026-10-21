@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-21T20:38:47.166Z",
+  "generatedAt": "2026-10-21T21:50:19.502Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -6696,16 +6696,28 @@
           "default": false
         },
         {
+          "name": "isDropZone",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "ungroupedLabel",
+          "type": "string",
+          "required": false,
+          "default": "Ungrouped"
+        },
+        {
           "name": "onToggle",
           "type": "function",
           "required": false,
-          "default": "> void = () => {}"
+          "default": "() => {}"
         },
         {
           "name": "onRename",
           "type": "function",
           "required": false,
-          "default": "> void = () => {}"
+          "default": "() => {}"
         },
         {
           "name": "onRenameEnd",
@@ -6717,7 +6729,7 @@
           "name": "onDelete",
           "type": "function",
           "required": false,
-          "default": "> void = () => {}"
+          "default": "() => {}"
         },
         {
           "name": "onCardDragStart",
@@ -6751,7 +6763,7 @@
         "DropdownMenuItem",
         "Icon"
       ],
-      "notes": "Figma is not linked yet. Renders from props only; the Ungrouped section (group null) has no caret or menu and is always open. data-group-drop on the root is the drag-and-drop target hook. A highlighted drop target uses bg-hovered with a ring-primary.",
+      "notes": "Figma is not linked yet. Renders from props only; the Ungrouped section (group null, headed by ungroupedLabel) has no caret or menu and is always open. data-group-drop on the root is the drag-and-drop target hook. isDropZone renders the compact one-line Ungrouped target that Home floats over the header bar while dragging. A highlighted drop target uses bg-hovered with a ring-primary.",
       "sourcePath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.svelte",
       "specPath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.spec.json",
       "storyPath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.stories.svelte",
