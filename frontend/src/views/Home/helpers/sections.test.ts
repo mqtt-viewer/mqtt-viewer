@@ -98,6 +98,17 @@ describe("buildHomeSections", () => {
     expect(s[0].total).toBe(2);
   });
 
+  it("shows Ungrouped while dragging during a search", () => {
+    const conns = [
+      conn(1, { groupId: 1, host: "192.168.10.1" }),
+      conn(2, { host: "10.3.3.3" }),
+    ];
+    const s = build(conns, [A], "192.168.10", true);
+    expect(ids(s)).toEqual([null, 1]);
+    expect(s[0].connections).toEqual([]);
+    expect(s[0].total).toBe(1);
+  });
+
   it("opens collapsed sections that have matches when searching", () => {
     const s = build(
       [conn(1, { groupId: 1, host: "192.168.10.1" })],

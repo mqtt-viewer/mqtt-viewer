@@ -61,8 +61,9 @@ export const buildHomeSections = ({
   });
 
   return sections.filter((s, i) => {
+    if (i === 0 && isDragging) return true;
     if (searching) return s.connections.length > 0;
     if (i > 0) return true;
-    return s.total > 0 || isDragging || groups.length === 0;
+    return s.total > 0 || groups.length === 0;
   });
 };
