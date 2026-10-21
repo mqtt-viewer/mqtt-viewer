@@ -29,6 +29,17 @@ export const sortForHome = (connections: Connection[]): Connection[] =>
     );
   });
 
+// The Ungrouped section that exists only as a drag-time drop zone (no cards)
+// is split off so Home can float it instead of shifting the sections below.
+export const splitDropZone = (
+  sections: HomeSection[]
+): { zone: HomeSection | null; rest: HomeSection[] } => {
+  const [first, ...rest] = sections;
+  return first && first.group === null && first.connections.length === 0
+    ? { zone: first, rest }
+    : { zone: null, rest: sections };
+};
+
 export const buildHomeSections = ({
   connections,
   groups,

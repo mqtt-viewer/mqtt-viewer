@@ -24,8 +24,8 @@
   export let onCardDragStart: (connectionId: number) => void = () => {};
   export let onCardHover: (drop: GroupDrop | null) => void = () => {};
   export let onCardDrop: (
-    connectionId: number,
-    drop: GroupDrop | null
+    drop: GroupDrop | null,
+    connectionId: number
   ) => void = () => {};
 
   $: group = section.group;

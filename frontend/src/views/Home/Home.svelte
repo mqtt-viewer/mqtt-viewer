@@ -6,7 +6,7 @@
   import connectionGroups from "@/stores/connection-groups";
   import Button from "@/components/Button/Button.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
-  import { buildHomeSections } from "./helpers/sections";
+  import { buildHomeSections, splitDropZone } from "./helpers/sections";
   import type { GroupDrop } from "./dnd/resolve-group-drop";
 
   let search = "";
@@ -26,6 +26,8 @@
     search,
     isDragging: draggingConnectionId !== null,
   });
+
+  $: ({ zone, rest } = splitDropZone(sections));
 
   const run = async (title: string, action: () => Promise<unknown>) => {
     try {
@@ -53,7 +55,7 @@
     (dropTarget = drop === null ? null : (drop.groupId ?? "ungrouped"));
 
   // Also the end of every cancelled drag (drop is null then).
-  const onCardDrop = (connectionId: number, drop: GroupDrop | null) => {
+  const onCardDrop = (drop: GroupDrop | null, connectionId: number) => {
     const current =
       $connectionsStore.connections?.[connectionId]?.connectionDetails.groupId ??
       null;
@@ -92,26 +94,46 @@
       </div>
     </div>
   {:else}
-    <div class="flex-grow h-0 overflow-auto scrollbar bg-elevation-1 py-4">
-      {#each sections as section (section.group?.id ?? "ungrouped")}
-        {@const group = section.group}
-        <HomeGroupSection
-          {section}
-          {search}
-          {isSearching}
-          isRenaming={group !== null && renamingGroupId === group.id}
-          isDropTarget={dropTarget === (group?.id ?? "ungrouped")}
-          onToggle={() => group && toggleGroup(group.id, !group.collapsed)}
-          onRename={(name) => group && renameGroup(group.id, name)}
-          onRenameEnd={() => (renamingGroupId = null)}
-          onDelete={() => group && deleteGroup(group.id)}
-          onCardDragStart={(id) => (draggingConnectionId = id)}
-          {onCardHover}
-          {onCardDrop}
-        />
-      {/each}
-      {#if isSearching && sections.length === 0}
-        <div class="px-4 text-secondary-text">No matching connections</div>
+    <div class="flex-grow h-0 relative">
+      <div class="h-full overflow-auto scrollbar bg-elevation-1 py-4">
+        {#each rest as section (section.group?.id ?? "ungrouped")}
+          {@const group = section.group}
+          <HomeGroupSection
+            {section}
+            {search}
+            {isSearching}
+            isRenaming={group !== null && renamingGroupId === group.id}
+            isDropTarget={dropTarget === (group?.id ?? "ungrouped")}
+            onToggle={() => group && toggleGroup(group.id, !group.collapsed)}
+            onRename={(name) => group && renameGroup(group.id, name)}
+            onRenameEnd={() => (renamingGroupId = null)}
+            onDelete={() => group && deleteGroup(group.id)}
+            onCardDragStart={(id) => (draggingConnectionId = id)}
+            {onCardHover}
+            {onCardDrop}
+          />
+        {/each}
+        {#if isSearching && rest.length === 0 && !zone}
+          <div class="px-4 text-secondary-text">No matching connections</div>
+        {/if}
+      </div>
+      {#if zone}
+        <!-- Drag-time Ungrouped drop zone: floats over the top of the scroll
+             area so showing it never moves a section. -->
+        <div
+          class="absolute top-0 inset-x-0 z-20 px-4 pt-2 pointer-events-none"
+        >
+          <div
+            class="pointer-events-auto bg-elevation-2 rounded shadow-lg [&>section]:mb-0"
+          >
+            <HomeGroupSection
+              section={zone}
+              {search}
+              {isSearching}
+              isDropTarget={dropTarget === "ungrouped"}
+            />
+          </div>
+        </div>
       {/if}
     </div>
   {/if}

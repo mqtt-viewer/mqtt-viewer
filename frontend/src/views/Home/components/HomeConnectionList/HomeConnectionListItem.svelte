@@ -20,9 +20,10 @@
 
   export let connection: Connection;
   export let search = "";
-  export let onDragStart: () => void = () => {};
+  export let onDragStart: (connectionId: number) => void = () => {};
   export let onHover: (drop: GroupDrop | null) => void = () => {};
-  export let onDrop: (drop: GroupDrop | null) => void = () => {};
+  export let onDrop: (drop: GroupDrop | null, connectionId: number) => void =
+    () => {};
 
   let onConnectionClick = async () => {
     const connectionId = connection.connectionDetails.id;

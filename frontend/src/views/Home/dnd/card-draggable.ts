@@ -7,9 +7,11 @@ const THRESHOLD = 4;
 
 export interface CardDraggableParams {
   connectionId: number;
-  onDragStart: () => void;
+  onDragStart: (connectionId: number) => void;
   onHover: (drop: GroupDrop | null) => void;
-  onDrop: (drop: GroupDrop | null) => void; // null = released outside any section
+  // null = released outside any section. The id is the one captured at drag
+  // start, so a re-render that hands this node another card cannot redirect it.
+  onDrop: (drop: GroupDrop | null, connectionId: number) => void;
 }
 
 // Makes a Home card draggable between sections with pointer events (HTML5 drag
@@ -24,6 +26,7 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
   let startX = 0;
   let startY = 0;
   let dragging = false;
+  let dragId = -1;
   let ghost: HTMLElement | null = null;
 
   const makeGhost = () => {
@@ -34,6 +37,8 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
     clone.style.left = `${rect.left}px`;
     clone.style.top = `${rect.top}px`;
     clone.style.width = `${rect.width}px`;
+    // The cloned h-full classes would otherwise resolve against the viewport.
+    clone.style.height = `${rect.height}px`;
     clone.style.margin = "0";
     clone.style.opacity = "0.7";
     clone.style.pointerEvents = "none";
@@ -87,7 +92,7 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
   const abort = () => {
     if (dragging) {
       endDrag();
-      params.onDrop(null);
+      params.onDrop(null, dragId);
     }
     stopListening();
   };
@@ -113,10 +118,11 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
         // ignored on purpose
       }
       dragging = true;
+      dragId = params.connectionId;
       ghost = makeGhost();
       document.body.style.userSelect = "none";
       window.addEventListener("keydown", onKeyDown, true);
-      params.onDragStart();
+      params.onDragStart(dragId);
     }
     event.preventDefault();
     if (ghost) {
@@ -133,7 +139,7 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
     const drop = wasDragging ? dropAt(event.clientX, event.clientY) : null;
     if (wasDragging) endDrag();
     stopListening();
-    if (wasDragging) params.onDrop(drop);
+    if (wasDragging) params.onDrop(drop, dragId);
   };
 
   const onPointerCancel = (event: PointerEvent) => {

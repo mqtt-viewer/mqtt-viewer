@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Connection } from "@/stores/connections";
 import type { ConnectionGroup } from "bindings/mqtt-viewer/backend/models/models";
-import { buildHomeSections, sortForHome } from "./sections";
+import { buildHomeSections, sortForHome, splitDropZone } from "./sections";
 
 const conn = (
   id: number,
@@ -140,5 +140,33 @@ describe("buildHomeSections", () => {
     const recent = conn(2, { groupId: 1, lastConnectedAt: new Date(2024, 0, 1) });
     const s = build([old, recent], [A]);
     expect(s[0].connections.map((c) => c.connectionDetails.id)).toEqual([2, 1]);
+  });
+});
+
+describe("splitDropZone", () => {
+  it("floats the drag-only empty Ungrouped section", () => {
+    const sections = build([conn(1, { groupId: 1 })], [A], "", true);
+    const { zone, rest } = splitDropZone(sections);
+    expect(zone?.group).toBeNull();
+    expect(ids(rest)).toEqual([1]);
+  });
+
+  it("floats it when a search hides every Ungrouped match mid-drag", () => {
+    const conns = [conn(1), conn(2, { groupId: 1, host: "192.168.1.1" })];
+    const { zone, rest } = splitDropZone(build(conns, [A], "192.168", true));
+    expect(zone?.total).toBe(1);
+    expect(ids(rest)).toEqual([1]);
+  });
+
+  it("keeps a non-empty Ungrouped section in flow", () => {
+    const sections = build([conn(1), conn(2, { groupId: 1 })], [A], "", true);
+    const { zone, rest } = splitDropZone(sections);
+    expect(zone).toBeNull();
+    expect(rest).toBe(sections);
+  });
+
+  it("leaves sections alone when there is no Ungrouped section", () => {
+    const sections = build([conn(1, { groupId: 1 })], [A]);
+    expect(splitDropZone(sections)).toEqual({ zone: null, rest: sections });
   });
 });
