@@ -40,6 +40,9 @@
     onRename: fn(),
     onRenameEnd: fn(),
     onDelete: fn(),
+    onCardDragStart: fn(),
+    onCardHover: fn(),
+    onCardDrop: fn(),
   };
 
   const { Story } = defineMeta({

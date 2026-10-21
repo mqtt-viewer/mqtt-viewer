@@ -12,12 +12,17 @@
   import { capitalizeFirstLetter } from "@/util/strings";
   import _ from "lodash";
   import { highlightParts } from "../../helpers/highlight";
+  import { cardDraggable } from "../../dnd/card-draggable";
+  import type { GroupDrop } from "../../dnd/resolve-group-drop";
 
   let className = "";
   export { className as class };
 
   export let connection: Connection;
   export let search = "";
+  export let onDragStart: () => void = () => {};
+  export let onHover: (drop: GroupDrop | null) => void = () => {};
+  export let onDrop: (drop: GroupDrop | null) => void = () => {};
 
   let onConnectionClick = async () => {
     const connectionId = connection.connectionDetails.id;
@@ -90,79 +95,92 @@
   );
 </script>
 
-<Card onClick={onConnectionClick} class="bg-elevation-1 p-0 group relative ">
-  <div
-    class={`
-      absolute top-0 left-0
-      text-sm text-secondary-text 
-      w-full pt-2 pl-2 
-      flex items-center justify-between
-      z-10
-    `}
+<div
+  class="h-full"
+  use:cardDraggable={{
+    connectionId: connection.connectionDetails.id,
+    onDragStart,
+    onHover,
+    onDrop,
+  }}
+>
+  <Card
+    onClick={onConnectionClick}
+    class="bg-elevation-1 p-0 group relative w-full h-full"
   >
-    <div class="w-fit">
-      {#if connection.connectionState === "connected" || connection.connectionState === "connecting"}
-        <span class="inline-block size-[8px] mr-1"
-          ><ConnectionStatusCircle state={connection.connectionState} /></span
+    <div
+      class={`
+        absolute top-0 left-0
+        text-sm text-secondary-text 
+        w-full pt-2 pl-2 
+        flex items-center justify-between
+        z-10
+      `}
+    >
+      <div class="w-fit">
+        {#if connection.connectionState === "connected" || connection.connectionState === "connecting"}
+          <span class="inline-block size-[8px] mr-1"
+            ><ConnectionStatusCircle state={connection.connectionState} /></span
+          >
+          {capitalizeFirstLetter(connection.connectionState)}
+        {:else if connection.connectionState === "error"}
+          <Tooltip
+            placement="top"
+            text={connection.lastConnectionError ?? "Connection failed"}
+          >
+            <div class="text-error flex items-center gap-1">
+              <Icon type="warning" size={14} />
+              <span>Connection failed</span>
+            </div>
+          </Tooltip>
+        {:else if lastConnectedString !== ""}
+          <Tooltip
+            placement="top"
+            text={`This connection was last connected ${_.lowerCase(lastConnectedString)}`}
+          >
+            <div class="text-secondary-text flex items-center gap-1">
+              <Icon type="lastConnected" size={14} />
+              <span>
+                {lastConnectedString}
+              </span>
+            </div>
+          </Tooltip>
+        {/if}
+      </div>
+      <Tooltip text="Edit connection details" placement="top" focusable>
+        <button
+          class={`absolute right-0 top-0 p-2
+          opacity-0 group-hover:opacity-100
+          transition-opacity duration-200`}
+          on:click={(e) => {
+            e.stopPropagation();
+            onEditConnection();
+          }}
         >
-        {capitalizeFirstLetter(connection.connectionState)}
-      {:else if connection.connectionState === "error"}
-        <Tooltip
-          placement="top"
-          text={connection.lastConnectionError ?? "Connection failed"}
-        >
-          <div class="text-error flex items-center gap-1">
-            <Icon type="warning" size={14} />
-            <span>Connection failed</span>
+          <div
+            class="rounded-full transition-colors text-secondary-text hover:text-emphasis"
+          >
+            <Icon type="edit" size={15} />
           </div>
-        </Tooltip>
-      {:else if lastConnectedString !== ""}
-        <Tooltip
-          placement="top"
-          text={`This connection was last connected ${_.lowerCase(lastConnectedString)}`}
-        >
-          <div class="text-secondary-text flex items-center gap-1">
-            <Icon type="lastConnected" size={14} />
-            <span>
-              {lastConnectedString}
-            </span>
-          </div>
-        </Tooltip>
-      {/if}
+        </button>
+      </Tooltip>
     </div>
-    <Tooltip text="Edit connection details" placement="top" focusable>
-      <button
-        class={`absolute right-0 top-0 p-2
-        opacity-0 group-hover:opacity-100
-        transition-opacity duration-200`}
-        on:click={(e) => {
-          e.stopPropagation();
-          onEditConnection();
-        }}
-      >
-        <div
-          class="rounded-full transition-colors text-secondary-text hover:text-emphasis"
-        >
-          <Icon type="edit" size={15} />
-        </div>
-      </button>
-    </Tooltip>
-  </div>
-  <div class="relative">
-    <ConnectionIdenticon {connection} />
-  </div>
-  <div class="px-4 pb-4 relative -mt-3">
-    <div class="text-lg font-bold truncate text-center">
-      {#each highlightParts(connection.connectionDetails.name, search) as part}{#if part.match}<mark
-            class="bg-search-highlight-bg text-search-highlight-text"
-            >{part.text}</mark
-          >{:else}{part.text}{/if}{/each}
+    <div class="relative">
+      <ConnectionIdenticon {connection} />
     </div>
-    <div class="text-secondary-text truncate">
-      {#each highlightParts(connection.connectionString, search) as part}{#if part.match}<mark
-            class="bg-search-highlight-bg text-search-highlight-text"
-            >{part.text}</mark
-          >{:else}{part.text}{/if}{/each}
+    <div class="px-4 pb-4 relative -mt-3">
+      <div class="text-lg font-bold truncate text-center">
+        {#each highlightParts(connection.connectionDetails.name, search) as part}{#if part.match}<mark
+              class="bg-search-highlight-bg text-search-highlight-text"
+              >{part.text}</mark
+            >{:else}{part.text}{/if}{/each}
+      </div>
+      <div class="text-secondary-text truncate">
+        {#each highlightParts(connection.connectionString, search) as part}{#if part.match}<mark
+              class="bg-search-highlight-bg text-search-highlight-text"
+              >{part.text}</mark
+            >{:else}{part.text}{/if}{/each}
+      </div>
     </div>
-  </div>
-</Card>
+  </Card>
+</div>

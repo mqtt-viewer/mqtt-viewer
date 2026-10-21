@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-21T20:31:02.439Z",
+  "generatedAt": "2026-10-21T20:38:47.166Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -6572,6 +6572,21 @@
           "type": "string",
           "required": false,
           "default": ""
+        },
+        {
+          "name": "onDragStart",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onHover",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onDrop",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [],
@@ -6606,6 +6621,21 @@
           "type": "string",
           "required": false,
           "default": ""
+        },
+        {
+          "name": "onDragStart",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onHover",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onDrop",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [
@@ -6688,6 +6718,21 @@
           "type": "function",
           "required": false,
           "default": "> void = () => {}"
+        },
+        {
+          "name": "onCardDragStart",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCardHover",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCardDrop",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [

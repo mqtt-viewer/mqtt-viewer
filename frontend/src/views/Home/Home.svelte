@@ -7,10 +7,11 @@
   import Button from "@/components/Button/Button.svelte";
   import { addToast } from "@/components/Toast/Toast.svelte";
   import { buildHomeSections } from "./helpers/sections";
+  import type { GroupDrop } from "./dnd/resolve-group-drop";
 
   let search = "";
   let renamingGroupId: number | null = null;
-  // Set by drag and drop (wired up separately).
+  // Set while a card is being dragged.
   let draggingConnectionId: number | null = null;
   let dropTarget: number | "ungrouped" | null = null;
 
@@ -47,6 +48,22 @@
 
   const deleteGroup = (id: number) =>
     run("Failed to delete group", () => connectionGroups.remove(id));
+
+  const onCardHover = (drop: GroupDrop | null) =>
+    (dropTarget = drop === null ? null : (drop.groupId ?? "ungrouped"));
+
+  // Also the end of every cancelled drag (drop is null then).
+  const onCardDrop = (connectionId: number, drop: GroupDrop | null) => {
+    const current =
+      $connectionsStore.connections?.[connectionId]?.connectionDetails.groupId ??
+      null;
+    draggingConnectionId = null;
+    dropTarget = null;
+    if (drop === null || drop.groupId === current) return;
+    run("Failed to move connection", () =>
+      connectionGroups.assign(connectionId, drop.groupId)
+    );
+  };
 
   // Searching opens every section without touching the saved fold state.
   const toggleGroup = (id: number, collapsed: boolean) =>
@@ -88,6 +105,9 @@
           onRename={(name) => group && renameGroup(group.id, name)}
           onRenameEnd={() => (renamingGroupId = null)}
           onDelete={() => group && deleteGroup(group.id)}
+          onCardDragStart={(id) => (draggingConnectionId = id)}
+          {onCardHover}
+          {onCardDrop}
         />
       {/each}
       {#if isSearching && sections.length === 0}

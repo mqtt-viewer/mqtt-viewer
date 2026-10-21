@@ -5,6 +5,7 @@
   import InlineNameInput from "@/views/Connection/DataView/components/Sidebar/components/InlineNameInput.svelte";
   import HomeConnectionList from "../HomeConnectionList/HomeConnectionList.svelte";
   import type { HomeSection } from "../../helpers/sections";
+  import type { GroupDrop } from "../../dnd/resolve-group-drop";
 
   export let section: HomeSection;
   export let search = "";
@@ -19,6 +20,13 @@
   // its own rename state.
   export let onRenameEnd: () => void = () => {};
   export let onDelete: () => void = () => {};
+  // Card drag callbacks, passed through to the card grid.
+  export let onCardDragStart: (connectionId: number) => void = () => {};
+  export let onCardHover: (drop: GroupDrop | null) => void = () => {};
+  export let onCardDrop: (
+    connectionId: number,
+    drop: GroupDrop | null
+  ) => void = () => {};
 
   $: group = section.group;
   let renaming = isRenaming;
@@ -97,7 +105,13 @@
   </div>
   {#if section.open}
     {#if section.connections.length > 0}
-      <HomeConnectionList connections={section.connections} {search} />
+      <HomeConnectionList
+        connections={section.connections}
+        {search}
+        onDragStart={onCardDragStart}
+        onHover={onCardHover}
+        onDrop={onCardDrop}
+      />
     {:else}
       <div class="px-4 pb-2 text-sm text-secondary-text">
         {group ? "Drag connections here" : "Drop here to ungroup"}

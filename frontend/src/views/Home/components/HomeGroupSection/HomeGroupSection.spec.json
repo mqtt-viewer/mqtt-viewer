@@ -64,6 +64,21 @@
       "type": "function",
       "required": false,
       "default": "> void = () => {}"
+    },
+    {
+      "name": "onCardDragStart",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onCardHover",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onCardDrop",
+      "type": "function",
+      "required": false
     }
   ],
   "tokens": [

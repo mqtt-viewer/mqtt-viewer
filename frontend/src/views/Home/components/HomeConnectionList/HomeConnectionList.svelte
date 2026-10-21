@@ -1,11 +1,16 @@
 <script lang="ts">
   import type { Connection } from "@/stores/connections";
   import HomeConnectionListItem from "./HomeConnectionListItem.svelte";
+  import type { GroupDrop } from "../../dnd/resolve-group-drop";
 
   const MAX_ITEM_WIDTH = 250;
 
   export let connections: Connection[] = [];
   export let search = "";
+  export let onDragStart: (connectionId: number) => void = () => {};
+  export let onHover: (drop: GroupDrop | null) => void = () => {};
+  export let onDrop: (connectionId: number, drop: GroupDrop | null) => void =
+    () => {};
 
   let maxGridWidth = 99999;
 
@@ -21,7 +26,14 @@
     style:max-width={maxGridWidth + "px"}
   >
     {#each connections as connection}
-      <HomeConnectionListItem {connection} {search} />
+      {@const id = connection.connectionDetails.id}
+      <HomeConnectionListItem
+        {connection}
+        {search}
+        onDragStart={() => onDragStart(id)}
+        {onHover}
+        onDrop={(drop) => onDrop(id, drop)}
+      />
     {/each}
   </div>
 </div>
