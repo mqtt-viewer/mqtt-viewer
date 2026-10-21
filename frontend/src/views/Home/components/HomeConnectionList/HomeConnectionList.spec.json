@@ -17,6 +17,12 @@
       "type": "object",
       "required": false,
       "default": "[]"
+    },
+    {
+      "name": "search",
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   ],
   "tokens": [],

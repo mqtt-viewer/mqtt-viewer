@@ -1,8 +1,78 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-03T14:09:55.666Z",
+  "generatedAt": "2026-10-21T20:20:04.677Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
+    {
+      "name": "AppBarBottom",
+      "tier": "component",
+      "description": "Storybook coverage for AppBarBottom.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [
+        "secondary",
+        "secondary-text",
+        "elevation-1"
+      ],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/AppBarBottom.svelte",
+      "specPath": "src/components/AppBarBottom/AppBarBottom.spec.json",
+      "storyPath": "src/components/AppBarBottom/AppBarBottom.stories.svelte",
+      "storyId": "Components/AppBarBottom",
+      "specMissing": false
+    },
+    {
+      "name": "LicenseStatus",
+      "tier": "component",
+      "description": "Storybook coverage for LicenseStatus.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/components/LicenseStatus.svelte",
+      "specPath": "src/components/AppBarBottom/components/LicenseStatus.spec.json",
+      "storyPath": "src/components/AppBarBottom/components/LicenseStatus.stories.svelte",
+      "storyId": "Components/AppBarBottom/LicenseStatus",
+      "specMissing": false
+    },
+    {
+      "name": "MessageStats",
+      "tier": "component",
+      "description": "Storybook coverage for MessageStats.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [],
+      "tokens": [],
+      "dependencies": [],
+      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
+      "sourcePath": "src/components/AppBarBottom/components/MessageStats.svelte",
+      "specPath": "src/components/AppBarBottom/components/MessageStats.spec.json",
+      "storyPath": "src/components/AppBarBottom/components/MessageStats.stories.svelte",
+      "storyId": "Components/AppBarBottom/MessageStats",
+      "specMissing": false
+    },
     {
       "name": "AppBar",
       "tier": "component",
@@ -310,76 +380,6 @@
       "specPath": "src/components/AppBar/components/NotificationsButton.spec.json",
       "storyPath": "src/components/AppBar/components/NotificationsButton.stories.svelte",
       "storyId": "Components/AppBar/NotificationsButton",
-      "specMissing": false
-    },
-    {
-      "name": "AppBarBottom",
-      "tier": "component",
-      "description": "Storybook coverage for AppBarBottom.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [],
-      "tokens": [
-        "secondary",
-        "secondary-text",
-        "elevation-1"
-      ],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/components/AppBarBottom/AppBarBottom.svelte",
-      "specPath": "src/components/AppBarBottom/AppBarBottom.spec.json",
-      "storyPath": "src/components/AppBarBottom/AppBarBottom.stories.svelte",
-      "storyId": "Components/AppBarBottom",
-      "specMissing": false
-    },
-    {
-      "name": "LicenseStatus",
-      "tier": "component",
-      "description": "Storybook coverage for LicenseStatus.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [],
-      "tokens": [],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/components/AppBarBottom/components/LicenseStatus.svelte",
-      "specPath": "src/components/AppBarBottom/components/LicenseStatus.spec.json",
-      "storyPath": "src/components/AppBarBottom/components/LicenseStatus.stories.svelte",
-      "storyId": "Components/AppBarBottom/LicenseStatus",
-      "specMissing": false
-    },
-    {
-      "name": "MessageStats",
-      "tier": "component",
-      "description": "Storybook coverage for MessageStats.",
-      "status": "story-only",
-      "figma": {
-        "fileKey": "",
-        "nodeId": "",
-        "url": "",
-        "lastSyncedHash": null,
-        "lastSyncedAt": null
-      },
-      "props": [],
-      "tokens": [],
-      "dependencies": [],
-      "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
-      "sourcePath": "src/components/AppBarBottom/components/MessageStats.svelte",
-      "specPath": "src/components/AppBarBottom/components/MessageStats.spec.json",
-      "storyPath": "src/components/AppBarBottom/components/MessageStats.stories.svelte",
-      "storyId": "Components/AppBarBottom/MessageStats",
       "specMissing": false
     },
     {
@@ -6566,6 +6566,12 @@
           "type": "object",
           "required": false,
           "default": "[]"
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
         }
       ],
       "tokens": [],
@@ -6594,12 +6600,20 @@
           "name": "connection",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
         }
       ],
       "tokens": [
         "secondary",
         "secondary-text",
-        "elevation-1"
+        "elevation-1",
+        "search-highlight-bg",
+        "search-highlight-text"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
@@ -6607,6 +6621,90 @@
       "specPath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.spec.json",
       "storyPath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.stories.svelte",
       "storyId": "Views/Home/HomeConnectionList/HomeConnectionListItem",
+      "specMissing": false
+    },
+    {
+      "name": "HomeGroupSection",
+      "tier": "view",
+      "description": "Collapsible Home section: header with fold caret, name, count and Rename/Delete menu, then the card grid.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "section",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "isSearching",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isRenaming",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isDropTarget",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onToggle",
+          "type": "function",
+          "required": false,
+          "default": "> void = () => {}"
+        },
+        {
+          "name": "onRename",
+          "type": "function",
+          "required": false,
+          "default": "> void = () => {}"
+        },
+        {
+          "name": "onDelete",
+          "type": "function",
+          "required": false,
+          "default": "> void = () => {}"
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [
+        "HomeConnectionList",
+        "InlineNameInput",
+        "DropdownMenu",
+        "DropdownMenuItem",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. Renders from props only; the Ungrouped section (group null) has no caret or menu and is always open. data-group-drop on the root is the drag-and-drop target hook. A highlighted drop target uses bg-hovered with a ring-primary.",
+      "sourcePath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.svelte",
+      "specPath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.spec.json",
+      "storyPath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.stories.svelte",
+      "storyId": "Views/Home/HomeGroupSection",
       "specMissing": false
     },
     {
@@ -6621,7 +6719,20 @@
         "lastSyncedHash": null,
         "lastSyncedAt": null
       },
-      "props": [],
+      "props": [
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onAddGroup",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        }
+      ],
       "tokens": [],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",

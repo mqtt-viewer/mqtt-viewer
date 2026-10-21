@@ -11,11 +11,13 @@
   import ConnectionStatusCircle from "@/components/ConnectionStatusCircle/ConnectionStatusCircle.svelte";
   import { capitalizeFirstLetter } from "@/util/strings";
   import _ from "lodash";
+  import { highlightParts } from "../../helpers/highlight";
 
   let className = "";
   export { className as class };
 
   export let connection: Connection;
+  export let search = "";
 
   let onConnectionClick = async () => {
     const connectionId = connection.connectionDetails.id;
@@ -151,10 +153,16 @@
   </div>
   <div class="px-4 pb-4 relative -mt-3">
     <div class="text-lg font-bold truncate text-center">
-      {connection.connectionDetails.name}
+      {#each highlightParts(connection.connectionDetails.name, search) as part}{#if part.match}<mark
+            class="bg-search-highlight-bg text-search-highlight-text"
+            >{part.text}</mark
+          >{:else}{part.text}{/if}{/each}
     </div>
     <div class="text-secondary-text truncate">
-      {connection.connectionString}
+      {#each highlightParts(connection.connectionString, search) as part}{#if part.match}<mark
+            class="bg-search-highlight-bg text-search-highlight-text"
+            >{part.text}</mark
+          >{:else}{part.text}{/if}{/each}
     </div>
   </div>
 </Card>

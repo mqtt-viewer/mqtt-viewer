@@ -5,6 +5,7 @@
   const MAX_ITEM_WIDTH = 250;
 
   export let connections: Connection[] = [];
+  export let search = "";
 
   let maxGridWidth = 99999;
 
@@ -20,7 +21,7 @@
     style:max-width={maxGridWidth + "px"}
   >
     {#each connections as connection}
-      <HomeConnectionListItem {connection} />
+      <HomeConnectionListItem {connection} {search} />
     {/each}
   </div>
 </div>

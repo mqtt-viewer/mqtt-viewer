@@ -16,12 +16,20 @@
       "name": "connection",
       "type": "string",
       "required": true
+    },
+    {
+      "name": "search",
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   ],
   "tokens": [
     "secondary",
     "secondary-text",
-    "elevation-1"
+    "elevation-1",
+    "search-highlight-bg",
+    "search-highlight-text"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."

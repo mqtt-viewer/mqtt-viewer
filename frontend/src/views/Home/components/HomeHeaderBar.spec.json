@@ -11,7 +11,20 @@
     "lastSyncedHash": null,
     "lastSyncedAt": null
   },
-  "props": [],
+  "props": [
+    {
+      "name": "search",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "onAddGroup",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    }
+  ],
   "tokens": [],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
