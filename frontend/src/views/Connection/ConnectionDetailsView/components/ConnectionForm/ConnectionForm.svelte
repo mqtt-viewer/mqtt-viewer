@@ -210,8 +210,8 @@
       />
     </div>
   </div>
+  <!-- Membership needs no reconnect, so this stays editable while connected. -->
   <Select
-    disabled={isAllFieldsDisabled}
     onChange={onGroupChange}
     selected={groupSelected}
     label="Group"
