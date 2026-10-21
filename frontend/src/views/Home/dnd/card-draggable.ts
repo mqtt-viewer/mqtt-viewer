@@ -1,4 +1,5 @@
 import type { Action } from "svelte/action";
+import { pointInRect } from "./point-in-rect";
 import { resolveGroupDrop, type GroupDrop } from "./resolve-group-drop";
 
 // A press has to travel this far before it counts as a drag, so a click still
@@ -27,6 +28,9 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
   let startY = 0;
   let dragging = false;
   let dragId = -1;
+  // The card's box at drag start. Inside it the drag has no target, so a press
+  // near a card's edge that jitters under the floating drop zone cannot ungroup it.
+  let originRect: DOMRect | null = null;
   let ghost: HTMLElement | null = null;
 
   const makeGhost = () => {
@@ -48,7 +52,9 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
   };
 
   const dropAt = (x: number, y: number) =>
-    resolveGroupDrop(document.elementFromPoint(x, y));
+    originRect && pointInRect(x, y, originRect)
+      ? null
+      : resolveGroupDrop(document.elementFromPoint(x, y));
 
   const swallowClick = (event: MouseEvent) => {
     event.preventDefault();
@@ -119,6 +125,7 @@ export const cardDraggable: Action<HTMLElement, CardDraggableParams> = (
       }
       dragging = true;
       dragId = params.connectionId;
+      originRect = node.getBoundingClientRect();
       ghost = makeGhost();
       document.body.style.userSelect = "none";
       window.addEventListener("keydown", onKeyDown, true);
