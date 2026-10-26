@@ -151,28 +151,33 @@ describe("buildHomeSections", () => {
 describe("splitDropZone", () => {
   it("floats the drag-only empty Ungrouped section", () => {
     const sections = build([conn(1, { groupId: 1 })], [A], "", true);
-    const { zone, rest } = splitDropZone(sections);
+    const { zone, rest } = splitDropZone(sections, true);
     expect(zone?.group).toBeNull();
     expect(ids(rest)).toEqual([1]);
   });
 
   it("floats it when a search hides every Ungrouped match mid-drag", () => {
     const conns = [conn(1), conn(2, { groupId: 1, host: "192.168.1.1" })];
-    const { zone, rest } = splitDropZone(build(conns, [A], "192.168", true));
+    const { zone, rest } = splitDropZone(build(conns, [A], "192.168", true), true);
     expect(zone?.total).toBe(1);
     expect(ids(rest)).toEqual([1]);
   });
 
   it("keeps a non-empty Ungrouped section in flow", () => {
     const sections = build([conn(1), conn(2, { groupId: 1 })], [A], "", true);
-    const { zone, rest } = splitDropZone(sections);
+    const { zone, rest } = splitDropZone(sections, true);
     expect(zone).toBeNull();
     expect(rest).toBe(sections);
   });
 
   it("leaves sections alone when there is no Ungrouped section", () => {
     const sections = build([conn(1, { groupId: 1 })], [A]);
-    expect(splitDropZone(sections)).toEqual({ zone: null, rest: sections });
+    expect(splitDropZone(sections, false)).toEqual({ zone: null, rest: sections });
+  });
+
+  it("floats nothing on a fresh install when no drag is happening", () => {
+    const sections = build([], []);
+    expect(splitDropZone(sections, false)).toEqual({ zone: null, rest: sections });
   });
 });
 

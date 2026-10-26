@@ -35,11 +35,13 @@ export const ungroupedLabel = (groups: ConnectionGroup[]): string =>
 
 // The Ungrouped section that exists only as a drag-time drop zone (no cards)
 // is split off so Home can float it over the header bar instead of the list.
+// Only during a drag: a fresh install's lone empty section is not a drop zone.
 export const splitDropZone = (
-  sections: HomeSection[]
+  sections: HomeSection[],
+  isDragging: boolean
 ): { zone: HomeSection | null; rest: HomeSection[] } => {
   const [first, ...rest] = sections;
-  return first && first.group === null && first.connections.length === 0
+  return isDragging && first && first.group === null && first.connections.length === 0
     ? { zone: first, rest }
     : { zone: null, rest: sections };
 };

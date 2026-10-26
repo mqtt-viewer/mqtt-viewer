@@ -33,7 +33,7 @@
   });
 
   $: label = ungroupedLabel($connectionGroups);
-  $: ({ zone, rest } = splitDropZone(sections));
+  $: ({ zone, rest } = splitDropZone(sections, draggingConnectionId !== null));
 
   const run = async (title: string, action: () => Promise<unknown>) => {
     try {
