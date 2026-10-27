@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-10-03T14:09:55.666Z",
+  "generatedAt": "2026-10-21T21:50:19.502Z",
   "tokensRef": "src/design-system/design-tokens.json",
   "components": [
     {
@@ -6566,6 +6566,27 @@
           "type": "object",
           "required": false,
           "default": "[]"
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onDragStart",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onHover",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onDrop",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [],
@@ -6594,12 +6615,35 @@
           "name": "connection",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onDragStart",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onHover",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onDrop",
+          "type": "function",
+          "required": false
         }
       ],
       "tokens": [
         "secondary",
         "secondary-text",
-        "elevation-1"
+        "elevation-1",
+        "search-highlight-bg",
+        "search-highlight-text"
       ],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",
@@ -6607,6 +6651,123 @@
       "specPath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.spec.json",
       "storyPath": "src/views/Home/components/HomeConnectionList/HomeConnectionListItem.stories.svelte",
       "storyId": "Views/Home/HomeConnectionList/HomeConnectionListItem",
+      "specMissing": false
+    },
+    {
+      "name": "HomeGroupSection",
+      "tier": "view",
+      "description": "Collapsible Home section: header with fold caret, name, count and Rename/Delete menu, then the card grid.",
+      "status": "story-only",
+      "figma": {
+        "fileKey": "",
+        "nodeId": "",
+        "url": "",
+        "lastSyncedHash": null,
+        "lastSyncedAt": null
+      },
+      "props": [
+        {
+          "name": "section",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "isSearching",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isRenaming",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isDropTarget",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "isDropZone",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "ungroupedLabel",
+          "type": "string",
+          "required": false,
+          "default": "Ungrouped"
+        },
+        {
+          "name": "onToggle",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "onRename",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "onRenameEnd",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "onDelete",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        },
+        {
+          "name": "onCardDragStart",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCardHover",
+          "type": "function",
+          "required": false
+        },
+        {
+          "name": "onCardDrop",
+          "type": "function",
+          "required": false
+        }
+      ],
+      "tokens": [
+        "primary",
+        "secondary",
+        "white-text",
+        "emphasis",
+        "secondary-text",
+        "hovered",
+        "error"
+      ],
+      "dependencies": [
+        "HomeConnectionList",
+        "InlineNameInput",
+        "DropdownMenu",
+        "DropdownMenuItem",
+        "Icon"
+      ],
+      "notes": "Figma is not linked yet. Renders from props only; the Ungrouped section (group null, headed by ungroupedLabel) has no caret or menu and is always open. data-group-drop on the root is the drag-and-drop target hook. isDropZone renders the compact one-line Ungrouped target that Home floats over the header bar while dragging. A highlighted drop target uses bg-hovered with a ring-primary.",
+      "sourcePath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.svelte",
+      "specPath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.spec.json",
+      "storyPath": "src/views/Home/components/HomeGroupSection/HomeGroupSection.stories.svelte",
+      "storyId": "Views/Home/HomeGroupSection",
       "specMissing": false
     },
     {
@@ -6621,7 +6782,20 @@
         "lastSyncedHash": null,
         "lastSyncedAt": null
       },
-      "props": [],
+      "props": [
+        {
+          "name": "search",
+          "type": "string",
+          "required": false,
+          "default": ""
+        },
+        {
+          "name": "onAddGroup",
+          "type": "function",
+          "required": false,
+          "default": "() => {}"
+        }
+      ],
       "tokens": [],
       "dependencies": [],
       "notes": "Figma is not linked yet; this story uses local Storybook fixtures.",

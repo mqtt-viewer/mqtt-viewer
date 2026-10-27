@@ -65,6 +65,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Here's what's landed since 1.2.0. I'll tidy these notes up and give them a version when the update ships.",
     sections: [
       {
+        group: "Added",
+        title: "Connection groups and Home search",
+        body: "You can now sort connections into groups on the Home screen: create, rename, delete and fold them, then drag a card onto a group or pick one in the connection settings. A search box filters by name or host as you type and highlights the match.",
+        thanks: [
+          {
+            name: "KevinJoosten",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/203",
+          },
+        ],
+      },
+      {
         group: "Fixed",
         title: "Startup on older macOS WebKit",
         body: "I removed a hostname validation expression that could leave a blank window on older WebKit versions.",

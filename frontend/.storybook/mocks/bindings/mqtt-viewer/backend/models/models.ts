@@ -129,6 +129,7 @@ export class Connection {
   subscriptions: Subscription[] = [];
   lastConnectedAt: any = null;
   customIconSeed: any = null;
+  groupId: number | null = null;
   filterHistories: FilterHistory[] = [];
   publishHistories: PublishHistory[] = [];
 
@@ -161,6 +162,22 @@ export class CollectionCollapsedState {
 
   static createFrom(source: any = {}) {
     return new CollectionCollapsedState(source);
+  }
+
+  constructor(source: any = {}) {
+    assign(this, source);
+  }
+}
+
+export class ConnectionGroup {
+  id = 0;
+  name = "";
+  collapsed = false;
+  createdAt: any = null;
+  updatedAt: any = null;
+
+  static createFrom(source: any = {}) {
+    return new ConnectionGroup(source);
   }
 
   constructor(source: any = {}) {

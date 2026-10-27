@@ -328,6 +328,12 @@ export class Connection {
     "customIconSeed": string | null;
 
     /**
+     * Home-screen folder this connection sits in; nil means ungrouped. Only
+     * SetConnectionGroup writes it (UpdateConnection omits it).
+     */
+    "groupId": number | null;
+
+    /**
      * Opt-in verbose MQTT-library debug logging for this connection's client
      * logs. false = only always-on lifecycle/error lines are captured.
      * Non-pointer so GORM never inserts NULL into the NOT NULL column.
@@ -404,6 +410,9 @@ export class Connection {
         if (!("customIconSeed" in $$source)) {
             this["customIconSeed"] = null;
         }
+        if (!("groupId" in $$source)) {
+            this["groupId"] = null;
+        }
         if (!("debugLoggingEnabled" in $$source)) {
             this["debugLoggingEnabled"] = false;
         }
@@ -422,19 +431,60 @@ export class Connection {
      */
     static createFrom($$source: any = {}): Connection {
         const $$createField19_0 = $$createType3;
-        const $$createField23_0 = $$createType5;
-        const $$createField24_0 = $$createType7;
+        const $$createField24_0 = $$createType5;
+        const $$createField25_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("subscriptions" in $$parsedSource) {
             $$parsedSource["subscriptions"] = $$createField19_0($$parsedSource["subscriptions"]);
         }
         if ("filterHistories" in $$parsedSource) {
-            $$parsedSource["filterHistories"] = $$createField23_0($$parsedSource["filterHistories"]);
+            $$parsedSource["filterHistories"] = $$createField24_0($$parsedSource["filterHistories"]);
         }
         if ("publishHistories" in $$parsedSource) {
-            $$parsedSource["publishHistories"] = $$createField24_0($$parsedSource["publishHistories"]);
+            $$parsedSource["publishHistories"] = $$createField25_0($$parsedSource["publishHistories"]);
         }
         return new Connection($$parsedSource as Partial<Connection>);
+    }
+}
+
+/**
+ * ConnectionGroup is a user-made folder on the Home screen. Connections
+ * point at it through Connection.GroupID; nil means ungrouped.
+ */
+export class ConnectionGroup {
+    "id": number;
+    "name": string;
+    "collapsed": boolean;
+    "createdAt": string;
+    "updatedAt": string;
+
+    /** Creates a new ConnectionGroup instance. */
+    constructor($$source: Partial<ConnectionGroup> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("collapsed" in $$source)) {
+            this["collapsed"] = false;
+        }
+        if (!("createdAt" in $$source)) {
+            this["createdAt"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updatedAt" in $$source)) {
+            this["updatedAt"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ConnectionGroup instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ConnectionGroup {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ConnectionGroup($$parsedSource as Partial<ConnectionGroup>);
     }
 }
 

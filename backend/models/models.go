@@ -102,6 +102,9 @@ type Connection struct {
 	Subscriptions        []Subscription `json:"subscriptions"`
 	LastConnectedAt      *time.Time     `json:"lastConnectedAt"`
 	CustomIconSeed       *string        `json:"customIconSeed"`
+	// Home-screen folder this connection sits in; nil means ungrouped. Only
+	// SetConnectionGroup writes it (UpdateConnection omits it).
+	GroupID *uint `json:"groupId" gorm:"index:connections_group_id"`
 	// Opt-in verbose MQTT-library debug logging for this connection's client
 	// logs. false = only always-on lifecycle/error lines are captured.
 	// Non-pointer so GORM never inserts NULL into the NOT NULL column.
@@ -255,6 +258,16 @@ type PinnedTopic struct {
 type CollectionCollapsedState struct {
 	ID        uint `json:"id" gorm:"primaryKey"`
 	Collapsed bool `json:"collapsed"`
+}
+
+// ConnectionGroup is a user-made folder on the Home screen. Connections
+// point at it through Connection.GroupID; nil means ungrouped.
+type ConnectionGroup struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	Name      string    `json:"name" gorm:"not null"`
+	Collapsed bool      `json:"collapsed" gorm:"not null;default:0"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type Migration struct {

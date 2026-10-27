@@ -16,12 +16,35 @@
       "name": "connection",
       "type": "string",
       "required": true
+    },
+    {
+      "name": "search",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "onDragStart",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onHover",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onDrop",
+      "type": "function",
+      "required": false
     }
   ],
   "tokens": [
     "secondary",
     "secondary-text",
-    "elevation-1"
+    "elevation-1",
+    "search-highlight-bg",
+    "search-highlight-text"
   ],
   "dependencies": [],
   "notes": "Figma is not linked yet; this story uses local Storybook fixtures."
