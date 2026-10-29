@@ -75,6 +75,17 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
         ],
       },
+      {
+        group: "Fixed",
+        title: "Copying on macOS",
+        body: "Copy path, copy payload and copying the topic name work again. I now use the system clipboard directly, and a failed copy says so instead of claiming success.",
+        thanks: [
+          {
+            name: "SoftwareKM",
+            url: "https://github.com/mqtt-viewer/mqtt-viewer/issues/204",
+          },
+        ],
+      },
     ],
   },
   {

@@ -15,6 +15,8 @@
 
 <script lang="ts">
   import { openExternal } from "@/util/external";
+  import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
   import Dialog from "../Dialog/Dialog.svelte";
   import UpdateAvailableContent from "./UpdateAvailableContent.svelte";
   import updateStore from "@/stores/update";
@@ -135,7 +137,18 @@
     if (!update?.update_command) {
       return;
     }
-    await navigator.clipboard.writeText(update.update_command);
+    try {
+      await copyToClipboard(update.update_command);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to copy update command",
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
+      return;
+    }
     addToast({
       data: {
         title: "Copied",
