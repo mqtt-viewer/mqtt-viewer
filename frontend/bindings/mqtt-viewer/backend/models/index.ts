@@ -8,6 +8,7 @@ export {
     CollectionCollapsedState,
     CollectionMessage,
     Connection,
+    ConnectionGroup,
     FilterHistory,
     PanelSize,
     PinnedTopic,

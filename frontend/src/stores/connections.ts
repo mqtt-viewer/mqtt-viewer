@@ -416,6 +416,22 @@ const toggleShowDataPageWhileDisconnected = (
   });
 };
 
+// Mirrors a group change the backend already persisted (assign, or a group
+// delete ungrouping its members) in one store update.
+const setGroupLocally = (connectionIds: number[], groupId: number | null) => {
+  update((store) => {
+    for (const id of connectionIds) {
+      const connection = store.connections[id];
+      if (!connection) continue;
+      store.connections[id] = {
+        ...connection,
+        connectionDetails: { ...connection.connectionDetails, groupId },
+      };
+    }
+    return store;
+  });
+};
+
 export default {
   subscribe,
   init,
@@ -426,6 +442,7 @@ export default {
   acknowledgeConnectionCreated,
   requestEdit,
   acknowledgeEditRequest,
+  setGroupLocally,
   connect,
   disconnect,
 };

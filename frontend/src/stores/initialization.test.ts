@@ -27,6 +27,9 @@ vi.mock("@wailsio/runtime", () => ({
 vi.mock("./connections", () => ({
   default: { init: mocks.otherStoreInit },
 }));
+vi.mock("./connection-groups", () => ({
+  default: { init: mocks.otherStoreInit },
+}));
 vi.mock("./tabs", () => ({ default: { init: mocks.otherStoreInit } }));
 vi.mock("./subscriptions", () => ({
   default: { init: mocks.otherStoreInit },

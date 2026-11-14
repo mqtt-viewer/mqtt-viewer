@@ -148,7 +148,8 @@
 | Views/Home | [x] | [ ] | [ ] | [x] |
 | Views/Home/HomeConnectionList | [x] | [ ] | [x] | [ ] |
 | Views/Home/HomeConnectionList/HomeConnectionListItem | [x] | [ ] | [x] | [x] |
-| Views/Home/HomeHeaderBar | [x] | [ ] | [ ] | [ ] |
+| Views/Home/HomeGroupSection | [x] | [ ] | [x] | [x] |
+| Views/Home/HomeHeaderBar | [x] | [ ] | [x] | [ ] |
 | Views/NewTab | [x] | [ ] | [ ] | [x] |
 | Views/NewTab/BigAddConnectionButton | [x] | [ ] | [x] | [ ] |
 | Views/NewTab/RecentConnectionsList | [x] | [ ] | [x] | [x] |
@@ -158,7 +159,7 @@
 
 ## Summary
 
-- Components scanned: 132
-- Story present: 132
+- Components scanned: 133
+- Story present: 133
 - Figma-linked: 0
 - Missing specs: 0

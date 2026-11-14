@@ -18,9 +18,13 @@
   import { getConnectionIsValidContext } from "@/views/Connection/contexts/connection-is-valid.js";
   import IconButton from "@/components/Button/IconButton.svelte";
   import ConfirmDeleteConnectionDialog from "../ConfirmDeleteConnectionDialog/ConfirmDeleteConnectionDialog.svelte";
-  import { writable } from "svelte/store";
+  import { get, writable } from "svelte/store";
+  import type { SelectOption } from "@melt-ui/svelte";
   import Icon from "@/components/Icon/Icon.svelte";
   import SparkplugLogo from "@/components/SparkplugLogo/SparkplugLogo.svelte";
+  import connectionGroups from "@/stores/connection-groups";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import { errorMessage } from "@/util/strings";
 
   export let connection: Connection;
   $: connectionId = connection.connectionDetails.id;
@@ -67,6 +71,50 @@
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const groupLabel = (id: number | null | undefined) =>
+    id == null
+      ? "None"
+      : (get(connectionGroups).find((g) => g.id === id)?.name ?? "");
+  const groupOption = (id: number | null) => ({
+    value: id,
+    label: groupLabel(id),
+  });
+  // Owned so a failed assign can put the field back: melt has already
+  // switched the selection by the time onChange runs.
+  const groupSelected = writable<SelectOption<number | null | undefined>>(
+    groupOption(connection.connectionDetails.groupId ?? null)
+  );
+  // Follow renames (and groups that load after mount). Setting the store
+  // directly bypasses melt's onSelectedChange, so this never calls assign.
+  $: $connectionGroups,
+    (() => {
+      const current = get(groupSelected);
+      if (current && current.label !== groupLabel(current.value)) {
+        groupSelected.set(groupOption(current.value ?? null));
+      }
+    })();
+
+  // Membership is written only here, never through the felte autosave (the
+  // backend's UpdateConnection ignores group_id), so the select stays outside
+  // felte's fields.
+  const onGroupChange = async (groupId: number | null | undefined) => {
+    try {
+      await connectionGroups.assign(connectionId, groupId ?? null);
+    } catch (e) {
+      // Not in the new group after all: show the group it is still in.
+      groupSelected.set(
+        groupOption(connection.connectionDetails.groupId ?? null)
+      );
+      addToast({
+        data: {
+          title: "Failed to move connection",
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
     }
   };
 
@@ -162,6 +210,14 @@
       />
     </div>
   </div>
+  <!-- Membership needs no reconnect, so this stays editable while connected. -->
+  <Select
+    onChange={onGroupChange}
+    selected={groupSelected}
+    label="Group"
+    getOptionLabel={groupLabel}
+    options={[null, ...$connectionGroups.map((g) => g.id)]}
+  />
 
   <div class="flex gap-3 relative">
     <div class="flex relative gap-3 w-3/4">

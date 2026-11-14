@@ -1,0 +1,113 @@
+{
+  "$schema": "../../../../design-system/component-spec.schema.json",
+  "name": "HomeGroupSection",
+  "tier": "view",
+  "description": "Collapsible Home section: header with fold caret, name, count and Rename/Delete menu, then the card grid.",
+  "status": "story-only",
+  "figma": {
+    "fileKey": "",
+    "nodeId": "",
+    "url": "",
+    "lastSyncedHash": null,
+    "lastSyncedAt": null
+  },
+  "props": [
+    {
+      "name": "section",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "search",
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "isSearching",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "isRenaming",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "isDropTarget",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "isDropZone",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "ungroupedLabel",
+      "type": "string",
+      "required": false,
+      "default": "Ungrouped"
+    },
+    {
+      "name": "onToggle",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
+      "name": "onRename",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
+      "name": "onRenameEnd",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
+      "name": "onDelete",
+      "type": "function",
+      "required": false,
+      "default": "() => {}"
+    },
+    {
+      "name": "onCardDragStart",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onCardHover",
+      "type": "function",
+      "required": false
+    },
+    {
+      "name": "onCardDrop",
+      "type": "function",
+      "required": false
+    }
+  ],
+  "tokens": [
+    "primary",
+    "secondary",
+    "white-text",
+    "emphasis",
+    "secondary-text",
+    "hovered",
+    "error"
+  ],
+  "dependencies": [
+    "HomeConnectionList",
+    "InlineNameInput",
+    "DropdownMenu",
+    "DropdownMenuItem",
+    "Icon"
+  ],
+  "notes": "Figma is not linked yet. Renders from props only; the Ungrouped section (group null, headed by ungroupedLabel) has no caret or menu and is always open. data-group-drop on the root is the drag-and-drop target hook. isDropZone renders the compact one-line Ungrouped target that Home floats over the header bar while dragging. A highlighted drop target uses bg-hovered with a ring-primary."
+}

@@ -113,7 +113,11 @@ export const getComponentFiles = () =>
           filePath.endsWith(".svelte") && !filePath.endsWith(".stories.svelte")
       )
     )
-    .sort();
+    // Compare POSIX paths so Windows (`\`) sorts like Linux (`/`).
+    .sort((a, b) => {
+      const [pa, pb] = [toPosix(a), toPosix(b)];
+      return pa < pb ? -1 : pa > pb ? 1 : 0;
+    });
 
 export const componentNameFromPath = (sourcePath) =>
   path.basename(sourcePath, ".svelte");
