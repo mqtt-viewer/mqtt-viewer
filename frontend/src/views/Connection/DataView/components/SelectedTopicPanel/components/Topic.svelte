@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from "svelte";
   import Tooltip from "@/components/Tooltip/Tooltip.svelte";
+  import { addToast } from "@/components/Toast/Toast.svelte";
+  import { copyToClipboard } from "@/util/copy";
+  import { errorMessage } from "@/util/strings";
   export let topic: string;
 
   let segments: string[] = [];
@@ -107,9 +110,19 @@
   $: handleClick = async (index: number) => {
     clicked = false;
     const highlightedSegments = topic.split("/").slice(0, index + 1);
-    console.log("Highlighted segments:", highlightedSegments);
     const topicToCopy = highlightedSegments.join("/");
-    navigator.clipboard.writeText(topicToCopy);
+    try {
+      await copyToClipboard(topicToCopy);
+    } catch (e) {
+      addToast({
+        data: {
+          title: "Failed to copy topic",
+          description: errorMessage(e),
+          type: "error",
+        },
+      });
+      return;
+    }
     await tick();
     clicked = true;
     if (!!clickTimeout) {

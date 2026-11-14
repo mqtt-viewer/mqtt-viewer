@@ -1,6 +1,6 @@
 // Storybook mock for @wailsio/runtime.
 // Provides the subset of the Wails v3 runtime API used by the app:
-// Events, Browser, Window and System.
+// Events, Browser, Clipboard, Window and System.
 
 interface MockWailsEvent {
   name: string;
@@ -55,6 +55,15 @@ export const Events = {
 export const Browser = {
   async OpenURL(url: string | URL): Promise<void> {
     console.info("Storybook Browser.OpenURL", String(url));
+  },
+};
+
+export const Clipboard = {
+  async SetText(text: string): Promise<void> {
+    console.info("Storybook Clipboard.SetText", text);
+  },
+  async Text(): Promise<string> {
+    return "";
   },
 };
 
