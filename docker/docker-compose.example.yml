@@ -2,7 +2,7 @@
 #
 # Copy this file (drop the .example) and adjust the port/volume as needed:
 #   cp docker/docker-compose.example.yml docker-compose.yml
-#   docker compose -f docker/docker-compose.example.yml up -d
+#   docker compose up -d
 #
 # There is no built-in authentication in the web UI: anyone who can reach
 # the published port can see and use your saved connections, and can read
@@ -15,6 +15,7 @@
 services:
   mqtt-viewer:
     image: ghcr.io/mqtt-viewer/mqtt-viewer:latest
+    container_name: mqtt-viewer
     ports:
       # Published to this host only. To reach it from other machines on your
       # network, change this to "8080:8080" and read the security note above
