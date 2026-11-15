@@ -15,7 +15,7 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -47,7 +47,7 @@ jobs:
   # keeps a slow/flaky CI runner from blocking merges; the JSON report is
   # uploaded as an artifact so a real regression can still be spotted by eye.
   perf-graph:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     defaults:
       run:

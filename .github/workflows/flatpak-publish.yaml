@@ -35,7 +35,7 @@ jobs:
       matrix:
         build:
           - arch: amd64
-            os: ubuntu-latest
+            os: ubuntu-24.04
           - arch: arm64
             os: ubuntu-24.04-arm
     runs-on: ${{ matrix.build.os }}
@@ -117,7 +117,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Merge, sign and deploy to Pages
     permissions:
       contents: read
